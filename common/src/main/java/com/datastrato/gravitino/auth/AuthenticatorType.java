@@ -8,5 +8,6 @@ package com.datastrato.gravitino.auth;
 public enum AuthenticatorType {
   NONE,
   SIMPLE,
-  OAUTH
+  OAUTH,
+  KERBEROS
 }

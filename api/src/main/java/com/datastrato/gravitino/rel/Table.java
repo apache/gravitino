@@ -12,6 +12,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -48,6 +50,14 @@ public interface Table extends Auditable {
     return Distributions.NONE;
   }
 
+  /**
+   * @return The indexes of the table. If no indexes are specified, Indexes.EMPTY_INDEXES is
+   *     returned.
+   */
+  default Index[] index() {
+    return Indexes.EMPTY_INDEXES;
+  }
+
   /** @return The comment of the table. Null is returned if no comment is set. */
   @Nullable
   default String comment() {
@@ -57,5 +67,16 @@ public interface Table extends Auditable {
   /** @return The properties of the table. Empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * Table method for working with partitions. If the table does not support partition operations,
+   * an {@link UnsupportedOperationException} is thrown.
+   *
+   * @return The partition support table.
+   * @throws UnsupportedOperationException If the table does not support partition operations.
+   */
+  default SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Table does not support partition operations.");
   }
 }

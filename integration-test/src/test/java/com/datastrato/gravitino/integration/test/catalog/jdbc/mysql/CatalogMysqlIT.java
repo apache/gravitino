@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -31,6 +32,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -50,39 +53,45 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
+@TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
-
-  public static String schema_comment = "schema_comment";
-  public static String MYSQL_COL_NAME1 = "mysql_col_name1";
-  public static String MYSQL_COL_NAME2 = "mysql_col_name2";
-  public static String MYSQL_COL_NAME3 = "mysql_col_name3";
+  private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  private static final String provider = "jdbc-mysql";
 
-  private static GravitinoMetaLake metalake;
+  public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
+  public String alertTableName = "alert_table_name";
+  public String table_comment = "table_comment";
 
-  private static Catalog catalog;
+  public String schema_comment = "schema_comment";
+  public String MYSQL_COL_NAME1 = "mysql_col_name1";
+  public String MYSQL_COL_NAME2 = "mysql_col_name2";
+  public String MYSQL_COL_NAME3 = "mysql_col_name3";
 
-  private static MysqlService mysqlService;
+  private GravitinoMetaLake metalake;
 
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private Catalog catalog;
 
-  protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
+  private MysqlService mysqlService;
 
-  public static final String mysqlImageName = "mysql:8.0";
+  private MySQLContainer<?> MYSQL_CONTAINER;
+
+  protected final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
+
+  public static final String defaultMysqlImageName = "mysql:8.0";
+
+  protected String mysqlImageName = defaultMysqlImageName;
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
@@ -103,7 +112,7 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     mysqlService.close();
@@ -116,16 +125,16 @@ public class CatalogMysqlIT extends AbstractIT {
     createSchema();
   }
 
-  private static void clearTableAndSchema() {
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().purgeTable(nameIdentifier);
+      catalog.asTableCatalog().dropTable(nameIdentifier);
     }
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
 
@@ -137,7 +146,7 @@ public class CatalogMysqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
@@ -161,7 +170,7 @@ public class CatalogMysqlIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
 
@@ -195,6 +204,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
+    properties.put(GRAVITINO_ENGINE_KEY, "InnoDB");
     return properties;
   }
 
@@ -560,5 +570,105 @@ public class CatalogMysqlIT extends AbstractIT {
             catalog
                 .asSchemas()
                 .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
+  }
+
+  @Test
+  void testCreateTableIndex() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
+          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_2"}, {"col_3"}, {"col_4"}}),
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
+
+    IllegalArgumentException illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in MySQL"));
+
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in MySQL"));
+
+    table =
+        tableCatalog.createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, "test_null_key"),
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[] {
+              Indexes.of(
+                  Index.IndexType.UNIQUE_KEY,
+                  null,
+                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+            });
+    Assertions.assertEquals(2, table.index().length);
+    Assertions.assertNotNull(table.index()[0].name());
+    Assertions.assertNotNull(table.index()[1].name());
   }
 }

@@ -13,7 +13,15 @@ public class Distributions {
 
   // NONE is used to indicate that there is no distribution.
   public static final Distribution NONE =
+      new DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION);
+
+  // List bucketing strategy hash, TODO: #1505 Separate the bucket number from the Distribution.
+  public static final Distribution HASH =
       new DistributionImpl(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION);
+
+  // List bucketing strategy range, TODO: #1505 Separate the bucket number from the Distribution.
+  public static final Distribution RANGE =
+      new DistributionImpl(Strategy.RANGE, 0, Expression.EMPTY_EXPRESSION);
 
   /**
    * Create a distribution by evenly distributing the data across the number of buckets.

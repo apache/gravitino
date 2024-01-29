@@ -14,17 +14,17 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.dto.rel.partitions.BucketPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.FunctionPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.HourPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.ListPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.MonthPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.FunctionPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.HourPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.MonthPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
@@ -47,7 +47,7 @@ public class TestDTOJsonSerDe {
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
   private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
+      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}";
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";
@@ -271,6 +271,7 @@ public class TestDTOJsonSerDe {
                 column.autoIncrement()),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null),
+            null,
             null,
             null,
             null);

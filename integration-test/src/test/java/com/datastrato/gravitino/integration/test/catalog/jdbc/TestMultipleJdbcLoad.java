@@ -60,13 +60,13 @@ public class TestMultipleJdbcLoad extends AbstractIT {
           CatalogMysqlIT.DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString(), icebergLibsPath.toString());
     }
     mySQLContainer =
-        new MySQLContainer<>(CatalogMysqlIT.mysqlImageName)
+        new MySQLContainer<>(CatalogMysqlIT.defaultMysqlImageName)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
     mySQLContainer.start();
     postgreSQLContainer =
-        new PostgreSQLContainer<>(CatalogPostgreSqlIT.POSTGRES_IMAGE)
+        new PostgreSQLContainer<>(CatalogPostgreSqlIT.DEFAULT_POSTGRES_IMAGE)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
@@ -122,7 +122,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
         postgreSqlCatalog
             .asSchemas()
             .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
-    Assertions.assertNotEquals(0, nameIdentifiers.length);
+    Assertions.assertEquals(0, nameIdentifiers.length);
 
     String schemaName = GravitinoITUtils.genRandomName("it_schema");
     mysqlCatalog

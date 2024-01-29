@@ -43,46 +43,50 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.datanucleus.util.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
+@TestInstance(Lifecycle.PER_CLASS)
 public class CatalogPostgreSqlIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("postgresql_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("postgresql_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
-
-  public static String schema_comment = "schema_comment";
-
-  public static String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
-  public static String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
-  public static String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
+  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
-  private static final String provider = "jdbc-postgresql";
 
-  private static GravitinoMetaLake metalake;
+  public String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("postgresql_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("postgresql_it_table");
+  public String alertTableName = "alert_table_name";
+  public String table_comment = "table_comment";
+  public String schema_comment = "schema_comment";
+  public String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
+  public String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
+  public String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
+  private final String provider = "jdbc-postgresql";
 
-  private static Catalog catalog;
+  private GravitinoMetaLake metalake;
 
-  private static PostgreSqlService postgreSqlService;
+  private Catalog catalog;
 
-  private static PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
+  private PostgreSqlService postgreSqlService;
 
-  protected static final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
+  private PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
 
-  public static final String POSTGRES_IMAGE = "postgres:13";
+  protected final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
+
+  protected String postgreImageName = DEFAULT_POSTGRES_IMAGE;
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
@@ -91,7 +95,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
 
     POSTGRESQL_CONTAINER =
-        new PostgreSQLContainer<>(POSTGRES_IMAGE)
+        new PostgreSQLContainer<>(postgreImageName)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
@@ -103,7 +107,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     postgreSqlService.close();
@@ -116,16 +120,16 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     createSchema();
   }
 
-  private static void clearTableAndSchema() {
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().purgeTable(nameIdentifier);
+      catalog.asTableCatalog().dropTable(nameIdentifier);
     }
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
 
@@ -137,7 +141,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     try {
@@ -166,7 +170,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
     Schema createdSchema =
@@ -522,5 +526,30 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         () -> {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
+  }
+
+  @Test
+  void testCreateAndLoadSchema() {
+    String testSchemaName = "test";
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+
+    Schema schema = catalog.asSchemas().createSchema(ident, "comment", null);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    Assertions.assertEquals("comment", schema.comment());
+    schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    Assertions.assertEquals("comment", schema.comment());
+
+    // test null comment
+    testSchemaName = "test2";
+    ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+
+    schema = catalog.asSchemas().createSchema(ident, null, null);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    // todo: Gravitino put id to comment, makes comment is empty string not null.
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
   }
 }

@@ -24,6 +24,7 @@ import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -98,6 +99,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithFilesetOps(ThrowableFunction<FilesetCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asFilesets() == null) {
+              throw new UnsupportedOperationException(
+                  "Catalog does not support fileset operations");
+            }
+            return fn.apply(asFilesets());
+          });
+    }
+
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
@@ -126,6 +138,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     private TableCatalog asTables() {
       return catalog.ops() instanceof TableCatalog ? (TableCatalog) catalog.ops() : null;
+    }
+
+    private FilesetCatalog asFilesets() {
+      return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
     }
   }
 
@@ -261,7 +277,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withComment(comment)
             .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -364,7 +380,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withComment(catalog.getComment());
 
                 AuditInfo newInfo =
-                    new AuditInfo.Builder()
+                    AuditInfo.builder()
                         .withCreator(catalog.auditInfo().creator())
                         .withCreateTime(catalog.auditInfo().createTime())
                         .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())

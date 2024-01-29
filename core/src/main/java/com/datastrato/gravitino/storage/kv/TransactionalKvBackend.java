@@ -28,4 +28,11 @@ public interface TransactionalKvBackend extends KvBackend {
 
   /** Close the current transaction. */
   void closeTransaction();
+
+  /**
+   * Check whether the backend is in transaction in the current thread.
+   *
+   * @return true if the backend is in transaction in the current thread
+   */
+  boolean inTransaction();
 }

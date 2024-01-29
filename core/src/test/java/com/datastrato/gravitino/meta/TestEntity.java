@@ -18,7 +18,7 @@ public class TestEntity {
 
   private final SchemaVersion version = SchemaVersion.V_0_1;
   private final AuditInfo auditInfo =
-      new AuditInfo.Builder().withCreator("test").withCreateTime(now).build();
+      AuditInfo.builder().withCreator("test").withCreateTime(now).build();
 
   // Metalake test data
   private final Long metalakeId = 1L;
@@ -136,6 +136,7 @@ public class TestEntity {
             .withName(fileName)
             .withAuditInfo(auditInfo)
             .withFilesetType(Fileset.Type.MANAGED)
+            .withStorageLocation("testLocation")
             .withProperties(map)
             .build();
 
@@ -146,6 +147,7 @@ public class TestEntity {
     Assertions.assertEquals(Fileset.Type.MANAGED, fields.get(FilesetEntity.TYPE));
     Assertions.assertEquals(map, fields.get(FilesetEntity.PROPERTIES));
     Assertions.assertNull(fields.get(FilesetEntity.COMMENT));
+    Assertions.assertEquals("testLocation", fields.get(FilesetEntity.STORAGE_LOCATION));
 
     FilesetEntity testFile1 =
         new FilesetEntity.Builder()
@@ -153,12 +155,11 @@ public class TestEntity {
             .withName(fileName)
             .withAuditInfo(auditInfo)
             .withFilesetType(Fileset.Type.MANAGED)
-            .withProperties(map)
             .withComment("testComment")
             .withStorageLocation("testLocation")
             .build();
     Assertions.assertEquals("testComment", testFile1.comment());
-    Assertions.assertEquals("testLocation", testFile1.storageLocation());
+    Assertions.assertNull(testFile1.properties());
 
     Throwable exception =
         Assertions.assertThrows(
@@ -173,7 +174,6 @@ public class TestEntity {
                   .withComment("testComment")
                   .build();
             });
-    Assertions.assertEquals(
-        "Storage location is required for EXTERNAL fileset.", exception.getMessage());
+    Assertions.assertEquals("Field storage_location is required", exception.getMessage());
   }
 }

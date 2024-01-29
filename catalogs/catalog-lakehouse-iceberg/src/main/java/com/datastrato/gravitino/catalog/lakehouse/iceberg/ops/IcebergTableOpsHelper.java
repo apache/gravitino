@@ -28,9 +28,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
@@ -307,12 +305,6 @@ public class IcebergTableOpsHelper {
     }
 
     return icebergTableChange;
-  }
-
-  public static Map<String, String> removeReservedProperties(Map<String, String> createProperties) {
-    return createProperties.entrySet().stream()
-        .filter(entry -> !IcebergReservedProperties.contains(entry.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   /**

@@ -16,6 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -225,7 +226,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning) {
+      Transform[] partitioning,
+      Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException(
           "Currently we do not support Partitioning in PostgreSQL");
@@ -327,13 +329,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    throw new UnsupportedOperationException(
-        "PostgreSQL does not support drop operation in Gravitino, please use purge operation");
+    return "DROP TABLE " + tableName;
   }
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    throw new UnsupportedOperationException(
+        "PostgreSQL does not support purge table in Gravitino, please use drop table");
   }
 
   @Override

@@ -8,7 +8,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -57,20 +58,12 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("partitioning")
   private final Partitioning[] partitioning;
 
-  public TableCreateRequest() {
-    this(null, null, null, null, null, null, null);
-  }
+  @Nullable
+  @JsonProperty("indexes")
+  private final IndexDTO[] indexes;
 
-  public TableCreateRequest(
-      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
-    this(
-        name,
-        comment,
-        columns,
-        properties,
-        new SortOrderDTO[0],
-        DistributionDTO.NONE,
-        new Partitioning[0]);
+  public TableCreateRequest() {
+    this(null, null, null, null, null, null, null, null);
   }
 
   public TableCreateRequest(
@@ -80,7 +73,8 @@ public class TableCreateRequest implements RESTRequest {
       @Nullable Map<String, String> properties,
       @Nullable SortOrderDTO[] sortOrders,
       @Nullable DistributionDTO distribution,
-      @Nullable Partitioning[] partitioning) {
+      @Nullable Partitioning[] partitioning,
+      @Nullable IndexDTO[] indexes) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
@@ -88,6 +82,7 @@ public class TableCreateRequest implements RESTRequest {
     this.sortOrders = sortOrders;
     this.distribution = distribution;
     this.partitioning = partitioning;
+    this.indexes = indexes;
   }
 
   @Override
@@ -122,5 +117,15 @@ public class TableCreateRequest implements RESTRequest {
         autoIncrementCols.size() <= 1,
         "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
             + autoIncrementColsStr);
+
+    if (indexes != null && indexes.length > 0) {
+      Arrays.stream(indexes)
+          .forEach(
+              index -> {
+                Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0, "Index field names cannot be null");
+              });
+    }
   }
 }

@@ -18,7 +18,7 @@ public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
   @BeforeAll
   public static void startup() {
     CONTAINER =
-        new MySQLContainer<>(CatalogMysqlIT.mysqlImageName)
+        new MySQLContainer<>(CatalogMysqlIT.defaultMysqlImageName)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
