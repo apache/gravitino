@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.web.rest;
 
 import static com.datastrato.gravitino.server.auth.KerberosConfig.KEYTAB;
 import static com.datastrato.gravitino.server.auth.KerberosConfig.PRINCIPAL;
+import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoVersion;
@@ -20,15 +21,24 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 public class KerberosOperationsIT extends AbstractIT {
 
-  private static final KerberosSecurityTestcase kdc = new KerberosSecurityTestcase();
+  private static final KerberosSecurityTestcase kdc =
+      new KerberosSecurityTestcase() {
+        @Override
+        public void createMiniKdcConf() {
+          super.createMiniKdcConf();
+          getConf().setProperty(MAX_TICKET_LIFETIME, "5");
+        }
+      };
 
   private static final String keytabFile =
       new File(System.getProperty("test.dir", "target"), UUID.randomUUID().toString())
@@ -75,6 +85,12 @@ public class KerberosOperationsIT extends AbstractIT {
       final String gitCommitId = readGitCommitIdFromGitFile();
       Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
     }
+
+    // Test to re-login with the keytab
+    Uninterruptibles.sleepUninterruptibly(6, TimeUnit.SECONDS);
+    client.getVersion();
+    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
+    Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
   }
 
   private static void initKeyTab() throws Exception {
