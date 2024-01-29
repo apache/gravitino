@@ -174,5 +174,6 @@ public class TestPartitionOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+    Assertions.assertTrue(errorResp2.getMessage().contains("test exception"));
   }
 }

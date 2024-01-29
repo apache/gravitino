@@ -60,8 +60,7 @@ public class ExceptionHandlers {
     public Response handle(OperationType op, String partition, String table, Exception e) {
       String formatted = StringUtil.isBlank(partition) ? "" : " [" + partition + "]";
       String errorMsg =
-          String.format(
-              PARTITION_MSG_TEMPLATE, formatted, op.name(), table, e.getClass().getSimpleName());
+          String.format(PARTITION_MSG_TEMPLATE, formatted, op.name(), table, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
