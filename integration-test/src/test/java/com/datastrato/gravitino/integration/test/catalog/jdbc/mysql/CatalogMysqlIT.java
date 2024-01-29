@@ -625,10 +625,26 @@ public class CatalogMysqlIT extends AbstractIT {
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
                   new SortOrder[0],
-                  new Index[] {
-                    Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}}),
-                    Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})
-                  });
+                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in MySQL"));
+
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
             });
     Assertions.assertTrue(
         StringUtils.contains(
