@@ -39,6 +39,9 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
             }
           });
 
+  private static final String GET_SCHEMA_COMMENT_SQL_FORMAT =
+      "SELECT obj_description('%s'::regnamespace) as comment";
+
   private String database;
 
   @Override
@@ -61,8 +64,10 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
             throw new NoSuchSchemaException("No such schema: " + schema);
           }
           String schemaName = resultSet.getString(1);
+          String comment = getSchemaComment(schema, connection);
           return new JdbcSchema.Builder()
               .withName(schemaName)
+              .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)
               .withProperties(Collections.emptyMap())
               .build();
@@ -134,5 +139,21 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   protected boolean isSystemDatabase(String dbName) {
     return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
+  }
+
+  private String getShowSchemaCommentSql(String schema) {
+    return String.format(GET_SCHEMA_COMMENT_SQL_FORMAT, schema);
+  }
+
+  private String getSchemaComment(String schema, Connection connection) throws SQLException {
+    try (PreparedStatement preparedStatement =
+        connection.prepareStatement(getShowSchemaCommentSql(schema))) {
+      try (ResultSet resultSet = preparedStatement.executeQuery()) {
+        if (resultSet.next()) {
+          return resultSet.getString("comment");
+        }
+      }
+    }
+    return null;
   }
 }

@@ -44,7 +44,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       localStorage.removeItem('accessToken')
       localStorage.removeItem('version')
 
-      Router().replace('/login')
+      Router().push('/ui/login')
 
       break
     case 403:

@@ -83,7 +83,7 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
         new BaseMetalake.Builder()
             .withName(metalakeName)
@@ -124,8 +124,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "v1"))
-            .withAuditInfo(
-                new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build())
+            .withAuditInfo(AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build())
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
@@ -167,7 +166,7 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
         new BaseMetalake.Builder()
             .withName(metalakeName)
@@ -242,7 +241,7 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
         new BaseMetalake.Builder()
             .withName(metalakeName)

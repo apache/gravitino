@@ -32,7 +32,11 @@ public final class AuditInfo implements Audit, Entity {
       Field.optional(
           "last_modified_time", Instant.class, "The time when the entity was last modified");
 
-  public static final AuditInfo EMPTY = new AuditInfo.Builder().build();
+  public static final AuditInfo EMPTY = AuditInfo.builder().build();
+
+  public static Builder builder() {
+    return new Builder();
+  }
 
   @Nullable private String creator;
 
@@ -153,7 +157,7 @@ public final class AuditInfo implements Audit, Entity {
     private AuditInfo auditInfo;
 
     /** Constructs a new {@link Builder}. */
-    public Builder() {
+    private Builder() {
       this.auditInfo = new AuditInfo();
     }
 
