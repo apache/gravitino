@@ -277,7 +277,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
           dataProvider.setHost(new URI(uri).getHost());
         }
       } catch (URISyntaxException ue) {
-        throw new IllegalArgumentException("Uri has the wrong format", ue);
+        throw new IllegalArgumentException("URI has the wrong format", ue);
       }
       this.authDataProvider = dataProvider;
       return this;

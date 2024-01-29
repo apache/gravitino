@@ -113,7 +113,7 @@ public class KerberosAuthenticator implements Authenticator {
     try {
       String serverPrincipal = KerberosServerUtils.getTokenServerName(clientToken);
       if (!serverPrincipal.startsWith("HTTP/")) {
-        throw new IllegalArgumentException("Principal must starts with `HTTP/`");
+        throw new IllegalArgumentException("Principal must start with `HTTP/`");
       }
 
       return Subject.doAs(
