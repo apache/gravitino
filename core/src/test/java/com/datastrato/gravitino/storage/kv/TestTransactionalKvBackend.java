@@ -819,4 +819,14 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bc", new String(data.get(0).getKey()));
     Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
   }
+
+  @Test
+  void testRevertByte() {
+    byte[] bytes = {0x01, 0x02, 0x03, 0x04};
+    byte[] copy = ArrayUtils.clone(bytes);
+    byte[] revertBytes = TransactionalKvBackendImpl.revertByteArray(bytes);
+    Assertions.assertArrayEquals(copy, bytes);
+    revertBytes = TransactionalKvBackendImpl.revertByteArray(revertBytes);
+    Assertions.assertArrayEquals(bytes, revertBytes);
+  }
 }

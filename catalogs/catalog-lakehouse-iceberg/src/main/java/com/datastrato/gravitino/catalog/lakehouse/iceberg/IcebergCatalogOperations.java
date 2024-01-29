@@ -27,7 +27,6 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -168,7 +167,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withComment(comment)
               .withProperties(properties)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(currentUser)
                       .withCreateTime(Instant.now())
                       .build())
@@ -487,10 +486,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
     try {
-      if (!Distributions.NONE.equals(distribution)) {
-        throw new UnsupportedOperationException("Iceberg does not support distribution");
-      }
-
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Iceberg schema (database) does not exist: {}", schemaIdent);
@@ -523,9 +518,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withPartitioning(partitioning)
               .withSortOrders(sortOrders)
               .withProperties(properties)
-              .withDistribution(Distributions.NONE)
+              .withDistribution(distribution)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(currentUser())
                       .withCreateTime(Instant.now())
                       .build())

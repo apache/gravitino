@@ -327,13 +327,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    throw new UnsupportedOperationException(
-        "PostgreSQL does not support drop operation in Gravitino, please use purge operation");
+    return "DROP TABLE " + tableName;
   }
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    throw new UnsupportedOperationException(
+        "PostgreSQL does not support purge table in Gravitino, please use drop table");
   }
 
   @Override

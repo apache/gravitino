@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
+
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
@@ -11,10 +13,18 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergPar
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergSortOrder;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -44,6 +54,8 @@ public class IcebergTable extends BaseTable {
 
   public CreateTableRequest toCreateTableRequest() {
     Schema schema = ConvertUtil.toIcebergSchema(this);
+    properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
+    properties.put(DISTRIBUTION_MODE, transformDistribution(distribution));
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)
@@ -56,6 +68,39 @@ public class IcebergTable extends BaseTable {
   }
 
   /**
+   * Transforms the gravitino distribution to the distribution mode name of the Iceberg table.
+   *
+   * @param distribution The distribution of the table.
+   * @return The distribution mode name of the iceberg table.
+   */
+  @VisibleForTesting
+  String transformDistribution(Distribution distribution) {
+    switch (distribution.strategy()) {
+      case HASH:
+        Preconditions.checkArgument(
+            ArrayUtils.isEmpty(distribution.expressions()),
+            "Iceberg's Distribution Mode.HASH does not support set expressions.");
+        Preconditions.checkArgument(
+            ArrayUtils.isNotEmpty(partitioning),
+            "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty.");
+        return DistributionMode.HASH.modeName();
+      case RANGE:
+        Preconditions.checkArgument(
+            ArrayUtils.isEmpty(distribution.expressions()),
+            "Iceberg's Distribution Mode.RANGE not support set expressions.");
+        Preconditions.checkArgument(
+            ArrayUtils.isNotEmpty(partitioning) || ArrayUtils.isNotEmpty(sortOrders),
+            "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty.");
+        return DistributionMode.RANGE.modeName();
+      case NONE:
+        return DistributionMode.NONE.modeName();
+      default:
+        throw new IllegalArgumentException(
+            "Iceberg unsupported distribution strategy: " + distribution.strategy());
+    }
+  }
+
+  /**
    * Creates a new IcebergTable instance from a Table and a Builder.
    *
    * @param table The inner Table representing the IcebergTable.
@@ -64,8 +109,24 @@ public class IcebergTable extends BaseTable {
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
     Map<String, String> properties = table.properties();
-
     Schema schema = table.schema();
+    Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
+    SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
+    Distribution distribution = Distributions.NONE;
+    String distributionName = properties.get(DISTRIBUTION_MODE);
+    if (null != distributionName) {
+      switch (DistributionMode.fromName(distributionName)) {
+        case HASH:
+          distribution = Distributions.HASH;
+          break;
+        case RANGE:
+          distribution = Distributions.RANGE;
+          break;
+        default:
+          // do nothing
+          break;
+      }
+    }
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
     return new IcebergTable.Builder()
@@ -75,8 +136,9 @@ public class IcebergTable extends BaseTable {
         .withColumns(icebergColumns)
         .withName(tableName)
         .withAuditInfo(AuditInfo.EMPTY)
-        .withPartitioning(FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema))
-        .withSortOrders(FromIcebergSortOrder.fromSortOrder(table.sortOrder()))
+        .withPartitioning(partitionSpec)
+        .withSortOrders(sortOrder)
+        .withDistribution(distribution)
         .build();
   }
 
@@ -110,6 +172,7 @@ public class IcebergTable extends BaseTable {
         icebergTable.location = icebergTable.properties.get(PROP_LOCATION);
       }
       icebergTable.partitioning = partitioning;
+      icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);

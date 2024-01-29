@@ -43,11 +43,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -84,18 +86,21 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param jdbcTypeConverter The type converter to be used by the operations.
    * @param databaseOperation The database operations to be used by the operations.
    * @param tableOperation The table operations to be used by the operations.
+   * @param jdbcTablePropertiesMetadata The table properties metadata to be used by the operations.
    */
   public JdbcCatalogOperations(
       CatalogEntity entity,
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
-      JdbcTableOperations tableOperation) {
+      JdbcTableOperations tableOperation,
+      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata) {
     this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
     this.tableOperation = tableOperation;
+    this.jdbcTablePropertiesMetadata = jdbcTablePropertiesMetadata;
   }
 
   /**
@@ -120,7 +125,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
     this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
-    this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
 
@@ -179,10 +183,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(resultProperties)
         .withComment(comment)
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -204,12 +205,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcSchema.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
-        .withProperties(properties)
+        .withProperties(StringIdentifier.newPropertiesWithId(id, properties))
         .build();
   }
 
@@ -276,7 +276,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       return load;
     }
     Map<String, String> properties =
-        load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
+        load.properties() == null
+            ? Maps.newHashMap()
+            : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
     properties = StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcTable.Builder()
         .withAuditInfo(load.auditInfo())
@@ -372,8 +374,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
             "The gravitino id attribute does not exist in properties");
     // The properties we write to the database do not require the id field, so it needs to be
     // removed.
-    HashMap<String, String> resultProperties = Maps.newHashMap(properties);
-    resultProperties.remove(StringIdentifier.ID_KEY);
+    HashMap<String, String> resultProperties =
+        Maps.newHashMap(jdbcTablePropertiesMetadata.transformToJdbcProperties(properties));
     JdbcColumn[] jdbcColumns =
         Arrays.stream(columns)
             .map(
@@ -398,14 +400,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     return new JdbcTable.Builder()
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)
         .withColumns(columns)
         .withComment(comment)
-        .withProperties(properties)
+        .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
         .build();
   }
@@ -443,8 +442,36 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private Table internalAlterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.alterTable(databaseName, tableIdent.name(), changes);
+    TableChange[] resultChanges = replaceJdbcProperties(changes);
+    tableOperation.alterTable(databaseName, tableIdent.name(), resultChanges);
     return loadTable(tableIdent);
+  }
+
+  private TableChange[] replaceJdbcProperties(TableChange[] changes) {
+    // Replace jdbc properties
+    return Arrays.stream(changes)
+        .flatMap(
+            tableChange -> {
+              if (tableChange instanceof TableChange.SetProperty) {
+                TableChange.SetProperty setProperty = (TableChange.SetProperty) tableChange;
+                Map<String, String> jdbcProperties =
+                    jdbcTablePropertiesMetadata.transformToJdbcProperties(
+                        Collections.singletonMap(
+                            setProperty.getProperty(), setProperty.getValue()));
+                return jdbcProperties.entrySet().stream()
+                    .map(entry -> TableChange.setProperty(entry.getKey(), entry.getValue()));
+              } else if (tableChange instanceof TableChange.RemoveProperty) {
+                TableChange.RemoveProperty removeProperty =
+                    (TableChange.RemoveProperty) tableChange;
+                Map<String, String> jdbcProperties =
+                    jdbcTablePropertiesMetadata.transformToJdbcProperties(
+                        Collections.singletonMap(removeProperty.getProperty(), null));
+                return jdbcProperties.keySet().stream().map(TableChange::removeProperty);
+              } else {
+                return Stream.of(tableChange);
+              }
+            })
+        .toArray(TableChange[]::new);
   }
 
   // TODO. We should figure out a better way to get the current user from servlet container.
