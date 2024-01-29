@@ -348,7 +348,7 @@ public class TestLockManager {
 
     CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
     // Can 2000 times ensure that the test is correct?
-    for (int t = 0; t < 2000; t++) {
+    for (int t = 0; t < 10000; t++) {
       for (int i = 0; i < 10; i++) {
         service.submit(
             () -> {
@@ -448,9 +448,15 @@ public class TestLockManager {
       service.submit(
           () -> {
             TreeLock treeLock;
-            for (int j = 0; j < 1000; j++) {
+            for (int j = 0; j < 10000; j++) {
               NameIdentifier nameIdentifier = completeRandomNameIdentifier();
               treeLock = lockManager.createTreeLock(nameIdentifier);
+              treeLock.lock(LockType.READ);
+              try {
+                //
+              } finally {
+                treeLock.unlock();
+              }
             }
             return 0;
           });
@@ -460,6 +466,13 @@ public class TestLockManager {
       service.take().get();
     }
 
-    Assertions.assertEquals(10 * 1000 * 4 + 1, lockManager.totalNodeCount.get());
+    Assertions.assertEquals(10 * 10000 * 4 + 1, lockManager.totalNodeCount.get());
+
+    // Pay attention to the lockCleaner thread.
+    lockManager
+        .treeLockRootNode
+        .getAllChildren()
+        .forEach(node -> lockManager.evictStaleNodes(node, lockManager.treeLockRootNode));
+    Assertions.assertEquals(1, lockManager.totalNodeCount.get());
   }
 }

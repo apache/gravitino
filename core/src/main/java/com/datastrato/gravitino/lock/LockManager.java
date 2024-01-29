@@ -43,14 +43,15 @@ public class LockManager {
 
     lockCleaner.scheduleAtFixedRate(
         () -> {
-          if (totalNodeCount.getAndIncrement() > MAX_TREE_NODE_IN_MEMORY) {
-            LOG.info("Total node count is {}", totalNodeCount.get());
+          long nodeCount = totalNodeCount.get();
+          LOG.info("Total tree lock node count: {}", nodeCount);
+          if (nodeCount > MAX_TREE_NODE_IN_MEMORY) {
             treeLockRootNode
                 .getAllChildren()
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));
           }
         },
-        1,
+        120,
         5,
         TimeUnit.SECONDS);
   }
