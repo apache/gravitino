@@ -42,7 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -56,10 +56,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -94,7 +93,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
   private ScheduledThreadPoolExecutor refreshScheduledExecutor;
-
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -149,29 +147,58 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
     UserGroupInformation.setConfiguration(hadoopConf);
 
-
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        // todo: check blank
-        String keyTab = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB);
-        String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.PRINCIPAL);
-        String krb5Conf = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KRB5_CONF);
-        FileUtils.writeByteArrayToFile(new File("/tmp/krb5.conf"), Base64.getDecoder().decode(krb5Conf));
-        FileUtils.writeByteArrayToFile(new File("/tmp/keytab"), Base64.getDecoder().decode(keyTab));
-        // todo: separate class loader for system properties
-        System.setProperty("java.security.krb5.conf", "/tmp/krb5.conf");
+        File keyTabFile = new File(String.format("/tmp/%s-keytab", entity.id()));
+        File krb5ConfFile = new File(String.format("/tmp/%s-krb5.conf", entity.id()));
+
+        String keyTab =
+            (String)
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB);
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(keyTab), "If you use Kerberos, key tab can't be blank");
+
+        String principal =
+            (String)
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.PRINCIPAL);
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
+
+        String krb5Conf =
+            (String)
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KRB5_CONF);
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(krb5Conf), "If you use Kerberos, krb5-conf can't be blank");
+
+        FileUtils.writeByteArrayToFile(krb5ConfFile, Base64.getDecoder().decode(krb5Conf));
+        FileUtils.writeByteArrayToFile(keyTabFile, Base64.getDecoder().decode(keyTab));
+
+        // TODO: set separate property for every classloader
+        System.setProperty("java.security.krb5.conf", krb5ConfFile.getAbsolutePath());
+
         refreshScheduledExecutor =
-                new ScheduledThreadPoolExecutor(1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.nameIdentifier())));
-        UserGroupInformation loginUgi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, "/tmp/keytab");
+            new ScheduledThreadPoolExecutor(
+                1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.nameIdentifier())));
+
+        UserGroupInformation loginUgi =
+            UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+                principal, keyTabFile.getAbsolutePath());
+
+        // TODO: Add the document for this pull request
+        // TODO: Add a new parameter
         refreshScheduledExecutor.scheduleAtFixedRate(
-                () -> {
-                  try {
-                    loginUgi.checkTGTAndReloginFromKeytab();
-                  } catch (Throwable throwable) {
-                    LOG.error("Fail to refresh ugi token: ", throwable);
-                  }
-                }, 5, 5, TimeUnit.SECONDS);
+            () -> {
+              try {
+                loginUgi.checkTGTAndReloginFromKeytab();
+              } catch (Throwable throwable) {
+                LOG.error("Fail to refresh ugi token: ", throwable);
+              }
+            },
+            5,
+            5,
+            TimeUnit.SECONDS);
+
       } catch (IOException ioe) {
         throw new UncheckedIOException(ioe);
       }
@@ -183,12 +210,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting
   int getClientPoolSize(Map<String, String> conf) {
-    return (int) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE);
+    return (int)
+        catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE);
   }
 
   long getCacheEvictionInterval(Map<String, String> conf) {
     return (long)
-        catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+        catalogPropertiesMetadata.getOrDefault(
+            conf, HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -198,9 +227,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       clientPool.close();
       clientPool = null;
     }
+
     if (refreshScheduledExecutor != null) {
       refreshScheduledExecutor.shutdown();
       refreshScheduledExecutor = null;
+    }
+
+    File krb5ConfFile = new File(String.format("/tmp/%s-krb5.conf", entity.id()));
+    if (krb5ConfFile.exists() && !krb5ConfFile.delete()) {
+      LOG.warn("Fail to delete krb5-conf {}", krb5ConfFile.getAbsolutePath());
+    }
+
+    File keyTabFile = new File(String.format("/tmp/%s-keytab", entity.id()));
+    if (keyTabFile.exists() && !keyTabFile.delete()) {
+      LOG.warn("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
     }
   }
 

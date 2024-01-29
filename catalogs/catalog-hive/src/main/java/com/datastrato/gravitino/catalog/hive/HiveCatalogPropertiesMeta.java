@@ -68,13 +68,16 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false))
           .put(
               KET_TAB,
-              PropertyEntry.stringImmutablePropertyEntry(KET_TAB, "", false, "", true, false))
+              PropertyEntry.stringImmutablePropertyEntry(
+                  KET_TAB, "The key tab for the catalog", false, null, true, false))
           .put(
               KRB5_CONF,
-              PropertyEntry.stringImmutablePropertyEntry(KRB5_CONF, "", false, "", true, false))
+              PropertyEntry.stringImmutablePropertyEntry(
+                  KRB5_CONF, "The krb5-conf for the catalog", false, null, true, false))
           .put(
               PRINCIPAL,
-              PropertyEntry.stringImmutablePropertyEntry(PRINCIPAL, "", false, "", true, false))
+              PropertyEntry.stringImmutablePropertyEntry(
+                  PRINCIPAL, "The principal for the catalog", false, null, true, false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 
