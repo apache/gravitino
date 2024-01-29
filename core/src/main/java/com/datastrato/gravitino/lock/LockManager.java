@@ -48,8 +48,7 @@ public class LockManager {
   }
 
   /**
-   * Evict the stale nodes from the tree lock node if the last access time is earlier than the given
-   * time.
+   * Evict the stale nodes from the tree lock node.
    *
    * @param treeNode The tree lock node to evict.
    * @param parent The parent of the tree lock node.
@@ -57,13 +56,11 @@ public class LockManager {
   @VisibleForTesting
   void evictStaleNodes(TreeLockNode treeNode, TreeLockNode parent) {
     if (treeNode.getReferenceCount() == 0) {
-      synchronized (treeNode) {
-        // Once goes here, the node is locked, so the reference could not be increased(please see
-        // TreeLockNode#addReference)
-        // thus No TreeLock will use (refer to) the TreeLockNode, so it's safe to remove the node.
+      synchronized (parent) {
+        // Once goes here, the parent node has been locked, so the reference could not be changed.
         if (treeNode.getReferenceCount() == 0) {
           parent.removeChild(treeNode.getIdent());
-          LOG.info("Evict stale tree lock node {}", treeNode.getIdent());
+          LOG.info("Evict stale tree lock node '{}' and all its children", treeNode.getIdent());
         } else {
           treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
         }
@@ -96,7 +93,6 @@ public class LockManager {
       for (int i = 0; i < levels.length; i++) {
         NameIdentifier ident = NameIdentifier.of(ArrayUtils.subarray(levels, 0, i + 1));
         lockNode = lockNode.getOrCreateChild(ident);
-        lockNode.addReference();
         treeLockNodes.add(lockNode);
       }
     } catch (Exception e) {

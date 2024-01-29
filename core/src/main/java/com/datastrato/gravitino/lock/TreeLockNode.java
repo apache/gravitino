@@ -120,26 +120,22 @@ public class TreeLockNode {
    * @param ident The name identifier of a resource such as entity or others.
    * @return The tree lock node of this ident.
    */
-  public TreeLockNode getOrCreateChild(NameIdentifier ident) {
-    TreeLockNode treeNode = childMap.get(ident);
-    if (treeNode == null) {
-      synchronized (this) {
-        treeNode = childMap.get(ident);
-        if (treeNode == null) {
-          treeNode = new TreeLockNode(ident);
-          childMap.put(ident, treeNode);
-        }
-      }
+  public synchronized TreeLockNode getOrCreateChild(NameIdentifier ident) {
+    TreeLockNode childNode = childMap.get(ident);
+    if (childNode == null) {
+      childNode = new TreeLockNode(ident);
+      childMap.put(ident, childNode);
     }
 
-    return treeNode;
+    childNode.addReference();
+    return childNode;
   }
 
   public synchronized List<TreeLockNode> getAllChildren() {
     return Lists.newArrayList(childMap.values());
   }
 
-  public synchronized void removeChild(NameIdentifier name) {
+  public void removeChild(NameIdentifier name) {
     childMap.remove(name);
   }
 }
