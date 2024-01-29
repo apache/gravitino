@@ -20,7 +20,7 @@ public class JdbcTable extends BaseTable {
   @Override
   protected TableOperations newOps() {
     // TODO: Implement this method when we have the JDBC table operations.
-    return null;
+    throw new UnsupportedOperationException("JdbcTable does not support TableOperations.");
   }
 
   /** A builder class for constructing JdbcTable instances. */

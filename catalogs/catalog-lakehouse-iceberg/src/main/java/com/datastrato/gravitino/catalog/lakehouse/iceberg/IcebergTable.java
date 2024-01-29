@@ -146,7 +146,7 @@ public class IcebergTable extends BaseTable {
   @Override
   protected TableOperations newOps() {
     // todo: implement this method when we have the Iceberg table operations.
-    return null;
+    throw new UnsupportedOperationException("IcebergTable does not support TableOperations.");
   }
 
   /** A builder class for constructing IcebergTable instances. */

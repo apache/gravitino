@@ -22,7 +22,7 @@ final class BaseTableExtension extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
-    return null;
+    throw new UnsupportedOperationException("BaseTableExtension does not support TableOperations.");
   }
 
   public static class Builder extends BaseTableBuilder<Builder, BaseTableExtension> {

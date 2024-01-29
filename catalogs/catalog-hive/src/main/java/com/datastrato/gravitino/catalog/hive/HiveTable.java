@@ -144,7 +144,7 @@ public class HiveTable extends BaseTable {
 
   public void close() {
     if (clientPool != null) {
-      clientPool.close();
+      // Note: Cannot close the client pool here because the client pool is shared by catalog
       clientPool = null;
     }
   }

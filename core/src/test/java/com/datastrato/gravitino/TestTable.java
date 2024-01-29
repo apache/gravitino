@@ -13,7 +13,7 @@ public class TestTable extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
-    return null;
+    throw new UnsupportedOperationException("TestTable does not support TableOperations.");
   }
 
   public static class Builder extends BaseTable.BaseTableBuilder<Builder, TestTable> {

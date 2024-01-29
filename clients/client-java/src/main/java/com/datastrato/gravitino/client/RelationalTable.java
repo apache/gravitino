@@ -5,10 +5,9 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
+import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
@@ -18,7 +17,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.partitions.Partition;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -87,13 +85,13 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public String[] listPartitionNames() {
-    EntityListResponse resp =
+    PartitionNameListResponse resp =
         restClient.get(
             getPartitionRequestPath(),
-            EntityListResponse.class,
+            PartitionNameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
-    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
+    return resp.partitionNames();
   }
 
   private String getPartitionRequestPath() {
