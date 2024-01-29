@@ -13,7 +13,7 @@ import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * OAuthDataProvider will request the access token from the authorization server and then provide
+ * OAuth2TokenProvider will request the access token from the authorization server and then provide
  * the access token for every request.
  */
 public abstract class OAuth2TokenProvider implements AuthDataProvider {
@@ -95,7 +95,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
      */
     @Override
     public T build() {
-      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuthDataProvider must set url");
+      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuth2TokenProvider must set url");
       client = HTTPClient.builder(Collections.emptyMap()).uri(uri).build();
       T t = internalBuild();
       return t;
