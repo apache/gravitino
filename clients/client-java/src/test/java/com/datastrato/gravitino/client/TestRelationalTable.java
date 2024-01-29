@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.client;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.http.HttpStatus.SC_NOT_IMPLEMENTED;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -13,18 +14,24 @@ import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
+import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Collections;
@@ -129,5 +136,47 @@ public class TestRelationalTable extends TestRelationalCatalog {
             UnsupportedOperationException.class,
             () -> partitionedTable.supportPartitions().listPartitionNames());
     Assertions.assertEquals("table does not support partition operations", exception.getMessage());
+  }
+
+  @Test
+  public void testGetPartition() throws JsonProcessingException {
+    String partitionName = "p1";
+    RangePartitionDTO partition =
+        RangePartitionDTO.builder()
+            .withName(partitionName)
+            .withLower(
+                new LiteralDTO.Builder()
+                    .withDataType(Types.IntegerType.get())
+                    .withValue("1")
+                    .build())
+            .withUpper(
+                new LiteralDTO.Builder()
+                    .withDataType(Types.IntegerType.get())
+                    .withValue("10")
+                    .build())
+            .build();
+    RelationalTable table = (RelationalTable) partitionedTable;
+    String partitionPath =
+        withSlash(
+            RelationalTable.formatPartitionRequestPath(
+                table.getPartitionRequestPath(), partitionName));
+    PartitionResponse resp = new PartitionResponse(partition);
+    buildMockResource(Method.GET, partitionPath, null, resp, SC_OK);
+
+    Partition actualPartition = table.supportPartitions().getPartition(partitionName);
+    Assertions.assertTrue(actualPartition instanceof RangePartition);
+    Assertions.assertEquals(partition, actualPartition);
+
+    // test throws exception
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(
+            NoSuchPartitionException.class.getSimpleName(), "partition not found");
+    buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_FOUND);
+
+    NoSuchPartitionException exception =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> table.supportPartitions().getPartition(partitionName));
+    Assertions.assertEquals("partition not found", exception.getMessage());
   }
 }

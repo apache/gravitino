@@ -148,8 +148,9 @@ public class RelationalTable implements Table, SupportsPartitions {
     return this;
   }
 
+  @VisibleForTesting
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
-  private static String formatPartitionRequestPath(String prefix, String partitionName) {
+  protected static String formatPartitionRequestPath(String prefix, String partitionName) {
     return prefix + "/" + URLEncoder.encode(partitionName, "UTF-8");
   }
 }
