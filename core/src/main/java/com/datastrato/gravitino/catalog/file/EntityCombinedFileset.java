@@ -69,7 +69,7 @@ public final class EntityCombinedFileset implements Fileset {
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =
-        new AuditInfo.Builder()
+        AuditInfo.builder()
             .withCreator(fileset.auditInfo().creator())
             .withCreateTime(fileset.auditInfo().createTime())
             .withLastModifier(fileset.auditInfo().lastModifier())
