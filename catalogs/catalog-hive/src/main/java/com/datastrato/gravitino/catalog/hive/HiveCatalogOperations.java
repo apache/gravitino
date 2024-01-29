@@ -5,6 +5,9 @@
 package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -98,7 +101,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(HiveCatalogPropertiesMeta.METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -210,14 +213,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting
   int getClientPoolSize(Map<String, String> conf) {
-    return (int)
-        catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE);
+    return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
   }
 
   long getCacheEvictionInterval(Map<String, String> conf) {
     return (long)
-        catalogPropertiesMetadata.getOrDefault(
-            conf, HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+        catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
