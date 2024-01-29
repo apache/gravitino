@@ -474,11 +474,6 @@ tasks {
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
-
-        from(it.configurations.compileClasspath) {
-          include("**/*activation*.jar")
-          into("distribution/package/libs")
-        }
       }
     }
   }
