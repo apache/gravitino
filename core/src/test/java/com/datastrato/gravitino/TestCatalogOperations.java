@@ -411,7 +411,7 @@ public class TestCatalogOperations
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     TestFileset fileset =
         new TestFileset.Builder()
             .withName(ident.name())
@@ -439,7 +439,7 @@ public class TestCatalogOperations
     }
 
     AuditInfo updatedAuditInfo =
-        new AuditInfo.Builder()
+        AuditInfo.builder()
             .withCreator("test")
             .withCreateTime(Instant.now())
             .withLastModifier("test")
