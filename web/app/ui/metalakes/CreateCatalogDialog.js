@@ -269,40 +269,33 @@ const CreateCatalogDialog = props => {
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
+      const { properties = {} } = data
+
       setCacheData(data)
       setValue('name', data.name)
       setValue('comment', data.comment)
       setValue('type', data.type)
       setValue('provider', data.provider)
-      const providerIndex = providers.findIndex(i => i.value === data.provider)
 
-      const propsItems = [...providers[providerIndex].defaultProps]
-
-      const { properties = {} } = data
-
-      let propsData = []
+      const providerItem = providers.find(i => i.value === data.provider)
+      const propsItems = providerItem.defaultProps || []
 
       for (let item of Object.keys(properties)) {
         const findProp = propsItems.find(i => i.key === item)
 
         if (findProp) {
-          let propItem = {
-            ...findProp,
-            value: properties[item]
-          }
-
-          propsData.push(propItem)
+          findProp.value = properties[item]
         } else {
           let propItem = {
             key: item,
             value: properties[item]
           }
-          propsData.push(propItem)
+          propsItems.push(propItem)
         }
       }
 
-      setInnerProps(propsData)
-      setValue('propItems', propsData)
+      setInnerProps(propsItems)
+      setValue('propItems', propsItems)
     }
   }, [open, data, setValue])
 
@@ -368,6 +361,7 @@ const CreateCatalogDialog = props => {
                       onChange={onChange}
                       error={Boolean(errors.type)}
                       labelId='select-catalog-type'
+                      disabled={type === 'update'}
                     >
                       <MenuItem value={'relational'}>relational</MenuItem>
                     </Select>
@@ -394,6 +388,7 @@ const CreateCatalogDialog = props => {
                       onChange={e => handleChangeProvider(onChange, e)}
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
+                      disabled={type === 'update'}
                     >
                       <MenuItem value={'hive'}>hive</MenuItem>
                       <MenuItem value={'lakehouse-iceberg'}>iceberg</MenuItem>
