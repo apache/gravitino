@@ -262,10 +262,15 @@ const CreateCatalogDialog = props => {
       defaultProps = providers[providerItemIndex].defaultProps
 
       resetPropsFields(providers, providerItemIndex)
-      setInnerProps(defaultProps)
-      setValue('propItems', providers[providerItemIndex].defaultProps)
+
+      if (type === 'create') {
+        setInnerProps(defaultProps)
+        setValue('propItems', providers[providerItemIndex].defaultProps)
+      }
     }
-  }, [providerSelect, setInnerProps, setValue])
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerSelect])
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
@@ -278,14 +283,27 @@ const CreateCatalogDialog = props => {
       setValue('provider', data.provider)
 
       const providerItem = providers.find(i => i.value === data.provider)
-      const propsItems = providerItem.defaultProps || []
+      let propsItems = [...providerItem.defaultProps]
 
-      for (let item of Object.keys(properties)) {
-        const findProp = propsItems.find(i => i.key === item)
+      propsItems = propsItems.map((it, idx) => {
+        let propItem = {
+          ...it,
+          disabled: true
+        }
+
+        const findProp = Object.keys(properties).find(i => i === it.key)
 
         if (findProp) {
-          findProp.value = properties[item]
-        } else {
+          propItem.value = properties[findProp]
+        }
+
+        return propItem
+      })
+
+      for (let item of Object.keys(properties)) {
+        const findPropIndex = propsItems.findIndex(i => i.key === item)
+
+        if (findPropIndex === -1) {
           let propItem = {
             key: item,
             value: properties[item]
@@ -469,6 +487,7 @@ const CreateCatalogDialog = props => {
                                     label='Value'
                                     error={item.required && item.value === ''}
                                     value={item.value}
+                                    disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
                                   />
                                 )}

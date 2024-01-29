@@ -303,8 +303,8 @@ export const updateCatalog = createAsyncThunk(
     if (err || !res) {
       throw new Error(err)
     }
-    dispatch(fetchCatalogs({ ...data, page: 'metalakes', init: true }))
-    dispatch(initMetalakeTree({ ...data }))
+    dispatch(fetchCatalogs({ metalake, catalog, page: 'metalakes', init: true }))
+    dispatch(initMetalakeTree({ metalake, catalog }))
 
     return res
   }
