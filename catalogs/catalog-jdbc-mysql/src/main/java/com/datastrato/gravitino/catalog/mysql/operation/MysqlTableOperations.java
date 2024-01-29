@@ -268,6 +268,31 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
 
+    appendIndexesSql(indexes, sqlBuilder);
+
+    sqlBuilder.append("\n)");
+
+    // Add table comment if specified
+    if (StringUtils.isNotEmpty(comment)) {
+      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+    }
+
+    // Add table properties if any
+    if (MapUtils.isNotEmpty(properties)) {
+      sqlBuilder.append(
+          properties.entrySet().stream()
+              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
+              .collect(Collectors.joining(",\n", "\n", "")));
+    }
+
+    // Return the generated SQL statement
+    String result = sqlBuilder.append(";").toString();
+
+    LOG.info("Generated create table:{} sql: {}", tableName, result);
+    return result;
+  }
+
+  public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
       String fieldStr =
           Arrays.stream(index.fieldNames())
@@ -301,27 +326,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
       }
     }
-
-    sqlBuilder.append("\n)");
-
-    // Add table comment if specified
-    if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
-    }
-
-    // Add table properties if any
-    if (MapUtils.isNotEmpty(properties)) {
-      sqlBuilder.append(
-          properties.entrySet().stream()
-              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
-              .collect(Collectors.joining(",\n", "\n", "")));
-    }
-
-    // Return the generated SQL statement
-    String result = sqlBuilder.append(";").toString();
-
-    LOG.info("Generated create table:{} sql: {}", tableName, result);
-    return result;
   }
 
   @Override
