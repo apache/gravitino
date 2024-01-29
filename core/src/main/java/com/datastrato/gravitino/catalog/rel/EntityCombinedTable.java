@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -68,6 +69,11 @@ public final class EntityCombinedTable implements Table {
     return table.properties().entrySet().stream()
         .filter(p -> !hiddenProperties.contains(p.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return table.supportPartitions();
   }
 
   @Override
