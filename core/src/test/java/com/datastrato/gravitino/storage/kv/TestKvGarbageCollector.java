@@ -167,7 +167,7 @@ class TestKvGarbageCollector {
       KvEntityStore kvEntityStore = (KvEntityStore) store;
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake1"), "catalog1", auditInfo);

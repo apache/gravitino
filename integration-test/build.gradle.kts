@@ -125,6 +125,9 @@ dependencies {
   implementation(libs.commons.cli)
   testImplementation(libs.selenium)
   testImplementation(libs.rauschig)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
 }
 
 /* Optimizing integration test execution conditions */

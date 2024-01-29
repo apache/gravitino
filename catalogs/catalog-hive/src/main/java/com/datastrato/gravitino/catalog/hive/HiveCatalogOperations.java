@@ -211,7 +211,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withConf(hiveConf)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
@@ -608,7 +608,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
