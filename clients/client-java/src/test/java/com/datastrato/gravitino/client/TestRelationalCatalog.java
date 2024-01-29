@@ -72,13 +72,13 @@ import org.junit.jupiter.api.Test;
 
 public class TestRelationalCatalog extends TestBase {
 
-  private static Catalog catalog;
+  protected static Catalog catalog;
 
   private static GravitinoMetaLake metalake;
 
-  private static final String metalakeName = "testMetalake";
+  protected static final String metalakeName = "testMetalake";
 
-  private static final String catalogName = "testCatalog";
+  protected static final String catalogName = "testCatalog";
 
   private static final String provider = "test";
 
@@ -1121,11 +1121,11 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(updatedSchema.properties(), alteredSchema.properties());
   }
 
-  private static String withSlash(String path) {
+  protected static String withSlash(String path) {
     return "/" + path;
   }
 
-  private static SchemaDTO createMockSchema(
+  protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
     return new SchemaDTO.Builder()
         .withName(name)
@@ -1136,7 +1136,7 @@ public class TestRelationalCatalog extends TestBase {
         .build();
   }
 
-  private static ColumnDTO createMockColumn(String name, Type type, String comment) {
+  protected static ColumnDTO createMockColumn(String name, Type type, String comment) {
     return createMockColumn(name, type, comment, true);
   }
 
@@ -1161,7 +1161,7 @@ public class TestRelationalCatalog extends TestBase {
         .build();
   }
 
-  private static TableDTO createMockTable(
+  protected static TableDTO createMockTable(
       String name,
       ColumnDTO[] columns,
       String comment,

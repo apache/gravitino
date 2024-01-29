@@ -12,10 +12,12 @@ import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -68,6 +70,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to Partition operations.
+   *
+   * @return A Consumer representing the Partition error handler.
+   */
+  public static Consumer<ErrorResponse> partitionErrorHandler() {
+    return PartitionErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates a generic error handler for REST requests.
    *
    * @return A Consumer representing the generic REST error handler.
@@ -110,6 +121,48 @@ public class ErrorHandlers {
       return message;
     } else {
       return String.format("%s\n%s", message, stack);
+    }
+  }
+
+  /** Error handler specific to Partition operations. */
+  private static class PartitionErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new PartitionErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+
+          } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
+            throw new NoSuchTableException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchPartitionException.class.getSimpleName())) {
+            throw new NoSuchPartitionException(errorMessage);
+
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new PartitionAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+      }
+
+      super.accept(errorResponse);
     }
   }
 

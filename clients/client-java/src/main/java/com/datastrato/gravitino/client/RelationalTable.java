@@ -17,6 +17,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -90,11 +91,12 @@ public class RelationalTable implements Table, SupportsPartitions {
             getPartitionRequestPath(),
             PartitionNameListResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.tableErrorHandler());
+            ErrorHandlers.partitionErrorHandler());
     return resp.partitionNames();
   }
 
-  private String getPartitionRequestPath() {
+  @VisibleForTesting
+  public String getPartitionRequestPath() {
     return "api/metalakes/"
         + namespace.level(0)
         + "/catalogs/"
