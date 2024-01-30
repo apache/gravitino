@@ -27,7 +27,7 @@ public final class JettyServerConfig {
   private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
   private static final String SPLITTER = ",";
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
-  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 8434;
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
   public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT = 8090;
   public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTPS_PORT = 8433;
 
