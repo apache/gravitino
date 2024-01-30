@@ -49,17 +49,20 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLConnection;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -154,31 +157,52 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
         File keyTabFile = new File(String.format("/tmp/%s-keytab", entity.id()));
-        File krb5ConfFile = new File(String.format("/tmp/%s-krb5.conf", entity.id()));
+        if (keyTabFile.exists() && !keyTabFile.delete()) {
+          LOG.warn("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
+        }
 
-        String keyTab =
+        String keyTabUri =
             (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB);
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(keyTab), "If you use Kerberos, key tab can't be blank");
+            StringUtils.isNotBlank(keyTabUri), "If you use Kerberos, key tab uri can't be blank");
+
+        try {
+          URI uri = new URI(keyTabUri);
+          String scheme = Optional.of(uri.getScheme()).orElse("file");
+          switch (scheme) {
+            case "http":
+            case "https":
+            case "ftp":
+              URLConnection uc = uri.toURL().openConnection();
+              // TODO: Add a new parameter
+              uc.setConnectTimeout(60 * 1000);
+              uc.setReadTimeout(60 * 1000);
+              uc.connect();
+
+              Files.copy(uc.getInputStream(), keyTabFile.toPath());
+              break;
+
+            case "file":
+              Files.createSymbolicLink(keyTabFile.toPath(), new File(uri).toPath());
+              break;
+
+              // TODO: Supports to download keytab from HCFS, it's unsafe to store
+              // keytab in an unsecured HDFS cluster. If we use a secured HDFS cluster,
+              // we should have a keytab first.
+            default:
+              throw new IllegalArgumentException(
+                  String.format("Don't support the scheme %s", scheme));
+          }
+        } catch (URISyntaxException ue) {
+          throw new IllegalArgumentException("The uri of keytab has the wrong format", ue);
+        }
 
         String principal =
             (String)
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
-
-        String krb5Conf =
-            (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KRB5_CONF);
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(krb5Conf), "If you use Kerberos, krb5-conf can't be blank");
-
-        FileUtils.writeByteArrayToFile(krb5ConfFile, Base64.getDecoder().decode(krb5Conf));
-        FileUtils.writeByteArrayToFile(keyTabFile, Base64.getDecoder().decode(keyTab));
-
-        // TODO: set separate property for every classloader
-        System.setProperty("java.security.krb5.conf", krb5ConfFile.getAbsolutePath());
 
         refreshScheduledExecutor =
             new ScheduledThreadPoolExecutor(
@@ -232,11 +256,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (refreshScheduledExecutor != null) {
       refreshScheduledExecutor.shutdown();
       refreshScheduledExecutor = null;
-    }
-
-    File krb5ConfFile = new File(String.format("/tmp/%s-krb5.conf", entity.id()));
-    if (krb5ConfFile.exists() && !krb5ConfFile.delete()) {
-      LOG.warn("Fail to delete krb5-conf {}", krb5ConfFile.getAbsolutePath());
     }
 
     File keyTabFile = new File(String.format("/tmp/%s-keytab", entity.id()));
