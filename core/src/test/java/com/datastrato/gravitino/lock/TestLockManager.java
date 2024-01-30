@@ -452,11 +452,7 @@ public class TestLockManager {
               NameIdentifier nameIdentifier = completeRandomNameIdentifier();
               treeLock = lockManager.createTreeLock(nameIdentifier);
               treeLock.lock(LockType.READ);
-              try {
-                //
-              } finally {
-                treeLock.unlock();
-              }
+              treeLock.unlock();
             }
             return 0;
           });

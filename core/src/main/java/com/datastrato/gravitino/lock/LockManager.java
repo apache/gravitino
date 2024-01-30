@@ -64,38 +64,22 @@ public class LockManager {
    */
   @VisibleForTesting
   void evictStaleNodes(TreeLockNode treeNode, TreeLockNode parent) {
+    // Handle from leaf nodes first.
+    treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
+
+    // Handle self node.
     if (treeNode.getReferenceCount() == 0) {
       synchronized (parent) {
         // Once goes here, the parent node has been locked, so the reference could not be changed.
         if (treeNode.getReferenceCount() == 0) {
           parent.removeChild(treeNode.getIdent());
-          totalNodeCount.addAndGet(-getAllNode(treeNode));
+          totalNodeCount.decrementAndGet();
           LOG.info("Evict stale tree lock node '{}' and all its children", treeNode.getIdent());
         } else {
           treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
         }
       }
-    } else {
-      treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
     }
-  }
-
-  /**
-   * Count all the nodes in the tree lock node.
-   *
-   * @param node The tree lock node to count.
-   * @return The number of nodes in the tree lock node.
-   */
-  private long getAllNode(TreeLockNode node) {
-    if (node.getAllChildren().isEmpty()) {
-      return 1;
-    }
-
-    long r = 1L;
-    for (TreeLockNode child : node.getAllChildren()) {
-      r += getAllNode(child);
-    }
-    return r;
   }
 
   /**

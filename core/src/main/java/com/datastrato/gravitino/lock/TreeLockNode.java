@@ -87,12 +87,6 @@ public class TreeLockNode {
     } else {
       readWriteLock.writeLock().lock();
     }
-
-    LOG.info(
-        "Node {} has been lock with '{}' lock, reference count = {}",
-        ident,
-        lockType,
-        referenceCount.get());
   }
 
   /**
@@ -108,11 +102,6 @@ public class TreeLockNode {
     } else {
       readWriteLock.writeLock().unlock();
     }
-    LOG.info(
-        "Node {} has been unlock with '{}' lock, reference count = {}",
-        ident,
-        lockType,
-        referenceCount.get());
   }
 
   /**
