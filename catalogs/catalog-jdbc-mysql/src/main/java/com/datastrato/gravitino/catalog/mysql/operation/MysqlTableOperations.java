@@ -136,6 +136,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
   private static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
     // Check auto increment column
     List<JdbcColumn> autoIncrementCols =
