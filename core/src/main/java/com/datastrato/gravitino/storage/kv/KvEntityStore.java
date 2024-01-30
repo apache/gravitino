@@ -128,7 +128,7 @@ public class KvEntityStore implements EntityStore {
                 executeInTransaction(
                     () ->
                         transactionalKvBackend.scan(
-                            new KvRangeScan.KvRangeScanBuilder()
+                            new KvRange.KvRangeBuilder()
                                 .start(startKey)
                                 .end(endKey)
                                 .startInclusive(true)
@@ -372,7 +372,7 @@ public class KvEntityStore implements EntityStore {
                   byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
                   List<Pair<byte[], byte[]>> kvs =
                       transactionalKvBackend.scan(
-                          new KvRangeScan.KvRangeScanBuilder()
+                          new KvRange.KvRangeBuilder()
                               .start(directChild)
                               .end(endKey)
                               .startInclusive(true)
@@ -394,7 +394,7 @@ public class KvEntityStore implements EntityStore {
 
                   for (byte[] prefix : subEntityPrefix) {
                     transactionalKvBackend.deleteRange(
-                        new KvRangeScan.KvRangeScanBuilder()
+                        new KvRange.KvRangeBuilder()
                             .start(prefix)
                             .startInclusive(true)
                             .end(Bytes.increment(Bytes.wrap(prefix)).get())

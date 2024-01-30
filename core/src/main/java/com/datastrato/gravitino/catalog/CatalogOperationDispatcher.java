@@ -398,7 +398,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
           .withHiddenPropertiesSet(
               getHiddenPropertyNames(
                   catalogIdentifier,
-                  HasPropertyMetadata::filesetPropertiesMetadata,
+                  HasPropertyMetadata::tablePropertiesMetadata,
                   table.properties()));
     }
 
@@ -667,7 +667,9 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
     return EntityCombinedFileset.of(fileset)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
-                catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, fileset.properties()));
+                catalogIdent,
+                HasPropertyMetadata::filesetPropertiesMetadata,
+                fileset.properties()));
   }
 
   @Override
@@ -705,7 +707,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
-                HasPropertyMetadata::tablePropertiesMetadata,
+                HasPropertyMetadata::filesetPropertiesMetadata,
                 createdFileset.properties()));
   }
 
@@ -725,7 +727,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
-                HasPropertyMetadata::tablePropertiesMetadata,
+                HasPropertyMetadata::filesetPropertiesMetadata,
                 alteredFileset.properties()));
   }
 

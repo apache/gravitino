@@ -12,6 +12,7 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.FunctionPartitioningDTO;
@@ -33,6 +34,7 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JacksonException;
@@ -58,6 +60,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,6 +89,10 @@ public class JsonUtils {
   private static final String SORT_TERM = "sortTerm";
   private static final String DIRECTION = "direction";
   private static final String NULL_ORDERING = "nullOrdering";
+
+  private static final String INDEX_TYPE = "indexType";
+  private static final String INDEX_NAME = "name";
+  private static final String INDEX_FIELD_NAMES = "fieldNames";
   private static final String NUMBER = "number";
   private static final String TYPE = "type";
   private static final String STRUCT = "struct";
@@ -1094,6 +1101,48 @@ public class JsonUtils {
         default:
           throw new IOException("Unknown partition type: " + type);
       }
+    }
+  }
+
+  public static class IndexSerializer extends JsonSerializer<Index> {
+    @Override
+    public void serialize(Index value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeStringField(INDEX_TYPE, value.type().name().toUpperCase(Locale.ROOT));
+      if (null != value.name()) {
+        gen.writeStringField(INDEX_NAME, value.name());
+      }
+      gen.writeFieldName(INDEX_FIELD_NAMES);
+      gen.writeObject(value.fieldNames());
+      gen.writeEndObject();
+    }
+  }
+
+  public static class IndexDeserializer extends JsonDeserializer<Index> {
+    @Override
+    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Index must be a valid JSON object, but found: %s",
+          node);
+
+      IndexDTO.Builder builder = new IndexDTO.Builder();
+      Preconditions.checkArgument(
+          node.has(INDEX_TYPE), "Cannot parse index from missing type: %s", node);
+      String indexType = getString(INDEX_TYPE, node);
+      builder.withIndexType(Index.IndexType.valueOf(indexType.toUpperCase(Locale.ROOT)));
+      if (node.has(INDEX_NAME)) {
+        builder.withName(getString(INDEX_NAME, node));
+      }
+      Preconditions.checkArgument(
+          node.has(INDEX_FIELD_NAMES), "Cannot parse index from missing field names: %s", node);
+      List<String[]> fieldNames = Lists.newArrayList();
+      node.get(INDEX_FIELD_NAMES)
+          .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
+      builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      return builder.build();
     }
   }
 }

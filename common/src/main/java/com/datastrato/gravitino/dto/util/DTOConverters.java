@@ -49,6 +49,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -120,6 +121,7 @@ public class DTOConverters {
         .withDistribution(toDTO(table.distribution()))
         .withAudit(toDTO(table.auditInfo()))
         .withPartitioning(toDTOs(table.partitioning()))
+        .withIndex(toDTOs(table.index()))
         .build();
   }
 
@@ -261,7 +263,7 @@ public class DTOConverters {
 
   public static IndexDTO[] toDTOs(Index[] indexes) {
     if (ArrayUtils.isEmpty(indexes)) {
-      return new IndexDTO[0];
+      return IndexDTO.EMPTY_INDEXES;
     }
     return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
@@ -300,6 +302,18 @@ public class DTOConverters {
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
+  }
+
+  public static Index fromDTO(IndexDTO indexDTO) {
+    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+  }
+
+  public static Index[] fromDTOs(IndexDTO[] indexDTOS) {
+    if (ArrayUtils.isEmpty(indexDTOS)) {
+      return Indexes.EMPTY_INDEXES;
+    }
+
+    return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {

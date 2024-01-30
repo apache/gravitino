@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.google.common.collect.Maps;
 import lombok.Getter;
@@ -15,6 +16,12 @@ import lombok.ToString;
 public class JdbcTable extends BaseTable {
 
   private JdbcTable() {}
+
+  @Override
+  protected TableOperations newOps() {
+    // TODO: Implement this method when we have the JDBC table operations.
+    throw new UnsupportedOperationException("JdbcTable does not support TableOperations.");
+  }
 
   /** A builder class for constructing JdbcTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, JdbcTable> {
@@ -34,6 +41,7 @@ public class JdbcTable extends BaseTable {
       jdbcTable.columns = columns;
       jdbcTable.partitioning = partitioning;
       jdbcTable.sortOrders = sortOrders;
+      jdbcTable.indexes = indexes;
       return jdbcTable;
     }
   }
