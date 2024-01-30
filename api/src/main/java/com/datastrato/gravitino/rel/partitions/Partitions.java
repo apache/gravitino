@@ -58,6 +58,17 @@ public class Partitions {
     return new IdentityPartitionImpl(name, fieldNames, values, properties);
   }
 
+  /**
+   * Creates an identity partition whose name will be automatically generated.
+   *
+   * @param fieldNames The field names of the identity partition.
+   * @param values The values of the identity partition.
+   * @return The created partition.
+   */
+  public static Partition identity(String[][] fieldNames, Literal<?>[] values) {
+    return identity(null, fieldNames, values, null);
+  }
+
   /** Represents a result of range partitioning. */
   private static class RangePartitionImpl implements RangePartition {
     private final String name;
