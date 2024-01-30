@@ -27,8 +27,8 @@ dependencies {
   implementation(libs.bundles.jersey)
   implementation(libs.metrics.jersey2)
 
-  // Workaround for the task copyActivation.
-  compileOnly(libs.javax.activation)
+  // For more, please see: https://stackoverflow.com/questions/46493613/what-is-the-replacement-for-javax-activation-package-in-java-9
+  implementation(libs.sun.activation)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

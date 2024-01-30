@@ -55,7 +55,7 @@ shadow-plugin = "8.1.1"
 kerby = "2.0.3"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
-javax-activation = "1.1.1"
+sun-activation-version = "1.2.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -145,7 +145,8 @@ postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
-javax-activation = { group = "javax.activation", name = "activation", version.ref = "javax-activation" }
+sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
+
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }
 
