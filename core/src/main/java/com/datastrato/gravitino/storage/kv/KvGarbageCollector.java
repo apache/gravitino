@@ -104,7 +104,7 @@ public final class KvGarbageCollector implements Closeable {
   private void collectAndRemoveUncommittedData() throws IOException {
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(new byte[] {0x20}) // below 0x20 is control character
                 .end(new byte[] {0x7F}) // above 0x7F is control character
                 .startInclusive(true)
@@ -146,7 +146,7 @@ public final class KvGarbageCollector implements Closeable {
     // TODO(yuqi), Use multi-thread to scan the data in case of the data is too large.
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(startKey)
                 .end(endKey)
                 .startInclusive(true)
@@ -193,7 +193,7 @@ public final class KvGarbageCollector implements Closeable {
         // directly.
         List<Pair<byte[], byte[]>> newVersionOfKey =
             kvBackend.scan(
-                new KvRangeScan.KvRangeScanBuilder()
+                new KvRange.KvRangeBuilder()
                     .start(key)
                     .end(generateKey(key, transactionId))
                     .startInclusive(false)

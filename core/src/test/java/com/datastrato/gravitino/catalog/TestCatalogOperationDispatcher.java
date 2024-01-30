@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static com.datastrato.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
 import static com.datastrato.gravitino.catalog.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -678,6 +679,7 @@ public class TestCatalogOperationDispatcher {
         });
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
     Assertions.assertFalse(testProps.containsKey(GRAVITINO_MANAGED_ENTITY));
+    Assertions.assertFalse(testProps.containsKey(TEST_FILESET_HIDDEN_KEY));
   }
 
   private void testPropertyException(Executable operation, String... errorMessage) {

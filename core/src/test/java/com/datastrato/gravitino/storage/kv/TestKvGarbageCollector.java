@@ -111,7 +111,7 @@ class TestKvGarbageCollector {
       Assertions.assertNull(transactionalKvBackend.get("testC".getBytes()));
       List<Pair<byte[], byte[]>> allData =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)
@@ -131,7 +131,7 @@ class TestKvGarbageCollector {
 
       allData =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)
@@ -185,7 +185,7 @@ class TestKvGarbageCollector {
       KvBackend kvBackend = kvEntityStore.backend;
       List<Pair<byte[], byte[]>> data =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)

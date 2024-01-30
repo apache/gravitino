@@ -18,12 +18,14 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -60,6 +62,7 @@ public class HiveTable extends BaseTable {
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
   private String schemaName;
+  private CachedClientPool clientPool;
 
   private HiveTable() {}
 
@@ -67,9 +70,9 @@ public class HiveTable extends BaseTable {
    * Creates a new HiveTable instance from a Table and a Builder.
    *
    * @param table The inner Table representing the HiveTable.
-   * @return A new HiveTable instance.
+   * @return A new HiveTable instance Builder.
    */
-  public static HiveTable fromHiveTable(Table table) {
+  public static HiveTable.Builder fromHiveTable(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.
     AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
@@ -132,8 +135,22 @@ public class HiveTable extends BaseTable {
             table.getPartitionKeys().stream()
                 .map(p -> identity(p.getName()))
                 .toArray(Transform[]::new))
-        .withSchemaName(table.getDbName())
-        .build();
+        .withSchemaName(table.getDbName());
+  }
+
+  public CachedClientPool clientPool() {
+    return clientPool;
+  }
+
+  public void close() {
+    if (clientPool != null) {
+      // Note: Cannot close the client pool here because the client pool is shared by catalog
+      clientPool = null;
+    }
+  }
+
+  public String schemaName() {
+    return schemaName;
   }
 
   private static Map<String, String> buildTableProperties(Table table) {
@@ -286,10 +303,21 @@ public class HiveTable extends BaseTable {
     return serDeInfo;
   }
 
+  @Override
+  protected TableOperations newOps() {
+    return new HiveTableOperations(this);
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return (SupportsPartitions) ops();
+  }
+
   /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
 
     private String schemaName;
+    private CachedClientPool clientPool;
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -299,6 +327,17 @@ public class HiveTable extends BaseTable {
      */
     public Builder withSchemaName(String schemaName) {
       this.schemaName = schemaName;
+      return this;
+    }
+
+    /**
+     * Sets the HiveClientPool to be used for operate partition.
+     *
+     * @param clientPool The HiveClientPool instance.
+     * @return This Builder instance.
+     */
+    public Builder withClientPool(CachedClientPool clientPool) {
+      this.clientPool = clientPool;
       return this;
     }
 
@@ -319,6 +358,7 @@ public class HiveTable extends BaseTable {
       hiveTable.sortOrders = sortOrders;
       hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
+      hiveTable.clientPool = clientPool;
 
       // HMS put table comment in parameters
       if (comment != null) {

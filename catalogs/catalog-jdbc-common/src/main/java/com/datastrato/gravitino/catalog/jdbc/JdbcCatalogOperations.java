@@ -268,26 +268,28 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     String tableName = tableIdent.name();
     JdbcTable load = tableOperation.load(databaseName, tableName);
+    Map<String, String> properties =
+        load.properties() == null
+            ? Maps.newHashMap()
+            : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
       LOG.warn(
           "The table {} comment {} does not contain gravitino id attribute", tableName, comment);
-      return load;
+    } else {
+      properties = StringIdentifier.newPropertiesWithId(id, properties);
+      // Remove id from comment
+      comment = StringIdentifier.removeIdFromComment(comment);
     }
-    Map<String, String> properties =
-        load.properties() == null
-            ? Maps.newHashMap()
-            : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
-    properties = StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcTable.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
         .withAuditInfo(load.auditInfo())
-        // Remove id from comment
-        .withComment(StringIdentifier.removeIdFromComment(load.comment()))
+        .withComment(comment)
         .withProperties(properties)
+        .withIndexes(load.index())
         .build();
   }
 
@@ -361,7 +363,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(indexes.length == 0, "Jdbc-catalog does not support indexes");
     Preconditions.checkArgument(
         null == distribution || distribution == Distributions.NONE,
         "jdbc-catalog does not support distribution");
@@ -385,6 +386,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withType(column.dataType())
                         .withComment(column.comment())
                         .withNullable(column.nullable())
+                        .withAutoIncrement(column.autoIncrement())
                         .build())
             .toArray(JdbcColumn[]::new);
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
@@ -396,7 +398,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         jdbcColumns,
         StringIdentifier.addToComment(identifier, comment),
         resultProperties,
-        partitioning);
+        partitioning,
+        indexes);
 
     return new JdbcTable.Builder()
         .withAuditInfo(
@@ -406,6 +409,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
+        .withIndexes(indexes)
         .build();
   }
 

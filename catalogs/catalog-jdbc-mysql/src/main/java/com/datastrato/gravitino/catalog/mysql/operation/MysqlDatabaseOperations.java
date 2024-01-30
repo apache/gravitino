@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -39,9 +40,10 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    if (StringUtils.isNotEmpty(comment)) {
-      LOG.warn(
-          "Ignoring comment option on database create. mysql does not support comment option on database create.");
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "MySQL doesn't support set schema comment: " + originComment);
     }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 

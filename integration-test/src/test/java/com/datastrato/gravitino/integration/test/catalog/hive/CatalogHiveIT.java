@@ -63,6 +63,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -660,6 +661,64 @@ public class CatalogHiveIT extends AbstractIT {
         exception
             .getMessage()
             .contains("The partition field must be placed at the end of the columns in order"));
+  }
+
+  @Test
+  public void testListPartitionNames() throws TException, InterruptedException {
+    Table createdTable = preparePartitionedTable();
+
+    String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
+    Assertions.assertArrayEquals(
+        new String[] {"hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test"},
+        partitionNames);
+  }
+
+  @Test
+  public void testGetPartition() throws TException, InterruptedException {
+    Table createdTable = preparePartitionedTable();
+
+    String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
+    Assertions.assertEquals(1, partitionNames.length);
+    IdentityPartition partition =
+        (IdentityPartition) createdTable.supportPartitions().getPartition(partitionNames[0]);
+
+    Assertions.assertEquals(
+        "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test", partition.name());
+
+    // Directly get partition from hive metastore
+    org.apache.hadoop.hive.metastore.api.Partition hivePartition =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partition.name()));
+    Assertions.assertEquals(
+        partition.values()[0].value().toString(), hivePartition.getValues().get(0));
+    Assertions.assertEquals(
+        partition.values()[1].value().toString(), hivePartition.getValues().get(1));
+    Assertions.assertNotNull(partition.properties());
+    Assertions.assertEquals(partition.properties(), hivePartition.getParameters());
+  }
+
+  private Table preparePartitionedTable() throws TException, InterruptedException {
+    ColumnDTO[] columns = createColumns();
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(
+            metalakeName, catalogName, schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    Map<String, String> properties = createProperties();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                new Transform[] {
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
+                });
+    org.apache.hadoop.hive.metastore.api.Table actualTable =
+        hiveClientPool.run(client -> client.getTable(schemaName, table.name()));
+    checkTableReadWrite(actualTable);
+    return table;
   }
 
   private void assertTableEquals(
