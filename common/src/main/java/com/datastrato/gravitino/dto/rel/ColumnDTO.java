@@ -204,10 +204,6 @@ public class ColumnDTO implements Column {
   }
 
   public void validate() throws IllegalArgumentException {
-    if (autoIncrement()) {
-      // TODO This part of the code will be deleted after underlying support.
-      throw new UnsupportedOperationException("Auto-increment column is not supported yet.");
-    }
     if (name() == null || name().isEmpty()) {
       throw new IllegalArgumentException("Column name cannot be null or empty.");
     }

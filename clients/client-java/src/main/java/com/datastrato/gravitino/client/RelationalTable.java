@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
+import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
@@ -19,9 +20,11 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.google.common.annotations.VisibleForTesting;
+import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import lombok.SneakyThrows;
 
 public class RelationalTable implements Table, SupportsPartitions {
 
@@ -121,7 +124,13 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
-    throw new UnsupportedOperationException();
+    PartitionResponse resp =
+        restClient.get(
+            formatPartitionRequestPath(getPartitionRequestPath(), partitionName),
+            PartitionResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    return resp.getPartition();
   }
 
   @Override
@@ -137,5 +146,11 @@ public class RelationalTable implements Table, SupportsPartitions {
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
     return this;
+  }
+
+  @VisibleForTesting
+  @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
+  protected static String formatPartitionRequestPath(String prefix, String partitionName) {
+    return prefix + "/" + URLEncoder.encode(partitionName, "UTF-8");
   }
 }
