@@ -598,6 +598,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("filesystem") &&
         it.name != "trino-connector" &&
         it.name != "spark-connector" &&
         it.name != "integration-test" &&

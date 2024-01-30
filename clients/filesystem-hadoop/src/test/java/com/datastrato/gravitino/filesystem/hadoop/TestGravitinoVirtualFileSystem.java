@@ -6,6 +6,8 @@ package com.datastrato.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -15,6 +17,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -25,15 +28,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoFileSystem {
+public class TestGravitinoVirtualFileSystem {
   private static MiniDFSCluster HDFS_CLUSTER;
   private static final int BUFFER_SIZE = 3;
-  private static final String GTFS_IMPL_CLASS = GravitinoFileSystem.class.getName();
-  private static final String GTFS_ABSTRACT_IMPL_CLASS = Gtfs.class.getName();
+  private static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
+  private static final String GVFS_ABSTRACT_IMPL_CLASS = Gvfs.class.getName();
   private static final FsPermission MOCK_PERMISSION = FsPermission.createImmutable((short) 0777);
   private static final Progressable DEFAULT_PROGRESS = () -> {};
   private FileSystem mockFileSystem = null;
   private FileSystem gravitinoFileSystem = null;
+  private Configuration conf = null;
   private Path mockPath = null;
   private Path gravitinoPath = null;
 
@@ -53,12 +57,14 @@ public class TestGravitinoFileSystem {
   @BeforeEach
   public void init() throws IOException {
     Configuration configuration = HDFS_CLUSTER.getFileSystem().getConf();
-    configuration.set("fs.gtfs.impl", GTFS_IMPL_CLASS);
-    configuration.set("fs.AbstractFileSystem.gtfs.impl", GTFS_ABSTRACT_IMPL_CLASS);
-    mockPath = new Path("hdfs://localhost/metalake_1/fileset_catalog_1/schema_1/fileset_test");
-    gravitinoPath = new Path("gtfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_test");
+    configuration.set("fs.gvfs.impl", GVFS_IMPL_CLASS);
+    configuration.set("fs.AbstractFileSystem.gvfs.impl", GVFS_ABSTRACT_IMPL_CLASS);
+    conf = configuration;
+    mockPath = new Path("hdfs://localhost/metalake_1/fileset_catalog_1/schema_1/fileset_test/xxx");
+    gravitinoPath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_test/xxx");
     mockFileSystem = HDFS_CLUSTER.getFileSystem();
-    gravitinoFileSystem = gravitinoPath.getFileSystem(configuration);
+    gravitinoFileSystem = gravitinoPath.getFileSystem(conf);
   }
 
   @AfterEach
@@ -69,6 +75,61 @@ public class TestGravitinoFileSystem {
     if (gravitinoFileSystem.exists(gravitinoPath)) {
       gravitinoFileSystem.delete(gravitinoPath, true);
     }
+  }
+
+  @Test
+  public void testCloseFSCache() throws IOException {
+    Path diffPath = new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_3");
+    FileSystem fs = diffPath.getFileSystem(conf);
+    assertNotEquals(fs, gravitinoFileSystem);
+  }
+
+  @Test
+  public void testDiffPathOperation() throws IOException {
+    // create
+    Path diffCreatePath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_create");
+    assertThrows(InvalidPathException.class, () -> create(diffCreatePath, gravitinoFileSystem));
+
+    // append
+    Path diffAppendPath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_append");
+    assertThrows(InvalidPathException.class, () -> append(diffAppendPath, gravitinoFileSystem));
+
+    // rename
+    create(gravitinoPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(gravitinoPath));
+    Path renamePath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_diffRename");
+    assertThrows(
+        InvalidPathException.class, () -> gravitinoFileSystem.rename(gravitinoPath, renamePath));
+    gravitinoFileSystem.delete(gravitinoPath, true);
+
+    // delete
+    Path diffDeletePath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_delete");
+    FileSystem fs1 = diffDeletePath.getFileSystem(conf);
+    create(diffDeletePath, fs1);
+    assertNotEquals(fs1, gravitinoFileSystem);
+    assertThrows(
+        InvalidPathException.class, () -> gravitinoFileSystem.delete(diffDeletePath, true));
+    fs1.delete(diffDeletePath, true);
+
+    // list status
+    Path diffStatusPath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_status");
+    FileSystem fs2 = diffStatusPath.getFileSystem(conf);
+    create(diffStatusPath, fs2);
+    assertNotEquals(fs2, gravitinoFileSystem);
+    assertThrows(InvalidPathException.class, () -> gravitinoFileSystem.listStatus(diffStatusPath));
+    fs2.delete(diffStatusPath, true);
+
+    // mkdir
+    Path diffMkdirPath =
+        new Path("gvfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_mkdir");
+    assertThrows(
+        InvalidPathException.class,
+        () -> gravitinoFileSystem.mkdirs(diffMkdirPath, MOCK_PERMISSION));
   }
 
   @Test
@@ -92,7 +153,7 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                 mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
@@ -124,7 +185,7 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                 mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
@@ -159,7 +220,7 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                 mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
@@ -181,9 +242,36 @@ public class TestGravitinoFileSystem {
   }
 
   @Test
+  public void testGetStatus() throws IOException {
+    Path mockFilePath = new Path(mockPath.toString() + "/testGet.txt");
+    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testGet.txt");
+    create(mockFilePath, mockFileSystem);
+    assertTrue(mockFileSystem.exists(mockFilePath));
+    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
+    FileStatus mockStatuses = mockFileSystem.getFileStatus(mockPath);
+    mockFileSystem.delete(mockFilePath, true);
+    assertFalse(mockFileSystem.exists(mockFilePath));
+    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
+
+    create(gravitinoFilePath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
+    FileStatus gravitinoStatuses = gravitinoFileSystem.getFileStatus(gravitinoPath);
+    gravitinoFileSystem.delete(gravitinoFilePath, true);
+    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
+    assertEquals(
+        mockStatuses.getPath().toString(),
+        gravitinoStatuses
+            .getPath()
+            .toString()
+            .replaceFirst(
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
+  }
+
+  @Test
   public void testListStatus() throws IOException {
-    Path mockFilePath = new Path(mockPath.toString() + "/testDelete.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testDelete.txt");
+    Path mockFilePath = new Path(mockPath.toString() + "/testList.txt");
+    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testList.txt");
     create(mockFilePath, mockFileSystem);
     assertTrue(mockFileSystem.exists(mockFilePath));
     assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
@@ -205,7 +293,7 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                 mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
@@ -227,7 +315,7 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                 mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
