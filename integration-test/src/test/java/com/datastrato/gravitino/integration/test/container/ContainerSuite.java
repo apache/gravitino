@@ -29,7 +29,7 @@ public class ContainerSuite implements Closeable {
   // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
   public static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/28";
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
-  private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.14/28";
+  private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.0/28";
   private static final String NETWORK_NAME = "gravitino-ci-network";
 
   private static Network network = null;
@@ -160,6 +160,9 @@ public class ContainerSuite implements Closeable {
 
     for (com.github.dockerjava.api.model.Network network : networks) {
       List<Config> ipamConfigs = network.getIpam().getConfig();
+      if (ipamConfigs == null) {
+        continue;
+      }
       for (Config ipamConfig : ipamConfigs) {
         try {
           if (ipRangesOverlap(ipamConfig.getSubnet(), CONTAINER_NETWORK_SUBNET)) {
