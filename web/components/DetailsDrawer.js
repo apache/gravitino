@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -16,7 +16,8 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  TableContainer
+  TableContainer,
+  Tooltip
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -26,7 +27,7 @@ import EmptyText from '@/components/EmptyText'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 
 const DetailsDrawer = props => {
-  const { openDrawer, setOpenDrawer, drawerData = {} } = props
+  const { openDrawer, setOpenDrawer, drawerData = {}, page } = props
 
   const { audit = {} } = drawerData
 
@@ -49,15 +50,19 @@ const DetailsDrawer = props => {
   }
 
   useEffect(() => {
-    if (drawerData.properties) {
-      const propsData = Object.keys(drawerData.properties).map(item => {
-        return {
-          key: item,
-          value: drawerData.properties[item]
-        }
-      })
+    if (JSON.stringify(drawerData) !== '{}') {
+      if (drawerData.properties) {
+        const propsData = Object.keys(drawerData.properties).map(item => {
+          return {
+            key: item,
+            value: drawerData.properties[item]
+          }
+        })
 
-      setProperties(propsData)
+        setProperties(propsData)
+      } else {
+        setProperties([])
+      }
     }
   }, [drawerData])
 
@@ -92,16 +97,37 @@ const DetailsDrawer = props => {
       </Box>
       <Box sx={{ p: 4 }}>
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
-          <Typography
-            variant='subtitle1'
-            className={'twc-py-2 twc-font-semibold twc-text-[1.2rem]'}
-            sx={{
-              borderBottom: theme => `1px solid ${theme.palette.divider}`
-            }}
-          >
-            {drawerData.name}
-          </Typography>
+          <Tooltip title={drawerData.name} placement='bottom-start'>
+            <Typography
+              variant='subtitle1'
+              className={
+                'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'
+              }
+              sx={{
+                borderBottom: theme => `1px solid ${theme.palette.divider}`
+              }}
+            >
+              {drawerData.name}
+            </Typography>
+          </Tooltip>
         </Grid>
+
+        {page && page === 'metalakes' ? (
+          <>
+            <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Type
+              </Typography>
+              {renderFieldText(drawerData.type)}
+            </Grid>
+            <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Provider
+              </Typography>
+              {renderFieldText(drawerData.provider)}
+            </Grid>
+          </>
+        ) : null}
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
