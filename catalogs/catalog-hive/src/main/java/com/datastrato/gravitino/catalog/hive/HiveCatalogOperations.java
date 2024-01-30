@@ -54,7 +54,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.nio.file.Files;
-import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -336,33 +335,27 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-      loginUgi.doAs(
-          new PrivilegedExceptionAction<Object>() {
-            @Override
-            public Object run() throws Exception {
-              clientPool.run(
-                  client -> {
-                    client.createDatabase(hiveSchema.toHiveDB());
-                    return null;
-                  });
-              return null;
-            }
+
+      clientPool.run(
+          client -> {
+            client.createDatabase(hiveSchema.toHiveDB());
+            return null;
           });
 
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
-    } /*catch (AlreadyExistsException e) {
-        throw new SchemaAlreadyExistsException(
-            String.format(
-                "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
-            e);
+    } catch (AlreadyExistsException e) {
+      throw new SchemaAlreadyExistsException(
+          String.format(
+              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
+          e);
 
-      } catch (TException e) {
-        throw new RuntimeException(
-            "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
+    } catch (TException e) {
+      throw new RuntimeException(
+          "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
 
-      }*/ catch (Exception e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
