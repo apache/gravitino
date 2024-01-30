@@ -17,7 +17,7 @@ import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } 
 
 import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
-import DetailsDrawer from './DetailsDrawer'
+import DetailsDrawer from '@/components/DetailsDrawer'
 import CreateMetalakeDialog from './CreateMetalakeDialog'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 

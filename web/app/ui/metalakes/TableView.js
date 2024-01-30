@@ -12,7 +12,7 @@ import { DataGrid } from '@mui/x-data-grid'
 import Icon from '@/components/Icon'
 
 import ColumnTypeChip from '@/components/ColumnTypeChip'
-import DetailsDrawer from '../DetailsDrawer'
+import DetailsDrawer from '@/components/DetailsDrawer'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from './CreateCatalogDialog'
 
@@ -336,7 +336,7 @@ const TableView = props => {
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
       />
-      <DetailsDrawer openDrawer={openDrawer} setOpenDrawer={setOpenDrawer} drawerData={drawerData} />
+      <DetailsDrawer openDrawer={openDrawer} setOpenDrawer={setOpenDrawer} drawerData={drawerData} page={page} />
       <ConfirmDeleteDialog
         open={openConfirmDelete}
         setOpen={setOpenConfirmDelete}
