@@ -79,6 +79,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -676,6 +677,44 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertArrayEquals(
         new String[] {"hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test"},
         partitionNames);
+  }
+
+  @Test
+  public void testListPartitions() throws TException, InterruptedException {
+    Table createdTable = preparePartitionedTable();
+    String insertTemplate =
+        "INSERT INTO TABLE %s.%s "
+            + "PARTITION (hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2') "
+            + "VALUES %s, %s";
+    sparkSession.sql(String.format(insertTemplate, schemaName, createdTable.name(), "(1)", "(2)"));
+
+    // update partition stats
+    String partition1 = "hive_col_name2='2023-01-01', hive_col_name3='gravitino_it_test'";
+    String partition2 = "hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2'";
+    sparkSession.sql(
+        String.format(
+            "ANALYZE TABLE %s.%s PARTITION (%s) COMPUTE STATISTICS",
+            schemaName, createdTable.name(), partition1));
+    sparkSession.sql(
+        String.format(
+            "ANALYZE TABLE %s.%s PARTITION (%s) COMPUTE STATISTICS",
+            schemaName, createdTable.name(), partition2));
+
+    Partition[] partitions = createdTable.supportPartitions().listPartitions();
+    Assertions.assertEquals(2, partitions.length);
+    String partition1Name = "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test";
+    String partition2Name = "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2";
+    Set<String> partitionNames =
+        Arrays.stream(partitions).map(Partition::name).collect(Collectors.toSet());
+    Assertions.assertTrue(partitionNames.contains(partition1Name));
+    Assertions.assertTrue(partitionNames.contains(partition2Name));
+    for (Partition partition : partitions) {
+      if (partition.name().equals(partition1Name)) {
+        Assertions.assertEquals("1", partition.properties().get("spark.sql.statistics.numRows"));
+      } else if (partition.name().equals(partition2Name)) {
+        Assertions.assertEquals("2", partition.properties().get("spark.sql.statistics.numRows"));
+      }
+    }
   }
 
   @Test
