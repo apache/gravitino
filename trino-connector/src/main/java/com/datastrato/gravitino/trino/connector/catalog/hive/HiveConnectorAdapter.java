@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   private static final Logger LOG = LoggerFactory.getLogger(HiveConnectorAdapter.class);
+  private static int version = 0;
+
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
@@ -33,7 +35,8 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
     config.put("connectorName", "hive");
 
     Map<String, Object> properties = new HashMap<>();

@@ -6,7 +6,7 @@ CREATE TABLE
    name varchar,
    salary integer
 )
-COMMENT ''
+COMMENT ''"
 
 CREATE TABLE
 

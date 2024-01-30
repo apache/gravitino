@@ -20,6 +20,7 @@ import java.util.Map;
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static int version = 0;
   private final HasPropertyMeta propertyMetadata;
 
   public MemoryConnectorAdapter() {
@@ -30,6 +31,8 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
     Map<String, Object> config = new HashMap<>();
     config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
     config.put("connectorName", "memory");
 
     Map<String, Object> properties = new HashMap<>();
