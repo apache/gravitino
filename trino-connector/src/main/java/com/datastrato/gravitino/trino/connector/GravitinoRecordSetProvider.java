@@ -31,8 +31,15 @@ public class GravitinoRecordSetProvider implements ConnectorRecordSetProvider {
       ConnectorTableHandle table,
       List<? extends ColumnHandle> columns) {
     if (!(table instanceof GravitinoTableHandle)) {
+      if (!columns.isEmpty() && columns.get(0) instanceof GravitinoColumnHandle) {
+        columns =
+            columns.stream()
+                .map(column -> ((GravitinoColumnHandle) column).getInternalColumnHandler())
+                .toList();
+      }
       return internalRecordSetProvider.getRecordSet(transaction, session, split, table, columns);
     }
+
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) table;
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transaction;
