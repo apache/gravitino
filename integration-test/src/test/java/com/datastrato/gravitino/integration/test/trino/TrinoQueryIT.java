@@ -55,7 +55,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     ciTestsets.add("lakehouse-iceberg");
     ciTestsets.add("jdbc-mysql");
     ciTestsets.add("jdbc-postgresql");
-    ciTestsets.add("tpcds");
+    ciTestsets.add("tpch");
   }
 
   @BeforeAll
@@ -206,6 +206,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       }
 
       String result = queryRunner.runQuery(sql).trim();
+      result = result.replaceAll("WARNING:.*?\\n", "");
       boolean match = match(expectResult, result);
 
       if (match) {
