@@ -12,8 +12,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
@@ -35,6 +38,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -153,7 +157,11 @@ public class TestPartitionOperations extends JerseyTest {
               @Override
               public Partition addPartition(Partition partition)
                   throws PartitionAlreadyExistsException {
-                return null;
+                if (partitions.containsKey(partition.name())) {
+                  throw new PartitionAlreadyExistsException(partition.name());
+                } else {
+                  return partition;
+                }
               }
 
               @Override
@@ -234,5 +242,51 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp2.getCode());
     Assertions.assertEquals(NoSuchPartitionException.class.getSimpleName(), errorResp2.getType());
     Assertions.assertTrue(errorResp2.getMessage().contains("p3"));
+  }
+
+  @Test
+  public void testAddPartition() {
+    mockPartitionedTable();
+
+    Partition newPartition =
+        Partitions.identity(
+            "p3",
+            new String[][] {colName},
+            new Literal[] {Literals.stringLiteral("v3")},
+            Maps.newHashMap());
+
+    AddPartitionsRequest req =
+        new AddPartitionsRequest(new PartitionDTO[] {DTOConverters.toDTO(newPartition)});
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    PartitionListResponse partitionResp = resp.readEntity(PartitionListResponse.class);
+    Assertions.assertEquals(0, partitionResp.getCode());
+
+    Partition[] partition = partitionResp.getPartitions();
+    Assertions.assertEquals(1, partition.length);
+    Assertions.assertEquals(DTOConverters.toDTO(newPartition), partition[0]);
+
+    // Test throws exception
+    req = new AddPartitionsRequest(new PartitionDTO[] {DTOConverters.toDTO(partition1)});
+    Response resp2 =
+        target(partitionPath(metalake, catalog, schema, table))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResp2.getCode());
+    Assertions.assertEquals(
+        PartitionAlreadyExistsException.class.getSimpleName(), errorResp2.getType());
+    Assertions.assertTrue(errorResp2.getMessage().contains(partition1.name()));
   }
 }

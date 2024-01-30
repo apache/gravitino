@@ -57,6 +57,7 @@ import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
@@ -361,6 +362,31 @@ public class DTOConverters {
     }
 
     return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
+  }
+
+  public static Partition fromDTO(PartitionDTO partitionDTO) {
+    switch (partitionDTO.type()) {
+      case IDENTITY:
+        IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) partitionDTO;
+        return Partitions.identity(
+            identityPartitionDTO.name(),
+            identityPartitionDTO.fieldNames(),
+            identityPartitionDTO.values(),
+            identityPartitionDTO.properties());
+      case RANGE:
+        RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
+        return Partitions.range(
+            rangePartitionDTO.name(),
+            rangePartitionDTO.lower(),
+            rangePartitionDTO.upper(),
+            rangePartitionDTO.properties());
+      case LIST:
+        ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
+        return Partitions.list(
+            listPartitionDTO.name(), listPartitionDTO.lists(), listPartitionDTO.properties());
+      default:
+        throw new IllegalArgumentException("Unsupported partition type: " + partitionDTO.type());
+    }
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
