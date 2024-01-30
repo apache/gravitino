@@ -18,10 +18,13 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMet
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.datastrato.gravitino.server.web.OverwriteDefaultConfig;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-public class IcebergConfig extends Config {
+public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(CATALOG_BACKEND_NAME)
@@ -111,5 +114,14 @@ public class IcebergConfig extends Config {
 
   public IcebergConfig() {
     super(false);
+  }
+
+  @Override
+  public Map<String, String> getOverwriteDefaultConfig() {
+    return ImmutableMap.of(
+        JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
+        JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
+        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
   }
 }

@@ -34,6 +34,10 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -50,6 +54,11 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -73,6 +82,45 @@ public class DTOConverters {
         .withProperties(metalake.properties())
         .withAudit(toDTO(metalake.auditInfo()))
         .build();
+  }
+
+  public static PartitionDTO toDTO(Partition partition) {
+    if (partition instanceof RangePartition) {
+      RangePartition rangePartition = (RangePartition) partition;
+      return RangePartitionDTO.builder()
+          .withName(rangePartition.name())
+          .withUpper((LiteralDTO) toFunctionArg(rangePartition.upper()))
+          .withLower((LiteralDTO) toFunctionArg(rangePartition.lower()))
+          .withProperties(rangePartition.properties())
+          .build();
+    } else if (partition instanceof IdentityPartition) {
+      IdentityPartition identityPartition = (IdentityPartition) partition;
+      return IdentityPartitionDTO.builder()
+          .withName(identityPartition.name())
+          .withFieldNames(identityPartition.fieldNames())
+          .withValues(
+              Arrays.stream(identityPartition.values())
+                  .map(v -> (LiteralDTO) toFunctionArg(v))
+                  .toArray(LiteralDTO[]::new))
+          .withProperties(identityPartition.properties())
+          .build();
+    } else if (partition instanceof ListPartition) {
+      ListPartition listPartition = (ListPartition) partition;
+      return ListPartitionDTO.builder()
+          .withName(listPartition.name())
+          .withLists(
+              Arrays.stream(listPartition.lists())
+                  .map(
+                      list ->
+                          Arrays.stream(list)
+                              .map(v -> (LiteralDTO) toFunctionArg(v))
+                              .toArray(LiteralDTO[]::new))
+                  .toArray(LiteralDTO[][]::new))
+          .withProperties(listPartition.properties())
+          .build();
+    } else {
+      throw new IllegalArgumentException("Unsupported partition type: " + partition.getClass());
+    }
   }
 
   public static CatalogDTO toDTO(Catalog catalog) {
@@ -213,8 +261,8 @@ public class DTOConverters {
 
     if (expression instanceof Literal) {
       return new LiteralDTO.Builder()
-          .withValue(((Literal<String>) expression).value())
-          .withDataType(((Literal<String>) expression).dataType())
+          .withValue((((Literal) expression).value().toString()))
+          .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
       return new FieldReferenceDTO.Builder()
@@ -314,6 +362,31 @@ public class DTOConverters {
     }
 
     return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
+  }
+
+  public static Partition fromDTO(PartitionDTO partitionDTO) {
+    switch (partitionDTO.type()) {
+      case IDENTITY:
+        IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) partitionDTO;
+        return Partitions.identity(
+            identityPartitionDTO.name(),
+            identityPartitionDTO.fieldNames(),
+            identityPartitionDTO.values(),
+            identityPartitionDTO.properties());
+      case RANGE:
+        RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
+        return Partitions.range(
+            rangePartitionDTO.name(),
+            rangePartitionDTO.lower(),
+            rangePartitionDTO.upper(),
+            rangePartitionDTO.properties());
+      case LIST:
+        ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
+        return Partitions.list(
+            listPartitionDTO.name(), listPartitionDTO.lists(), listPartitionDTO.properties());
+      default:
+        throw new IllegalArgumentException("Unsupported partition type: " + partitionDTO.type());
+    }
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {

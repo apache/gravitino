@@ -776,7 +776,7 @@ public class TestTableOperations extends JerseyTest {
         .toString();
   }
 
-  private static Column mockColumn(String name, Type type) {
+  public static Column mockColumn(String name, Type type) {
     return mockColumn(name, type, true);
   }
 
@@ -823,7 +823,7 @@ public class TestTableOperations extends JerseyTest {
     return table;
   }
 
-  private static Table mockTable(
+  public static Table mockTable(
       String tableName,
       Column[] columns,
       String comment,
