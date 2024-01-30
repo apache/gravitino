@@ -104,7 +104,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Catalog catalog = createCatalog(catalogName);
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
-    Schema schema = catalog.asSchemas().createSchema(ident, "comment", prop);
+    Schema schema = catalog.asSchemas().createSchema(ident, null, prop);
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
   }
@@ -127,7 +127,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", properties);
+            NameIdentifier.of(metalakeName, catalogName, schemaName), null, properties);
     Table table =
         catalog
             .asTableCatalog()
