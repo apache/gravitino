@@ -108,7 +108,7 @@ public class GravitinoTable {
     return properties;
   }
 
-  public GravitinoColumn getRawColumns(String columName) {
+  public GravitinoColumn getColumn(String columName) {
     Optional<GravitinoColumn> entry =
         columns.stream().filter((column -> column.getName().equals(columName))).findFirst();
     if (entry.isEmpty()) {
