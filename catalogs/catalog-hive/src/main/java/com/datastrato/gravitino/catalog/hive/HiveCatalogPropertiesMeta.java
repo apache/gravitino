@@ -28,7 +28,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public static final String KET_TAB_URI = "kerberos.keytab";
+  public static final String KET_TAB_URI = "kerberos.keytab-uri";
 
   public static final String PRINCIPAL = "kerberos.principal";
 

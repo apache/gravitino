@@ -169,7 +169,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         try {
           URI uri = new URI(keyTabUri);
-          String scheme = Optional.of(uri.getScheme()).orElse("file");
+          String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
           switch (scheme) {
             case "http":
             case "https":
@@ -184,7 +184,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               break;
 
             case "file":
-              Files.createSymbolicLink(keyTabFile.toPath(), new File(uri).toPath());
+              Files.createSymbolicLink(keyTabFile.toPath(), new File(uri.getPath()).toPath());
               break;
 
               // TODO: Supports to download keytab from HCFS, it's unsafe to store
@@ -309,6 +309,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
+      LOG.warn("Current user : " + UserGroupInformation.getCurrentUser().getUserName());
       HiveSchema hiveSchema =
           new HiveSchema.Builder()
               .withName(ident.name())
