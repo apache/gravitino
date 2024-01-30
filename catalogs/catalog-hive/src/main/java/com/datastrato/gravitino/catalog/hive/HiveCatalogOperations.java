@@ -333,7 +333,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             client.createDatabase(hiveSchema.toHiveDB());
             return null;
           });
-
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
@@ -1077,6 +1076,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Hive catalog does not support fileset properties metadata");
+  }
+
+  CachedClientPool getClientPool() {
+    return clientPool;
+  }
+
+  HiveConf getHiveConf() {
+    return hiveConf;
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {
