@@ -112,3 +112,15 @@ export function setObjToUrlParams(baseUrl, obj) {
 
   return /\?$/.test(baseUrl) ? baseUrl + parameters : baseUrl.replace(/\/?$/, '?') + parameters
 }
+
+export function extractPlaceholder(str) {
+  const regex = /\{\{(.*?)\}\}/g
+  let matches = []
+  let match
+
+  while ((match = regex.exec(str)) !== null) {
+    matches.push(match[1])
+  }
+
+  return matches
+}
