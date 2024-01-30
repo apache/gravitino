@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -104,7 +105,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(
+          METASTORE_URIS,
+          ConfVars.METASTOREURIS.varname,
+          PRINCIPAL,
+          ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -156,7 +161,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keyTabFile = new File(String.format("/tmp/%s-keytab", entity.id()));
+        File keyTabFile = new File(String.format("/tmp/gravitino-%s-keytab", entity.id()));
+        keyTabFile.deleteOnExit();
         if (keyTabFile.exists() && !keyTabFile.delete()) {
           LOG.warn("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
         }
@@ -197,16 +203,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         } catch (URISyntaxException ue) {
           throw new IllegalArgumentException("The uri of keytab has the wrong format", ue);
         }
+        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keyTabFile.getAbsolutePath());
 
-        String principal =
-            (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.PRINCIPAL);
+        String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
 
         refreshScheduledExecutor =
             new ScheduledThreadPoolExecutor(
-                1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.nameIdentifier())));
+                1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.id())));
 
         UserGroupInformation loginUgi =
             UserGroupInformation.loginUserFromKeytabAndReturnUGI(
