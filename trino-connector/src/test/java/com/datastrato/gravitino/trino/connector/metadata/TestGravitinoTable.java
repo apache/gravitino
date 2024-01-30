@@ -74,7 +74,7 @@ public class TestGravitinoTable {
     Map<String, String> properties = new HashMap<>();
     properties.put("format", "TEXTFILE");
 
-    Table mockTable = mockTable("table1", columns, "test table", properties);
+    Table mockTable = mockTable("table1", columns, null, properties);
 
     GravitinoTable table = new GravitinoTable("db1", "table1", mockTable);
     assertNull(table.getComment());
