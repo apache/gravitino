@@ -7,19 +7,19 @@ This software is licensed under the Apache License version 2."
 
 ## Apache Hadoop
 
-- An open source distributed storage and processing framework.
+- An open-source distributed storage and processing framework.
 
 ## Apache Hive
 
-- An open source data warehousing and SQL-like query language software project for managing and querying large datasets.
+- An open-source data warehousing and SQL-like query language software project for managing and querying large datasets.
 
 ## Apache Iceberg
 
-- An open source versioned table format for large-scale data processing.
+- An open-source, versioned table format for large-scale data processing.
 
 ## Apache License version 2
 
-- A permissive open source software license written by the Apache Software Foundation.
+- A permissive, open-source software license written by The Apache Software Foundation.
 
 ## API
 
@@ -37,7 +37,7 @@ This software is licensed under the Apache License version 2."
 
 - A compatible implementation of the Hive Metastore Service (HMS).
 
-## Binary Distribution Package
+## Binary distribution package
 
 - A package containing the compiled and executable version of the software, ready for distribution and deployment.
 
@@ -53,13 +53,13 @@ This software is licensed under the Apache License version 2."
 
 - The individual fields or attributes of a table, specifying details such as name, data type, comment, and nullability.
 
-## Continuous Integration (CI)
+## Continuous integration (CI)
 
-- The practice of automatically building, testing, and validating code changes when committed to version control.
+- The practice of automatically building, testing, and validating code changes when they are committed to version control.
 
-## Contributor Covenant
+## Contributor covenant
 
-- A widely used and recognized code of conduct for open source communities. It provides guidelines for creating a welcoming and inclusive environment for all contributors.
+- A widely-used and recognized code of conduct for open-source communities. It provides guidelines for creating a welcoming and inclusive environment for all contributors.
 
 ## Dependencies
 
@@ -101,7 +101,7 @@ This software is licensed under the Apache License version 2."
 
 - Variables used to pass information to running processes.
 
-## Geo-Distributed
+## Geo-distributed
 
 - The distribution of data or services across multiple geographic locations.
 
@@ -109,7 +109,7 @@ This software is licensed under the Apache License version 2."
 
 - A web-based platform for version control and collaboration using Git.
 
-## GitHub actions
+## GitHub Actions
 
 - A continuous integration and continuous deployment (CI/CD) service provided by GitHub, used for automating build, test, and deployment workflows.
 
@@ -135,7 +135,7 @@ This software is licensed under the Apache License version 2."
 
 ## GPG/GnuPG
 
-- Gnu Privacy Guard or GnuPG, an open source implementation of the OpenPGP standard, used for encryption, signing files, or emails.
+- Gnu Privacy Guard or GnuPG, an open-source implementation of the OpenPGP standard, used for encrypting and signing files and emails.
 
 ## Gradle
 
@@ -147,11 +147,11 @@ This software is licensed under the Apache License version 2."
 
 ## Gravitino
 
-- A open source software platform created by Datastrato for high-performance, geo-distributed, and federated metadata lake. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
+- An open-source software platform created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
 
-## Gravitino Configuration File (gravitino.conf)
+## Gravitino configuration file (gravitino.conf)
 
-- The configuration file for the Gravitino server, located in the conf directory. It follows the standard property file format and contains settings for the Gravitino server.
+- The configuration file for the Gravitino server, located in the `conf` directory. It follows the standard property file format and contains settings for the Gravitino server.
 
 ## Hashes
 
@@ -159,7 +159,7 @@ This software is licensed under the Apache License version 2."
 
 ## HDFS
 
-- **HDFS** (Hadoop Distributed File System) is an open-source distributed file system and a key component of the Apache Hadoop ecosystem. It is designed to store and process large-scale datasets, providing high reliability, fault tolerance, and performance for distributed storage solutions.
+- **HDFS** (Hadoop Distributed File System) is an open-source, distributed file system and a key component of the Apache Hadoop ecosystem. It is designed to store and process large-scale datasets, providing high reliability, fault tolerance, and performance for distributed storage solutions.
 
 ## Headless
 
@@ -225,11 +225,11 @@ This software is licensed under the Apache License version 2."
 
 - A virtual machine that enables a computer to run Java applications, providing an abstraction layer between the application and the underlying hardware.
 
-## JVM Metrics 
+## JVM metrics 
 
 - Metrics related to the performance and behavior of the Java Virtual Machine (JVM), including memory usage, garbage collection, and buffer pool metrics.
 
-## JVM Instrumentation 
+## JVM instrumentation 
 
 - The process of adding monitoring and management capabilities to the Java Virtual Machine, allowing for the collection of performance metrics.
 
@@ -269,7 +269,7 @@ This software is licensed under the Apache License version 2."
 
 - A tool mentioned as an alternative to Docker for macOS when running Gravitino integration tests.
 
-## Open Authorization / OAuth
+## Open authorization / OAuth
 
 - A standard protocol for authorization that allows third-party applications to access user data without exposing user credentials.
 
@@ -283,9 +283,9 @@ This software is licensed under the Apache License version 2."
 
 ## Properties
 
-- Configurable settings and attributes associated with catalogs, schemas, and tables, influence their behavior and storage.
+- Configurable settings and attributes associated with catalogs, schemas, and tables, to influence their behavior and storage.
 
-## Protocol Buffers (protobuf)
+## Protocol buffers (protobuf)
 
 - A method developed by Google for serializing structured data, similar to XML or JSON. It is often used for efficient and extensible communication between systems.
 
@@ -295,7 +295,7 @@ This software is licensed under the Apache License version 2."
 
 ## Representational State Transfer (REST)
 
-- Representational State Transfer, a set of architectural principles for designing networked applications.
+- A set of architectural principles for designing networked applications.
 
 ## REST API (Representational State Transfer Application Programming Interface)
 
@@ -365,7 +365,7 @@ This software is licensed under the Apache License version 2."
 
 - A connector module for integrating Gravitino with Trino.
 
-## Trino Gravitino Connector Documentation
+## Trino Gravitino connector documentation
 
 -  Documentation providing information on using the Trino connector to access metadata in Gravitino.
 
@@ -373,7 +373,7 @@ This software is licensed under the Apache License version 2."
 
 - A Linux distribution based on Debian, widely used for cloud computing and servers.
 
-## Unit Test
+## Unit test
 
 - A type of testing where individual components or functions of a program are tested to ensure they work as expected in isolation.
 
