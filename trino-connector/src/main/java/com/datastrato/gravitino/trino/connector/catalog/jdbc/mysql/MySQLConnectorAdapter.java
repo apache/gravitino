@@ -19,7 +19,9 @@ import java.util.Map;
 
 /** Transforming MySQL connector configuration and components into Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
+
   private final PropertyConverter catalogConverter;
+  private static int version = 0;
   private final HasPropertyMeta propertyMetadata;
 
   public MySQLConnectorAdapter() {
@@ -30,7 +32,8 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
     config.put("connectorName", "mysql");
 
     Map<String, String> properties =

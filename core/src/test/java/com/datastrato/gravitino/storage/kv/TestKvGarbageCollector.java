@@ -111,7 +111,7 @@ class TestKvGarbageCollector {
       Assertions.assertNull(transactionalKvBackend.get("testC".getBytes()));
       List<Pair<byte[], byte[]>> allData =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)
@@ -131,7 +131,7 @@ class TestKvGarbageCollector {
 
       allData =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)
@@ -167,7 +167,7 @@ class TestKvGarbageCollector {
       KvEntityStore kvEntityStore = (KvEntityStore) store;
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake1"), "catalog1", auditInfo);
@@ -185,7 +185,7 @@ class TestKvGarbageCollector {
       KvBackend kvBackend = kvEntityStore.backend;
       List<Pair<byte[], byte[]>> data =
           kvBackend.scan(
-              new KvRangeScan.KvRangeScanBuilder()
+              new KvRange.KvRangeBuilder()
                   .start("_".getBytes())
                   .end("z".getBytes())
                   .startInclusive(false)

@@ -183,10 +183,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(resultProperties)
         .withComment(comment)
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -291,6 +288,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         // Remove id from comment
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
         .withProperties(properties)
+        .withIndexes(load.index())
         .build();
   }
 
@@ -364,7 +362,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(indexes.length == 0, "Jdbc-catalog does not support indexes");
     Preconditions.checkArgument(
         null == distribution || distribution == Distributions.NONE,
         "jdbc-catalog does not support distribution");
@@ -399,19 +396,18 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         jdbcColumns,
         StringIdentifier.addToComment(identifier, comment),
         resultProperties,
-        partitioning);
+        partitioning,
+        indexes);
 
     return new JdbcTable.Builder()
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)
         .withColumns(columns)
         .withComment(comment)
         .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
+        .withIndexes(indexes)
         .build();
   }
 

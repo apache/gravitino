@@ -5,10 +5,11 @@
 package com.datastrato.gravitino.dto.rel.partitions;
 
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import java.util.Map;
 import java.util.Objects;
 
-public class RangePartitionDTO implements PartitionDTO {
+public class RangePartitionDTO implements PartitionDTO, RangePartition {
 
   private final String name;
   private final Map<String, String> properties;
@@ -36,10 +37,12 @@ public class RangePartitionDTO implements PartitionDTO {
     return name;
   }
 
+  @Override
   public LiteralDTO upper() {
     return upper;
   }
 
+  @Override
   public LiteralDTO lower() {
     return lower;
   }

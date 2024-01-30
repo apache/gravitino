@@ -51,7 +51,7 @@ const CustomTabPanel = props => {
 }
 
 const TabsContent = props => {
-  const { tableTitle, store, page } = props
+  const { tableTitle, store, page, routeParams } = props
   const [tab, setTab] = useState('table')
 
   const handleChangeTab = (event, newValue) => {
@@ -67,7 +67,7 @@ const TabsContent = props => {
         </TabList>
       </Box>
       <CustomTabPanel value='table'>
-        <TableView page={page} />
+        <TableView page={page} routeParams={routeParams} />
       </CustomTabPanel>
       <CustomTabPanel value='details'>
         <DetailsView store={store} page={page} />

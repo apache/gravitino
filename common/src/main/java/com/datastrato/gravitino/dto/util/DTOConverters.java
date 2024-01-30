@@ -34,6 +34,10 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -49,6 +53,11 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -72,6 +81,45 @@ public class DTOConverters {
         .withProperties(metalake.properties())
         .withAudit(toDTO(metalake.auditInfo()))
         .build();
+  }
+
+  public static PartitionDTO toDTO(Partition partition) {
+    if (partition instanceof RangePartition) {
+      RangePartition rangePartition = (RangePartition) partition;
+      return RangePartitionDTO.builder()
+          .withName(rangePartition.name())
+          .withUpper((LiteralDTO) toFunctionArg(rangePartition.upper()))
+          .withLower((LiteralDTO) toFunctionArg(rangePartition.lower()))
+          .withProperties(rangePartition.properties())
+          .build();
+    } else if (partition instanceof IdentityPartition) {
+      IdentityPartition identityPartition = (IdentityPartition) partition;
+      return IdentityPartitionDTO.builder()
+          .withName(identityPartition.name())
+          .withFieldNames(identityPartition.fieldNames())
+          .withValues(
+              Arrays.stream(identityPartition.values())
+                  .map(v -> (LiteralDTO) toFunctionArg(v))
+                  .toArray(LiteralDTO[]::new))
+          .withProperties(identityPartition.properties())
+          .build();
+    } else if (partition instanceof ListPartition) {
+      ListPartition listPartition = (ListPartition) partition;
+      return ListPartitionDTO.builder()
+          .withName(listPartition.name())
+          .withLists(
+              Arrays.stream(listPartition.lists())
+                  .map(
+                      list ->
+                          Arrays.stream(list)
+                              .map(v -> (LiteralDTO) toFunctionArg(v))
+                              .toArray(LiteralDTO[]::new))
+                  .toArray(LiteralDTO[][]::new))
+          .withProperties(listPartition.properties())
+          .build();
+    } else {
+      throw new IllegalArgumentException("Unsupported partition type: " + partition.getClass());
+    }
   }
 
   public static CatalogDTO toDTO(Catalog catalog) {
@@ -120,6 +168,7 @@ public class DTOConverters {
         .withDistribution(toDTO(table.distribution()))
         .withAudit(toDTO(table.auditInfo()))
         .withPartitioning(toDTOs(table.partitioning()))
+        .withIndex(toDTOs(table.index()))
         .build();
   }
 
@@ -261,7 +310,7 @@ public class DTOConverters {
 
   public static IndexDTO[] toDTOs(Index[] indexes) {
     if (ArrayUtils.isEmpty(indexes)) {
-      return new IndexDTO[0];
+      return IndexDTO.EMPTY_INDEXES;
     }
     return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
@@ -300,6 +349,18 @@ public class DTOConverters {
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
+  }
+
+  public static Index fromDTO(IndexDTO indexDTO) {
+    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+  }
+
+  public static Index[] fromDTOs(IndexDTO[] indexDTOS) {
+    if (ArrayUtils.isEmpty(indexDTOS)) {
+      return Indexes.EMPTY_INDEXES;
+    }
+
+    return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {

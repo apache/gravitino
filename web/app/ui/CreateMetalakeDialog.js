@@ -30,6 +30,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { genUpdates } from '@/lib/utils'
+import { nameRegex, keyRegex } from '@/lib/utils/regex'
 
 const defaultValues = {
   name: '',
@@ -37,7 +38,13 @@ const defaultValues = {
 }
 
 const schema = yup.object().shape({
-  name: yup.string().required()
+  name: yup
+    .string()
+    .required()
+    .matches(
+      nameRegex,
+      'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
+    )
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -75,6 +82,11 @@ const CreateMetalakeDialog = props => {
 
     const duplicateKeys = nonEmptyKeys.some((item, i) => i !== index && item.key === event.target.value)
     data[index].hasDuplicateKey = duplicateKeys
+
+    if (event.target.name === 'key') {
+      const invalidKey = !keyRegex.test(event.target.value)
+      data[index].invalid = invalidKey
+    }
   }
 
   const addFields = () => {
@@ -114,7 +126,9 @@ const CreateMetalakeDialog = props => {
           filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
       )
 
-    if (duplicateKeys) {
+    const invalidKeys = innerProps.some(i => i.invalid)
+
+    if (duplicateKeys || invalidKeys) {
       return
     }
 
@@ -262,6 +276,12 @@ const CreateMetalakeDialog = props => {
                       </Box>
                       {item.hasDuplicateKey && (
                         <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
+                      )}
+                      {item.invalid && (
+                        <FormHelperText className={'twc-text-error-main'}>
+                          Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
+                          characters, underscores, hyphens, or dots.
+                        </FormHelperText>
                       )}
                     </FormControl>
                   </Grid>

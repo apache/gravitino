@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.dto.rel;
 
 import com.datastrato.gravitino.dto.AuditDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -44,7 +45,7 @@ public class TableDTO implements Table {
   private Partitioning[] partitioning;
 
   @JsonProperty("indexes")
-  private Index[] indexes;
+  private IndexDTO[] indexes;
 
   private TableDTO() {}
 
@@ -68,7 +69,7 @@ public class TableDTO implements Table {
       Partitioning[] partitioning,
       DistributionDTO distribution,
       SortOrderDTO[] sortOrderDTOs,
-      Index[] indexes) {
+      IndexDTO[] indexes) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
@@ -148,7 +149,7 @@ public class TableDTO implements Table {
     protected SortOrderDTO[] sortOrderDTOs;
     protected DistributionDTO distributionDTO;
     protected Partitioning[] Partitioning;
-    protected Index[] indexes;
+    protected IndexDTO[] indexes;
 
     public Builder() {}
 
@@ -222,7 +223,7 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
-    public S withIndex(Index[] indexes) {
+    public S withIndex(IndexDTO[] indexes) {
       this.indexes = indexes;
       return (S) this;
     }
