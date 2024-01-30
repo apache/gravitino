@@ -15,6 +15,7 @@ import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOper
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.sql.Connection;
@@ -75,7 +76,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     // list table
     List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -83,7 +85,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
 
     // rename table
     String newName = "new_table";
@@ -126,7 +128,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -152,7 +154,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // alter column Nullability
     TABLE_OPERATIONS.alterTable(
@@ -176,7 +178,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -184,7 +186,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.remove(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
@@ -203,9 +205,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
                 TEST_DB_NAME,
                 newName,
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
-    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
     Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
   }
 
   @Test
@@ -303,10 +305,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         Collections.emptyMap(),
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), load);
+    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
   }
 
   @Test
@@ -352,7 +355,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         },
         null,
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     List<String> tableNames = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_1));
@@ -379,7 +383,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         },
         null,
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
     tableNames = postgreSqlTableOperations.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_2));
 
@@ -389,7 +394,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         NoSuchTableException.class, () -> postgreSqlTableOperations.load("other_schema", table_2));
     Assertions.assertThrows(
         NoSuchTableException.class, () -> TABLE_OPERATIONS.load("other_schema", table_2));
-    postgreSqlTableOperations.purge(TEST_DB_NAME, table_1);
+    postgreSqlTableOperations.drop(TEST_DB_NAME, table_1);
 
     Assertions.assertThrows(
         NoSuchTableException.class,
@@ -429,7 +434,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     // list table
     List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -437,7 +443,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
 
     columns.clear();
     columns.add(
@@ -467,7 +473,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
                     columns.toArray(new JdbcColumn[0]),
                     tableComment,
                     properties,
-                    null));
+                    null,
+                    Indexes.EMPTY_INDEXES));
 
     Assertions.assertTrue(
         StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));

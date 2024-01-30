@@ -57,11 +57,10 @@ public class KerberosUtils {
   }
 
   public static LoginContext login(String principal, String keyTabFile) throws LoginException {
-    LoginContext loginContext = null;
     Set<Principal> principals = new HashSet<>();
     principals.add(new KerberosPrincipal(principal));
     Subject subject = new Subject(false, principals, new HashSet<>(), new HashSet<>());
-    loginContext =
+    LoginContext loginContext =
         new LoginContext("", subject, null, new KerberosConfiguration(principal, keyTabFile));
     loginContext.login();
     return loginContext;
@@ -95,9 +94,12 @@ public class KerberosUtils {
     public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
       Map<String, String> options = new HashMap<String, String>();
 
-      options.put("keyTab", keyTabFile);
+      if (keyTabFile != null) {
+        options.put("useKeyTab", "true");
+        options.put("keyTab", keyTabFile);
+      }
+
       options.put("principal", principal);
-      options.put("useKeyTab", "true");
       options.put("storeKey", "true");
       options.put("doNotPrompt", "true");
       options.put("useTicketCache", "true");

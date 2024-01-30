@@ -5,7 +5,7 @@
 
 # Governance Policy
 
-This document provides the governance policy for the project. Maintainers agree to this policy and to follow all Project polices by adding their name to the [maintainers.md file](./MAINTAINERS.md).
+This document provides the governance policy for the project. Maintainers agree to this policy and to follow all project polices by adding their name to the [maintainers.md file](./MAINTAINERS.md).
 
 ## 1. Roles
 
@@ -25,7 +25,7 @@ This project includes the following roles.
 
 **3.2. Balance**. The development process should balance the interests of all stakeholders.
 
-**3.3. Harmonization**. Good faith efforts shall be made to resolve any conflicts.
+**3.3. Harmonization**. Good-faith efforts shall be made to resolve any conflicts.
 
 ## 4. Trademarks
 

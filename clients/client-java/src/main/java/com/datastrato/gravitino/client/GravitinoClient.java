@@ -21,6 +21,8 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -258,6 +260,25 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
      * @return This Builder instance for method chaining.
      */
     public Builder withOAuth(OAuth2TokenProvider dataProvider) {
+      this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Sets KerberosTokenProvider for the GravitinoClient.
+     *
+     * @param dataProvider The KerberosTokenProvider used as the provider of authentication data for
+     *     GravitinoClient.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withKerberosAuth(KerberosTokenProvider dataProvider) {
+      try {
+        if (uri != null) {
+          dataProvider.setHost(new URI(uri).getHost());
+        }
+      } catch (URISyntaxException ue) {
+        throw new IllegalArgumentException("URI has the wrong format", ue);
+      }
       this.authDataProvider = dataProvider;
       return this;
     }

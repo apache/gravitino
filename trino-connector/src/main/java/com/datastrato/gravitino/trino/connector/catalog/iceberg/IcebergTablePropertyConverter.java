@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_LOCATION_PROPERTY;
+
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
@@ -22,7 +25,10 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
   // TODO (yuqi) add more properties
   @VisibleForTesting
   static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
-      new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
+      new TreeBidiMap<>(
+          new ImmutableMap.Builder<String, String>()
+              .put(ICEBERG_LOCATION_PROPERTY, LOCATION)
+              .build());
 
   @Override
   public TreeBidiMap<String, String> engineToGravitinoMapping() {
