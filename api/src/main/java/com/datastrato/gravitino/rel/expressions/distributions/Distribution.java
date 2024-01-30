@@ -30,9 +30,13 @@ public interface Distribution extends Expression {
    * Indicates whether some other object is "equal to" this one.
    *
    * @param distribution The reference distribution object with which to compare.
-   * @return
+   * @return returns true if this object is the same as the obj argument; false otherwise.
    */
   default boolean equals(Distribution distribution) {
+    if (distribution == null) {
+      return false;
+    }
+
     return strategy().equals(distribution.strategy())
         && number() == distribution.number()
         && Arrays.equals(expressions(), distribution.expressions());
