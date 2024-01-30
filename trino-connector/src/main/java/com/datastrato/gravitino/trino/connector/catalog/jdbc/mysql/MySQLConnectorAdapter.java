@@ -51,4 +51,9 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   public List<PropertyMetadata<?>> getTableProperties() {
     return propertyMetadata.getTablePropertyMetadata();
   }
+
+  @Override
+  public List<PropertyMetadata<?>> getColumnProperties() {
+    return propertyMetadata.getColumnPropertyMetadata();
+  }
 }

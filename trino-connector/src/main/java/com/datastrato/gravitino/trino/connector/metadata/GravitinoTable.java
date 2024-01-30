@@ -95,12 +95,14 @@ public class GravitinoTable {
   public ColumnDTO[] getColumnDTOs() {
     ColumnDTO[] gravitinoColumns = new ColumnDTO[columns.size()];
     for (int i = 0; i < columns.size(); i++) {
+      GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
           ColumnDTO.builder()
-              .withName(columns.get(i).getName())
-              .withDataType(columns.get(i).getType())
-              .withComment(columns.get(i).getComment())
-              .withNullable(columns.get(i).isNullable())
+              .withName(column.getName())
+              .withDataType(column.getType())
+              .withComment(column.getComment())
+              .withNullable(column.isNullable())
+              .withAutoIncrement(column.isAutoIncrement())
               .build();
     }
     return gravitinoColumns;

@@ -15,17 +15,35 @@ public final class GravitinoColumn {
   private final int index;
   private final String comment;
   private final boolean nullable;
+  private final boolean autoIncrement;
 
   public GravitinoColumn(Column column, int columnIndex) {
-    this(column.name(), column.dataType(), columnIndex, column.comment(), column.nullable());
+    this(
+        column.name(),
+        column.dataType(),
+        columnIndex,
+        column.comment(),
+        column.nullable(),
+        column.autoIncrement());
   }
 
-  public GravitinoColumn(String name, Type dataType, int index, String comment, boolean nullable) {
+  public GravitinoColumn(
+      String name,
+      Type dataType,
+      int index,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement) {
     this.name = name;
     this.dataType = dataType;
     this.index = index;
     this.comment = comment;
     this.nullable = nullable;
+    this.autoIncrement = autoIncrement;
+  }
+
+  public GravitinoColumn(String name, Type dataType, int index, String comment, boolean nullable) {
+    this(name, dataType, index, comment, nullable, false);
   }
 
   public int getIndex() {
@@ -54,5 +72,9 @@ public final class GravitinoColumn {
 
   public boolean isHidden() {
     return false;
+  }
+
+  public boolean isAutoIncrement() {
+    return autoIncrement;
   }
 }

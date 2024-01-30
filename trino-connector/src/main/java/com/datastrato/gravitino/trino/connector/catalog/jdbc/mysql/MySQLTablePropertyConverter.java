@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_AUTO_INCREMENT_OFFSET;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_ENGINE;
 
 import com.datastrato.catalog.property.PropertyConverter;
@@ -27,6 +28,9 @@ public class MySQLTablePropertyConverter extends PropertyConverter {
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
               .put(TABLE_ENGINE, MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY)
+              .put(
+                  TABLE_AUTO_INCREMENT_OFFSET,
+                  MysqlTablePropertiesMetadata.GRAVITINO_AUTO_INCREMENT_OFFSET_KEY)
               .build());
 
   @Override

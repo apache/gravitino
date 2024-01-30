@@ -16,6 +16,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.google.common.collect.ImmutableSet;
@@ -100,13 +101,17 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
+      boolean autoIncrement =
+          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
+
       columns.add(
           new GravitinoColumn(
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
               column.getComment(),
-              column.isNullable()));
+              column.isNullable(),
+              autoIncrement));
     }
     GravitinoTable gravitinoTable =
         new GravitinoTable(schemaName, tableName, columns, comment, properties);

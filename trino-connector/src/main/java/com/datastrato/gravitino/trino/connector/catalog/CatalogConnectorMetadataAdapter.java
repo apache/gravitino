@@ -4,10 +4,12 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -83,14 +85,18 @@ public class CatalogConnectorMetadataAdapter {
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
+      boolean autoIncrement =
+          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
       columns.add(
           new GravitinoColumn(
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
               column.getComment(),
-              column.isNullable()));
+              column.isNullable(),
+              autoIncrement));
     }
+
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
 
@@ -108,12 +114,18 @@ public class CatalogConnectorMetadataAdapter {
 
   /** Transform gravitino column metadata to trino ColumnMetadata */
   public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
+    Map<String, Object> columnPropertyMap =
+        column.isAutoIncrement()
+            ? ImmutableMap.of(MySQLPropertyMeta.AUTO_INCREMENT, true)
+            : ImmutableMap.of();
+
     return ColumnMetadata.builder()
         .setName(column.getName())
         .setType(dataTypeTransformer.getTrinoType(column.getType()))
         .setComment(Optional.ofNullable(column.getComment()))
         .setNullable(column.isNullable())
         .setHidden(column.isHidden())
+        .setProperties(columnPropertyMap)
         .build();
   }
 
@@ -167,11 +179,15 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   public GravitinoColumn createColumn(ColumnMetadata column) {
+    boolean autoIncrement =
+        (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
+
     return new GravitinoColumn(
         column.getName(),
         dataTypeTransformer.getGravitinoType(column.getType()),
         -1,
         column.getComment(),
-        column.isNullable());
+        column.isNullable(),
+        autoIncrement);
   }
 }
