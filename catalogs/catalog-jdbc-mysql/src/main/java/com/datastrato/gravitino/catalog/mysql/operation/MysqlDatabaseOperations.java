@@ -43,7 +43,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "MySQL doesn't support set schema comment:" + originComment);
+          "MySQL doesn't support set schema comment: " + originComment);
     }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 
