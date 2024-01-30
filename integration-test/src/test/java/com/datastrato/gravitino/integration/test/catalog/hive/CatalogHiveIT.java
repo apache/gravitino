@@ -662,6 +662,34 @@ public class CatalogHiveIT extends AbstractIT {
             .contains("The partition field must be placed at the end of the columns in order"));
   }
 
+  @Test
+  public void testListPartitionNames() throws TException, InterruptedException {
+    ColumnDTO[] columns = createColumns();
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                new Transform[] {
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
+                });
+    org.apache.hadoop.hive.metastore.api.Table actualTable =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(actualTable);
+
+    String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
+    Assertions.assertArrayEquals(
+        new String[] {"hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test"},
+        partitionNames);
+  }
+
   private void assertTableEquals(
       Table createdTable, org.apache.hadoop.hive.metastore.api.Table hiveTab) {
     Distribution distribution = createdTable.distribution();

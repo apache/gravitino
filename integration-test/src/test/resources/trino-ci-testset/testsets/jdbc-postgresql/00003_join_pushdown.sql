@@ -52,7 +52,7 @@ FROM "test.gt_postgresql".gt_db1.employee_performance AS p
 JOIN "test.gt_postgresql".gt_db1.employees AS e
   ON p.employee_id = e.employee_id
 ORDER BY
-rating DESC
+rating DESC, given_name
 LIMIT 10;
 
 drop table "test.gt_postgresql".gt_db1.employee_performance;

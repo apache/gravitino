@@ -63,7 +63,7 @@ public class TestCatalogOperations
     filesets = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
-    filesetPropertiesMetadata = new TestBasePropertiesMetadata();
+    filesetPropertiesMetadata = new TestFilesetPropertiesMetadata();
     this.config = config;
   }
 

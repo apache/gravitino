@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
@@ -140,6 +141,12 @@ public class IcebergTable extends BaseTable {
         .withSortOrders(sortOrder)
         .withDistribution(distribution)
         .build();
+  }
+
+  @Override
+  protected TableOperations newOps() {
+    // todo: implement this method when we have the Iceberg table operations.
+    throw new UnsupportedOperationException("IcebergTable does not support TableOperations.");
   }
 
   /** A builder class for constructing IcebergTable instances. */

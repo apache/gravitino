@@ -15,7 +15,13 @@ import {
   getMetalakeDetailsApi
 } from '@/lib/api/metalakes'
 
-import { getCatalogsApi, getCatalogDetailsApi, createCatalogApi } from '@/lib/api/catalogs'
+import {
+  getCatalogsApi,
+  getCatalogDetailsApi,
+  createCatalogApi,
+  updateCatalogApi,
+  deleteCatalogApi
+} from '@/lib/api/catalogs'
 import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 
@@ -274,7 +280,9 @@ export const getCatalogDetails = createAsyncThunk('appMetalakes/getCatalogDetail
 export const createCatalog = createAsyncThunk(
   'appMetalakes/createCatalog',
   async ({ data, metalake }, { dispatch }) => {
+    dispatch(setTableLoading(true))
     const [err, res] = await to(createCatalogApi({ data, metalake }))
+    dispatch(setTableLoading(false))
 
     if (err || !res) {
       throw new Error(err)
@@ -287,6 +295,35 @@ export const createCatalog = createAsyncThunk(
     return res.catalog
   }
 )
+
+export const updateCatalog = createAsyncThunk(
+  'appMetalakes/updateCatalog',
+  async ({ metalake, catalog, data }, { dispatch }) => {
+    const [err, res] = await to(updateCatalogApi({ metalake, catalog, data }))
+    if (err || !res) {
+      throw new Error(err)
+    }
+    dispatch(fetchCatalogs({ metalake, catalog, page: 'metalakes', init: true }))
+    dispatch(initMetalakeTree({ metalake, catalog }))
+
+    return res
+  }
+)
+
+export const deleteCatalog = createAsyncThunk('appMetalakes/deleteCatalog', async (data, { dispatch }) => {
+  dispatch(setTableLoading(true))
+  const [err, res] = await to(deleteCatalogApi(data))
+  dispatch(setTableLoading(false))
+
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  dispatch(fetchCatalogs({ ...data, page: 'metalakes', init: true }))
+  dispatch(initMetalakeTree({ ...data }))
+
+  return res
+})
 
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
