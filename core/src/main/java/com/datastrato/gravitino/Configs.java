@@ -41,7 +41,8 @@ public interface Configs {
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
-          .doc("Directory path of `RocksDBKvBackend`")
+          .doc(
+              "The storage path for RocksDB storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/rocksdb`")
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
