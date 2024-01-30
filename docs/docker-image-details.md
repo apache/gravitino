@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 # User Docker images
 
-There are 2 kinds of Docker images for users to use: the Gravitino Docker image and playground Docker images.
+There are two kinds of Docker images you can use: the Gravitino Docker image and playground Docker images.
 
 ## Gravitino Docker image
 
@@ -66,8 +66,7 @@ Changelog
 
 # Developer Docker images
 
-You can use these kinds of Docker images to facilitate Gravitino integration testing.
-You can use it to test all catalog and connector modules within Gravitino.
+You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
 ## Gravitino CI Apache Hive image
 

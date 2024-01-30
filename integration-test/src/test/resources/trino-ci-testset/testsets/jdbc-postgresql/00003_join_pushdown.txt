@@ -16,9 +16,9 @@ INSERT: 10 rows
 "Avram","Lawrence","6"
 "Avram","Lawrence","4"
 "Avram","Lawrence","4"
-"Gregory","Smith","4"
-"Gregory","Smith","4"
 "Avram","Lawrence","4"
+"Gregory","Smith","4"
+"Gregory","Smith","4"
 "Avram","Lawrence","2"
 
 DROP TABLE
