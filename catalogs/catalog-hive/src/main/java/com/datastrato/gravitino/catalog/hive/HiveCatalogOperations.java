@@ -54,6 +54,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.nio.file.Files;
+import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -100,6 +101,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
   private ScheduledThreadPoolExecutor refreshScheduledExecutor;
+
+  private UserGroupInformation loginUgi;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -180,10 +183,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             case "http":
             case "https":
             case "ftp":
+              int timeout =
+                  (int)
+                      catalogPropertiesMetadata.getOrDefault(
+                          conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
               URLConnection uc = uri.toURL().openConnection();
-              // TODO: Add a new parameter
-              uc.setConnectTimeout(60 * 1000);
-              uc.setReadTimeout(60 * 1000);
+              uc.setConnectTimeout(timeout * 1000);
+              uc.setReadTimeout(timeout * 1000);
               uc.connect();
 
               Files.copy(uc.getInputStream(), keyTabFile.toPath());
@@ -203,6 +209,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         } catch (URISyntaxException ue) {
           throw new IllegalArgumentException("The uri of keytab has the wrong format", ue);
         }
+
         hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keyTabFile.getAbsolutePath());
 
         String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
@@ -213,12 +220,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.id())));
 
-        UserGroupInformation loginUgi =
+        loginUgi =
             UserGroupInformation.loginUserFromKeytabAndReturnUGI(
                 principal, keyTabFile.getAbsolutePath());
 
-        // TODO: Add the document for this pull request
-        // TODO: Add a new parameter
+        int refreshInterval =
+            (int)
+                catalogPropertiesMetadata.getOrDefault(
+                    conf, HiveCatalogPropertiesMeta.REFRESH_INTERVAL_SEC);
         refreshScheduledExecutor.scheduleAtFixedRate(
             () -> {
               try {
@@ -227,8 +236,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 LOG.error("Fail to refresh ugi token: ", throwable);
               }
             },
-            5,
-            5,
+            refreshInterval,
+            refreshInterval,
             TimeUnit.SECONDS);
 
       } catch (IOException ioe) {
@@ -327,26 +336,33 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-
-      clientPool.run(
-          client -> {
-            client.createDatabase(hiveSchema.toHiveDB());
-            return null;
+      loginUgi.doAs(
+          new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+              clientPool.run(
+                  client -> {
+                    client.createDatabase(hiveSchema.toHiveDB());
+                    return null;
+                  });
+              return null;
+            }
           });
+
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
-    } catch (AlreadyExistsException e) {
-      throw new SchemaAlreadyExistsException(
-          String.format(
-              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
-          e);
+    } /*catch (AlreadyExistsException e) {
+        throw new SchemaAlreadyExistsException(
+            String.format(
+                "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
+            e);
 
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
+      } catch (TException e) {
+        throw new RuntimeException(
+            "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
 
-    } catch (Exception e) {
+      }*/ catch (Exception e) {
       throw new RuntimeException(e);
     }
   }

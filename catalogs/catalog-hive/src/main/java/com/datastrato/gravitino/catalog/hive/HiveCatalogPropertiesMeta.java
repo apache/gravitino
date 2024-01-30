@@ -32,6 +32,10 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String PRINCIPAL = "kerberos.principal";
 
+  public static final String REFRESH_INTERVAL_SEC = "kerberos.refresh-interval-sec";
+
+  public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
+
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -67,11 +71,19 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
           .put(
               KET_TAB_URI,
               PropertyEntry.stringImmutablePropertyEntry(
-                  KET_TAB_URI, "The uri of key tab for the catalog", false, null, true, false))
+                  KET_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
           .put(
               PRINCIPAL,
               PropertyEntry.stringImmutablePropertyEntry(
-                  PRINCIPAL, "The principal for the catalog", false, null, true, false))
+                  PRINCIPAL, "The principal for the catalog", false, null, false, false))
+          .put(
+              REFRESH_INTERVAL_SEC,
+              PropertyEntry.integerOptionalPropertyEntry(
+                  REFRESH_INTERVAL_SEC, "The interval to refresh the principal", true, 60, false))
+          .put(
+              FETCH_TIMEOUT_SEC,
+              PropertyEntry.integerOptionalPropertyEntry(
+                  FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 
