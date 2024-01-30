@@ -126,8 +126,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), null, properties);
+        .createSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), null, properties);
     Table table =
         catalog
             .asTableCatalog()
