@@ -27,7 +27,9 @@ dependencies {
   implementation(libs.bundles.jersey)
   implementation(libs.metrics.jersey2)
 
-  // For more, please see: https://stackoverflow.com/questions/46493613/what-is-the-replacement-for-javax-activation-package-in-java-9
+  // As of Java 9 or newer, the javax.activation package (needed by the jetty server) is no longer part of the JDK. It was removed because it was part of the
+  // JavaBeans Activation Framework (JAF) which has been removed from Java SE. So we need to add it as a dependency. For more,
+  // please see: https://stackoverflow.com/questions/46493613/what-is-the-replacement-for-javax-activation-package-in-java-9
   implementation(libs.sun.activation)
 
   compileOnly(libs.lombok)
