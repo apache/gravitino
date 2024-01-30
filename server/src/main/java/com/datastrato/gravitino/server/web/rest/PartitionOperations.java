@@ -79,7 +79,7 @@ public class PartitionOperations {
             return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePartitionException(OperationType.LIST, "", table, e);
+      return ExceptionHandlers.handlePartitionException(OperationType.GET, "", table, e);
     }
   }
 }
