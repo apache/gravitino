@@ -16,7 +16,8 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  TableContainer
+  TableContainer,
+  Tooltip
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -42,7 +43,7 @@ const DetailsDrawer = props => {
     }
 
     return (
-      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
+      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
         {isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
@@ -92,15 +93,19 @@ const DetailsDrawer = props => {
       </Box>
       <Box sx={{ p: 4 }}>
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
-          <Typography
-            variant='subtitle1'
-            className={'twc-py-2 twc-font-semibold twc-text-[1.2rem]'}
-            sx={{
-              borderBottom: theme => `1px solid ${theme.palette.divider}`
-            }}
-          >
-            {drawerData.name}
-          </Typography>
+          <Tooltip title={drawerData.name} placement='bottom-start'>
+            <Typography
+              variant='subtitle1'
+              className={
+                'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'
+              }
+              sx={{
+                borderBottom: theme => `1px solid ${theme.palette.divider}`
+              }}
+            >
+              {drawerData.name}
+            </Typography>
+          </Tooltip>
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>

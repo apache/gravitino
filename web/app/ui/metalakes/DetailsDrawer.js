@@ -42,7 +42,7 @@ const DetailsDrawer = props => {
     }
 
     return (
-      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
+      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
         {isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
