@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.datastrato.gravitino.rel.types.Type;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.TypeUtil;
@@ -26,16 +27,20 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
   @Override
   public Type struct(Types.StructType struct, List<Type> fieldResults) {
+    List<com.datastrato.gravitino.rel.types.Types.StructType.Field> fieldsList = new ArrayList<>();
+    List<Types.NestedField> originalFields = struct.fields();
+
+    for (int i = 0; i < originalFields.size(); i++) {
+      Types.NestedField nestedField = originalFields.get(i);
+      fieldsList.add(
+          com.datastrato.gravitino.rel.types.Types.StructType.Field.of(
+              nestedField.name(),
+              fieldResults.get(i),
+              nestedField.isOptional(),
+              nestedField.doc()));
+    }
     return com.datastrato.gravitino.rel.types.Types.StructType.of(
-        struct.fields().stream()
-            .map(
-                nestedField ->
-                    com.datastrato.gravitino.rel.types.Types.StructType.Field.of(
-                        nestedField.name(),
-                        fieldResults.get(struct.fields().indexOf(nestedField)),
-                        nestedField.isOptional(),
-                        nestedField.doc()))
-            .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new));
+        fieldsList.toArray(new com.datastrato.gravitino.rel.types.Types.StructType.Field[0]));
   }
 
   @Override

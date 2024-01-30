@@ -63,10 +63,10 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the Gravitino field of Iceberg to the Iceberg column.
+   * Convert the Gravitino field to the Iceberg column.t
    *
    * @param field Gravitino field.
-   * @param id
+   * @param id Gravitino field id.
    * @return
    */
   public static IcebergColumn fromGravitinoField(
