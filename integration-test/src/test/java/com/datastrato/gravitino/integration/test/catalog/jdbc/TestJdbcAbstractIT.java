@@ -94,10 +94,6 @@ public abstract class TestJdbcAbstractIT {
       // TODO: uncomment this after default value is supported.
       // Assertions.assertEquals(
       //    columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
-      if (null != columns.get(i).getProperties()) {
-        Assertions.assertEquals(
-            columns.get(i).getProperties(), ((JdbcColumn) table.columns()[i]).getProperties());
-      }
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));

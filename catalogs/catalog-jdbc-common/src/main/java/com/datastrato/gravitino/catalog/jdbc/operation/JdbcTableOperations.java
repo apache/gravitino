@@ -282,7 +282,6 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withName(column.getString("COLUMN_NAME"))
         .withType(typeConverter.toGravitinoType(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
-        .withNullable(column.getBoolean("NULLABLE"))
-        .withProperties(Collections.emptyList());
+        .withNullable(column.getBoolean("NULLABLE"));
   }
 }

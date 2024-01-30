@@ -385,6 +385,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withType(column.dataType())
                         .withComment(column.comment())
                         .withNullable(column.nullable())
+                        .withAutoIncrement(column.autoIncrement())
                         .build())
             .toArray(JdbcColumn[]::new);
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
