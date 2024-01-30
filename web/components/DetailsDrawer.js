@@ -55,7 +55,7 @@ const DetailsDrawer = props => {
         const propsData = Object.keys(drawerData.properties).map(item => {
           return {
             key: item,
-            value: drawerData.properties[item]
+            value: JSON.stringify(drawerData.properties[item]).replace(/^"|"$/g, '')
           }
         })
 

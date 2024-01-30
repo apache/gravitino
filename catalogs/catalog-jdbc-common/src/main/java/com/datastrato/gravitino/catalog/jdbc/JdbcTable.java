@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.jdbc;
 import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.google.common.collect.Maps;
+import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -43,6 +44,14 @@ public class JdbcTable extends BaseTable {
       jdbcTable.sortOrders = sortOrders;
       jdbcTable.indexes = indexes;
       return jdbcTable;
+    }
+
+    public String comment() {
+      return comment;
+    }
+
+    public Map<String, String> properties() {
+      return properties;
     }
   }
 }

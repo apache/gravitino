@@ -11,11 +11,9 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -49,139 +47,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
   public static final String BACK_QUOTE = "`";
 
   @Override
-  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    List<JdbcColumn> jdbcColumns = new ArrayList<>();
-    try (Connection connection = getConnection(databaseName)) {
-      // 1.Get table information
-      DatabaseMetaData metaData = connection.getMetaData();
-      ResultSet table = metaData.getTables(databaseName, null, tableName, null);
-      if (!table.next() || !tableName.equals(table.getString("TABLE_NAME"))) {
-        throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, databaseName));
-      }
-
-      // 2.Get column information
-      ResultSet columns = metaData.getColumns(databaseName, null, tableName, null);
-      while (columns.next()) {
-        MysqlTypeConverter.MysqlTypeBean typeBean =
-            new MysqlTypeConverter.MysqlTypeBean(columns.getString("TYPE_NAME"));
-        typeBean.setColumnSize(columns.getString("COLUMN_SIZE"));
-        typeBean.setScale(columns.getString("DECIMAL_DIGITS"));
-
-        String columnName = columns.getString("COLUMN_NAME");
-        String colComment = columns.getString("REMARKS");
-        jdbcColumns.add(
-            new JdbcColumn.Builder()
-                .withName(columnName)
-                .withType(typeConverter.toGravitinoType(typeBean))
-                .withNullable(columns.getBoolean("NULLABLE"))
-                .withComment(StringUtils.isEmpty(colComment) ? null : colComment)
-                // TODO #1531 will add default value.
-                //                .withDefaultValue(columns.getString("COLUMN_DEF"))
-                .withProperties(Collections.emptyList())
-                .build());
-      }
-
-      // 3.Load table properties
-      Map<String, String> tableProperties = loadTablePropertiesFromSql(connection, tableName);
-
-      String comment = table.getString("REMARKS");
-      if (StringUtils.isEmpty(comment)) {
-        // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
-        LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
-        comment = tableProperties.getOrDefault(COMMENT, comment);
-      }
-
-      // 4.Get index information
-      List<Index> indexes = getIndexes(databaseName, tableName, metaData);
-
-      return new JdbcTable.Builder()
-          .withName(tableName)
-          .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
-          .withComment(comment)
-          .withProperties(
-              Collections.unmodifiableMap(
-                  new HashMap<String, String>() {
-                    {
-                      put(MYSQL_ENGINE_KEY, tableProperties.get(MYSQL_ENGINE_KEY));
-                      String autoIncrement = tableProperties.get(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                      if (StringUtils.isNotEmpty(autoIncrement)) {
-                        put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                      }
-                    }
-                  }))
-          .withIndexes(indexes.toArray(new Index[0]))
-          .withAuditInfo(AuditInfo.EMPTY)
-          .build();
-    } catch (SQLException e) {
-      throw exceptionMapper.toGravitinoException(e);
-    }
-  }
-
-  public List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
-      throws SQLException {
-    List<Index> indexes = new ArrayList<>();
-
-    // Get primary key information
-    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
-    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
-    while (primaryKeys.next()) {
-      String columnName = primaryKeys.getString("COLUMN_NAME");
-      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
-    }
-    for (String key : primaryKeyGroupByName.keySet()) {
-      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
-    }
-
-    // Get unique key information
-    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
-    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
-    while (indexInfo.next()) {
-      String indexName = indexInfo.getString("INDEX_NAME");
-      if (!indexInfo.getBoolean("NON_UNIQUE")
-          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
-        String columnName = indexInfo.getString("COLUMN_NAME");
-        indexGroupByName.put(indexName, columnName);
-      }
-    }
-    for (String key : indexGroupByName.keySet()) {
-      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
-    }
-
-    return indexes;
-  }
-
-  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
-    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
-  }
-
-  private Map<String, String> loadTablePropertiesFromSql(Connection connection, String tableName)
-      throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
-      statement.setString(1, tableName);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
-          throw new NoSuchTableException(
-              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
-        }
-        return Collections.unmodifiableMap(
-            new HashMap<String, String>() {
-              {
-                // It is not possible to get all column assembly returns here, because in version
-                // 5.7, some columns exist in metadata but get will report an error that they do not
-                // exist, such as: TABLE_NAME
-                put(COMMENT, resultSet.getString(COMMENT));
-                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                put(
-                    MYSQL_AUTO_INCREMENT_OFFSET_KEY,
-                    resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY));
-              }
-            });
-      }
-    }
-  }
-
-  @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(databaseName)) {
       try (Statement statement = connection.createStatement()) {
@@ -210,12 +75,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
                 () ->
                     new NoSuchColumnException(
                         "Column " + colName + " does not exist in table " + jdbcTable.name()));
-  }
-
-  @Override
-  protected Map<String, String> extractPropertiesFromResultSet(ResultSet table) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table properties is not supported yet");
   }
 
   @Override
@@ -309,10 +168,85 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
   }
 
+  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    List<Index> indexes = new ArrayList<>();
+
+    // Get primary key information
+    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
+    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
+    while (primaryKeys.next()) {
+      String columnName = primaryKeys.getString("COLUMN_NAME");
+      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
+    }
+    for (String key : primaryKeyGroupByName.keySet()) {
+      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
+    }
+
+    // Get unique key information
+    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
+    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
+    while (indexInfo.next()) {
+      String indexName = indexInfo.getString("INDEX_NAME");
+      if (!indexInfo.getBoolean("NON_UNIQUE")
+          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
+        String columnName = indexInfo.getString("COLUMN_NAME");
+        indexGroupByName.put(indexName, columnName);
+      }
+    }
+    for (String key : indexGroupByName.keySet()) {
+      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
+    }
+
+    return indexes;
+  }
+
+  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
+    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
+  }
+
   @Override
-  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table columns is not supported yet");
+  protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
+    return "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT"));
+  }
+
+  @Override
+  protected Map<String, String> getTableProperties(Connection connection, String tableName)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
+      statement.setString(1, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
+          throw new NoSuchTableException(
+              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        }
+        return Collections.unmodifiableMap(
+            new HashMap<String, String>() {
+              {
+                // It is not possible to get all column assembly returns here, because in version
+                // 5.7, some columns exist in metadata but get will report an error that they do not
+                // exist, such as: TABLE_NAME
+                put(COMMENT, resultSet.getString(COMMENT));
+                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                if (StringUtils.isNotEmpty(autoIncrement)) {
+                  put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                }
+              }
+            });
+      }
+    }
+  }
+
+  @Override
+  protected void correctJdbcTableFields(
+      Connection connection, String tableName, JdbcTable.Builder tableBuilder) throws SQLException {
+    if (StringUtils.isEmpty(tableBuilder.comment())) {
+      // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
+      LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
+      tableBuilder.withComment(
+          tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
+    }
   }
 
   @Override

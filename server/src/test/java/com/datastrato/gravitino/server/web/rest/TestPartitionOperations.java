@@ -15,17 +15,23 @@ import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
+import com.datastrato.gravitino.dto.responses.PartitionResponse;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -40,6 +46,24 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestPartitionOperations extends JerseyTest {
+
+  private static final String[] partitionNames = new String[] {"p1", "p2"};
+  private static final String[] colName = new String[] {"col1"};
+
+  private static final Partition partition1 =
+      Partitions.identity(
+          partitionNames[0],
+          new String[][] {colName},
+          new Literal[] {Literals.stringLiteral("v1")},
+          Maps.newHashMap());
+  private static final Partition partition2 =
+      Partitions.identity(
+          partitionNames[1],
+          new String[][] {colName},
+          new Literal[] {Literals.stringLiteral("v2")},
+          Maps.newHashMap());
+  private static final Map<String, Partition> partitions =
+      ImmutableMap.of(partitionNames[0], partition1, partitionNames[1], partition2);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -85,6 +109,17 @@ public class TestPartitionOperations extends JerseyTest {
         metalake, catalog, schema, table);
   }
 
+  private Table mockPartitionedTable() {
+    Column[] columns =
+        new Column[] {
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
+        };
+    String comment = "mock comment";
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    Transform[] transforms = new Transform[] {Transforms.identity("col1")};
+    return mockPartitionedTable(table, columns, comment, properties, transforms, partitionNames);
+  }
+
   private Table mockPartitionedTable(
       String tableName,
       Column[] columns,
@@ -108,7 +143,11 @@ public class TestPartitionOperations extends JerseyTest {
 
               @Override
               public Partition getPartition(String partitionName) throws NoSuchPartitionException {
-                return null;
+                Partition partition = partitions.get(partitionName);
+                if (partition == null) {
+                  throw new NoSuchPartitionException(partitionName);
+                }
+                return partition;
               }
 
               @Override
@@ -122,26 +161,13 @@ public class TestPartitionOperations extends JerseyTest {
                 return false;
               }
             });
+    when(dispatcher.loadTable(any())).thenReturn(mockedTable);
     return mockedTable;
   }
 
   @Test
   public void testListPartitionNames() {
-    Column[] columns =
-        new Column[] {
-          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
-        };
-    String partitionName1 = "p1";
-    String partitionName2 = "p2";
-    Table mockedTable =
-        mockPartitionedTable(
-            table,
-            columns,
-            "mock comment",
-            ImmutableMap.of("k1", "v1"),
-            new Transform[] {Transforms.identity("col1")},
-            new String[] {partitionName1, partitionName2});
-    when(dispatcher.loadTable(any())).thenReturn(mockedTable);
+    Table mockedTable = mockPartitionedTable();
 
     Response resp =
         target(partitionPath(metalake, catalog, schema, table))
@@ -157,8 +183,8 @@ public class TestPartitionOperations extends JerseyTest {
 
     String[] names = listResp.partitionNames();
     Assertions.assertEquals(2, names.length);
-    Assertions.assertEquals(partitionName1, names[0]);
-    Assertions.assertEquals(partitionName2, names[1]);
+    Assertions.assertEquals(partitionNames[0], names[0]);
+    Assertions.assertEquals(partitionNames[1], names[1]);
 
     // Test throws exception
     doThrow(new RuntimeException("test exception")).when(mockedTable).supportPartitions();
@@ -175,5 +201,38 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
     Assertions.assertTrue(errorResp2.getMessage().contains("test exception"));
+  }
+
+  @Test
+  public void testGetPartition() {
+    mockPartitionedTable();
+
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table) + partitionNames[0])
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    PartitionResponse partitionResp = resp.readEntity(PartitionResponse.class);
+    Assertions.assertEquals(0, partitionResp.getCode());
+
+    Partition partition = partitionResp.getPartition();
+    Assertions.assertEquals(DTOConverters.toDTO(partition1), partition);
+
+    // Test throws exception
+    Response resp2 =
+        target(partitionPath(metalake, catalog, schema, table) + "p3")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp2.getCode());
+    Assertions.assertEquals(NoSuchPartitionException.class.getSimpleName(), errorResp2.getType());
+    Assertions.assertTrue(errorResp2.getMessage().contains("p3"));
   }
 }

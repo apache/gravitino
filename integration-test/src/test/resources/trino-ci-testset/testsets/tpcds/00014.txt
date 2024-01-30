@@ -1,4 +1,3 @@
-WARNING: Number of stages in the query (%) exceeds the soft limit (50). If the query contains multiple aggregates with DISTINCT over different columns, please set the 'mark_distinct_strategy' session property to 'none'. If the query contains WITH clauses that are referenced more than once, please create temporary table(s) for the queries in those clauses.
 "catalog","1001001","1","5","24855.29","3"
 "catalog","1001001","1","","24855.29","3"
 "catalog","1001001","2","2","14819.17","3"
