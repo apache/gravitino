@@ -68,9 +68,9 @@ const MetalakeView = props => {
     dispatch(
       setSelectedTreeNode(
         routeParams.catalog
-          ? `${routeParams.metalake}____${routeParams.catalog}${routeParams.schema ? `____${routeParams.schema}` : ''}${
-              routeParams.table ? `____${routeParams.table}` : ''
-            }`
+          ? `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
+              routeParams.schema ? `{{${routeParams.schema}}}` : ''
+            }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
           : null
       )
     )

@@ -5,7 +5,7 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { to } from '@/lib/utils'
+import { to, extractPlaceholder } from '@/lib/utils'
 
 import {
   createMetalakeApi,
@@ -87,7 +87,7 @@ export const initMetalakeTree = createAsyncThunk(
         const catalogNode = {
           ...catalogItem,
           node: 'catalog',
-          id: `${metalake}____${catalogItem.name}`,
+          id: `{{${metalake}}}{{${catalogItem.name}}}`,
           path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name }).toString()}`,
           name: catalogItem.name,
           schemas: [],
@@ -105,7 +105,7 @@ export const initMetalakeTree = createAsyncThunk(
               const schemaNode = {
                 ...schemaItem,
                 node: 'schema',
-                id: `${metalake}____${catalogItem.name}____${schemaItem.name}`,
+                id: `{{${metalake}}}{{${catalogItem.name}}}{{${schemaItem.name}}}`,
                 path: `?${new URLSearchParams({
                   metalake,
                   catalog: catalogItem.name,
@@ -126,7 +126,7 @@ export const initMetalakeTree = createAsyncThunk(
                     const tableNode = {
                       ...tableItem,
                       node: 'table',
-                      id: `${metalake}____${catalogItem.name}____${schemaItem.name}____${tableItem.name}`,
+                      id: `{{${metalake}}}{{${catalogItem.name}}}{{${schemaItem.name}}}{{${tableItem.name}}}`,
                       path: `?${new URLSearchParams({
                         metalake,
                         catalog: catalogItem.name,
@@ -164,7 +164,7 @@ export const setIntoTreeAction = createAsyncThunk(
   'appMetalakes/setIntoTreeAction',
   async ({ catalogItem, nodeIds }, { getState, dispatch }) => {
     dispatch(setTreeLoading(true))
-    const nodeArr = nodeIds[0].split('____')
+    const nodeArr = extractPlaceholder(nodeIds[0])
     const [metalake, catalog, schema, table] = nodeArr
 
     const data = {
@@ -250,7 +250,7 @@ export const fetchCatalogs = createAsyncThunk(
       return {
         ...catalog,
         node: 'catalog',
-        id: `${metalake}____${catalog.name}`,
+        id: `{{${metalake}}}{{${catalog.name}}}`,
         path: `?${new URLSearchParams({ metalake, catalog: catalog.name }).toString()}`,
         name: catalog.name,
         schemas: []
@@ -290,7 +290,7 @@ export const createCatalog = createAsyncThunk(
 
     const { catalog: catalogItem } = res
 
-    dispatch(setIntoTreeAction({ catalogItem, nodeIds: [metalake] }))
+    dispatch(setIntoTreeAction({ catalogItem, nodeIds: [`{{${metalake}}}`] }))
 
     return res.catalog
   }
@@ -345,7 +345,7 @@ export const fetchSchemas = createAsyncThunk(
       return {
         ...schema,
         node: 'schema',
-        id: `${metalake}____${catalog}____${schema.name}`,
+        id: `{{${metalake}}}{{${catalog}}}{{${schema.name}}}`,
         path: `?${new URLSearchParams({ metalake, catalog, schema: schema.name }).toString()}`,
         name: schema.name,
         tables: []
@@ -391,7 +391,7 @@ export const fetchTables = createAsyncThunk(
       return {
         ...table,
         node: 'table',
-        id: `${metalake}____${catalog}____${schema}____${table.name}`,
+        id: `{{${metalake}}}{{${catalog}}}{{${schema}}}{{${table.name}}}`,
         path: `?${new URLSearchParams({ metalake, catalog, schema, table: table.name }).toString()}`,
         name: table.name,
         columns: []
@@ -497,7 +497,7 @@ export const appMetalakesSlice = createSlice({
         const catalogItem = {
           namespace: [action.payload.metalake],
           node: 'catalog',
-          id: `${action.payload.metalake}____${action.payload.catalogItem.name}`,
+          id: `{{${action.payload.metalake}}}{{${action.payload.catalogItem.name}}}`,
           path: `?${new URLSearchParams({
             metalake: action.payload.metalake,
             catalog: action.payload.catalogItem.name
