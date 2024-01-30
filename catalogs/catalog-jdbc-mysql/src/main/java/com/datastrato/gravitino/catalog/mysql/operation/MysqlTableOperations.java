@@ -19,6 +19,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
@@ -33,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -45,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String BACK_QUOTE = "`";
+  public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -88,6 +91,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
     }
+    validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
 
@@ -130,6 +134,44 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
+  private static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
+    // Check auto increment column
+    List<JdbcColumn> autoIncrementCols =
+        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
+    String autoIncrementColsStr =
+        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
+    Preconditions.checkArgument(
+        autoIncrementCols.size() <= 1,
+        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
+            + autoIncrementColsStr);
+    if (!autoIncrementCols.isEmpty()) {
+      Optional<Index> existAutoIncrementColIndexOptional =
+          Arrays.stream(indexes)
+              .filter(
+                  index ->
+                      Arrays.stream(index.fieldNames())
+                          .flatMap(Arrays::stream)
+                          .anyMatch(
+                              s ->
+                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
+              .filter(
+                  index ->
+                      index.type() == Index.IndexType.PRIMARY_KEY
+                          || index.type() == Index.IndexType.UNIQUE_KEY)
+              .findAny();
+      Preconditions.checkArgument(
+          existAutoIncrementColIndexOptional.isPresent(),
+          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
+    }
   }
 
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
@@ -366,9 +408,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(change.nullable())
-            .withProperties(column.getProperties())
             .withType(column.dataType())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
@@ -400,9 +442,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(column.nullable())
-            .withProperties(column.getProperties())
             .withType(column.dataType())
             .withComment(newComment)
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
@@ -455,10 +497,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(newColumnName)
             .withType(column.dataType())
             .withComment(column.comment())
-            .withProperties(column.getProperties())
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(column.nullable())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -522,12 +564,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            // Modifying a field type does not require adding its attributes. If
-            // additional attributes are required, they must be modified separately.
-            // TODO #839
-            .withProperties(null)
             .withDefaultValue(null)
             .withNullable(column.nullable())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -547,12 +586,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // TODO #1531 will add default value.
 
-    // Add column properties if specified
-    if (CollectionUtils.isNotEmpty(column.getProperties())) {
-      for (String property : column.getProperties()) {
-        sqlBuilder.append(property).append(SPACE);
-      }
+    // Add column auto_increment if specified
+    if (column.autoIncrement()) {
+      sqlBuilder.append(MYSQL_AUTO_INCREMENT).append(" ");
     }
+
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
       sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");

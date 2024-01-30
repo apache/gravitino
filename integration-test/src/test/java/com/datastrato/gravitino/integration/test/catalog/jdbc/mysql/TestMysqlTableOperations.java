@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang.math.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
@@ -243,7 +244,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(col_1.name())
             .withType(INT)
             .withComment(col_1.comment())
-            .withProperties(col_1.getProperties())
+            .withAutoIncrement(col_1.autoIncrement())
             .withNullable(col_1.nullable())
             // TODO: uncomment this after supporting default values
             // .withDefaultValue(col_1.getDefaultValue())
@@ -253,7 +254,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(col_2.name())
             .withType(col_2.dataType())
             .withComment(newComment)
-            .withProperties(col_2.getProperties())
+            .withAutoIncrement(col_2.autoIncrement())
             .withNullable(col_2.nullable())
             // TODO: uncomment this after supporting default values
             // .withDefaultValue(col_2.getDefaultValue())
@@ -279,7 +280,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(newColName_1)
             .withType(col_1.dataType())
             .withComment(col_1.comment())
-            .withProperties(col_1.getProperties())
+            .withAutoIncrement(col_1.autoIncrement())
             .withNullable(col_1.nullable())
             // TODO: uncomment this after supporting default values
             // .withDefaultValue(col_1.getDefaultValue())
@@ -289,7 +290,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(newColName_2)
             .withType(col_2.dataType())
             .withComment(col_2.comment())
-            .withProperties(col_2.getProperties())
+            .withAutoIncrement(col_2.autoIncrement())
             .withNullable(col_2.nullable())
             // TODO: uncomment this after supporting default values
             // .withDefaultValue(col_2.getDefaultValue())
@@ -318,7 +319,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(col_2.name())
             .withType(col_2.dataType())
             .withComment(newCol2Comment)
-            .withProperties(col_2.getProperties())
+            .withAutoIncrement(col_2.autoIncrement())
             // TODO: uncomment this after supporting default values
             // .withDefaultValue(col_2.getDefaultValue())
             .withNullable(col_2.nullable())
@@ -667,5 +668,138 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             + "CONSTRAINT PRIMARY KEY (`col_2`, `col_1`, `col_3`),\n"
             + "CONSTRAINT `uk_3` UNIQUE (`col_4`, `col_5`, `col_6`, `col_7`)";
     Assertions.assertEquals(expectedStr, sql.toString());
+  }
+
+  @Test
+  public void testAutoIncrement() {
+    String tableName = "test_increment_table_1";
+    String comment = "test_comment";
+    Map<String, String> properties =
+        new HashMap<String, String>() {
+          {
+            put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
+          }
+        };
+    JdbcColumn[] columns = {
+      new JdbcColumn.Builder()
+          .withName("col_1")
+          .withType(Types.LongType.get())
+          .withComment("id")
+          .withAutoIncrement(true)
+          .withNullable(false)
+          .build(),
+      new JdbcColumn.Builder()
+          .withName("col_2")
+          .withType(Types.VarCharType.of(255))
+          .withComment("city")
+          .withNullable(false)
+          .build(),
+      new JdbcColumn.Builder()
+          .withName("col_3")
+          .withType(Types.VarCharType.of(255))
+          .withComment("name")
+          .withNullable(false)
+          .build()
+    };
+    // Test create increment key for unique index.
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_1", new String[][] {{"col_1"}})
+        };
+    TABLE_OPERATIONS.create(TEST_DB_NAME, tableName, columns, comment, properties, null, indexes);
+
+    JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(
+        tableName,
+        comment,
+        Arrays.stream(columns).collect(Collectors.toList()),
+        properties,
+        indexes,
+        table);
+    TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+
+    // Test create increment key for primary index.
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
+          Indexes.unique("uk_2", new String[][] {{"col_2"}})
+        };
+    TABLE_OPERATIONS.create(TEST_DB_NAME, tableName, columns, comment, properties, null, indexes);
+
+    table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(
+        tableName,
+        comment,
+        Arrays.stream(columns).collect(Collectors.toList()),
+        properties,
+        indexes,
+        table);
+    TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+
+    // Test create increment key for col_1 + col_3 uk.
+    indexes = new Index[] {Indexes.unique("uk_2_3", new String[][] {{"col_1"}, {"col_3"}})};
+    TABLE_OPERATIONS.create(TEST_DB_NAME, tableName, columns, comment, properties, null, indexes);
+
+    table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(
+        tableName,
+        comment,
+        Arrays.stream(columns).collect(Collectors.toList()),
+        properties,
+        indexes,
+        table);
+    TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+
+    // Test create auto increment fail
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    tableName,
+                    columns,
+                    comment,
+                    properties,
+                    null,
+                    Indexes.EMPTY_INDEXES));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            exception.getMessage(),
+            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
+
+    // Test create many auto increment col
+    JdbcColumn[] newColumns = {
+      columns[0],
+      columns[1],
+      columns[2],
+      new JdbcColumn.Builder()
+          .withName("col_4")
+          .withType(Types.IntegerType.get())
+          .withComment("test_id")
+          .withAutoIncrement(true)
+          .withNullable(false)
+          .build()
+    };
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    tableName,
+                    newColumns,
+                    comment,
+                    properties,
+                    null,
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})
+                    }));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            exception.getMessage(),
+            "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_4]"));
   }
 }
