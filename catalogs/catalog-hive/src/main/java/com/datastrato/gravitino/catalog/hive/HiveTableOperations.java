@@ -18,7 +18,7 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -111,10 +111,10 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
         partition instanceof IdentityPartition, "Hive only supports identity partition");
     IdentityPartition identityPartition = (IdentityPartition) partition;
 
-    List<String> transformFields =
+    Set<String> transformFields =
         Arrays.stream(table.partitioning())
             .map(t -> ((Transforms.IdentityTransform) t).fieldName()[0])
-            .collect(Collectors.toList());
+            .collect(Collectors.toSet());
 
     Preconditions.checkArgument(
         transformFields.size() == identityPartition.fieldNames().length,
