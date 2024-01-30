@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { useEffect, useCallback, useState, useMemo, Fragment } from 'react'
+import { useEffect, useCallback, useState, Fragment } from 'react'
 
 import Link from 'next/link'
 
@@ -79,11 +79,6 @@ const MetalakeList = () => {
   const handleShowDetails = row => {
     setDrawerData(row)
     setOpenDrawer(true)
-  }
-
-  const onFilterModelChange = (model, details) => {
-    console.log(model)
-    console.log(details)
   }
 
   useEffect(() => {
@@ -221,7 +216,6 @@ const MetalakeList = () => {
           <DataGrid
             disableColumnSelector
             disableDensitySelector
-            onFilterModelChange={onFilterModelChange}
             slots={{ toolbar: TableToolbar }}
             slotProps={{
               toolbar: {
