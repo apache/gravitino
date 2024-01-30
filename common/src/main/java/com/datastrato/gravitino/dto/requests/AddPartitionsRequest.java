@@ -36,6 +36,6 @@ public class AddPartitionsRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(partitions != null, "partitions must not be null");
     Preconditions.checkArgument(
-        partitions.length == 1, "Have not implemented multiple partitions yet");
+        partitions.length == 1, "Haven't yet implemented multiple partitions");
   }
 }
