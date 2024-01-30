@@ -280,7 +280,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     } else {
       properties = StringIdentifier.newPropertiesWithId(id, properties);
       // Remove id from comment
-      comment = StringIdentifier.removeIdFromComment(load.comment());
+      comment = StringIdentifier.removeIdFromComment(comment);
     }
     return new JdbcTable.Builder()
         .withAuditInfo(load.auditInfo())
