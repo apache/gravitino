@@ -32,7 +32,7 @@ gravitino.entity.store = kv
 # The RocksDB entity store
 gravitino.entity.store.kv = RocksDBKvBackend
 # The RocksDB backend path for entity store, default value is as below, please uncomment and change it in your production environment.
-# gravitino.entity.store.kv.rocksdbPath = ${GRAVITINO_HOME}/data/rocksdb
+# gravitino.entity.store.kv.rocksdbPath = data/rocksdb
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache
