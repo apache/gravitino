@@ -754,6 +754,11 @@ public class CatalogMysqlIT extends AbstractIT {
           col4,
           col5
         };
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
+        };
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 

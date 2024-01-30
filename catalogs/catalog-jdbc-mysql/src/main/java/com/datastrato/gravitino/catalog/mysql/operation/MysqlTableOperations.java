@@ -20,10 +20,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -35,7 +32,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -213,43 +209,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
       }
     }
-  }
-
-  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
-      throws SQLException {
-    List<Index> indexes = new ArrayList<>();
-
-    // Get primary key information
-    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
-    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
-    while (primaryKeys.next()) {
-      String columnName = primaryKeys.getString("COLUMN_NAME");
-      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
-    }
-    for (String key : primaryKeyGroupByName.keySet()) {
-      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
-    }
-
-    // Get unique key information
-    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
-    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
-    while (indexInfo.next()) {
-      String indexName = indexInfo.getString("INDEX_NAME");
-      if (!indexInfo.getBoolean("NON_UNIQUE")
-          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
-        String columnName = indexInfo.getString("COLUMN_NAME");
-        indexGroupByName.put(indexName, columnName);
-      }
-    }
-    for (String key : indexGroupByName.keySet()) {
-      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
-    }
-
-    return indexes;
-  }
-
-  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
-    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
   @Override

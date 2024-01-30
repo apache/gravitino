@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.catalog.jdbc.bean.JdbcIndexBean;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
@@ -16,6 +17,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -23,8 +25,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -239,7 +244,75 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
       throws SQLException {
-    return Collections.emptyList();
+    List<Index> indexes = new ArrayList<>();
+
+    // Get primary key information
+    ResultSet primaryKeys = getPrimaryKeys(databaseName, tableName, metaData);
+    List<JdbcIndexBean> jdbcIndexBeans = new ArrayList<>();
+    while (primaryKeys.next()) {
+      jdbcIndexBeans.add(
+          new JdbcIndexBean(
+              Index.IndexType.PRIMARY_KEY,
+              primaryKeys.getString("COLUMN_NAME"),
+              primaryKeys.getString("PK_NAME"),
+              primaryKeys.getInt("KEY_SEQ")));
+    }
+
+    Set<String> primaryIndexNames =
+        jdbcIndexBeans.stream().map(JdbcIndexBean::getName).collect(Collectors.toSet());
+
+    // Get unique key information
+    ResultSet indexInfo = getIndexInfo(databaseName, tableName, metaData);
+    while (indexInfo.next()) {
+      String indexName = indexInfo.getString("INDEX_NAME");
+      if (!indexInfo.getBoolean("NON_UNIQUE") && !primaryIndexNames.contains(indexName)) {
+        jdbcIndexBeans.add(
+            new JdbcIndexBean(
+                Index.IndexType.UNIQUE_KEY,
+                indexInfo.getString("COLUMN_NAME"),
+                indexName,
+                indexInfo.getInt("ORDINAL_POSITION")));
+      }
+    }
+
+    // Assemble into Index
+    Map<Index.IndexType, List<JdbcIndexBean>> indexBeanGroupByIndexType =
+        jdbcIndexBeans.stream().collect(Collectors.groupingBy(JdbcIndexBean::getIndexType));
+
+    for (Map.Entry<Index.IndexType, List<JdbcIndexBean>> entry :
+        indexBeanGroupByIndexType.entrySet()) {
+      // Group by index Name
+      Map<String, List<JdbcIndexBean>> indexBeanGroupByName =
+          entry.getValue().stream().collect(Collectors.groupingBy(JdbcIndexBean::getName));
+      for (Map.Entry<String, List<JdbcIndexBean>> indexEntry : indexBeanGroupByName.entrySet()) {
+        List<String> colNames =
+            indexEntry.getValue().stream()
+                .sorted(Comparator.comparingInt(JdbcIndexBean::getOrder))
+                .map(JdbcIndexBean::getColName)
+                .collect(Collectors.toList());
+        String[][] colStrArrays = convertIndexFieldNames(colNames);
+        if (entry.getKey() == Index.IndexType.PRIMARY_KEY) {
+          indexes.add(Indexes.primary(indexEntry.getKey(), colStrArrays));
+        } else {
+          indexes.add(Indexes.unique(indexEntry.getKey(), colStrArrays));
+        }
+      }
+    }
+    return indexes;
+  }
+
+  protected ResultSet getIndexInfo(String databaseName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getIndexInfo(databaseName, null, tableName, false, false);
+  }
+
+  protected ResultSet getPrimaryKeys(
+      String databaseName, String tableName, DatabaseMetaData metaData) throws SQLException {
+    return metaData.getPrimaryKeys(databaseName, null, tableName);
+  }
+
+  protected String[][] convertIndexFieldNames(List<String> fieldNames) {
+    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
   protected abstract String generateCreateTableSql(
