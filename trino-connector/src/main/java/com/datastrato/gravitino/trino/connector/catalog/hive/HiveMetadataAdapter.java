@@ -195,10 +195,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       properties.put(
           HIVE_BUCKET_KEY,
           Arrays.stream(gravitinoTable.getDistribution().expressions())
-              .map(
-                  ts ->
-                      ((NamedReference.FieldReference) ts)
-                          .fieldName()[0].toLowerCase(Locale.ENGLISH))
+              .map(ts -> ((NamedReference) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
               .collect(Collectors.toList()));
 
       properties.put(HIVE_BUCKET_COUNT_KEY, gravitinoTable.getDistribution().number());
@@ -221,8 +218,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
                             ? Order.ASCENDING
                             : Order.DESCENDING;
                     return new SortingColumn(
-                        ((NamedReference.FieldReference) expression)
-                            .fieldName()[0].toLowerCase(Locale.ENGLISH),
+                        ((NamedReference) expression).fieldName()[0].toLowerCase(Locale.ENGLISH),
                         order);
                   })
               .collect(Collectors.toList()));
