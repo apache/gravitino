@@ -28,20 +28,13 @@ public interface Distribution extends Expression {
 
   /**
    * Indicates whether some other object is "equal to" this one.
-   * @param obj The reference object with which to compare.
+   *
+   * @param distribution The reference distribution object with which to compare.
    * @return
    */
-  default boolean equalTo(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-
-    if (obj instanceof Distribution) {
-      Distribution other = (Distribution) obj;
-      return strategy().equals(other.strategy())
-          && number() == other.number()
-          && Arrays.equals(expressions(), other.expressions());
-    }
-    return false;
+  default boolean equals(Distribution distribution) {
+    return strategy().equals(distribution.strategy())
+        && number() == distribution.number()
+        && Arrays.equals(expressions(), distribution.expressions());
   }
 }
