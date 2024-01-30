@@ -261,8 +261,8 @@ public class DTOConverters {
 
     if (expression instanceof Literal) {
       return new LiteralDTO.Builder()
-          .withValue(((Literal<String>) expression).value())
-          .withDataType(((Literal<String>) expression).dataType())
+          .withValue((((Literal) expression).value().toString()))
+          .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
       return new FieldReferenceDTO.Builder()
