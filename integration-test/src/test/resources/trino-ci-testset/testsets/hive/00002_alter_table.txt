@@ -18,14 +18,7 @@ DROP COLUMN
 )
 COMMENT ''
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 RENAME COLUMN
@@ -36,14 +29,7 @@ RENAME COLUMN
 )
 COMMENT ''
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 SET COLUMN TYPE
@@ -54,14 +40,7 @@ SET COLUMN TYPE
 )
 COMMENT ''
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 COMMENT
@@ -72,14 +51,7 @@ COMMENT
 )
 COMMENT 'test table comments'
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 COMMENT
@@ -90,14 +62,7 @@ COMMENT
 )
 COMMENT 'test table comments'
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 ADD COLUMN
@@ -109,14 +74,7 @@ ADD COLUMN
 )
 COMMENT 'test table comments'
 WITH (
-   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
-   num_files = '0',
-   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
-   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
-   serde_name = 'tb01',
-   table_type = 'MANAGED_TABLE',
-   total_size = '0'
+%
 )"
 
 DROP TABLE
