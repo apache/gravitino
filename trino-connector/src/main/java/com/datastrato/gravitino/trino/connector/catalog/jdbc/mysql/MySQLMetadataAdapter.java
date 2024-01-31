@@ -6,7 +6,12 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
+import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.session.PropertyMetadata;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -34,5 +39,30 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
     Map<String, String> objectMap = tableConverter.gravitinoToEngineProperties(properties);
     return super.toTrinoTableProperties(objectMap);
+  }
+
+  /** Transform trino ConnectorTableMetadata to gravitino table metadata */
+  public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
+    String tableName = tableMetadata.getTableSchema().getTable().getTableName();
+    String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
+    String comment = tableMetadata.getComment().orElse("");
+    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+
+    List<GravitinoColumn> columns = new ArrayList<>();
+    for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
+      ColumnMetadata column = tableMetadata.getColumns().get(i);
+      boolean autoIncrement =
+          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
+      columns.add(
+          new GravitinoColumn(
+              column.getName(),
+              dataTypeTransformer.getGravitinoType(column.getType()),
+              i,
+              column.getComment(),
+              column.isNullable(),
+              autoIncrement));
+    }
+
+    return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
 }
