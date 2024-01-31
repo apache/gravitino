@@ -184,7 +184,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         Preconditions.checkArgument(
             StringUtils.isNotBlank(keytabUri), "If you use Kerberos, key tab uri can't be blank");
         Preconditions.checkArgument(
-            !keytabUri.startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
+            !keytabUri.trim().startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
 
         int fetchKeytabFileTimeout =
             (int)
