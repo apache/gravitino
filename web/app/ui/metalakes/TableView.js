@@ -19,17 +19,8 @@ import CreateCatalogDialog from './CreateCatalogDialog'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { setIntoTreeAction, updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
 
-import { to } from '@/lib/utils'
+import { extractPlaceholder, to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
-
-function removeLastSegment(inputString, separator = '____') {
-  const lastIndex = inputString.lastIndexOf(separator)
-  if (lastIndex === -1) {
-    return inputString
-  }
-
-  return inputString.substring(0, lastIndex)
-}
 
 const TableView = props => {
   const { page, routeParams } = props
@@ -57,19 +48,23 @@ const TableView = props => {
     }
     const [metalake, catalog, schema, table] = new URLSearchParams(path)
 
-    const id = `${(metalake && metalake[1]) ?? ''}${
+    const id = `${metalake && metalake[1] ? '{{' + metalake[1] + '}}' : ''}${
       catalog && catalog[1]
-        ? `____${catalog[1]}${
-            schema && schema[1] ? `____${schema[1]}${table && table[1] ? `____${table[1]}` : ''}` : ''
+        ? `{{${catalog[1]}}}${
+            schema && schema[1] ? `{{${schema[1]}}}${table && table[1] ? `{{${table[1]}}}` : ''}` : ''
           }`
         : ''
     }`
-    if (id.split('____').length <= 2) {
+
+    if (extractPlaceholder(id).length <= 2) {
       if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
         dispatch(setIntoTreeAction({ nodeIds: [id] }))
       }
     } else if (table) {
-      dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
+      const removedLastSegment = extractPlaceholder(id).slice(0, -1)
+      const removedLastSegmentId = removedLastSegment.map(i => `{{${i}}}`).join('')
+
+      dispatch(setIntoTreeAction({ nodeIds: [removedLastSegmentId] }))
     } else {
       dispatch(setIntoTreeAction({ nodeIds: [id] }))
     }

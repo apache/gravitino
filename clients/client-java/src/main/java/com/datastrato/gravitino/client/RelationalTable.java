@@ -4,9 +4,14 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
+
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.rel.TableDTO;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
+import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
@@ -22,6 +27,7 @@ import com.datastrato.gravitino.rel.partitions.Partition;
 import com.google.common.annotations.VisibleForTesting;
 import java.net.URLEncoder;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.SneakyThrows;
@@ -119,7 +125,16 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public Partition[] listPartitions() {
-    throw new UnsupportedOperationException();
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    PartitionListResponse resp =
+        restClient.get(
+            getPartitionRequestPath(),
+            params,
+            PartitionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    return resp.getPartitions();
   }
 
   @Override
@@ -135,7 +150,19 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
-    throw new UnsupportedOperationException();
+    AddPartitionsRequest req = new AddPartitionsRequest(new PartitionDTO[] {toDTO(partition)});
+    req.validate();
+
+    PartitionListResponse resp =
+        restClient.post(
+            getPartitionRequestPath(),
+            req,
+            PartitionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    resp.validate();
+
+    return resp.getPartitions()[0];
   }
 
   @Override

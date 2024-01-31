@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -146,11 +145,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
     // }
 
-    // Add column properties if specified
-    if (CollectionUtils.isNotEmpty(column.getProperties())) {
-      // TODO #804 will add properties
-      throw new IllegalArgumentException("Properties are not supported yet");
-    }
     return sqlBuilder;
   }
 

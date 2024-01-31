@@ -57,6 +57,7 @@ import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
@@ -260,8 +261,8 @@ public class DTOConverters {
 
     if (expression instanceof Literal) {
       return new LiteralDTO.Builder()
-          .withValue(((Literal<String>) expression).value())
-          .withDataType(((Literal<String>) expression).dataType())
+          .withValue((((Literal) expression).value().toString()))
+          .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
       return new FieldReferenceDTO.Builder()
@@ -315,6 +316,13 @@ public class DTOConverters {
     return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
 
+  public static PartitionDTO[] toDTOs(Partition[] partitions) {
+    if (ArrayUtils.isEmpty(partitions)) {
+      return new PartitionDTO[0];
+    }
+    return Arrays.stream(partitions).map(DTOConverters::toDTO).toArray(PartitionDTO[]::new);
+  }
+
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
     if (DistributionDTO.NONE.equals(distributionDTO) || null == distributionDTO) {
       return Distributions.NONE;
@@ -361,6 +369,31 @@ public class DTOConverters {
     }
 
     return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
+  }
+
+  public static Partition fromDTO(PartitionDTO partitionDTO) {
+    switch (partitionDTO.type()) {
+      case IDENTITY:
+        IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) partitionDTO;
+        return Partitions.identity(
+            identityPartitionDTO.name(),
+            identityPartitionDTO.fieldNames(),
+            identityPartitionDTO.values(),
+            identityPartitionDTO.properties());
+      case RANGE:
+        RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
+        return Partitions.range(
+            rangePartitionDTO.name(),
+            rangePartitionDTO.lower(),
+            rangePartitionDTO.upper(),
+            rangePartitionDTO.properties());
+      case LIST:
+        ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
+        return Partitions.list(
+            listPartitionDTO.name(), listPartitionDTO.lists(), listPartitionDTO.properties());
+      default:
+        throw new IllegalArgumentException("Unsupported partition type: " + partitionDTO.type());
+    }
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {

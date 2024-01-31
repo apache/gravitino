@@ -16,9 +16,15 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -31,12 +37,25 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   private static HiveCatalog hiveCatalog;
   private static HiveSchema hiveSchema;
   private static HiveTable hiveTable;
+  private static Column[] columns;
+  private static Partition existingPartition;
 
   @BeforeAll
   private static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveSchema = initHiveSchema(hiveCatalog);
     hiveTable = createPartitionedTable();
+
+    // add partition: city=0/dt=2020-01-01
+    String[] fieldCity = new String[] {columns[1].name()};
+    Literal<?> valueCity = Literals.byteLiteral((byte) 0);
+    String[] fieldDt = new String[] {columns[2].name()};
+    Literal<?> valueDt = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition =
+        Partitions.identity(
+            new String[][] {fieldCity, fieldDt}, new Literal<?>[] {valueCity, valueDt});
+
+    existingPartition = hiveTable.supportPartitions().addPartition(partition);
   }
 
   private static HiveTable createPartitionedTable() {
@@ -44,13 +63,16 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
+    HiveColumn col0 =
+        new HiveColumn.Builder().withName("name").withType(Types.StringType.get()).build();
     HiveColumn col1 =
         new HiveColumn.Builder().withName("city").withType(Types.ByteType.get()).build();
     HiveColumn col2 =
         new HiveColumn.Builder().withName("dt").withType(Types.DateType.get()).build();
-    Column[] columns = new Column[] {col1, col2};
 
-    Transform[] partitioning = new Transform[] {identity(col2.name())};
+    columns = new Column[] {col0, col1, col2};
+
+    Transform[] partitioning = new Transform[] {identity(col1.name()), identity(col2.name())};
 
     return (HiveTable)
         hiveCatalog
@@ -61,12 +83,25 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   @Test
   public void testListPartitionNames() {
     String[] partitionNames = hiveTable.supportPartitions().listPartitionNames();
-    // TODO: update following assertion after implementing addPartition
-    Assertions.assertEquals(0, partitionNames.length);
+    // there maybe other partitions in the list, so we only check the added partition
+    Assertions.assertTrue(
+        partitionNames.length > 0
+            && Arrays.asList(partitionNames).contains(existingPartition.name()));
+  }
+
+  @Test
+  public void testListPartitions() {
+    Partition[] partitions = hiveTable.supportPartitions().listPartitions();
+    // there maybe other partitions in the list, so we only check the added partition
+    Assertions.assertTrue(
+        partitions.length > 0 && Arrays.asList(partitions).contains(existingPartition));
   }
 
   @Test
   public void testGetPartition() {
+    Partition partition = hiveTable.supportPartitions().getPartition(existingPartition.name());
+    Assertions.assertEquals(existingPartition, partition);
+
     NoSuchPartitionException exception =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -75,6 +110,51 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
             });
     Assertions.assertEquals(
         "Hive partition does_not_exist_partition does not exist in Hive Metastore",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testAddPartition() {
+    // add partition: city=1/dt=2020-01-01
+    String[] fieldCity = new String[] {columns[1].name()};
+    Literal<?> valueCity = Literals.byteLiteral((byte) 1);
+    String[] fieldDt = new String[] {columns[2].name()};
+    Literal<?> valueDt = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition =
+        Partitions.identity(
+            new String[][] {fieldCity, fieldDt}, new Literal<?>[] {valueCity, valueDt});
+
+    Partition addedPartition = hiveTable.supportPartitions().addPartition(partition);
+    Partition gotPartition = hiveTable.supportPartitions().getPartition(addedPartition.name());
+    Assertions.assertEquals(addedPartition, gotPartition);
+
+    // test exception
+    String[] field1 = new String[] {columns[0].name()};
+    Literal<?> value1 = Literals.byteLiteral((byte) 1);
+    Partition partition1 = Partitions.identity(new String[][] {field1}, new Literal<?>[] {value1});
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> hiveTable.supportPartitions().addPartition(partition1));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hive partition field names must be the same as table partitioning field names"),
+        exception.getMessage());
+
+    String[] field2 = new String[] {columns[1].name()};
+    Literal<?> value2 = Literals.byteLiteral((byte) 1);
+    Partition partition2 =
+        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {value1, value2});
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> hiveTable.supportPartitions().addPartition(partition2));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Hive partition field name must be in table partitioning field names"),
         exception.getMessage());
   }
 }
