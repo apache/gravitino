@@ -170,29 +170,29 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           file.mkdir();
         }
 
-        File keyTabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
-        keyTabFile.deleteOnExit();
-        if (keyTabFile.exists() && !keyTabFile.delete()) {
+        File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
+        keytabFile.deleteOnExit();
+        if (keytabFile.exists() && !keytabFile.delete()) {
           throw new IllegalStateException(
-              String.format("Fail to delete key tab file %s", keyTabFile.getAbsolutePath()));
+              String.format("Fail to delete key tab file %s", keytabFile.getAbsolutePath()));
         }
 
-        String keyTabUri =
+        String keytabUri =
             (String)
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(keyTabUri), "If you use Kerberos, key tab uri can't be blank");
+            StringUtils.isNotBlank(keytabUri), "If you use Kerberos, key tab uri can't be blank");
         Preconditions.checkArgument(
-            !keyTabUri.startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
+            !keytabUri.startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
 
         int timeout =
             (int)
                 catalogPropertiesMetadata.getOrDefault(
                     conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        DownloadUtils.downloadFile(keyTabUri, keyTabFile, timeout, hadoopConf);
+        DownloadUtils.downloadFile(keytabUri, keytabFile, timeout, hadoopConf);
 
-        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keyTabFile.getAbsolutePath());
+        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
 
         String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
@@ -202,7 +202,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
 
-        UserGroupInformation.loginUserFromKeytab(principal, keyTabFile.getAbsolutePath());
+        UserGroupInformation.loginUserFromKeytab(principal, keytabFile.getAbsolutePath());
 
         loginUgi = UserGroupInformation.getCurrentUser();
 
@@ -251,9 +251,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkScheduledExecutor = null;
     }
 
-    File keyTabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
-    if (keyTabFile.exists() && !keyTabFile.delete()) {
-      LOG.error("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
+    File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
+    if (keytabFile.exists() && !keytabFile.delete()) {
+      LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
     }
   }
 
