@@ -202,9 +202,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
 
-        loginUgi =
-            UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-                principal, keyTabFile.getAbsolutePath());
+        UserGroupInformation.loginUserFromKeytab(principal, keyTabFile.getAbsolutePath());
+
+        loginUgi = UserGroupInformation.getCurrentUser();
 
         int checkInterval =
             (int)
