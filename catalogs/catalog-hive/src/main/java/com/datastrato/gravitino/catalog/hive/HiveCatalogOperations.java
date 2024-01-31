@@ -181,6 +181,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(keyTabUri), "If you use Kerberos, key tab uri can't be blank");
+        Preconditions.checkArgument(
+            !keyTabUri.startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
 
         int timeout =
             (int)
