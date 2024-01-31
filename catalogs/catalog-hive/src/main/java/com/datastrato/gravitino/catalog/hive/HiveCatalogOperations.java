@@ -96,7 +96,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
 
-
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
