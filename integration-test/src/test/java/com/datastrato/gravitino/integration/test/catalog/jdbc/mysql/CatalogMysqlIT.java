@@ -71,7 +71,8 @@ public class CatalogMysqlIT extends AbstractIT {
   public String alertTableName = "alert_table_name";
   public String table_comment = "table_comment";
 
-  public String schema_comment = "schema_comment";
+  // MySQL doesn't support schema comment
+  public String schema_comment = null;
   public String MYSQL_COL_NAME1 = "mysql_col_name1";
   public String MYSQL_COL_NAME2 = "mysql_col_name2";
   public String MYSQL_COL_NAME3 = "mysql_col_name3";
@@ -545,7 +546,7 @@ public class CatalogMysqlIT extends AbstractIT {
         .asSchemas()
         .createSchema(
             NameIdentifier.of(metalakeName, catalogName, schemaName),
-            "Created by gravitino client",
+            null,
             ImmutableMap.<String, String>builder().build());
 
     catalog
@@ -804,5 +805,24 @@ public class CatalogMysqlIT extends AbstractIT {
         StringUtils.contains(
             runtimeException.getMessage(),
             "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_6]"));
+  }
+
+  void testSchemaComment() {
+    String testSchemaName = "test";
+    NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    RuntimeException exception =
+        Assertions.assertThrowsExactly(
+            RuntimeException.class,
+            () -> catalog.asSchemas().createSchema(identer, "comment", null));
+    Assertions.assertTrue(
+        exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));
+
+    // test null comment
+    testSchemaName = "test2";
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    Schema schema = catalog.asSchemas().createSchema(ident, "", null);
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
   }
 }
