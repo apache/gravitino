@@ -103,20 +103,22 @@ public class LockManager {
    * @return The created tree lock.
    */
   public TreeLock createTreeLock(NameIdentifier identifier) {
-    TreeLockNode lockNode = treeLockRootNode;
-    treeLockRootNode.addReference();
+    List<TreeLockNode> treeLockNodes = Lists.newArrayList();
 
-    List<TreeLockNode> treeLockNodes = Lists.newArrayList(lockNode);
-    if (identifier == ROOT) {
-      // The lock tree root node
-      return new TreeLock(treeLockNodes);
-    }
-
-    String[] levels = identifier.namespace().levels();
-    levels = ArrayUtils.add(levels, identifier.name());
-
-    TreeLockNode child;
     try {
+      TreeLockNode lockNode = treeLockRootNode;
+      lockNode.addReference();
+      treeLockNodes.add(lockNode);
+
+      if (identifier == ROOT) {
+        // The lock tree root node
+        return new TreeLock(treeLockNodes);
+      }
+
+      String[] levels = identifier.namespace().levels();
+      levels = ArrayUtils.add(levels, identifier.name());
+
+      TreeLockNode child;
       for (int i = 0; i < levels.length; i++) {
         NameIdentifier ident = NameIdentifier.of(ArrayUtils.subarray(levels, 0, i + 1));
         synchronized (lockNode) {
@@ -125,11 +127,16 @@ public class LockManager {
         treeLockNodes.add(child);
         lockNode = child;
       }
+
+      return new TreeLock(treeLockNodes);
     } catch (Exception e) {
       LOG.error("Failed to create tree lock {}", identifier, e);
+      // Release reference if fails.
+      for (TreeLockNode node : treeLockNodes) {
+        node.decReference();
+      }
+
       throw e;
     }
-
-    return new TreeLock(treeLockNodes);
   }
 }

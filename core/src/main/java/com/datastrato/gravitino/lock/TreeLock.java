@@ -61,7 +61,7 @@ public class TreeLock {
   /** Unlock the tree lock. */
   public void unlock() {
     if (lockType == null) {
-      throw new IllegalStateException("You must lock the tree lock before unlock it.");
+      throw new IllegalStateException("We must lock the tree lock before unlock it.");
     }
 
     boolean lastNode = false;
@@ -77,15 +77,16 @@ public class TreeLock {
         }
 
         current = heldLocks.peek();
+
+        // Unlock the node and decrease the reference count.
         current.unlock(type);
+        current.decReference();
         heldLocks.pop();
       }
     } catch (Exception e) {
-      LOG.error("Can't release the locks: {}", current);
+      LOG.error("Can't release the lock node: {}", current, e);
       throw new IllegalStateException(
-          String.format("Locks %s are not released properly...", current));
-    } finally {
-      lockNodes.forEach(TreeLockNode::decReference);
+          String.format("Locks %s are not released properly...", current), e);
     }
 
     LOG.trace("Unlocked the tree lock: [{}], lock type: {}", lockNodes, lockType);

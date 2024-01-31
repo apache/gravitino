@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
@@ -22,7 +23,7 @@ public class TreeLockNode {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLockNode.class);
   private final NameIdentifier ident;
   private final ReentrantReadWriteLock readWriteLock;
-  private final Map<NameIdentifier, TreeLockNode> childMap;
+  @VisibleForTesting final Map<NameIdentifier, TreeLockNode> childMap;
   private final LockManager lockManager;
 
   private final AtomicLong referenceCount = new AtomicLong();
@@ -44,7 +45,7 @@ public class TreeLockNode {
     referenceCount.getAndIncrement();
   }
 
-  void decReference() {
+  synchronized void decReference() {
     referenceCount.getAndDecrement();
   }
 

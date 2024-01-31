@@ -10,6 +10,8 @@ import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -471,5 +473,76 @@ public class TestLockManager {
         .forEach(node -> lockManager.evictStaleNodes(node, lockManager.treeLockRootNode));
     Assertions.assertTrue(lockManager.totalNodeCount.get() > 1);
     Assertions.assertTrue(lockManager.totalNodeCount.get() < LockManager.MAX_TREE_NODE_IN_MEMORY);
+  }
+
+  static void setFinal(Field field, Object newValue, Object object) throws Exception {
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    modifiersField.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    field.set(object, newValue);
+  }
+
+  private TreeLockNode getTreeNode(TreeLockNode root, int depth) {
+    if (depth == 0) {
+      return root;
+    }
+
+    int i = 0;
+    TreeLockNode result = root;
+    while (i++ < depth) {
+      // We know it only has one child;
+      result = result.getAllChildren().get(0);
+    }
+
+    return result;
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3})
+  void testCreateTreeLock(int level) throws Exception {
+    LockManager lockManager = new LockManager();
+    TreeLockNode rootNode = lockManager.treeLockRootNode;
+    TreeLock treeLock = lockManager.createTreeLock(NameIdentifier.of("a", "b", "c", "d"));
+    treeLock.lock(LockType.READ);
+    treeLock.unlock();
+    checkReferenceCount(rootNode);
+
+    // Start to use concurrent threads to create tree lock.
+    TreeLockNode treeLockNode = getTreeNode(rootNode, level);
+    TreeLockNode spyNode = Mockito.spy(treeLockNode);
+    Mockito.doThrow(new RuntimeException("Mock exception"))
+        .when(spyNode)
+        .getOrCreateChild(Mockito.any());
+
+    if (level == 0) {
+      Field f = LockManager.class.getDeclaredField("treeLockRootNode");
+      setFinal(f, spyNode, lockManager);
+    } else {
+      int parentLevel = level - 1;
+      TreeLockNode parentNode = getTreeNode(rootNode, parentLevel);
+      parentNode.childMap.put(treeLockNode.getIdent(), spyNode);
+    }
+
+    CompletionService<Integer> service = createCompletionService();
+    int concurrentThreadCount = 1;
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 1000; j++) {
+              Assertions.assertThrows(
+                  RuntimeException.class,
+                  () -> lockManager.createTreeLock(NameIdentifier.of("a", "b", "c", "d")));
+            }
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.take().get();
+    }
+
+    TreeLockNode lockNode = lockManager.treeLockRootNode;
+    checkReferenceCount(lockNode);
   }
 }
