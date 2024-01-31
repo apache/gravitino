@@ -197,8 +197,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(catalogPrincipal),
-            "The principal can't be blank");
+            StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
