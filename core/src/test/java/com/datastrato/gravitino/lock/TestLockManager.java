@@ -5,6 +5,10 @@
 
 package com.datastrato.gravitino.lock;
 
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+
+import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.Lists;
@@ -50,7 +54,12 @@ public class TestLockManager {
     return "entity_" + i;
   }
 
-  private static final LockManager lockManager = new LockManager();
+  static Config getConfig() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(10000L);
+    Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(1000L);
+    return config;
+  }
 
   private CompletionService<Integer> createCompletionService() {
     ThreadPoolExecutor executor =
@@ -101,6 +110,7 @@ public class TestLockManager {
 
   @Test
   void multipleThreadTestLockManager() throws InterruptedException, ExecutionException {
+    LockManager lockManager = new LockManager(getConfig());
     CompletionService<Integer> completionService = createCompletionService();
     for (int i = 0; i < 10; i++) {
       completionService.submit(() -> this.testLockManager(lockManager));
@@ -162,7 +172,7 @@ public class TestLockManager {
   @Test
   @Disabled
   void testLockWithError() {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     LockManager spy = Mockito.spy(lockManager);
 
     // one fifth (2 /10 = 0.2) of tests will fail
@@ -187,7 +197,7 @@ public class TestLockManager {
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 4, 8, 10})
   void compare(int threadCount) throws InterruptedException, ExecutionException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     CompletionService<Integer> completionService = createCompletionService();
     for (int i = 0; i < 2; i++) {
       completionService.submit(() -> this.testLockManager(lockManager));
@@ -219,7 +229,7 @@ public class TestLockManager {
 
   @Test
   void testLockCleaner() throws InterruptedException, ExecutionException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     Random random = new Random();
     CompletionService<Integer> service = createCompletionService();
 
@@ -319,7 +329,7 @@ public class TestLockManager {
 
   @Test
   void testNodeCountAndCleaner() throws ExecutionException, InterruptedException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     CompletionService<Integer> service = createCompletionService();
 
     Future<Integer> future =
@@ -341,7 +351,7 @@ public class TestLockManager {
 
   @Test
   void testConcurrentRead() throws InterruptedException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     Map<String, Integer> stringMap = Maps.newHashMap();
     stringMap.put("total", 0);
 
@@ -386,7 +396,7 @@ public class TestLockManager {
 
   @Test
   void testConcurrentWrite() throws InterruptedException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     Map<String, Integer> stringMap = Maps.newHashMap();
     stringMap.put("total", 0);
 
@@ -443,7 +453,7 @@ public class TestLockManager {
 
   @Test
   void testNodeCount() throws InterruptedException, ExecutionException {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     CompletionService<Integer> service = createCompletionService();
 
     for (int i = 0; i < 10; i++) {
@@ -472,7 +482,7 @@ public class TestLockManager {
         .getAllChildren()
         .forEach(node -> lockManager.evictStaleNodes(node, lockManager.treeLockRootNode));
     Assertions.assertTrue(lockManager.totalNodeCount.get() > 1);
-    Assertions.assertTrue(lockManager.totalNodeCount.get() < LockManager.MAX_TREE_NODE_IN_MEMORY);
+    Assertions.assertTrue(lockManager.totalNodeCount.get() < lockManager.maxTreeNodeInMemory);
   }
 
   static void setFinal(Field field, Object newValue, Object object) throws Exception {
@@ -501,7 +511,7 @@ public class TestLockManager {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3})
   void testCreateTreeLock(int level) throws Exception {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
     TreeLockNode rootNode = lockManager.treeLockRootNode;
     TreeLock treeLock = lockManager.createTreeLock(NameIdentifier.of("a", "b", "c", "d"));
     treeLock.lock(LockType.READ);
@@ -544,5 +554,16 @@ public class TestLockManager {
 
     TreeLockNode lockNode = lockManager.treeLockRootNode;
     checkReferenceCount(lockNode);
+  }
+
+  @Test
+  void testConfigs() {
+    Config config = getConfig();
+    Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(20000L);
+    Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(2000L);
+
+    LockManager manager = new LockManager(config);
+    Assertions.assertEquals(20000L, manager.maxTreeNodeInMemory);
+    Assertions.assertEquals(2000L, manager.minTreeNodeInMemory);
   }
 }

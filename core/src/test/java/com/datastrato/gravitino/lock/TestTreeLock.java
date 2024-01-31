@@ -5,13 +5,15 @@
 
 package com.datastrato.gravitino.lock;
 
+import static com.datastrato.gravitino.lock.TestLockManager.getConfig;
+
 import org.junit.jupiter.api.Test;
 
 class TestTreeLock {
 
   @Test
   void testLock() {
-    LockManager lockManager = new LockManager();
+    LockManager lockManager = new LockManager(getConfig());
 
     for (int i = 0; i < 1000; i++) {
       TreeLock lock = lockManager.createTreeLock(TestLockManager.randomNameIdentifier());

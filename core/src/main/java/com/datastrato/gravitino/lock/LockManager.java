@@ -5,6 +5,10 @@
 
 package com.datastrato.gravitino.lock;
 
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+
+import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
@@ -28,16 +32,41 @@ public class LockManager {
   @VisibleForTesting final TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
 
-  // TODO (yuqi) make these two configurable
-  static final long MAX_TREE_NODE_IN_MEMORY = 10000L;
+  // The maximum number of tree lock nodes to keep in memory. If the total node count is greater
+  // than this value, we will do the cleanup.
+  @VisibleForTesting long maxTreeNodeInMemory;
   // If the total node count is less than this value, we will not do the cleanup.
-  @VisibleForTesting static final long MIN_TREE_NODE_IN_MEMORY = 1000L;
+  @VisibleForTesting long minTreeNodeInMemory;
 
-  private final ScheduledThreadPoolExecutor lockCleaner;
+  private void initParameters(Config config) {
+    long maxNodesInMemory = config.get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    if (maxNodesInMemory <= 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The maximum number of tree lock nodes '%d' should be greater than 0",
+              maxNodesInMemory));
+    }
 
-  public LockManager() {
-    treeLockRootNode = new TreeLockNode(ROOT, this);
-    this.lockCleaner =
+    long minNodesInMemory = config.get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    if (minNodesInMemory <= 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The minimum number of tree lock nodes '%d' should be greater than 0",
+              minNodesInMemory));
+    }
+
+    if (maxNodesInMemory <= minNodesInMemory) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The maximum number of tree lock nodes '%d' should be greater than the minimum number of tree lock nodes '%d'",
+              maxNodesInMemory, minNodesInMemory));
+    }
+    this.maxTreeNodeInMemory = maxNodesInMemory;
+    this.minTreeNodeInMemory = minNodesInMemory;
+  }
+
+  private void startNodeCleaner() {
+    ScheduledThreadPoolExecutor lockCleaner =
         new ScheduledThreadPoolExecutor(
             1,
             new ThreadFactoryBuilder()
@@ -49,7 +78,7 @@ public class LockManager {
         () -> {
           long nodeCount = totalNodeCount.get();
           LOG.trace("Total tree lock node count: {}", nodeCount);
-          if (nodeCount > MAX_TREE_NODE_IN_MEMORY) {
+          if (nodeCount > maxTreeNodeInMemory) {
             treeLockRootNode
                 .getAllChildren()
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));
@@ -58,6 +87,16 @@ public class LockManager {
         120,
         5,
         TimeUnit.SECONDS);
+  }
+
+  public LockManager(Config config) {
+    treeLockRootNode = new TreeLockNode(ROOT, this);
+
+    // Init the parameters.
+    initParameters(config);
+
+    // Start tree lock cleaner.
+    startNodeCleaner();
   }
 
   /**
@@ -71,7 +110,7 @@ public class LockManager {
     // We will not evict the root node if the total node count is less than the
     // MIN_TREE_NODE_IN_MEMORY.
     // Do not need to consider thread-safe issues.
-    if (totalNodeCount.get() < MIN_TREE_NODE_IN_MEMORY) {
+    if (totalNodeCount.get() < minTreeNodeInMemory) {
       return;
     }
 
