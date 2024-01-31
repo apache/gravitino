@@ -15,7 +15,6 @@ import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -35,7 +34,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
-import sun.misc.Unsafe;
 
 public class TestLockManager {
   private static final String[] ENTITY_NAMES = {
@@ -487,18 +485,6 @@ public class TestLockManager {
     Assertions.assertTrue(lockManager.totalNodeCount.get() < lockManager.maxTreeNodeInMemory);
   }
 
-  static void setFinal(Field field, Object newValue, Object object) throws Exception {
-    field.setAccessible(true);
-
-    final Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-    unsafeField.setAccessible(true);
-    final Unsafe unsafe = (Unsafe) unsafeField.get(null);
-    final Field ourField = LockManager.class.getDeclaredField("treeLockRootNode");
-
-    final long fieldOffset = unsafe.objectFieldOffset(ourField);
-    unsafe.putObject(object, fieldOffset, newValue); // copy the field to itself, boxing/unboxing
-  }
-
   private TreeLockNode getTreeNode(TreeLockNode root, int depth) {
     if (depth == 0) {
       return root;
@@ -532,8 +518,7 @@ public class TestLockManager {
         .getOrCreateChild(Mockito.any());
 
     if (level == 0) {
-      Field f = LockManager.class.getDeclaredField("treeLockRootNode");
-      setFinal(f, spyNode, lockManager);
+      lockManager.treeLockRootNode = spyNode;
     } else {
       int parentLevel = level - 1;
       TreeLockNode parentNode = getTreeNode(rootNode, parentLevel);

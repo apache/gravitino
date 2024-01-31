@@ -31,7 +31,7 @@ public class LockManager {
 
   static final NameIdentifier ROOT = NameIdentifier.of("/");
 
-  @VisibleForTesting final TreeLockNode treeLockRootNode;
+  @VisibleForTesting TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
 
   // The maximum number of tree lock nodes to keep in memory. If the total node count is greater
