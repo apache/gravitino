@@ -29,6 +29,7 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
+import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { nameRegex, keyRegex } from '@/lib/utils/regex'
 
@@ -76,17 +77,23 @@ const CreateMetalakeDialog = props => {
   const handleFormChange = (index, event) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
-    setInnerProps(data)
-
-    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
-
-    const duplicateKeys = nonEmptyKeys.some((item, i) => i !== index && item.key === event.target.value)
-    data[index].hasDuplicateKey = duplicateKeys
 
     if (event.target.name === 'key') {
       const invalidKey = !keyRegex.test(event.target.value)
       data[index].invalid = invalidKey
     }
+
+    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
+    const grouped = groupBy(nonEmptyKeys, 'key')
+    const duplicateKeys = Object.keys(grouped).some(key => grouped[key].length > 1)
+
+    if (duplicateKeys) {
+      data[index].hasDuplicateKey = duplicateKeys
+    } else {
+      data.forEach(it => (it.hasDuplicateKey = false))
+    }
+
+    setInnerProps(data)
   }
 
   const addFields = () => {
