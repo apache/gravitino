@@ -10,19 +10,27 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestDownloadUtils {
+public class TestFetchFileUtils {
 
   @Test
-  public void testDownloadFile() throws Exception {
+  public void testLinkLocalFile() throws Exception {
 
     File srcFile = new File("test");
     File destFile = new File("dest");
 
     srcFile.createNewFile();
-    DownloadUtils.downloadFile(srcFile.toURI().toString(), destFile, 10, new Configuration());
+    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, new Configuration());
     Assertions.assertTrue(destFile.exists());
 
     srcFile.delete();
+    destFile.delete();
+  }
+
+  @Test
+  public void testDownloadFromHTTP() throws Exception {
+    File destFile = new File("dest");
+    FetchFileUtils.fetchFileFromUri("https://downloads.apache.org/hadoop/common/KEYS", destFile, 10, new Configuration());
+    Assertions.assertTrue(destFile.exists());
     destFile.delete();
   }
 }

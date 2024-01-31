@@ -15,11 +15,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-public class DownloadUtils {
+public class FetchFileUtils {
 
-  private DownloadUtils() {}
+  private FetchFileUtils() {}
 
-  public static void downloadFile(String fileUri, File destFile, int timeout, Configuration conf)
+  public static void fetchFileFromUri(String fileUri, File destFile, int timeout, Configuration conf)
       throws IOException {
     try {
       URI uri = new URI(fileUri);

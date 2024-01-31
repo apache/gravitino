@@ -190,7 +190,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 catalogPropertiesMetadata.getOrDefault(
                     conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        DownloadUtils.downloadFile(keytabUri, keytabFile, timeout, hadoopConf);
+        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, timeout, hadoopConf);
 
         hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
 
