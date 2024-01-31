@@ -155,6 +155,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
     UserGroupInformation.setConfiguration(hadoopConf);
 
+    initKerberosIfNecessary(conf, hadoopConf);
+
+    this.clientPool =
+        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+  }
+
+  private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
@@ -216,9 +223,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         throw new UncheckedIOException(ioe);
       }
     }
-
-    this.clientPool =
-        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
   }
 
   @VisibleForTesting
