@@ -126,7 +126,7 @@ public class RelationalTable implements Table, SupportsPartitions {
   @Override
   public Partition[] listPartitions() {
     Map<String, String> params = new HashMap<>();
-    params.put("verbose", "true");
+    params.put("details", "true");
     PartitionListResponse resp =
         restClient.get(
             getPartitionRequestPath(),

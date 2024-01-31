@@ -54,7 +54,7 @@ public class PartitionOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("table") String table,
-      @QueryParam("verbose") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
     try {
       return Utils.doAs(
           httpRequest,
