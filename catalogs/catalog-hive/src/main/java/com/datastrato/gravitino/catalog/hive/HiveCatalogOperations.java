@@ -81,6 +81,7 @@ import org.slf4j.LoggerFactory;
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
   @VisibleForTesting CachedClientPool clientPool;
 
@@ -163,15 +164,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keytabs = new File("tmp");
-        if (!keytabs.exists()) {
+        File keytabsDir = new File("keytabs");
+        if (!keytabsDir.exists()) {
           // Ignore the return value, because there exists many Hive catalog operations making
           // this directory.
-          keytabs.mkdir();
+          keytabsDir.mkdir();
         }
 
         // The id of entity is a random unique id.
-        File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
+        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
         keytabFile.deleteOnExit();
         if (keytabFile.exists() && !keytabFile.delete()) {
           throw new IllegalStateException(
@@ -253,7 +254,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
 
-    File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
+    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
     if (keytabFile.exists() && !keytabFile.delete()) {
       LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
     }
