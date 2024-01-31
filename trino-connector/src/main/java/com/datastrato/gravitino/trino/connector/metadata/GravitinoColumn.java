@@ -16,6 +16,7 @@ public final class GravitinoColumn {
   private final int index;
   private final String comment;
   private final boolean nullable;
+  private final boolean autoIncrement;
 
   // Column properties
   private final Map<String, Object> properties;
@@ -27,6 +28,7 @@ public final class GravitinoColumn {
         columnIndex,
         column.comment(),
         column.nullable(),
+        column.autoIncrement(),
         ImmutableMap.of());
   }
 
@@ -36,17 +38,19 @@ public final class GravitinoColumn {
       int index,
       String comment,
       boolean nullable,
+      boolean autoIncrement,
       Map<String, Object> properties) {
     this.name = name;
     this.dataType = dataType;
     this.index = index;
     this.comment = comment;
     this.nullable = nullable;
+    this.autoIncrement = autoIncrement;
     this.properties = properties;
   }
 
   public GravitinoColumn(String name, Type dataType, int index, String comment, boolean nullable) {
-    this(name, dataType, index, comment, nullable, ImmutableMap.of());
+    this(name, dataType, index, comment, nullable, false, ImmutableMap.of());
   }
 
   public int getIndex() {
@@ -75,5 +79,9 @@ public final class GravitinoColumn {
 
   public boolean isHidden() {
     return false;
+  }
+
+  public boolean isAutoIncrement() {
+    return autoIncrement;
   }
 }

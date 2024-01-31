@@ -6,15 +6,16 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.jdbc.GravitinoJdbcTable;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
+import com.google.common.collect.Maps;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Transforming gravitino MySQL metadata to trino. */
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -52,6 +53,9 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
+      boolean autoIncrement =
+          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
+
       columns.add(
           new GravitinoColumn(
               column.getName(),
@@ -59,9 +63,27 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
               i,
               column.getComment(),
               column.isNullable(),
+              autoIncrement,
               column.getProperties()));
     }
 
-    return new GravitinoJdbcTable(schemaName, tableName, columns, comment, properties);
+    return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  @Override
+  public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
+    Map<String, Object> propertyMap = Maps.newHashMap(column.getProperties());
+    if (column.isAutoIncrement()) {
+      propertyMap.put(MySQLPropertyMeta.AUTO_INCREMENT, true);
+    }
+
+    return ColumnMetadata.builder()
+        .setName(column.getName())
+        .setType(dataTypeTransformer.getTrinoType(column.getType()))
+        .setComment(Optional.ofNullable(column.getComment()))
+        .setNullable(column.isNullable())
+        .setHidden(column.isHidden())
+        .setProperties(propertyMap)
+        .build();
   }
 }

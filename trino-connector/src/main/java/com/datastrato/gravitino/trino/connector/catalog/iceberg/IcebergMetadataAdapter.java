@@ -107,6 +107,7 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
               i,
               column.getComment(),
               column.isNullable(),
+              false,
               column.getProperties()));
     }
     GravitinoTable gravitinoTable =

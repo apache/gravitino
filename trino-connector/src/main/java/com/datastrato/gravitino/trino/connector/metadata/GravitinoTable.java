@@ -99,7 +99,7 @@ public class GravitinoTable {
               column.getType(),
               column.getComment(),
               column.isNullable(),
-              false,
+              column.isAutoIncrement(),
               null);
     }
     return gravitinoColumns;

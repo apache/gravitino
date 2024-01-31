@@ -90,6 +90,7 @@ public class CatalogConnectorMetadataAdapter {
               i,
               column.getComment(),
               column.isNullable(),
+              false,
               column.getProperties()));
     }
 
@@ -176,6 +177,7 @@ public class CatalogConnectorMetadataAdapter {
         -1,
         column.getComment(),
         column.isNullable(),
+        false,
         column.getProperties());
   }
 }
