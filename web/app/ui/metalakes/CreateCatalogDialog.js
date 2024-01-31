@@ -28,13 +28,16 @@ import {
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { createCatalog } from '@/lib/store/metalakes'
+import { createCatalog, updateCatalog } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
+import { groupBy } from 'lodash-es'
+import { genUpdates } from '@/lib/utils'
 import { providers } from '@/lib/utils/initial'
+import { nameRegex, keyRegex } from '@/lib/utils/regex'
 
 const defaultValues = {
   name: '',
@@ -47,7 +50,13 @@ const defaultValues = {
 const providerTypeValues = providers.map(i => i.value)
 
 const schema = yup.object().shape({
-  name: yup.string().required(),
+  name: yup
+    .string()
+    .required()
+    .matches(
+      nameRegex,
+      'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
+    ),
   type: yup.mixed().oneOf(['relational']).required(),
   provider: yup.mixed().oneOf(providerTypeValues).required(),
   propItems: yup.array().of(
@@ -98,11 +107,38 @@ const CreateCatalogDialog = props => {
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
+
+    if (event.target.name === 'key') {
+      const invalidKey = !keyRegex.test(event.target.value)
+      data[index].invalid = invalidKey
+    }
+
+    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
+    const grouped = groupBy(nonEmptyKeys, 'key')
+    const duplicateKeys = Object.keys(grouped).some(key => grouped[key].length > 1)
+
+    if (duplicateKeys) {
+      data[index].hasDuplicateKey = duplicateKeys
+    } else {
+      data.forEach(it => (it.hasDuplicateKey = false))
+    }
+
     setInnerProps(data)
     setValue('propItems', data)
   }
 
   const addFields = () => {
+    const duplicateKeys = innerProps
+      .filter(item => item.key.trim() !== '')
+      .some(
+        (item, index, filteredItems) =>
+          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
+      )
+
+    if (duplicateKeys) {
+      return
+    }
+
     let newField = { key: '', value: '', required: false }
 
     setInnerProps([...innerProps, newField])
@@ -155,6 +191,19 @@ const CreateCatalogDialog = props => {
   }
 
   const onSubmit = data => {
+    const duplicateKeys = innerProps
+      .filter(item => item.key.trim() !== '')
+      .some(
+        (item, index, filteredItems) =>
+          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
+      )
+
+    const invalidKeys = innerProps.some(i => i.invalid)
+
+    if (duplicateKeys || invalidKeys) {
+      return
+    }
+
     const { propItems, ...mainData } = data
 
     let nextProps = []
@@ -206,6 +255,12 @@ const CreateCatalogDialog = props => {
 
         if (type === 'create') {
           dispatch(createCatalog({ data: catalogData, metalake }))
+        } else {
+          const reqData = { updates: genUpdates(cacheData, catalogData) }
+
+          if (reqData.updates.length !== 0) {
+            dispatch(updateCatalog({ metalake, catalog: cacheData.name, data: reqData }))
+          }
         }
 
         handleClose()
@@ -228,27 +283,58 @@ const CreateCatalogDialog = props => {
       defaultProps = providers[providerItemIndex].defaultProps
 
       resetPropsFields(providers, providerItemIndex)
-      setInnerProps(defaultProps)
-      setValue('propItems', providers[providerItemIndex].defaultProps)
+
+      if (type === 'create') {
+        setInnerProps(defaultProps)
+        setValue('propItems', providers[providerItemIndex].defaultProps)
+      }
     }
-  }, [providerSelect, setInnerProps, setValue])
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerSelect])
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
-      setCacheData(data)
       const { properties = {} } = data
 
-      const propsArr = Object.keys(properties).map(item => {
-        return {
-          key: item,
-          value: properties[item]
-        }
-      })
-
-      setInnerProps(propsArr)
-
+      setCacheData(data)
       setValue('name', data.name)
       setValue('comment', data.comment)
+      setValue('type', data.type)
+      setValue('provider', data.provider)
+
+      const providerItem = providers.find(i => i.value === data.provider)
+      let propsItems = [...providerItem.defaultProps]
+
+      propsItems = propsItems.map((it, idx) => {
+        let propItem = {
+          ...it,
+          disabled: true
+        }
+
+        const findProp = Object.keys(properties).find(i => i === it.key)
+
+        if (findProp) {
+          propItem.value = properties[findProp]
+        }
+
+        return propItem
+      })
+
+      for (let item of Object.keys(properties)) {
+        const findPropIndex = propsItems.findIndex(i => i.key === item)
+
+        if (findPropIndex === -1) {
+          let propItem = {
+            key: item,
+            value: properties[item]
+          }
+          propsItems.push(propItem)
+        }
+      }
+
+      setInnerProps(propsItems)
+      setValue('propItems', propsItems)
     }
   }, [open, data, setValue])
 
@@ -314,6 +400,7 @@ const CreateCatalogDialog = props => {
                       onChange={onChange}
                       error={Boolean(errors.type)}
                       labelId='select-catalog-type'
+                      disabled={type === 'update'}
                     >
                       <MenuItem value={'relational'}>relational</MenuItem>
                     </Select>
@@ -340,6 +427,7 @@ const CreateCatalogDialog = props => {
                       onChange={e => handleChangeProvider(onChange, e)}
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
+                      disabled={type === 'update'}
                     >
                       <MenuItem value={'hive'}>hive</MenuItem>
                       <MenuItem value={'lakehouse-iceberg'}>iceberg</MenuItem>
@@ -395,6 +483,7 @@ const CreateCatalogDialog = props => {
                                   value={item.key}
                                   disabled={item.required}
                                   onChange={event => handleFormChange({ index, event })}
+                                  error={item.hasDuplicateKey}
                                 />
                               </Box>
                               <Box>
@@ -404,6 +493,7 @@ const CreateCatalogDialog = props => {
                                     value={item.value}
                                     size='small'
                                     sx={{ width: 195 }}
+                                    disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
                                   >
                                     {item.select.map(selectItem => (
@@ -419,6 +509,7 @@ const CreateCatalogDialog = props => {
                                     label='Value'
                                     error={item.required && item.value === ''}
                                     value={item.value}
+                                    disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
                                   />
                                 )}
@@ -443,6 +534,15 @@ const CreateCatalogDialog = props => {
                           >
                             {item.description}
                           </FormHelperText>
+                          {item.hasDuplicateKey && (
+                            <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
+                          )}
+                          {item.invalid && (
+                            <FormHelperText className={'twc-text-error-main'}>
+                              Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
+                              characters, underscores, hyphens, or dots.
+                            </FormHelperText>
+                          )}
                         </FormControl>
                       </Grid>
                     </Fragment>

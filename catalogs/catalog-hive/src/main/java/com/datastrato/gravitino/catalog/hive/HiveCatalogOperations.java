@@ -211,7 +211,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withConf(hiveConf)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
@@ -426,7 +426,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
-    HiveTable hiveTable = HiveTable.fromHiveTable(table);
+    HiveTable hiveTable = HiveTable.fromHiveTable(table).withClientPool(clientPool).build();
 
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
@@ -602,13 +602,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           new HiveTable.Builder()
               .withName(tableIdent.name())
               .withSchemaName(schemaIdent.name())
+              .withClientPool(clientPool)
               .withComment(comment)
               .withColumns(columns)
               .withProperties(properties)
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                  AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
@@ -717,7 +718,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return HiveTable.fromHiveTable(alteredHiveTable);
+      return HiveTable.fromHiveTable(alteredHiveTable).withClientPool(clientPool).build();
 
     } catch (TException | InterruptedException e) {
       if (e.getMessage() != null

@@ -14,10 +14,15 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.indexes.Index;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -75,6 +80,7 @@ public abstract class TestJdbcAbstractIT {
       String tableComment,
       List<JdbcColumn> columns,
       Map<String, String> properties,
+      Index[] indexes,
       JdbcTable table) {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertEquals(tableComment, table.comment());
@@ -88,13 +94,27 @@ public abstract class TestJdbcAbstractIT {
       // TODO: uncomment this after default value is supported.
       // Assertions.assertEquals(
       //    columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
-      if (null != columns.get(i).getProperties()) {
-        Assertions.assertEquals(
-            columns.get(i).getProperties(), ((JdbcColumn) table.columns()[i]).getProperties());
-      }
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
+    }
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      Assertions.assertEquals(indexes.length, table.index().length);
+
+      Map<String, Index> indexByName =
+          Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
+
+      for (int i = 0; i < table.index().length; i++) {
+        Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
+        Assertions.assertEquals(
+            indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
+        for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
+          Set<String> colNames =
+              Arrays.stream(indexByName.get(table.index()[i].name()).fieldNames()[j])
+                  .collect(Collectors.toSet());
+          colNames.containsAll(Arrays.asList(table.index()[i].fieldNames()[j]));
+        }
+      }
     }
   }
 

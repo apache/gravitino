@@ -8,6 +8,8 @@ import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static com.datastrato.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
+import static com.datastrato.gravitino.catalog.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +31,8 @@ import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaEntity;
@@ -87,7 +91,7 @@ public class TestCatalogOperationDispatcher {
             .withId(1L)
             .withName(metalake)
             .withAuditInfo(
-                new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .withVersion(SchemaVersion.V_0_1)
             .build();
     entityStore.put(metalakeEntity, true);
@@ -218,7 +222,7 @@ public class TestCatalogOperationDispatcher {
             .withName("schema11")
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
@@ -287,7 +291,7 @@ public class TestCatalogOperationDispatcher {
             .withName("schema21")
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
@@ -439,10 +443,7 @@ public class TestCatalogOperationDispatcher {
             .withName("table11")
             .withNamespace(tableNs)
             .withAuditInfo(
-                new AuditInfo.Builder()
-                    .withCreator("gravitino")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(tableEntity).when(entityStore).get(any(), any(), any());
     Table loadedTable4 = dispatcher.loadTable(tableIdent1);
@@ -508,10 +509,7 @@ public class TestCatalogOperationDispatcher {
             .withName("table21")
             .withNamespace(tableNs)
             .withAuditInfo(
-                new AuditInfo.Builder()
-                    .withCreator("gravitino")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).update(any(), any(), any(), any());
     Table alteredTable4 = dispatcher.alterTable(tableIdent, changes);
@@ -542,6 +540,119 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
+  public void testCreateAndListFilesets() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema81");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+    NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset1");
+    Fileset fileset1 =
+        dispatcher.createFileset(filesetIdent1, "comment", Fileset.Type.MANAGED, "test", props);
+    Assertions.assertEquals("fileset1", fileset1.name());
+    Assertions.assertEquals("comment", fileset1.comment());
+    testProperties(props, fileset1.properties());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+    Assertions.assertEquals("test", fileset1.storageLocation());
+
+    NameIdentifier[] idents = dispatcher.listFilesets(filesetNs);
+    Assertions.assertEquals(1, idents.length);
+    Assertions.assertEquals(filesetIdent1, idents[0]);
+
+    Map<String, String> illegalProps = ImmutableMap.of("k2", "v2");
+    testPropertyException(
+        () ->
+            dispatcher.createFileset(
+                filesetIdent1, "comment", Fileset.Type.MANAGED, "test", illegalProps),
+        "Properties are required and must be set");
+
+    Map<String, String> illegalProps2 = ImmutableMap.of("k1", "v1", ID_KEY, "test");
+    testPropertyException(
+        () ->
+            dispatcher.createFileset(
+                filesetIdent1, "comment", Fileset.Type.MANAGED, "test", illegalProps2),
+        "Properties are reserved and cannot be set",
+        "gravitino.identifier");
+  }
+
+  @Test
+  public void testCreateAndLoadFileset() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema91");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema91");
+    dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+    NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset11");
+    Fileset fileset1 =
+        dispatcher.createFileset(filesetIdent1, "comment", Fileset.Type.MANAGED, null, props);
+    Assertions.assertEquals("fileset11", fileset1.name());
+    Assertions.assertEquals("comment", fileset1.comment());
+    testProperties(props, fileset1.properties());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+    Assertions.assertNull(fileset1.storageLocation());
+
+    Fileset loadedFileset1 = dispatcher.loadFileset(filesetIdent1);
+    Assertions.assertEquals(fileset1.name(), loadedFileset1.name());
+    Assertions.assertEquals(fileset1.comment(), loadedFileset1.comment());
+    testProperties(props, loadedFileset1.properties());
+    Assertions.assertEquals(fileset1.type(), loadedFileset1.type());
+    Assertions.assertEquals(fileset1.storageLocation(), loadedFileset1.storageLocation());
+  }
+
+  @Test
+  public void testCreateAndAlterFileset() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema101");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+    NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset21");
+    Fileset fileset1 =
+        dispatcher.createFileset(
+            filesetIdent1, "comment", Fileset.Type.MANAGED, "fileset21", props);
+    Assertions.assertEquals("fileset21", fileset1.name());
+    Assertions.assertEquals("comment", fileset1.comment());
+    testProperties(props, fileset1.properties());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+    Assertions.assertEquals("fileset21", fileset1.storageLocation());
+
+    FilesetChange[] changes =
+        new FilesetChange[] {
+          FilesetChange.setProperty("k3", "v3"), FilesetChange.removeProperty("k1")
+        };
+
+    Fileset alteredFileset = dispatcher.alterFileset(filesetIdent1, changes);
+    Assertions.assertEquals(fileset1.name(), alteredFileset.name());
+    Assertions.assertEquals(fileset1.comment(), alteredFileset.comment());
+    Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
+    testProperties(expectedProps, alteredFileset.properties());
+
+    // Test immutable fileset properties
+    FilesetChange[] illegalChange =
+        new FilesetChange[] {FilesetChange.setProperty(GRAVITINO_MANAGED_ENTITY, "test")};
+    testPropertyException(
+        () -> dispatcher.alterFileset(filesetIdent1, illegalChange),
+        "Property gravitino.managed.entity is immutable or reserved, cannot be set");
+  }
+
+  @Test
+  public void testCreateAndDropFileset() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema111");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+    NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset31");
+    Fileset fileset1 =
+        dispatcher.createFileset(
+            filesetIdent1, "comment", Fileset.Type.MANAGED, "fileset31", props);
+    Assertions.assertEquals("fileset31", fileset1.name());
+    Assertions.assertEquals("comment", fileset1.comment());
+    testProperties(props, fileset1.properties());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+    Assertions.assertEquals("fileset31", fileset1.storageLocation());
+
+    boolean dropped = dispatcher.dropFileset(filesetIdent1);
+    Assertions.assertTrue(dropped);
+  }
+
+  @Test
   public void testGetCatalogIdentifier() {
     CatalogOperationDispatcher dispatcher = new CatalogOperationDispatcher(null, null, null);
 
@@ -567,6 +678,8 @@ public class TestCatalogOperationDispatcher {
           Assertions.assertEquals(v, testProps.get(k));
         });
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertFalse(testProps.containsKey(GRAVITINO_MANAGED_ENTITY));
+    Assertions.assertFalse(testProps.containsKey(TEST_FILESET_HIDDEN_KEY));
   }
 
   private void testPropertyException(Executable operation, String... errorMessage) {

@@ -174,8 +174,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public boolean deleteRange(KvRangeScan kvRangeScan) throws IOException {
-    List<Pair<byte[], byte[]>> pairs = scan(kvRangeScan);
+  public boolean deleteRange(KvRange kvRange) throws IOException {
+    List<Pair<byte[], byte[]>> pairs = scan(kvRange);
     pairs.forEach(
         p ->
             putPairs
@@ -188,7 +188,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
+  public List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException {
     // Why we need to change the end key? Because we use the transaction id to construct a row key
     // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
     // value of key a, then we need to change the end key to 'b' and set the value of endInclusive
@@ -200,8 +200,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       endInclude = false;
     }
 
-    KvRangeScan kvRangeScan =
-        new KvRangeScan.KvRangeScanBuilder()
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
             .start(scanRange.getStart())
             .end(end)
             .startInclusive(scanRange.isStartInclusive())
@@ -214,7 +214,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .limit(Integer.MAX_VALUE)
             .build();
 
-    List<Pair<byte[], byte[]>> rawPairs = kvBackend.scan(kvRangeScan);
+    List<Pair<byte[], byte[]>> rawPairs = kvBackend.scan(kvRange);
     List<Pair<byte[], byte[]>> result = Lists.newArrayList();
     int i = 0, j = 0;
     while (i < scanRange.getLimit() && j < rawPairs.size()) {
@@ -286,7 +286,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private byte[] getNextReadableValue(byte[] key) throws IOException {
     List<Pair<byte[], byte[]>> pairs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(key)
                 .startInclusive(false)
                 .end(endOfKey(key))

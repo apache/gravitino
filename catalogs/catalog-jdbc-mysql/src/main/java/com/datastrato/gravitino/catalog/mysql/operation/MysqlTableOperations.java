@@ -11,14 +11,17 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -31,6 +34,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -42,98 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String BACK_QUOTE = "`";
-
-  @Override
-  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    List<JdbcColumn> jdbcColumns = new ArrayList<>();
-    try (Connection connection = getConnection(databaseName)) {
-      // 1.Get table information
-      DatabaseMetaData metaData = connection.getMetaData();
-      ResultSet table = metaData.getTables(databaseName, null, tableName, null);
-      if (!table.next() || !tableName.equals(table.getString("TABLE_NAME"))) {
-        throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, databaseName));
-      }
-
-      // 2.Get column information
-      ResultSet columns = metaData.getColumns(databaseName, null, tableName, null);
-      while (columns.next()) {
-        MysqlTypeConverter.MysqlTypeBean typeBean =
-            new MysqlTypeConverter.MysqlTypeBean(columns.getString("TYPE_NAME"));
-        typeBean.setColumnSize(columns.getString("COLUMN_SIZE"));
-        typeBean.setScale(columns.getString("DECIMAL_DIGITS"));
-
-        String columnName = columns.getString("COLUMN_NAME");
-        String colComment = columns.getString("REMARKS");
-        jdbcColumns.add(
-            new JdbcColumn.Builder()
-                .withName(columnName)
-                .withType(typeConverter.toGravitinoType(typeBean))
-                .withNullable(columns.getBoolean("NULLABLE"))
-                .withComment(StringUtils.isEmpty(colComment) ? null : colComment)
-                // TODO #1531 will add default value.
-                //                .withDefaultValue(columns.getString("COLUMN_DEF"))
-                .withProperties(Collections.emptyList())
-                .build());
-      }
-
-      // 3.Load table properties
-      Map<String, String> tableProperties = loadTablePropertiesFromSql(connection, tableName);
-
-      String comment = table.getString("REMARKS");
-      if (StringUtils.isEmpty(comment)) {
-        // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
-        LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
-        comment = tableProperties.getOrDefault(COMMENT, comment);
-      }
-
-      return new JdbcTable.Builder()
-          .withName(tableName)
-          .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
-          .withComment(comment)
-          .withProperties(
-              Collections.unmodifiableMap(
-                  new HashMap<String, String>() {
-                    {
-                      put(MYSQL_ENGINE_KEY, tableProperties.get(MYSQL_ENGINE_KEY));
-                      String autoIncrement = tableProperties.get(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                      if (StringUtils.isNotEmpty(autoIncrement)) {
-                        put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                      }
-                    }
-                  }))
-          .withAuditInfo(AuditInfo.EMPTY)
-          .build();
-    } catch (SQLException e) {
-      throw exceptionMapper.toGravitinoException(e);
-    }
-  }
-
-  private Map<String, String> loadTablePropertiesFromSql(Connection connection, String tableName)
-      throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
-      statement.setString(1, tableName);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
-          throw new NoSuchTableException(
-              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
-        }
-        return Collections.unmodifiableMap(
-            new HashMap<String, String>() {
-              {
-                // It is not possible to get all column assembly returns here, because in version
-                // 5.7, some columns exist in metadata but get will report an error that they do not
-                // exist, such as: TABLE_NAME
-                put(COMMENT, resultSet.getString(COMMENT));
-                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                put(
-                    MYSQL_AUTO_INCREMENT_OFFSET_KEY,
-                    resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY));
-              }
-            });
-      }
-    }
-  }
+  public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -167,21 +81,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected Map<String, String> extractPropertiesFromResultSet(ResultSet table) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table properties is not supported yet");
-  }
-
-  @Override
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning) {
+      Transform[] partitioning,
+      Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
     }
+    validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
 
@@ -201,6 +111,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
         sqlBuilder.append(",\n");
       }
     }
+
+    appendIndexesSql(indexes, sqlBuilder);
+
     sqlBuilder.append("\n)");
 
     // Add table comment if specified
@@ -223,10 +136,159 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
+  private static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
+    // Check auto increment column
+    List<JdbcColumn> autoIncrementCols =
+        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
+    String autoIncrementColsStr =
+        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
+    Preconditions.checkArgument(
+        autoIncrementCols.size() <= 1,
+        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
+            + autoIncrementColsStr);
+    if (!autoIncrementCols.isEmpty()) {
+      Optional<Index> existAutoIncrementColIndexOptional =
+          Arrays.stream(indexes)
+              .filter(
+                  index ->
+                      Arrays.stream(index.fieldNames())
+                          .flatMap(Arrays::stream)
+                          .anyMatch(
+                              s ->
+                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
+              .filter(
+                  index ->
+                      index.type() == Index.IndexType.PRIMARY_KEY
+                          || index.type() == Index.IndexType.UNIQUE_KEY)
+              .findAny();
+      Preconditions.checkArgument(
+          existAutoIncrementColIndexOptional.isPresent(),
+          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
+    }
+  }
+
+  public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    for (Index index : indexes) {
+      String fieldStr =
+          Arrays.stream(index.fieldNames())
+              .map(
+                  colNames -> {
+                    if (colNames.length > 1) {
+                      throw new IllegalArgumentException(
+                          "Index does not support complex fields in MySQL");
+                    }
+                    return BACK_QUOTE + colNames[0] + BACK_QUOTE;
+                  })
+              .collect(Collectors.joining(", "));
+      sqlBuilder.append(",\n");
+      switch (index.type()) {
+        case PRIMARY_KEY:
+          if (null != index.name()
+              && !StringUtils.equalsIgnoreCase(
+                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+            throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
+          }
+          sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          sqlBuilder.append("CONSTRAINT ");
+          if (null != index.name()) {
+            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
+          }
+          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          break;
+        default:
+          throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
+      }
+    }
+  }
+
+  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    List<Index> indexes = new ArrayList<>();
+
+    // Get primary key information
+    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
+    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
+    while (primaryKeys.next()) {
+      String columnName = primaryKeys.getString("COLUMN_NAME");
+      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
+    }
+    for (String key : primaryKeyGroupByName.keySet()) {
+      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
+    }
+
+    // Get unique key information
+    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
+    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
+    while (indexInfo.next()) {
+      String indexName = indexInfo.getString("INDEX_NAME");
+      if (!indexInfo.getBoolean("NON_UNIQUE")
+          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
+        String columnName = indexInfo.getString("COLUMN_NAME");
+        indexGroupByName.put(indexName, columnName);
+      }
+    }
+    for (String key : indexGroupByName.keySet()) {
+      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
+    }
+
+    return indexes;
+  }
+
+  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
+    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
+  }
+
   @Override
-  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table columns is not supported yet");
+  protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
+    return "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT"));
+  }
+
+  @Override
+  protected Map<String, String> getTableProperties(Connection connection, String tableName)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
+      statement.setString(1, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
+          throw new NoSuchTableException(
+              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        }
+        return Collections.unmodifiableMap(
+            new HashMap<String, String>() {
+              {
+                // It is not possible to get all column assembly returns here, because in version
+                // 5.7, some columns exist in metadata but get will report an error that they do not
+                // exist, such as: TABLE_NAME
+                put(COMMENT, resultSet.getString(COMMENT));
+                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                if (StringUtils.isNotEmpty(autoIncrement)) {
+                  put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                }
+              }
+            });
+      }
+    }
+  }
+
+  @Override
+  protected void correctJdbcTableFields(
+      Connection connection, String tableName, JdbcTable.Builder tableBuilder) throws SQLException {
+    if (StringUtils.isEmpty(tableBuilder.comment())) {
+      // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
+      LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
+      tableBuilder.withComment(
+          tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
+    }
   }
 
   @Override
@@ -346,9 +408,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(change.nullable())
-            .withProperties(column.getProperties())
             .withType(column.dataType())
             .withComment(column.comment())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
@@ -380,9 +442,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(column.nullable())
-            .withProperties(column.getProperties())
             .withType(column.dataType())
             .withComment(newComment)
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
@@ -435,10 +497,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(newColumnName)
             .withType(column.dataType())
             .withComment(column.comment())
-            .withProperties(column.getProperties())
             // TODO #1531 will add default value.
             .withDefaultValue(null)
             .withNullable(column.nullable())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -502,12 +564,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            // Modifying a field type does not require adding its attributes. If
-            // additional attributes are required, they must be modified separately.
-            // TODO #839
-            .withProperties(null)
             .withDefaultValue(null)
             .withNullable(column.nullable())
+            .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -527,12 +586,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // TODO #1531 will add default value.
 
-    // Add column properties if specified
-    if (CollectionUtils.isNotEmpty(column.getProperties())) {
-      for (String property : column.getProperties()) {
-        sqlBuilder.append(property).append(SPACE);
-      }
+    // Add column auto_increment if specified
+    if (column.autoIncrement()) {
+      sqlBuilder.append(MYSQL_AUTO_INCREMENT).append(" ");
     }
+
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
       sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");

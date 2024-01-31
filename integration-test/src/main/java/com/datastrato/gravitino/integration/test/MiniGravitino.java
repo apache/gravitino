@@ -17,6 +17,7 @@ import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
@@ -99,6 +100,15 @@ public class MiniGravitino {
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
+              .build();
+    } else if (AuthenticatorType.KERBEROS
+        .name()
+        .toLowerCase()
+        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      restClient =
+          HTTPClient.builder(ImmutableMap.of())
+              .uri(URI)
+              .withAuthDataProvider(KerberosProviderHelper.getProvider())
               .build();
     } else {
       restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
