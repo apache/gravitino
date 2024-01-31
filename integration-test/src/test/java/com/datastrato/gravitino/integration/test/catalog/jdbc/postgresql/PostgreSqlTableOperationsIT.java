@@ -9,6 +9,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
@@ -341,7 +342,11 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     PostgreSqlTableOperations postgreSqlTableOperations = new PostgreSqlTableOperations();
 
     postgreSqlTableOperations.initialize(
-        dataSource, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+        dataSource,
+        JDBC_EXCEPTION_CONVERTER,
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        config);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(

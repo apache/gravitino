@@ -4,6 +4,10 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -26,8 +30,11 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
@@ -388,7 +395,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(createdTable.columns()[i], columns[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -401,7 +408,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(columns[i], loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -716,5 +723,72 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             });
     Assertions.assertEquals(1, table.index().length);
     Assertions.assertEquals("u4_key_2", table.index()[0].name());
+  }
+
+  @Test
+  void testColumnDefaultValue() {
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.FloatType.get(),
+            "col_1_comment",
+            false,
+            false,
+            FunctionExpression.of("random"));
+    Column col2 =
+        Column.of(
+            "col_2",
+            Types.TimestampType.withoutTimeZone(),
+            "col_2_comment",
+            false,
+            false,
+            FunctionExpression.of("current_timestamp"));
+    Column col3 =
+        Column.of("col_3", Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL);
+    Column col4 = Column.of("col_4", Types.StringType.get(), "col_4_comment", false, false, null);
+    Column col5 =
+        Column.of(
+            "col_5",
+            Types.VarCharType.of(255),
+            "col_5_comment",
+            true,
+            false,
+            Literals.stringLiteral("current_timestamp"));
+    Column col6 =
+        Column.of(
+            "col_6",
+            Types.IntegerType.get(),
+            "col_6_comment",
+            true,
+            false,
+            Literals.integerLiteral(1000));
+
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(
+                    metalakeName,
+                    catalogName,
+                    schemaName,
+                    GravitinoITUtils.genRandomName("pg_it_table")),
+                newColumns,
+                null,
+                ImmutableMap.of());
+
+    Assertions.assertEquals(
+        toFunctionArg(UnparsedExpression.of("random()")), createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
+        createdTable.columns()[1].defaultValue());
+    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[2].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(Literals.stringLiteral("current_timestamp")),
+        createdTable.columns()[4].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(Literals.integerLiteral(1000)), createdTable.columns()[5].defaultValue());
   }
 }

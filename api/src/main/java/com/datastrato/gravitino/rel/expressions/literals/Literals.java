@@ -182,13 +182,18 @@ public class Literals {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      LiteralImpl<?> literal = (LiteralImpl<?>) o;
+      LiteralImpl<?> literal = (LiteralImpl) o;
       return Objects.equals(value, literal.value) && Objects.equals(dataType, literal.dataType);
     }
 
     @Override
     public int hashCode() {
       return Objects.hash(value, dataType);
+    }
+
+    @Override
+    public String toString() {
+      return "LiteralImpl{" + "value=" + value + ", dataType=" + dataType + '}';
     }
   }
 }

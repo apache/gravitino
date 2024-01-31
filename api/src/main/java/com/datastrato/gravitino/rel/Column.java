@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.types.Type;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -23,6 +24,7 @@ import java.util.Objects;
 public interface Column {
 
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+  Expression DEFAULT_VALUE_OF_CURRENT_TIMESTAMP = FunctionExpression.of("current_timestamp");
 
   /** @return The name of this column. */
   String name();

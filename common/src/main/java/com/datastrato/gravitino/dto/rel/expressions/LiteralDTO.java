@@ -6,10 +6,13 @@ package com.datastrato.gravitino.dto.rel.expressions;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
 public class LiteralDTO implements Literal<String>, FunctionArg {
+
+  public static final LiteralDTO NULL = new LiteralDTO("NULL", Types.NullType.get());
 
   private final String value;
   private final Type dataType;
@@ -32,6 +35,11 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
   @Override
   public ArgType argType() {
     return ArgType.LITERAL;
+  }
+
+  @Override
+  public String toString() {
+    return "LiteralDTO{" + "value='" + value + '\'' + ", dataType=" + dataType + '}';
   }
 
   public static class Builder {

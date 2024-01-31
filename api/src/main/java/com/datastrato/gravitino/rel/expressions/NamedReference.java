@@ -96,5 +96,10 @@ public interface NamedReference extends Expression {
     public int hashCode() {
       return Arrays.hashCode(fieldName);
     }
+
+    @Override
+    public String toString() {
+      return String.join(".", fieldName);
+    }
   }
 }
