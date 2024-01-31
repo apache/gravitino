@@ -14,7 +14,7 @@ This software is licensed under the Apache License version 2."
 Gravitino provides the ability to manage PostgreSQL metadata.
 
 :::caution
-Gravitino will save some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
 :::
 
 ## Catalog
