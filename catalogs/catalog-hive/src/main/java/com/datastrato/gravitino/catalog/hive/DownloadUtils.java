@@ -19,24 +19,24 @@ public class DownloadUtils {
 
   private DownloadUtils() {}
 
-  public static void downloadFile(
-      String keyTabUri, File keyTabFile, int timeout, Configuration conf) throws IOException {
+  public static void downloadFile(String fileUri, File destFile, int timeout, Configuration conf)
+      throws IOException {
     try {
-      URI uri = new URI(keyTabUri);
+      URI uri = new URI(fileUri);
       String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
       switch (scheme) {
         case "http":
         case "https":
         case "ftp":
-          FileUtils.copyURLToFile(uri.toURL(), keyTabFile, timeout * 1000, timeout * 1000);
+          FileUtils.copyURLToFile(uri.toURL(), destFile, timeout * 1000, timeout * 1000);
           break;
 
         case "file":
-          Files.createSymbolicLink(keyTabFile.toPath(), new File(uri.getPath()).toPath());
+          Files.createSymbolicLink(destFile.toPath(), new File(uri.getPath()).toPath());
           break;
 
         case "hdfs":
-          FileSystem.get(conf).copyToLocalFile(new Path(uri), new Path(keyTabFile.toURI()));
+          FileSystem.get(conf).copyToLocalFile(new Path(uri), new Path(destFile.toURI()));
 
         default:
           throw new IllegalArgumentException(

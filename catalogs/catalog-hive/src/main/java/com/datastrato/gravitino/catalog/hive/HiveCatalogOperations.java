@@ -173,7 +173,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         File keyTabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
         keyTabFile.deleteOnExit();
         if (keyTabFile.exists() && !keyTabFile.delete()) {
-          LOG.error("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
+          throw new IllegalStateException(
+              String.format("Fail to delete key tab file %s", keyTabFile.getAbsolutePath()));
         }
 
         String keyTabUri =
