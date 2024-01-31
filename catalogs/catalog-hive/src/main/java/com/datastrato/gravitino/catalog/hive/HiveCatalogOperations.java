@@ -165,11 +165,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File file = new File("tmp");
-        if (!file.exists()) {
-          file.mkdir();
+        File keytabTemporaryDirectory = new File("tmp");
+        if (!keytabTemporaryDirectory.exists()) {
+          keytabTemporaryDirectory.mkdir();
         }
 
+
+        // The id of entity is a random unique id.
         File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
         keytabFile.deleteOnExit();
         if (keytabFile.exists() && !keytabFile.delete()) {
@@ -185,24 +187,24 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         Preconditions.checkArgument(
             !keytabUri.startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
 
-        int timeout =
+        int fetchKeytabFileTimeout =
             (int)
                 catalogPropertiesMetadata.getOrDefault(
                     conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, timeout, hadoopConf);
+        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
 
         hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
 
-        String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
+        String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
+            StringUtils.isNotBlank(catalogPrincipal), "If you use Kerberos, principal can't be blank");
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
 
-        UserGroupInformation.loginUserFromKeytab(principal, keytabFile.getAbsolutePath());
+        UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         loginUgi = UserGroupInformation.getCurrentUser();
 
