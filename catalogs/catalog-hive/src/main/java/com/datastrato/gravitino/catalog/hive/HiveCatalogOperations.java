@@ -96,7 +96,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
 
-  private UserGroupInformation loginUgi;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -209,7 +208,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
-        loginUgi = UserGroupInformation.getCurrentUser();
+        UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
         int checkInterval =
             (int)
@@ -219,7 +218,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         checkTgtExecutor.scheduleAtFixedRate(
             () -> {
               try {
-                loginUgi.checkTGTAndReloginFromKeytab();
+                kerberosLoginUgi.checkTGTAndReloginFromKeytab();
               } catch (Throwable throwable) {
                 LOG.error("Fail to refresh ugi token: ", throwable);
               }
