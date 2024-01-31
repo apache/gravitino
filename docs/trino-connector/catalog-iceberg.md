@@ -19,17 +19,17 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
-## Schema operation
+## Schema operations
 
 ### Create a schema
 
-Users can create a schema with properties through Gravitino Trino connector as follows:
+Users can create a schema through Gravitino Trino connector as follows:
 
 ```SQL
 CREATE SCHEMA "metalake.catalog".schema_name 
 ```
 
-## Table operation
+## Table operations
 
 ### Create table
 
@@ -85,11 +85,12 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 
 The following tables are the properties supported by the Iceberg table:
 
-| Property       | Description                             | Default Value                                              | Required | Since Version |
-|----------------|-----------------------------------------|------------------------------------------------------------|----------|---------------|
-| partitioning   | Partition columns for the table         | (none)                                                     | No       | 0.4.0         |
-| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | 0.4.0         | 
+| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
+|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
+| partitioning   | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |
+| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         | 
 
+Reserved properties: A reserved property is one can't be set by users but can be read by users. 
 
 ## Basic usage examples
 
