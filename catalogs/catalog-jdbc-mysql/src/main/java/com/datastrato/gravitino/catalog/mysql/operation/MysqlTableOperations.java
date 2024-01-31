@@ -93,7 +93,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
+    sqlBuilder
+        .append("CREATE TABLE ")
+        .append(BACK_QUOTE)
+        .append(tableName)
+        .append(BACK_QUOTE)
+        .append(" (\n");
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
@@ -293,12 +298,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("RENAME TABLE %s TO %s", oldTableName, newTableName);
+    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    return "DROP TABLE " + BACK_QUOTE + tableName + BACK_QUOTE;
   }
 
   @Override
@@ -390,7 +395,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
+    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
   }
@@ -412,7 +417,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "MODIFY COLUMN "
+        + BACK_QUOTE
+        + col
+        + BACK_QUOTE
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -446,7 +455,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "MODIFY COLUMN "
+        + BACK_QUOTE
+        + col
+        + BACK_QUOTE
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -457,7 +470,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
+    columnDefinition
+        .append("ADD COLUMN ")
+        .append(BACK_QUOTE)
+        .append(col)
+        .append(BACK_QUOTE)
+        .append(SPACE)
+        .append(dataType)
+        .append(SPACE);
 
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
@@ -472,7 +492,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+      columnDefinition
+          .append("AFTER ")
+          .append(BACK_QUOTE)
+          .append(afterPosition.getColumn())
+          .append(BACK_QUOTE);
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing, follow the default behavior of mysql
     } else {
@@ -491,7 +515,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String newColumnName = renameColumn.getNewName();
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
     StringBuilder sqlBuilder =
-        new StringBuilder("CHANGE COLUMN " + oldColumnName + SPACE + newColumnName);
+        new StringBuilder(
+            "CHANGE COLUMN "
+                + BACK_QUOTE
+                + oldColumnName
+                + BACK_QUOTE
+                + SPACE
+                + BACK_QUOTE
+                + newColumnName
+                + BACK_QUOTE);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(newColumnName)
@@ -548,7 +580,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + col;
+    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
   }
 
   private String updateColumnTypeFieldDefinition(

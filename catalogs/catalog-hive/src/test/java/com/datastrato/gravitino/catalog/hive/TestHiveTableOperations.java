@@ -90,6 +90,14 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   }
 
   @Test
+  public void testListPartitions() {
+    Partition[] partitions = hiveTable.supportPartitions().listPartitions();
+    // there maybe other partitions in the list, so we only check the added partition
+    Assertions.assertTrue(
+        partitions.length > 0 && Arrays.asList(partitions).contains(existingPartition));
+  }
+
+  @Test
   public void testGetPartition() {
     Partition partition = hiveTable.supportPartitions().getPartition(existingPartition.name());
     Assertions.assertEquals(existingPartition, partition);
