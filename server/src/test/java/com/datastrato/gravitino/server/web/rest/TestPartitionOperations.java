@@ -142,7 +142,7 @@ public class TestPartitionOperations extends JerseyTest {
 
               @Override
               public Partition[] listPartitions() {
-                return new Partition[0];
+                return partitions.values().toArray(new Partition[0]);
               }
 
               @Override
@@ -198,6 +198,46 @@ public class TestPartitionOperations extends JerseyTest {
     doThrow(new RuntimeException("test exception")).when(mockedTable).supportPartitions();
     Response resp2 =
         target(partitionPath(metalake, catalog, schema, table))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+    Assertions.assertTrue(errorResp2.getMessage().contains("test exception"));
+  }
+
+  @Test
+  public void testListPartitions() {
+    Table mockedTable = mockPartitionedTable();
+
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table))
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    PartitionListResponse listResp = resp.readEntity(PartitionListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+
+    Partition[] partitions = listResp.getPartitions();
+    Assertions.assertEquals(2, partitions.length);
+    Assertions.assertEquals(DTOConverters.toDTO(partition1), partitions[0]);
+    Assertions.assertEquals(DTOConverters.toDTO(partition2), partitions[1]);
+
+    // Test throws exception
+    doThrow(new RuntimeException("test exception")).when(mockedTable).supportPartitions();
+    Response resp2 =
+        target(partitionPath(metalake, catalog, schema, table))
+            .queryParam("details", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();

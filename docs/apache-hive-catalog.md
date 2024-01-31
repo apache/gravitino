@@ -38,7 +38,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -57,7 +57,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema operations
 
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations).
+see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -138,7 +138,7 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 
 ### Table operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter operations
 

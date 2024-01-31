@@ -57,6 +57,8 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -64,16 +66,20 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.partitions.IdentityPartition;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -665,12 +671,84 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testListPartitionNames() throws TException, InterruptedException {
+    // test empty partitions
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Table nonPartitionedTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Transforms.EMPTY_TRANSFORM);
+    String[] result = nonPartitionedTable.supportPartitions().listPartitionNames();
+    Assertions.assertEquals(0, result.length);
+
+    // test partitioned table
     Table createdTable = preparePartitionedTable();
 
     String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
     Assertions.assertArrayEquals(
         new String[] {"hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test"},
         partitionNames);
+  }
+
+  @Test
+  public void testListPartitions() throws TException, InterruptedException {
+    // test empty partitions
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Table nonPartitionedTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Transforms.EMPTY_TRANSFORM);
+    Partition[] result = nonPartitionedTable.supportPartitions().listPartitions();
+    Assertions.assertEquals(0, result.length);
+
+    // test partitioned table
+    Table createdTable = preparePartitionedTable();
+    String insertTemplate =
+        "INSERT INTO TABLE %s.%s "
+            + "PARTITION (hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2') "
+            + "VALUES %s, %s";
+    sparkSession.sql(String.format(insertTemplate, schemaName, createdTable.name(), "(1)", "(2)"));
+
+    // update partition stats
+    String partition1 = "hive_col_name2='2023-01-01', hive_col_name3='gravitino_it_test'";
+    String partition2 = "hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2'";
+    sparkSession.sql(
+        String.format(
+            "ANALYZE TABLE %s.%s PARTITION (%s) COMPUTE STATISTICS",
+            schemaName, createdTable.name(), partition1));
+    sparkSession.sql(
+        String.format(
+            "ANALYZE TABLE %s.%s PARTITION (%s) COMPUTE STATISTICS",
+            schemaName, createdTable.name(), partition2));
+
+    Partition[] partitions = createdTable.supportPartitions().listPartitions();
+    Assertions.assertEquals(2, partitions.length);
+    String partition1Name = "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test";
+    String partition2Name = "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2";
+    Set<String> partitionNames =
+        Arrays.stream(partitions).map(Partition::name).collect(Collectors.toSet());
+    Assertions.assertTrue(partitionNames.contains(partition1Name));
+    Assertions.assertTrue(partitionNames.contains(partition2Name));
+    for (Partition partition : partitions) {
+      if (partition.name().equals(partition1Name)) {
+        Assertions.assertEquals("1", partition.properties().get("spark.sql.statistics.numRows"));
+      } else if (partition.name().equals(partition2Name)) {
+        Assertions.assertEquals("2", partition.properties().get("spark.sql.statistics.numRows"));
+      }
+    }
   }
 
   @Test
@@ -695,6 +773,56 @@ public class CatalogHiveIT extends AbstractIT {
         partition.values()[1].value().toString(), hivePartition.getValues().get(1));
     Assertions.assertNotNull(partition.properties());
     Assertions.assertEquals(partition.properties(), hivePartition.getParameters());
+  }
+
+  @Test
+  public void testAddPartition() throws TException, InterruptedException {
+    Table createdTable = preparePartitionedTable();
+
+    // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field1 = new String[] {"hive_col_name2"};
+    String[] field2 = new String[] {"hive_col_name3"};
+    Literal<?> literal1 = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
+    Literal<?> literal2 = Literals.stringLiteral("gravitino_it_test2");
+
+    Partition identity =
+        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
+    IdentityPartition partitionAdded =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
+
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
+    Assertions.assertEquals(
+        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+
+    // test the new partition can be read and write successfully by dynamic partition
+    String selectTemplate =
+        "SELECT * FROM %s.%s WHERE hive_col_name2 = '2023-01-02' AND hive_col_name3 = 'gravitino_it_test2'";
+    long count =
+        sparkSession.sql(String.format(selectTemplate, schemaName, createdTable.name())).count();
+    Assertions.assertEquals(0, count);
+
+    String insertTemplate =
+        "INSERT INTO TABLE %s.%s PARTITION (hive_col_name2='2023-01-02', hive_col_name3) VALUES (%s, %s)";
+    sparkSession.sql(
+        String.format(
+            insertTemplate, schemaName, createdTable.name(), "1", "'gravitino_it_test2'"));
+    count =
+        sparkSession.sql(String.format(selectTemplate, schemaName, createdTable.name())).count();
+    Assertions.assertEquals(1, count);
+
+    // test the new partition can be read and write successfully by static partition
+    String insertTemplate2 =
+        "INSERT INTO TABLE %s.%s PARTITION (hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2') VALUES (%s)";
+    sparkSession.sql(String.format(insertTemplate2, schemaName, createdTable.name(), "2"));
+    count =
+        sparkSession.sql(String.format(selectTemplate, schemaName, createdTable.name())).count();
+    Assertions.assertEquals(2, count);
   }
 
   private Table preparePartitionedTable() throws TException, InterruptedException {
