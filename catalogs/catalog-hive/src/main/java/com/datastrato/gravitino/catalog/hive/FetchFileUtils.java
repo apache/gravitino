@@ -24,6 +24,7 @@ public class FetchFileUtils {
     try {
       URI uri = new URI(fileUri);
       String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
+
       switch (scheme) {
         case "http":
         case "https":
