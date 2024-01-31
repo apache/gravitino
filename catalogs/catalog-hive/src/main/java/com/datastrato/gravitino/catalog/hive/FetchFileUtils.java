@@ -38,13 +38,14 @@ public class FetchFileUtils {
 
         case "hdfs":
           FileSystem.get(conf).copyToLocalFile(new Path(uri), new Path(destFile.toURI()));
+          break;
 
         default:
           throw new IllegalArgumentException(
               String.format("Doesn't support the scheme %s", scheme));
       }
     } catch (URISyntaxException ue) {
-      throw new IllegalArgumentException("The uri of keytab has the wrong format", ue);
+      throw new IllegalArgumentException("The uri of file has the wrong format", ue);
     }
   }
 }

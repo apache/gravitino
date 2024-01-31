@@ -163,11 +163,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keytabTemporaryDirectory = new File("tmp");
-        if (!keytabTemporaryDirectory.exists()) {
+        File keytabs = new File("tmp");
+        if (!keytabs.exists()) {
           // Ignore the return value, because there exists many Hive catalog operations making
           // this directory.
-          keytabTemporaryDirectory.mkdir();
+          keytabs.mkdir();
         }
 
         // The id of entity is a random unique id.
@@ -175,17 +175,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         keytabFile.deleteOnExit();
         if (keytabFile.exists() && !keytabFile.delete()) {
           throw new IllegalStateException(
-              String.format("Fail to delete key tab file %s", keytabFile.getAbsolutePath()));
+              String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
         }
 
         String keytabUri =
             (String)
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(keytabUri), "If you use Kerberos, key tab uri can't be blank");
+            StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
-            !keytabUri.trim().startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
+            !keytabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
 
         int fetchKeytabFileTimeout =
             (int)
