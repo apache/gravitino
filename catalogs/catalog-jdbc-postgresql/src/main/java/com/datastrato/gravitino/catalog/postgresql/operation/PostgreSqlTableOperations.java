@@ -64,7 +64,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in PostgreSQL");
     }
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE ").append(PG_QUOTE).append(tableName).append(PG_QUOTE).append(" (\n");
+    sqlBuilder
+        .append("CREATE TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" (\n");
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {

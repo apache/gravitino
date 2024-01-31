@@ -546,7 +546,7 @@ public class CatalogMysqlIT extends AbstractIT {
         .asSchemas()
         .createSchema(
             NameIdentifier.of(metalakeName, catalogName, schemaName),
-            "Created by gravitino client",
+            null,
             ImmutableMap.<String, String>builder().build());
 
     catalog
