@@ -167,6 +167,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       try {
         File keytabTemporaryDirectory = new File("tmp");
         if (!keytabTemporaryDirectory.exists()) {
+          // Ignore the return value, because there exists many Hive catalog operations making
+          // this directory.
           keytabTemporaryDirectory.mkdir();
         }
 
@@ -183,6 +185,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(keytabUri), "If you use Kerberos, key tab uri can't be blank");
+        // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
             !keytabUri.trim().startsWith("hdfs"), "Key tab uri doesn't support to use HDFS");
 
@@ -212,6 +215,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 catalogPropertiesMetadata.getOrDefault(
                     conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+
         checkTgtExecutor.scheduleAtFixedRate(
             () -> {
               try {
