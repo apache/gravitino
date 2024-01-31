@@ -6,9 +6,6 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -92,18 +89,18 @@ public class GravitinoTable {
     return columns;
   }
 
-  public ColumnDTO[] getColumnDTOs() {
-    ColumnDTO[] gravitinoColumns = new ColumnDTO[columns.size()];
+  public Column[] getRawColumns() {
+    Column[] gravitinoColumns = new Column[columns.size()];
     for (int i = 0; i < columns.size(); i++) {
       GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
-          ColumnDTO.builder()
-              .withName(column.getName())
-              .withDataType(column.getType())
-              .withComment(column.getComment())
-              .withNullable(column.isNullable())
-              .withAutoIncrement(column.isAutoIncrement())
-              .build();
+          Column.of(
+              columns.get(i).getName(),
+              columns.get(i).getType(),
+              columns.get(i).getComment(),
+              columns.get(i).isNullable(),
+              column.isAutoIncrement(),
+              null);
     }
     return gravitinoColumns;
   }
@@ -128,16 +125,6 @@ public class GravitinoTable {
 
   public String getComment() {
     return comment;
-  }
-
-  public TableDTO getTableDTO() {
-    return TableDTO.builder()
-        .withName(tableName)
-        .withComment(comment)
-        .withColumns(getColumnDTOs())
-        .withProperties(properties)
-        .withAudit(new AuditDTO.Builder().build())
-        .build();
   }
 
   public void setSortOrders(SortOrder[] sortOrders) {
