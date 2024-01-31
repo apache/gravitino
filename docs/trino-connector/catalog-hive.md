@@ -36,15 +36,36 @@ per catalog:
 - CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
 - TextFile
 
-## Create table
+
+## Schema operations
+
+### Create a schema 
+
+Users can create a schema with properties through Gravitino Trino connector as follows:
+
+```SQL
+CREATE SCHEMA "metalake.catalog".schema_name 
+```
+
+## Table operations
+
+### Create table
 
 The Gravitino connector currently supports basic Hive table creation statements, such as defining fields,
-allowing null values, and adding comments.
-However, it does not support advanced features like partitioning, sorting, and distribution.
+allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
 
-The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The following example shows how to create a table in the Hive catalog:
 
-## Alter table
+```shell
+CREATE TABLE "metalake.catalog".schema_name.table_name
+(
+  name varchar,
+  salary int
+)
+```
+
+
+### Alter table
 
 Support for the following alter table operations:
 
@@ -55,15 +76,40 @@ Support for the following alter table operations:
 - Change a column type
 - Set a table property
 
-## Select
+### Select
 
 The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
-## Table properties
+## Schema and table properties
 
-You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE TABLE"
+You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
 statement.
+
+
+### Create a schema with properties
+
+Users can use the following example to create a schema with properties: 
+
+```sql
+CREATE SCHEMA "metalake.catalog".dbname
+WITH (
+  location = 'hdfs://hdfs-host:9000/user/hive/warehouse/dbname'
+);
+```
+
+The following tables are the properties supported by the Hive schema:
+
+| Property | Description                     | Default Value | Required | Reserved | Since Version |
+|----------|---------------------------------|---------------|----------|----------|---------------|
+| location | HDFS location for table storage | (none)        | No       | No       | 0.2.0         |
+
+Reserved properties: A reserved property is one can't be set by users but can be read by users.
+
+
+### Create a table with properties
+
+Users can use the following example to create a table with properties: 
 
 ```sql
 CREATE TABLE "metalake.catalog".dbname.tabname
@@ -71,28 +117,30 @@ CREATE TABLE "metalake.catalog".dbname.tabname
   name varchar,
   salary int
 ) WITH (
-  format = 'TEXTFILE'
+  format = 'TEXTFILE',
+  KEY = 'VALUE',
+  ...      
 );
 ```
 
-| Property      | Description                             | Default Value                                              | Required | Since Version |
-|---------------|-----------------------------------------|------------------------------------------------------------|----------|---------------|
-| format        | Hive storage format for the table       | TEXTFILE                                                   | No       | 0.2.0         |
-| total_size    | Total size of the table                 | (none)                                                     | No       | 0.2.0         |
-| num_files     | Number of files                         | 0                                                          | No       | 0.2.0         |
-| external      | Indicate whether it's an external table | (none)                                                     | No       | 0.2.0         |
-| location      | HDFS location for table storage         | (none)                                                     | No       | 0.2.0         |
-| table_type    | The type of Hive table                  | (none)                                                     | No       | 0.2.0         |
-| input_format  | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.2.0         |
-| output_format | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.2.0         |
-| serde_lib     | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.2.0         |
-| serde_name    | Name of the serde                       | table name by default                                      | No       | 0.2.0         |
+The following tables are the properties supported by the Hive table:
 
-## Schema properties
-
-| Property | Description                     | Default Value | Required | Since Version |
-|----------|---------------------------------|---------------|----------|---------------|
-| location | HDFS location for table storage | (none)        | No       | 0.2.0         |
+| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
+|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
+| format         | Hive storage format for the table       | TEXTFILE                                                   | No       | No       | 0.2.0         |
+| total_size     | Total size of the table                 | (none)                                                     | No       | Yes      | 0.2.0         |
+| num_files      | Number of files                         | 0                                                          | No       | Yes      | 0.2.0         |
+| external       | Indicate whether it's an external table | (none)                                                     | No       | No       | 0.2.0         |
+| location       | HDFS location for table storage         | (none)                                                     | No       | No       | 0.2.0         |
+| table_type     | The type of Hive table                  | (none)                                                     | No       | No       | 0.2.0         |
+| input_format   | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | No       | 0.2.0         |
+| output_format  | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | No       | 0.2.0         |
+| serde_lib      | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | No       | 0.2.0         |
+| serde_name     | Name of the serde                       | table name by default                                      | No       | No       | 0.2.0         |
+| partitioned_by | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |   
+| bucketed_by    | Bucket columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
+| bucket_count   | Number of buckets for the table         | (none)                                                     | No       | No       | 0.4.0         |
+| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
 
 ## Basic usage examples
 
@@ -168,7 +216,7 @@ CREATE SCHEMA "test.hive_test".database_01 WITH (
 );
 ```
 
-Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format.
+Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format, partitioning by `salary`, bucket by `name` and sorted by `salary`.
 
 ```sql
 CREATE TABLE  "test.hive_test".database_01.table_01
@@ -177,7 +225,11 @@ name varchar,
 salary int
 )
 WITH (
-  format = 'TEXTFILE'
+  format = 'TEXTFILE',
+  partitioned_by = ARRAY['salary'],
+  bucketed_by = ARRAY['name'],
+  bucket_count = 2,
+  sorted_by = ARRAY['salary']  
 );
 ```
 
