@@ -170,7 +170,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           keytabTemporaryDirectory.mkdir();
         }
 
-
         // The id of entity is a random unique id.
         File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
         keytabFile.deleteOnExit();
@@ -198,7 +197,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(catalogPrincipal), "If you use Kerberos, principal can't be blank");
+            StringUtils.isNotBlank(catalogPrincipal),
+            "If you use Kerberos, principal can't be blank");
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(

@@ -19,8 +19,8 @@ public class FetchFileUtils {
 
   private FetchFileUtils() {}
 
-  public static void fetchFileFromUri(String fileUri, File destFile, int timeout, Configuration conf)
-      throws IOException {
+  public static void fetchFileFromUri(
+      String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
     try {
       URI uri = new URI(fileUri);
       String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
