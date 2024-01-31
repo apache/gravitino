@@ -95,10 +95,10 @@ public class GravitinoTable {
       GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
           Column.of(
-              columns.get(i).getName(),
-              columns.get(i).getType(),
-              columns.get(i).getComment(),
-              columns.get(i).isNullable(),
+              column.getName(),
+              column.getType(),
+              column.getComment(),
+              column.isNullable(),
               column.isAutoIncrement(),
               null);
     }
