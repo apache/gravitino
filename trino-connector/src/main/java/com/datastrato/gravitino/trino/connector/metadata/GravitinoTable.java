@@ -21,17 +21,17 @@ import java.util.Optional;
 
 /** Help Gravitino connector access TableMetadata from gravitino client. */
 public class GravitinoTable {
-  private final String schemaName;
-  private final String tableName;
+  protected final String schemaName;
+  protected final String tableName;
 
-  private final List<GravitinoColumn> columns;
+  protected final List<GravitinoColumn> columns;
 
-  private final String comment;
-  private final Map<String, String> properties;
+  protected final String comment;
+  protected final Map<String, String> properties;
 
-  private SortOrder[] sortOrders = new SortOrder[0];
-  private Transform[] partitioning = new Transform[0];
-  private Distribution distribution = Distributions.NONE;
+  protected SortOrder[] sortOrders = new SortOrder[0];
+  protected Transform[] partitioning = new Transform[0];
+  protected Distribution distribution = Distributions.NONE;
 
   @JsonCreator
   public GravitinoTable(String schemaName, String tableName, Table tableMetadata) {
@@ -99,7 +99,7 @@ public class GravitinoTable {
               column.getType(),
               column.getComment(),
               column.isNullable(),
-              column.isAutoIncrement(),
+              false,
               null);
     }
     return gravitinoColumns;

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.GravitinoJdbcTable;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import io.trino.spi.connector.ColumnMetadata;
@@ -51,8 +52,6 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
-      boolean autoIncrement =
-          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
       columns.add(
           new GravitinoColumn(
               column.getName(),
@@ -60,9 +59,9 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
               i,
               column.getComment(),
               column.isNullable(),
-              autoIncrement));
+              column.getProperties()));
     }
 
-    return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+    return new GravitinoJdbcTable(schemaName, tableName, columns, comment, properties);
   }
 }
