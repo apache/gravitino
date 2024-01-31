@@ -164,11 +164,6 @@ public class NameIdentifier {
     this.name = name;
   }
 
-  private NameIdentifier() {
-    this.namespace = Namespace.empty();
-    this.name = ".";
-  }
-
   /**
    * Check if the {@link NameIdentifier} has a namespace.
    *

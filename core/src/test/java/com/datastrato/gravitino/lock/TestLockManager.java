@@ -323,7 +323,7 @@ public class TestLockManager {
   }
 
   private void checkReferenceCount(TreeLockNode node) {
-    Assertions.assertEquals(0, node.getReferenceCount());
+    Assertions.assertEquals(0, node.getReference());
     node.getAllChildren().forEach(this::checkReferenceCount);
   }
 

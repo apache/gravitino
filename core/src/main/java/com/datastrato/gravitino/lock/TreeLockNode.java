@@ -57,7 +57,7 @@ public class TreeLockNode {
     referenceCount.getAndDecrement();
   }
 
-  long getReferenceCount() {
+  long getReference() {
     return referenceCount.get();
   }
 

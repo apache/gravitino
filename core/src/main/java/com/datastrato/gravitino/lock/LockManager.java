@@ -133,10 +133,10 @@ public class LockManager {
     treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
 
     // Handle self node.
-    if (treeNode.getReferenceCount() == 0) {
+    if (treeNode.getReference() == 0) {
       synchronized (parent) {
         // Once goes here, the parent node has been locked, so the reference could not be changed.
-        if (treeNode.getReferenceCount() == 0) {
+        if (treeNode.getReference() == 0) {
           parent.removeChild(treeNode.getName());
           long leftNodeCount = totalNodeCount.decrementAndGet();
           LOG.trace(
