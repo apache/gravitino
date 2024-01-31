@@ -86,7 +86,7 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
               .put("hive.max-initial-split-size", "hive.max-initial-split-size")
               .put("hive.max-split-size", "hive.max-split-size")
 
-              // S3 Properties
+              // S3
               .put("hive.s3.aws-access-key", "hive.s3.aws-access-key")
               .put("hive.s3.aws-secret-key", "hive.s3.aws-secret-key")
               .put("hive.s3.iam-role", "hive.s3.iam-role")
