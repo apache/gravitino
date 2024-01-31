@@ -348,7 +348,7 @@ public class TestLockManager {
 
     CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
     // Can 2000 times ensure that the test is correct?
-    for (int t = 0; t < 10000; t++) {
+    for (int t = 0; t < 100000; t++) {
       for (int i = 0; i < 10; i++) {
         service.submit(
             () -> {
