@@ -16,7 +16,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -497,10 +496,7 @@ public class TestLockManager {
     final Field ourField = LockManager.class.getDeclaredField("treeLockRootNode");
 
     final long fieldOffset = unsafe.objectFieldOffset(ourField);
-    unsafe.putObject(
-        object,
-        fieldOffset,
-        newValue); // copy the field to itself, boxing/unboxing
+    unsafe.putObject(object, fieldOffset, newValue); // copy the field to itself, boxing/unboxing
   }
 
   private TreeLockNode getTreeNode(TreeLockNode root, int depth) {

@@ -95,8 +95,7 @@ public class TreeLockNode {
   }
 
   /**
-   * Get the tree lock node by the given name. If the node doesn't exist, create a new
-   * TreeNode.
+   * Get the tree lock node by the given name. If the node doesn't exist, create a new TreeNode.
    *
    * <p>Note: This method should always be guarded by object lock.
    *
@@ -104,12 +103,15 @@ public class TreeLockNode {
    * @return The tree lock node of this ident.
    */
   TreeLockNode getOrCreateChild(String name) {
-    TreeLockNode childNode = childMap.computeIfAbsent(name, k -> {
-      TreeLockNode newNode = new TreeLockNode(name, lockManager);
-      lockManager.totalNodeCount.getAndIncrement();
-      LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
-      return newNode;
-    });
+    TreeLockNode childNode =
+        childMap.computeIfAbsent(
+            name,
+            k -> {
+              TreeLockNode newNode = new TreeLockNode(name, lockManager);
+              lockManager.totalNodeCount.getAndIncrement();
+              LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
+              return newNode;
+            });
 
     childNode.addReference();
     return childNode;
