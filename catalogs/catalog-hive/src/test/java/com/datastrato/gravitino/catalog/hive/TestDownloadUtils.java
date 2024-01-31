@@ -5,25 +5,24 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
+import java.io.File;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-
 public class TestDownloadUtils {
 
-    @Test
-    public void testDownloadFile() throws Exception{
+  @Test
+  public void testDownloadFile() throws Exception {
 
-        File srcFile = new File("test");
-        File destFile = new File("dest");
+    File srcFile = new File("test");
+    File destFile = new File("dest");
 
-        srcFile.createNewFile();
-        DownloadUtils.downloadFile(srcFile.toURI().toString(), destFile, 10, new Configuration());
-        Assertions.assertTrue(destFile.exists());
+    srcFile.createNewFile();
+    DownloadUtils.downloadFile(srcFile.toURI().toString(), destFile, 10, new Configuration());
+    Assertions.assertTrue(destFile.exists());
 
-        srcFile.delete();
-        destFile.delete();
-    }
+    srcFile.delete();
+    destFile.delete();
+  }
 }
