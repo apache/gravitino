@@ -236,7 +236,7 @@ const TableView = props => {
                 textDecoration: 'none'
               }}
             >
-              {`${nullable}`}
+              {typeof nullable !== 'undefined' && `${nullable}`}
             </Typography>
           </Box>
         )
