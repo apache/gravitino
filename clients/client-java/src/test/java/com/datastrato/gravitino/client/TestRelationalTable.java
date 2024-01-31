@@ -149,6 +149,46 @@ public class TestRelationalTable extends TestRelationalCatalog {
   }
 
   @Test
+  public void testListPartitions() throws JsonProcessingException {
+    String partitionName = "p1";
+    RangePartitionDTO partition =
+        RangePartitionDTO.builder()
+            .withName(partitionName)
+            .withLower(
+                new LiteralDTO.Builder()
+                    .withDataType(Types.IntegerType.get())
+                    .withValue("1")
+                    .build())
+            .withUpper(
+                new LiteralDTO.Builder()
+                    .withDataType(Types.IntegerType.get())
+                    .withValue("10")
+                    .build())
+            .build();
+    String partitionPath =
+        withSlash(((RelationalTable) partitionedTable).getPartitionRequestPath());
+    PartitionListResponse resp = new PartitionListResponse(new PartitionDTO[] {partition});
+
+    buildMockResource(Method.GET, partitionPath, null, resp, SC_OK);
+
+    Partition[] partitions = partitionedTable.supportPartitions().listPartitions();
+    Assertions.assertEquals(1, partitions.length);
+    Assertions.assertTrue(partitions[0] instanceof RangePartition);
+    Assertions.assertEquals(partition, partitions[0]);
+
+    // test throws exception
+    ErrorResponse errorResp =
+        ErrorResponse.unsupportedOperation("table does not support partition operations");
+    buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_IMPLEMENTED);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> partitionedTable.supportPartitions().listPartitions());
+    Assertions.assertEquals("table does not support partition operations", exception.getMessage());
+  }
+
+  @Test
   public void testGetPartition() throws JsonProcessingException {
     String partitionName = "p1";
     RangePartitionDTO partition =

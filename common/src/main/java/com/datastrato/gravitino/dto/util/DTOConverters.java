@@ -316,6 +316,13 @@ public class DTOConverters {
     return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
 
+  public static PartitionDTO[] toDTOs(Partition[] partitions) {
+    if (ArrayUtils.isEmpty(partitions)) {
+      return new PartitionDTO[0];
+    }
+    return Arrays.stream(partitions).map(DTOConverters::toDTO).toArray(PartitionDTO[]::new);
+  }
+
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
     if (DistributionDTO.NONE.equals(distributionDTO) || null == distributionDTO) {
       return Distributions.NONE;
