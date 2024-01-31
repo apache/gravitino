@@ -14,7 +14,7 @@ Depending on your network and computer, startup time may take 3-5 minutes. Once 
 
 ## Prerequisites
 
-You first need to install git and docker-compose.
+Install Git and docker-compose.
 
 ## TCP ports used
 
@@ -38,7 +38,7 @@ cd gravitino-playground
 
 ## Experiencing Gravitino with Trino SQL
 
-1. Login to the Gravitino playground Trino Docker container using the following command.
+1. Log in to the Gravitino playground Trino Docker container using the following command:
 
 ```shell
 docker exec -it playground-trino bash
@@ -86,9 +86,9 @@ SHOW TABLES from "metalake_demo.catalog_hive".company;
 
 ### Cross-catalog queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data and the sales department uses PostgreSQL to store its data. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
 
-If you want to know which employee has the largest sales amount, you can run this SQL.
+To know which employee has the largest sales amount, run this SQL:
 
 ```SQL
 SELECT given_name, family_name, job_title, sum(total_amount) AS total_sales
@@ -100,7 +100,7 @@ ORDER BY total_sales DESC
 LIMIT 1;
 ```
 
-If you want to know the top customers who bought the most by state, you can run this SQL.
+To know the top customers who bought the most by state, run this SQL:
 
 ```SQL
 SELECT customer_name, location, SUM(total_amount) AS total_spent
@@ -112,7 +112,7 @@ GROUP BY location, customer_name
 ORDER BY location, SUM(total_amount) DESC;
 ```
 
-If you want to know the employee's average performance rating and total sales, you can run this SQL.
+To know the employee's average performance rating and total sales, run this SQL:
 
 ```SQL
 SELECT e.employee_id, given_name, family_name, AVG(rating) AS average_rating,  SUM(total_amount) AS total_sales
