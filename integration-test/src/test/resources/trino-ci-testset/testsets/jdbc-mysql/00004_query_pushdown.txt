@@ -40,8 +40,8 @@ INSERT: 15000 rows
 
 "Trino version: %
 %
-    ScanProject[table = test.gt_mysql:gt_db1:customer]
-        Layout: [custkey:bigint, name:varchar(25), address:varchar(40), nationkey:bigint, phone:varchar(15), acctbal:decimal(12,2), mktsegment:varchar(10), comment:varchar(117), $hashvalue_4:bigint]
+    └─ TableScan[table = test.gt_mysql:Query[SELECT l.`orderkey` AS `orderkey_0`, l.`custkey` AS `custkey_1`, l.`orderstatus` AS `orderstatus_2`, l.`totalprice` AS `totalprice_3`, l.`orderdate` AS `orderdate_4`, l.`orderpriority` AS `orderpriority_5`, l.`clerk` AS `clerk_6`, l.`shippriority` AS `shippriority_7`, l.`comment` AS `comment_8`, r.`custkey` AS `custkey_9`, r.`name` AS `name_10`, r.`address` AS `address_11`, r.`nationkey` AS `nationkey_12`, r.`phone` AS `phone_13`, r.`acctbal` AS `acctbal_14`, r.`mktsegment` AS `mktsegment_15`, r.`comment` AS `comment_16` FROM (SELECT `orderkey`, `custkey`, `orderstatus`, `totalprice`, `orderdate`, `orderpriority`, `clerk`, `shippriority`, `comment` FROM `gt_db1`.`orders`) l INNER JOIN (SELECT `custkey`, `name`, `address`, `nationkey`, `phone`, `acctbal`, `mktsegment`, `comment` FROM `gt_db1`.`customer`) r ON l.`custkey` = r.`custkey`] limit=10 columns=[clerk_6:varchar(15):VARCHAR, comment_8:varchar(79):VARCHAR, orderkey_0:bigint:BIGINT, orderstatus_2:varchar(1):VARCHAR, totalprice_3:decimal(12,2):DECIMAL, orderdate_4:date:DATE, orderpriority_5:varchar(15):VARCHAR, shippriority_7:integer:INT, nationkey_12:bigint:BIGINT, mktsegment_15:varchar(10):VARCHAR, address_11:varchar(40):VARCHAR, phone_13:varchar(15):VARCHAR, custkey_9:bigint:BIGINT, name_10:varchar(25):VARCHAR, comment_16:varchar(117):VARCHAR, acctbal_14:decimal(12,2):DECIMAL]]
+           Layout: [clerk:varchar(15), comment_1:varchar(79), orderkey:bigint, orderstatus:varchar(1), totalprice:decimal(12,2), orderdate:date, orderpriority:varchar(15), shippriority:integer, nationkey:bigint, mktsegment:varchar(10), address:varchar(40), phone:varchar(15), custkey:bigint, name:varchar(25), comment:varchar(117), acctbal:decimal(12,2)]
 %
 "
 
