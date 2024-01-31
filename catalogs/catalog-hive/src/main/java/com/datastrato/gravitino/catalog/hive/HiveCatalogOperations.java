@@ -50,15 +50,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLConnection;
-import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -99,7 +94,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
-  private ScheduledThreadPoolExecutor refreshScheduledExecutor;
+  private ScheduledThreadPoolExecutor checkScheduledExecutor;
 
   private UserGroupInformation loginUgi;
 
@@ -163,10 +158,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keyTabFile = new File(String.format("/tmp/gravitino-%s-keytab", entity.id()));
+        File file = new File("tmp");
+        if (!file.exists()) {
+          file.mkdir();
+        }
+
+        File keyTabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
         keyTabFile.deleteOnExit();
         if (keyTabFile.exists() && !keyTabFile.delete()) {
-          LOG.warn("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
+          LOG.error("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
         }
 
         String keyTabUri =
@@ -175,39 +175,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         Preconditions.checkArgument(
             StringUtils.isNotBlank(keyTabUri), "If you use Kerberos, key tab uri can't be blank");
 
-        try {
-          URI uri = new URI(keyTabUri);
-          String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
-          switch (scheme) {
-            case "http":
-            case "https":
-            case "ftp":
-              int timeout =
-                  (int)
-                      catalogPropertiesMetadata.getOrDefault(
-                          conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
-              URLConnection uc = uri.toURL().openConnection();
-              uc.setConnectTimeout(timeout * 1000);
-              uc.setReadTimeout(timeout * 1000);
-              uc.connect();
+        int timeout =
+            (int)
+                catalogPropertiesMetadata.getOrDefault(
+                    conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-              Files.copy(uc.getInputStream(), keyTabFile.toPath());
-              break;
-
-            case "file":
-              Files.createSymbolicLink(keyTabFile.toPath(), new File(uri.getPath()).toPath());
-              break;
-
-              // TODO: Supports to download keytab from HCFS, it's unsafe to store
-              // keytab in an unsecured HDFS cluster. If we use a secured HDFS cluster,
-              // we should have a keytab first.
-            default:
-              throw new IllegalArgumentException(
-                  String.format("Don't support the scheme %s", scheme));
-          }
-        } catch (URISyntaxException ue) {
-          throw new IllegalArgumentException("The uri of keytab has the wrong format", ue);
-        }
+        DownloadUtils.downloadFile(keyTabUri, keyTabFile, timeout, hadoopConf);
 
         hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keyTabFile.getAbsolutePath());
 
@@ -215,19 +188,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         Preconditions.checkArgument(
             StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
 
-        refreshScheduledExecutor =
+        checkScheduledExecutor =
             new ScheduledThreadPoolExecutor(
-                1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.id())));
+                1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
 
         loginUgi =
             UserGroupInformation.loginUserFromKeytabAndReturnUGI(
                 principal, keyTabFile.getAbsolutePath());
 
-        int refreshInterval =
+        int checkInterval =
             (int)
                 catalogPropertiesMetadata.getOrDefault(
-                    conf, HiveCatalogPropertiesMeta.REFRESH_INTERVAL_SEC);
-        refreshScheduledExecutor.scheduleAtFixedRate(
+                    conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+        checkScheduledExecutor.scheduleAtFixedRate(
             () -> {
               try {
                 loginUgi.checkTGTAndReloginFromKeytab();
@@ -235,8 +208,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 LOG.error("Fail to refresh ugi token: ", throwable);
               }
             },
-            refreshInterval,
-            refreshInterval,
+            checkInterval,
+            checkInterval,
             TimeUnit.SECONDS);
 
       } catch (IOException ioe) {
@@ -266,14 +239,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       clientPool = null;
     }
 
-    if (refreshScheduledExecutor != null) {
-      refreshScheduledExecutor.shutdown();
-      refreshScheduledExecutor = null;
+    if (checkScheduledExecutor != null) {
+      checkScheduledExecutor.shutdown();
+      checkScheduledExecutor = null;
     }
 
-    File keyTabFile = new File(String.format("/tmp/gravitino-%s-keytab", entity.id()));
+    File keyTabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
     if (keyTabFile.exists() && !keyTabFile.delete()) {
-      LOG.warn("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
+      LOG.error("Fail to delete key tab file {}", keyTabFile.getAbsolutePath());
     }
   }
 
@@ -322,7 +295,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
-      LOG.warn("Current user : " + UserGroupInformation.getCurrentUser().getUserName());
       HiveSchema hiveSchema =
           new HiveSchema.Builder()
               .withName(ident.name())

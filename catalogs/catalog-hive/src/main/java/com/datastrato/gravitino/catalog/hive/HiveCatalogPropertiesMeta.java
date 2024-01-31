@@ -32,7 +32,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String PRINCIPAL = "kerberos.principal";
 
-  public static final String REFRESH_INTERVAL_SEC = "kerberos.refresh-interval-sec";
+  public static final String CHECK_INTERVAL_SEC = "kerberos.check-interval-sec";
 
   public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
 
@@ -77,9 +77,13 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               PropertyEntry.stringImmutablePropertyEntry(
                   PRINCIPAL, "The principal for the catalog", false, null, false, false))
           .put(
-              REFRESH_INTERVAL_SEC,
+              CHECK_INTERVAL_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
-                  REFRESH_INTERVAL_SEC, "The interval to refresh the principal", true, 60, false))
+                  CHECK_INTERVAL_SEC,
+                  "The interval to check validness of the principal",
+                  true,
+                  60,
+                  false))
           .put(
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
