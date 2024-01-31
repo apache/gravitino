@@ -24,15 +24,16 @@ Gravitino provides the ability to manage MySQL metadata.
 
 ### Catalog properties
 
-Any property that isn't defined by Gravitino can pass to MySQL data source by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
-You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+
+If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 
 | Configuration item      | Description                                                                                                | Default value | Required | Since Version |
 |-------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example `jdbc:mysql://localhost:3306`                         | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`           | The driver of the JDBC connection. For example `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.      | (none)        | Yes      | 0.3.0         |
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                         | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.      | (none)        | Yes      | 0.3.0         |
 | `jdbc-user`             | The JDBC user name.                                                                                        | (none)        | Yes      | 0.3.0         |
 | `jdbc-password`         | The JDBC password.                                                                                         | (none)        | Yes      | 0.3.0         |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                             | `2`           | No       | 0.3.0         |
@@ -44,16 +45,18 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
 ### Schema capabilities
 
-- Gravitino schema corresponds to the MySQL database.
-- Supports create schema with comments.
-- Supports drop schema.
-- Doesn't support cascade drop database.
+The Gravitino schema:
+
+- corresponds to the MySQL database.
+- Ssupports create schema with comments.
+- supports drop schema.
+- doesn't support cascade drop database.
 
 ### Schema properties
 
@@ -61,17 +64,19 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
 ### Table capabilities
 
-- Gravitino table corresponds to the MySQL table.
-- Supports DDL operation for MySQL tables.
-- Doesn't support setting certain column properties, such as default value and check constraints.
-- Doesn't support index definition.
-- Doesn't support table property settings.
+The Gravitino table:
+
+- corresponds to the MySQL table.
+- supports DDL operation for MySQL tables.
+- doesn't support setting certain column properties, such as default value and check constraints.
+- doesn't support index definition.
+- doesn't support table property settings.
 
 #### Table column types
 
@@ -93,20 +98,20 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 | `Binary`         | `Binary`    |
 
 :::info
-MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Boolean`, `Fixed`, `Struct`, `List`, `Map`, `Timestamp_tz`, `IntervalDay`, `IntervalYear`, `Union`, or `UUID` types.
 :::
 
 ### Table properties
 
-- Doesn't support table properties.
+The Gravitino table doesn't support table properties.
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
-Supports operations:
+The Gravitino table Supports these operations:
 - `RenameTable`
 - `UpdateComment`
 - `AddColumn`
@@ -122,5 +127,5 @@ You cannot submit the `RenameTable` operation at the same time as other operatio
 :::
 
 :::caution
-If you update a nullability column to non nullability, there may be compatibility issues.
+If you update a nullability column to non-nullability, there may be compatibility issues.
 :::
