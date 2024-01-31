@@ -18,6 +18,7 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -57,7 +58,31 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public Partition[] listPartitions() {
-    throw new UnsupportedOperationException();
+    List<String> partitionNames;
+    List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
+    try {
+      partitionNames =
+          table
+              .clientPool()
+              .run(c -> c.listPartitionNames(table.schemaName(), table.name(), (short) -1));
+      partitions =
+          table
+              .clientPool()
+              .run(c -> c.getPartitionsByNames(table.schemaName(), table.name(), partitionNames));
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    // should never happen
+    Preconditions.checkArgument(
+        partitionNames.size() == partitions.size(),
+        "oops?! partition names and partitions size are not equal: %s vs %s",
+        partitionNames.size(),
+        partitions.size());
+
+    return IntStream.range(0, partitionNames.size())
+        .mapToObj(i -> fromHivePartition(partitionNames.get(i), partitions.get(i)))
+        .toArray(Partition[]::new);
   }
 
   @Override

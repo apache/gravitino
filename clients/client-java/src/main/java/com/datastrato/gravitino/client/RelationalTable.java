@@ -27,6 +27,7 @@ import com.datastrato.gravitino.rel.partitions.Partition;
 import com.google.common.annotations.VisibleForTesting;
 import java.net.URLEncoder;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.SneakyThrows;
@@ -124,7 +125,16 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public Partition[] listPartitions() {
-    throw new UnsupportedOperationException();
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    PartitionListResponse resp =
+        restClient.get(
+            getPartitionRequestPath(),
+            params,
+            PartitionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    return resp.getPartitions();
   }
 
   @Override
