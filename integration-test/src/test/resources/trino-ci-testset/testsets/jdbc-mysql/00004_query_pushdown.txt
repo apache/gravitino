@@ -38,6 +38,13 @@ INSERT: 15000 rows
 %
 "
 
+"Trino version: %
+%
+    ScanProject[table = test.gt_mysql:gt_db1:customer]
+        Layout: [custkey:bigint, name:varchar(25), address:varchar(40), nationkey:bigint, phone:varchar(15), acctbal:decimal(12,2), mktsegment:varchar(10), comment:varchar(117), $hashvalue_4:bigint]
+%
+"
+
 DROP TABLE
 
 DROP TABLE
