@@ -7,6 +7,7 @@ package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -124,7 +125,9 @@ public class TreeLockNode {
   }
 
   public synchronized List<TreeLockNode> getAllChildren() {
-    return Lists.newArrayList(childMap.values());
+    List<TreeLockNode> children = Lists.newArrayList(childMap.values());
+    Collections.shuffle(children);
+    return Collections.unmodifiableList(children);
   }
 
   public void removeChild(NameIdentifier name) {
