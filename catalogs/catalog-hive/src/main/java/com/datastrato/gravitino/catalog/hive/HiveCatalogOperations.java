@@ -181,8 +181,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String keytabUri =
             (String)
                 catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
+        Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
             !keytabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
