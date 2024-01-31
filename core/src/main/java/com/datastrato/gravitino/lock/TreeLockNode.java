@@ -26,6 +26,9 @@ public class TreeLockNode {
   @VisibleForTesting final Map<NameIdentifier, TreeLockNode> childMap;
   private final LockManager lockManager;
 
+  // The reference count of this node. The reference count is used to track the number of the
+  // TreeLocks that are using this node. If the reference count is 0, it means that no TreeLock is
+  // using this node, and this node can be removed from the tree.
   private final AtomicLong referenceCount = new AtomicLong();
 
   public TreeLockNode(NameIdentifier identifier, LockManager manager) {
@@ -39,42 +42,24 @@ public class TreeLockNode {
     return ident;
   }
 
-  // Why is this method synchronized, please see the comment in the method
-  // LockManager#evictStaleNodes
+  /**
+   * Increase the reference count of this node. The reference count should always be greater than or
+   * equal to 0.
+   */
   synchronized void addReference() {
     referenceCount.getAndIncrement();
   }
 
+  /**
+   * Decrease the reference count of this node. The reference count should always be greater than or
+   * equal to 0.
+   */
   synchronized void decReference() {
     referenceCount.getAndDecrement();
   }
 
   long getReferenceCount() {
     return referenceCount.get();
-  }
-
-  /**
-   * Try to lock the node with the given lock type.
-   *
-   * @param lockType The lock type to lock the node.
-   * @return True if the node is locked successfully, false otherwise.
-   */
-  public boolean tryLock(LockType lockType) {
-    boolean success =
-        lockType == LockType.READ
-            ? readWriteLock.readLock().tryLock()
-            : readWriteLock.writeLock().tryLock();
-    if (success) {
-      referenceCount.getAndIncrement();
-
-      LOG.info(
-          "Node {} has been lock with '{}' lock, reference count = {}",
-          ident,
-          lockType,
-          referenceCount.get());
-    }
-
-    return success;
   }
 
   /**
@@ -135,6 +120,10 @@ public class TreeLockNode {
 
   /**
    * Get all the children of this node. The returned list is unmodifiable and the order is random.
+   * The reason why we return a random order list is that we want to avoid the cases that the first
+   * child is always to be dropped firstly and the last child is always the last to be dropped,
+   * chances are that the first child is always the most popular one and the last child is always
+   * the least popular.
    *
    * @return The list of all the children of this node.
    */
@@ -144,8 +133,15 @@ public class TreeLockNode {
     return Collections.unmodifiableList(children);
   }
 
-  void removeChild(NameIdentifier name) {
-    childMap.remove(name);
+  /**
+   * Remove the child node by the given name identifier.
+   *
+   * <p>Note: This method should be guarded by object lock.
+   *
+   * @param ident The name identifier of a resource such as entity or others.
+   */
+  void removeChild(NameIdentifier ident) {
+    childMap.remove(ident);
   }
 
   @Override

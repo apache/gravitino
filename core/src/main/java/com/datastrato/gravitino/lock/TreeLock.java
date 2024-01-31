@@ -65,28 +65,22 @@ public class TreeLock {
     }
 
     boolean lastNode = false;
-    TreeLockNode current = null;
-    try {
-      while (!heldLocks.isEmpty()) {
-        LockType type;
-        if (!lastNode) {
-          lastNode = true;
-          type = lockType;
-        } else {
-          type = LockType.READ;
-        }
-
-        current = heldLocks.peek();
-
-        // Unlock the node and decrease the reference count.
-        current.unlock(type);
-        current.decReference();
-        heldLocks.pop();
+    TreeLockNode current;
+    while (!heldLocks.isEmpty()) {
+      LockType type;
+      if (!lastNode) {
+        lastNode = true;
+        type = lockType;
+      } else {
+        type = LockType.READ;
       }
-    } catch (Exception e) {
-      LOG.error("Can't release the lock node: {}", current, e);
-      throw new IllegalStateException(
-          String.format("Locks %s are not released properly...", current), e);
+
+      current = heldLocks.peek();
+
+      // Unlock the node and decrease the reference count.
+      current.unlock(type);
+      current.decReference();
+      heldLocks.pop();
     }
 
     LOG.trace("Unlocked the tree lock: [{}], lock type: {}", lockNodes, lockType);
