@@ -28,7 +28,8 @@ import org.slf4j.LoggerFactory;
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
-  static final NameIdentifier ROOT = NameIdentifier.of(".");
+
+  static final NameIdentifier ROOT = NameIdentifier.of("/");
 
   @VisibleForTesting final TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
@@ -104,7 +105,7 @@ public class LockManager {
   }
 
   public LockManager(Config config) {
-    treeLockRootNode = new TreeLockNode(ROOT, this);
+    treeLockRootNode = new TreeLockNode(ROOT.name(), this);
 
     // Init the parameters.
     initParameters(config);
@@ -121,7 +122,7 @@ public class LockManager {
    */
   @VisibleForTesting
   void evictStaleNodes(TreeLockNode treeNode, TreeLockNode parent) {
-    // We will not evict the root node if the total node count is less than the
+    // We will not evict the node tree if the total node count is less than the
     // MIN_TREE_NODE_IN_MEMORY.
     // Do not need to consider thread-safe issues.
     if (totalNodeCount.get() < minTreeNodeInMemory) {
@@ -136,11 +137,11 @@ public class LockManager {
       synchronized (parent) {
         // Once goes here, the parent node has been locked, so the reference could not be changed.
         if (treeNode.getReferenceCount() == 0) {
-          parent.removeChild(treeNode.getIdent());
+          parent.removeChild(treeNode.getName());
           long leftNodeCount = totalNodeCount.decrementAndGet();
           LOG.trace(
               "Evict stale tree lock node '{}', current left nodes '{}'",
-              treeNode.getIdent(),
+              treeNode.getName(),
               leftNodeCount);
         } else {
           treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
@@ -173,9 +174,8 @@ public class LockManager {
 
       TreeLockNode child;
       for (int i = 0; i < levels.length; i++) {
-        NameIdentifier ident = NameIdentifier.of(ArrayUtils.subarray(levels, 0, i + 1));
         synchronized (lockNode) {
-          child = lockNode.getOrCreateChild(ident);
+          child = lockNode.getOrCreateChild(levels[i]);
         }
         treeLockNodes.add(child);
         lockNode = child;

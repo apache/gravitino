@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.lock;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.Collections;
@@ -21,9 +20,9 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class TreeLockNode {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLockNode.class);
-  private final NameIdentifier ident;
+  private final String name;
   private final ReentrantReadWriteLock readWriteLock;
-  @VisibleForTesting final Map<NameIdentifier, TreeLockNode> childMap;
+  @VisibleForTesting final Map<String, TreeLockNode> childMap;
   private final LockManager lockManager;
 
   // The reference count of this node. The reference count is used to track the number of the
@@ -31,15 +30,15 @@ public class TreeLockNode {
   // using this node, and this node can be removed from the tree.
   private final AtomicLong referenceCount = new AtomicLong();
 
-  public TreeLockNode(NameIdentifier identifier, LockManager manager) {
-    this.ident = identifier;
+  public TreeLockNode(String name, LockManager manager) {
+    this.name = name;
     this.readWriteLock = new ReentrantReadWriteLock();
     this.childMap = new ConcurrentHashMap<>();
     this.lockManager = manager;
   }
 
-  public NameIdentifier getIdent() {
-    return ident;
+  public String getName() {
+    return name;
   }
 
   /**
@@ -75,7 +74,7 @@ public class TreeLockNode {
       readWriteLock.writeLock().lock();
     }
 
-    LOG.trace("Node {} has been lock with '{}' lock", ident, lockType);
+    LOG.trace("Node {} has been lock with '{}' lock", name, lockType);
   }
 
   /**
@@ -92,27 +91,25 @@ public class TreeLockNode {
       readWriteLock.writeLock().unlock();
     }
 
-    LOG.trace("Node {} has been unlock with '{}' lock", ident, lockType);
+    LOG.trace("Node {} has been unlock with '{}' lock", name, lockType);
   }
 
   /**
-   * Get the tree lock node by the given name identifier. If the node doesn't exist, create a new
+   * Get the tree lock node by the given name. If the node doesn't exist, create a new
    * TreeNode.
    *
    * <p>Note: This method should always be guarded by object lock.
    *
-   * @param ident The name identifier of a resource such as entity or others.
+   * @param name The name of a resource such as entity or others.
    * @return The tree lock node of this ident.
    */
-  TreeLockNode getOrCreateChild(NameIdentifier ident) {
-    TreeLockNode childNode = childMap.get(ident);
-    if (childNode == null) {
-      childNode = new TreeLockNode(ident, lockManager);
+  TreeLockNode getOrCreateChild(String name) {
+    TreeLockNode childNode = childMap.computeIfAbsent(name, k -> {
+      TreeLockNode newNode = new TreeLockNode(name, lockManager);
       lockManager.totalNodeCount.getAndIncrement();
-      childMap.put(ident, childNode);
-
-      LOG.trace("Create tree lock node '{}' as a child of '{}'", ident, this.ident);
-    }
+      LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
+      return newNode;
+    });
 
     childNode.addReference();
     return childNode;
@@ -138,16 +135,16 @@ public class TreeLockNode {
    *
    * <p>Note: This method should be guarded by object lock.
    *
-   * @param ident The name identifier of a resource such as entity or others.
+   * @param name The name of a resource such as entity or others.
    */
-  void removeChild(NameIdentifier ident) {
-    childMap.remove(ident);
+  void removeChild(String name) {
+    childMap.remove(name);
   }
 
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("TreeLockNode{");
-    sb.append("ident=").append(ident);
+    sb.append("ident=").append(name);
     sb.append('}');
     return sb.toString();
   }

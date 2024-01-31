@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
+import sun.misc.Unsafe;
 
 public class TestLockManager {
   private static final String[] ENTITY_NAMES = {
@@ -489,10 +490,17 @@ public class TestLockManager {
 
   static void setFinal(Field field, Object newValue, Object object) throws Exception {
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
-    modifiersField.setAccessible(true);
-    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-    field.set(object, newValue);
+
+    final Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+    unsafeField.setAccessible(true);
+    final Unsafe unsafe = (Unsafe) unsafeField.get(null);
+    final Field ourField = LockManager.class.getDeclaredField("treeLockRootNode");
+
+    final long fieldOffset = unsafe.objectFieldOffset(ourField);
+    unsafe.putObject(
+        object,
+        fieldOffset,
+        newValue); // copy the field to itself, boxing/unboxing
   }
 
   private TreeLockNode getTreeNode(TreeLockNode root, int depth) {
@@ -533,7 +541,7 @@ public class TestLockManager {
     } else {
       int parentLevel = level - 1;
       TreeLockNode parentNode = getTreeNode(rootNode, parentLevel);
-      parentNode.childMap.put(treeLockNode.getIdent(), spyNode);
+      parentNode.childMap.put(treeLockNode.getName(), spyNode);
     }
 
     CompletionService<Integer> service = createCompletionService();
