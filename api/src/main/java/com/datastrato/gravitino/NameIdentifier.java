@@ -19,8 +19,6 @@ public class NameIdentifier {
 
   private static final Splitter DOT = Splitter.on('.');
 
-  private static final NameIdentifier ROOT = new NameIdentifier();
-
   private final Namespace namespace;
 
   private final String name;
@@ -48,18 +46,6 @@ public class NameIdentifier {
    */
   public static NameIdentifier of(Namespace namespace, String name) {
     return new NameIdentifier(namespace, name);
-  }
-
-  /**
-   * Create the root {@link NameIdentifier}.
-   *
-   * <p>Note: this is a special {@link NameIdentifier} which has no namespace and name is "." and is
-   * only used for the tree lock intentionally.
-   *
-   * @return
-   */
-  public static NameIdentifier ofRoot() {
-    return ROOT;
   }
 
   /**

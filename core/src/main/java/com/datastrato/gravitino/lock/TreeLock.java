@@ -35,7 +35,7 @@ public class TreeLock {
   private final Stack<TreeLockNode> heldLocks = new Stack<>();
   private LockType lockType;
 
-  public TreeLock(List<TreeLockNode> lockNodes) {
+  TreeLock(List<TreeLockNode> lockNodes) {
     this.lockNodes = lockNodes;
   }
 
@@ -54,6 +54,8 @@ public class TreeLock {
       treeLockNode.lock(type);
       heldLocks.push(treeLockNode);
     }
+
+    LOG.trace("Locked the tree lock: [{}], lock type: {}", lockNodes, lockType);
   }
 
   /** Unlock the tree lock. */
@@ -85,5 +87,7 @@ public class TreeLock {
     } finally {
       lockNodes.forEach(TreeLockNode::decReference);
     }
+
+    LOG.trace("Unlocked the tree lock: [{}], lock type: {}", lockNodes, lockType);
   }
 }

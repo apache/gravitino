@@ -67,10 +67,10 @@ public class TestLockManager {
   static NameIdentifier randomNameIdentifier() {
     Random random = new Random();
     int level = random.nextInt(10);
-    NameIdentifier nameIdentifier = null;
+    NameIdentifier nameIdentifier;
     switch (level) {
       case 0:
-        nameIdentifier = NameIdentifier.ofRoot();
+        nameIdentifier = LockManager.ROOT;
         break;
       case 1:
         nameIdentifier = NameIdentifier.of(getName(random.nextInt(5)));

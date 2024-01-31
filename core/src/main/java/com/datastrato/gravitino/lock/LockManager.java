@@ -23,6 +23,8 @@ import org.slf4j.LoggerFactory;
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
+  static final NameIdentifier ROOT = NameIdentifier.of(".");
+
   @VisibleForTesting final TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
 
@@ -34,7 +36,7 @@ public class LockManager {
   private final ScheduledThreadPoolExecutor lockCleaner;
 
   public LockManager() {
-    treeLockRootNode = new TreeLockNode(NameIdentifier.ofRoot(), this);
+    treeLockRootNode = new TreeLockNode(ROOT, this);
     this.lockCleaner =
         new ScheduledThreadPoolExecutor(
             1,
@@ -46,7 +48,7 @@ public class LockManager {
     lockCleaner.scheduleAtFixedRate(
         () -> {
           long nodeCount = totalNodeCount.get();
-          LOG.info("Total tree lock node count: {}", nodeCount);
+          LOG.trace("Total tree lock node count: {}", nodeCount);
           if (nodeCount > MAX_TREE_NODE_IN_MEMORY) {
             treeLockRootNode
                 .getAllChildren()
@@ -82,8 +84,11 @@ public class LockManager {
         // Once goes here, the parent node has been locked, so the reference could not be changed.
         if (treeNode.getReferenceCount() == 0) {
           parent.removeChild(treeNode.getIdent());
-          totalNodeCount.decrementAndGet();
-          LOG.info("Evict stale tree lock node '{}' and all its children", treeNode.getIdent());
+          long leftNodeCount = totalNodeCount.decrementAndGet();
+          LOG.trace(
+              "Evict stale tree lock node '{}', current left nodes '{}'",
+              treeNode.getIdent(),
+              leftNodeCount);
         } else {
           treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
         }
@@ -102,7 +107,7 @@ public class LockManager {
     treeLockRootNode.addReference();
 
     List<TreeLockNode> treeLockNodes = Lists.newArrayList(lockNode);
-    if (identifier.equals(NameIdentifier.ofRoot())) {
+    if (identifier == ROOT) {
       // The lock tree root node
       return new TreeLock(treeLockNodes);
     }
@@ -110,11 +115,15 @@ public class LockManager {
     String[] levels = identifier.namespace().levels();
     levels = ArrayUtils.add(levels, identifier.name());
 
+    TreeLockNode child;
     try {
       for (int i = 0; i < levels.length; i++) {
         NameIdentifier ident = NameIdentifier.of(ArrayUtils.subarray(levels, 0, i + 1));
-        lockNode = lockNode.getOrCreateChild(ident);
-        treeLockNodes.add(lockNode);
+        synchronized (lockNode) {
+          child = lockNode.getOrCreateChild(ident);
+        }
+        treeLockNodes.add(child);
+        lockNode = child;
       }
     } catch (Exception e) {
       LOG.error("Failed to create tree lock {}", identifier, e);

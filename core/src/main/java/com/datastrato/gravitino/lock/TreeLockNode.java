@@ -40,15 +40,15 @@ public class TreeLockNode {
 
   // Why is this method synchronized, please see the comment in the method
   // LockManager#evictStaleNodes
-  public synchronized void addReference() {
+  synchronized void addReference() {
     referenceCount.getAndIncrement();
   }
 
-  public void decReference() {
+  void decReference() {
     referenceCount.getAndDecrement();
   }
 
-  public long getReferenceCount() {
+  long getReferenceCount() {
     return referenceCount.get();
   }
 
@@ -88,6 +88,8 @@ public class TreeLockNode {
     } else {
       readWriteLock.writeLock().lock();
     }
+
+    LOG.trace("Node {} has been lock with '{}' lock", ident, lockType);
   }
 
   /**
@@ -103,34 +105,53 @@ public class TreeLockNode {
     } else {
       readWriteLock.writeLock().unlock();
     }
+
+    LOG.trace("Node {} has been unlock with '{}' lock", ident, lockType);
   }
 
   /**
    * Get the tree lock node by the given name identifier. If the node doesn't exist, create a new
    * TreeNode.
    *
+   * <p>Note: This method should always be guarded by object lock.
+   *
    * @param ident The name identifier of a resource such as entity or others.
    * @return The tree lock node of this ident.
    */
-  public synchronized TreeLockNode getOrCreateChild(NameIdentifier ident) {
+  TreeLockNode getOrCreateChild(NameIdentifier ident) {
     TreeLockNode childNode = childMap.get(ident);
     if (childNode == null) {
       childNode = new TreeLockNode(ident, lockManager);
       lockManager.totalNodeCount.getAndIncrement();
       childMap.put(ident, childNode);
+
+      LOG.trace("Create tree lock node '{}' as a child of '{}'", ident, this.ident);
     }
 
     childNode.addReference();
     return childNode;
   }
 
-  public synchronized List<TreeLockNode> getAllChildren() {
+  /**
+   * Get all the children of this node. The returned list is unmodifiable and the order is random.
+   *
+   * @return The list of all the children of this node.
+   */
+  synchronized List<TreeLockNode> getAllChildren() {
     List<TreeLockNode> children = Lists.newArrayList(childMap.values());
     Collections.shuffle(children);
     return Collections.unmodifiableList(children);
   }
 
-  public void removeChild(NameIdentifier name) {
+  void removeChild(NameIdentifier name) {
     childMap.remove(name);
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder("TreeLockNode{");
+    sb.append("ident=").append(ident);
+    sb.append('}');
+    return sb.toString();
   }
 }
