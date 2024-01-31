@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.lock;
 
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_CLEAN_INTERVAL;
 import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 
@@ -38,6 +39,9 @@ public class LockManager {
   // If the total node count is less than this value, we will not do the cleanup.
   @VisibleForTesting long minTreeNodeInMemory;
 
+  // The interval in seconds to clean up the stale tree lock nodes.
+  @VisibleForTesting long cleanTreeNodeIntervalInSecs;
+
   private void initParameters(Config config) {
     long maxNodesInMemory = config.get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     if (maxNodesInMemory <= 0) {
@@ -63,6 +67,16 @@ public class LockManager {
     }
     this.maxTreeNodeInMemory = maxNodesInMemory;
     this.minTreeNodeInMemory = minNodesInMemory;
+
+    long cleanIntervalInSecs = config.get(TREE_LOCK_CLEAN_INTERVAL);
+    if (cleanIntervalInSecs <= 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The interval in seconds to clean up the stale tree lock nodes '%d' should be greater than 0",
+              cleanIntervalInSecs));
+    }
+
+    this.cleanTreeNodeIntervalInSecs = cleanIntervalInSecs;
   }
 
   private void startNodeCleaner() {
@@ -84,8 +98,8 @@ public class LockManager {
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));
           }
         },
-        120,
-        5,
+        cleanTreeNodeIntervalInSecs,
+        cleanTreeNodeIntervalInSecs,
         TimeUnit.SECONDS);
   }
 

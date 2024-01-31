@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.lock;
 
+import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_CLEAN_INTERVAL;
 import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 
@@ -58,6 +59,7 @@ public class TestLockManager {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(10000L);
     Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(1000L);
+    Mockito.when(config.get(TREE_LOCK_CLEAN_INTERVAL)).thenReturn(60L);
     return config;
   }
 
@@ -561,9 +563,11 @@ public class TestLockManager {
     Config config = getConfig();
     Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(20000L);
     Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(2000L);
+    Mockito.when(config.get(TREE_LOCK_CLEAN_INTERVAL)).thenReturn(2000L);
 
     LockManager manager = new LockManager(config);
     Assertions.assertEquals(20000L, manager.maxTreeNodeInMemory);
     Assertions.assertEquals(2000L, manager.minTreeNodeInMemory);
+    Assertions.assertEquals(2000L, manager.cleanTreeNodeIntervalInSecs);
   }
 }
