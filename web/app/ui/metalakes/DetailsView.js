@@ -19,7 +19,7 @@ const DetailsView = props => {
   const properties = Object.keys(activatedItem?.properties || []).map(item => {
     return {
       key: item,
-      value: activatedItem?.properties[item]
+      value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
     }
   })
 

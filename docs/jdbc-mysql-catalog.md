@@ -13,6 +13,10 @@ This software is licensed under the Apache License version 2."
 
 Gravitino provides the ability to manage MySQL metadata.
 
+:::caution
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+:::
+
 ## Catalog
 
 ### Catalog capabilities
@@ -44,14 +48,14 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
 ### Schema capabilities
 
 - Gravitino schema corresponds to the MySQL database.
-- Supports create schema with comments.
+- Supports create schema, but does not explicitly support setting comments.
 - Supports drop schema.
 - Doesn't support cascade drop database.
 
@@ -61,7 +65,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -102,7 +106,7 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 

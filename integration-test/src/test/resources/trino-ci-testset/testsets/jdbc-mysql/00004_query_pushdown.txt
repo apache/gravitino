@@ -38,6 +38,10 @@ INSERT: 15000 rows
 %
 "
 
+"Trino version: %
+%
+"
+
 DROP TABLE
 
 DROP TABLE

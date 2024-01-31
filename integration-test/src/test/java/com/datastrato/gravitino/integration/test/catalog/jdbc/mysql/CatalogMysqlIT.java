@@ -825,4 +825,44 @@ public class CatalogMysqlIT extends AbstractIT {
     schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
   }
+
+  @Test
+  public void testBackQuoteTable() {
+    Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("delete", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "table");
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                newColumns,
+                table_comment,
+                Collections.emptyMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                Indexes.EMPTY_INDEXES));
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.loadTable(tableIdentifier));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                new TableChange[] {
+                  TableChange.addColumn(
+                      new String[] {"int"},
+                      Types.StringType.get(),
+                      TableChange.ColumnPosition.after("status")),
+                  TableChange.deleteColumn(new String[] {"create"}, true),
+                  TableChange.renameColumn(new String[] {"delete"}, "varchar")
+                }));
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+  }
 }
