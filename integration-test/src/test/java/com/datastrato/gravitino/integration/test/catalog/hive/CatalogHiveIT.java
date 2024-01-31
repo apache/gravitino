@@ -671,6 +671,23 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testListPartitionNames() throws TException, InterruptedException {
+    // test empty partitions
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Table nonPartitionedTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Transforms.EMPTY_TRANSFORM);
+    String[] result = nonPartitionedTable.supportPartitions().listPartitionNames();
+    Assertions.assertEquals(0, result.length);
+
+    // test partitioned table
     Table createdTable = preparePartitionedTable();
 
     String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
@@ -681,6 +698,23 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testListPartitions() throws TException, InterruptedException {
+    // test empty partitions
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Table nonPartitionedTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Transforms.EMPTY_TRANSFORM);
+    Partition[] result = nonPartitionedTable.supportPartitions().listPartitions();
+    Assertions.assertEquals(0, result.length);
+
+    // test partitioned table
     Table createdTable = preparePartitionedTable();
     String insertTemplate =
         "INSERT INTO TABLE %s.%s "
