@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -12,7 +13,6 @@ import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
@@ -43,7 +43,6 @@ import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -156,32 +155,15 @@ public class GravitinoMetadata implements ConnectorMetadata {
     }
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-
-    GravitinoTable table =
-        catalogConnectorMetadata.getTable(
-            gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
-
-    ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
-
     Map<String, ColumnHandle> internalColumnHandles =
         internalMetadata.getColumnHandles(session, gravitinoTableHandle.getInternalTableHandle());
-    for (GravitinoColumn column : table.getColumns()) {
-      GravitinoColumnHandle columnHandle =
-          new GravitinoColumnHandle(column.getName(), internalColumnHandles.get(column.getName()));
-      columnHandles.put(column.getName(), columnHandle);
-    }
-    return columnHandles.buildOrThrow();
+    return internalColumnHandles;
   }
 
   @Override
   public ColumnMetadata getColumnMetadata(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
     if (!(tableHandle instanceof GravitinoTableHandle)) {
-      if (columnHandle instanceof GravitinoColumnHandle) {
-        GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) columnHandle;
-        return internalMetadata.getColumnMetadata(
-            session, tableHandle, gravitinoColumnHandle.getInternalColumnHandler());
-      }
       return internalMetadata.getColumnMetadata(session, tableHandle, columnHandle);
     }
 
@@ -190,10 +172,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
         catalogConnectorMetadata.getTable(
             gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
 
-    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) columnHandle;
-    String columName = gravitinoColumnHandle.getColumnName();
-
-    GravitinoColumn column = table.getColumn(columName);
+    String columnName = getColumnName(session, gravitinoTableHandle, columnHandle);
+    GravitinoColumn column = table.getColumn(columnName);
     return metadataAdapter.getColumnMetadata(column);
   }
 
@@ -242,16 +222,9 @@ public class GravitinoMetadata implements ConnectorMetadata {
       List<ColumnHandle> columns,
       RetryMode retryMode) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    List<ColumnHandle> internalColumnHandles = new ArrayList<>();
-    for (ColumnHandle column : columns) {
-      internalColumnHandles.add(((GravitinoColumnHandle) column).getInternalColumnHandler());
-    }
     ConnectorInsertTableHandle insertTableHandle =
         internalMetadata.beginInsert(
-            session,
-            gravitinoTableHandle.getInternalTableHandle(),
-            internalColumnHandles,
-            retryMode);
+            session, gravitinoTableHandle.getInternalTableHandle(), columns, retryMode);
     return new GravitinoInsertTableHandle(insertTableHandle);
   }
 
@@ -317,9 +290,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
   public void dropColumn(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
-    catalogConnectorMetadata.dropColumn(
-        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName());
+    String columnName = getColumnName(session, gravitinoTableHandle, column);
+    catalogConnectorMetadata.dropColumn(gravitinoTableHandle.toSchemaTableName(), columnName);
   }
 
   @Override
@@ -329,19 +301,19 @@ public class GravitinoMetadata implements ConnectorMetadata {
       ColumnHandle source,
       String target) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) source;
+    String columnName = getColumnName(session, gravitinoTableHandle, source);
     catalogConnectorMetadata.renameColumn(
-        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName(), target);
+        gravitinoTableHandle.toSchemaTableName(), columnName, target);
   }
 
   @Override
   public void setColumnType(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Type type) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+    String columnName = getColumnName(session, gravitinoTableHandle, column);
     catalogConnectorMetadata.setColumnType(
         gravitinoTableHandle.toSchemaTableName(),
-        gravitinoColumnHandle.getColumnName(),
+        columnName,
         metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
   }
 
@@ -352,16 +324,14 @@ public class GravitinoMetadata implements ConnectorMetadata {
       ColumnHandle column,
       Optional<String> comment) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+    String columnName = getColumnName(session, gravitinoTableHandle, column);
 
     String commentString = "";
     if (comment.isPresent() && !StringUtils.isBlank(comment.get())) {
       commentString = comment.get();
     }
     catalogConnectorMetadata.setColumnComment(
-        gravitinoTableHandle.toSchemaTableName(),
-        gravitinoColumnHandle.getColumnName(),
-        commentString);
+        gravitinoTableHandle.toSchemaTableName(), columnName, commentString);
   }
 
   @Override
@@ -399,16 +369,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
         gravitinoLeftTableHandle.getInternalTableHandle(),
         gravitinoRightTableHandle.getInternalTableHandle(),
         joinCondition,
-        leftAssignments.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())),
-        rightAssignments.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())),
+        leftAssignments,
+        rightAssignments,
         statistics);
   }
 
@@ -424,14 +386,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyProjection(
-        session,
-        gravitinoTableHandle.getInternalTableHandle(),
-        projections,
-        assignments.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())));
+        session, gravitinoTableHandle.getInternalTableHandle(), projections, assignments);
   }
 
   @Override
@@ -447,15 +402,6 @@ public class GravitinoMetadata implements ConnectorMetadata {
       return internalMetadata.applyFilter(session, handle, constraint);
     }
 
-    constraint =
-        new Constraint(
-            constraint.getSummary(),
-            constraint.getExpression(),
-            constraint.getAssignments().entrySet().stream()
-                .collect(
-                    Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())));
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyFilter(
         session, gravitinoTableHandle.getInternalTableHandle(), constraint);
@@ -478,18 +424,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
         session,
         gravitinoTableHandle.getInternalTableHandle(),
         aggregates,
-        assignments.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())),
-        groupingSets.stream()
-            .map(
-                l ->
-                    l.stream()
-                        .map(c -> ((GravitinoColumnHandle) c).getInternalColumnHandler())
-                        .collect(Collectors.toList()))
-            .collect(Collectors.toList()));
+        assignments,
+        groupingSets);
   }
 
   @Override
@@ -517,15 +453,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyTopN(
-        session,
-        gravitinoTableHandle.getInternalTableHandle(),
-        topNCount,
-        sortItems,
-        assignments.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> ((GravitinoColumnHandle) e.getValue()).getInternalColumnHandler())));
+        session, gravitinoTableHandle.getInternalTableHandle(), topNCount, sortItems, assignments);
   }
 
   @Override
@@ -538,5 +466,18 @@ public class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     return internalMetadata.getTableStatistics(
         session, gravitinoTableHandle.getInternalTableHandle());
+  }
+
+  private String getColumnName(
+      ConnectorSession session, GravitinoTableHandle tableHandle, ColumnHandle columnHandle) {
+    ColumnMetadata internalMetadataColumnMetadata =
+        internalMetadata.getColumnMetadata(
+            session, tableHandle.getInternalTableHandle(), columnHandle);
+    if (internalMetadataColumnMetadata == null) {
+      throw new TrinoException(
+          GRAVITINO_COLUMN_NOT_EXISTS,
+          String.format("Column %s does not exist in the internal connector", columnHandle));
+    }
+    return internalMetadataColumnMetadata.getName();
   }
 }
