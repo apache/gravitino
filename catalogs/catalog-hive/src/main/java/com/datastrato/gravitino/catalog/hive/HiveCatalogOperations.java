@@ -94,7 +94,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
-  private ScheduledThreadPoolExecutor checkScheduledExecutor;
+  private ScheduledThreadPoolExecutor checkTgtExecutor;
 
   private UserGroupInformation loginUgi;
 
@@ -198,7 +198,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         Preconditions.checkArgument(
             StringUtils.isNotBlank(principal), "If you use Kerberos, principal can't be blank");
 
-        checkScheduledExecutor =
+        checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
 
@@ -210,7 +210,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             (int)
                 catalogPropertiesMetadata.getOrDefault(
                     conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
-        checkScheduledExecutor.scheduleAtFixedRate(
+        checkTgtExecutor.scheduleAtFixedRate(
             () -> {
               try {
                 loginUgi.checkTGTAndReloginFromKeytab();
@@ -246,9 +246,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       clientPool = null;
     }
 
-    if (checkScheduledExecutor != null) {
-      checkScheduledExecutor.shutdown();
-      checkScheduledExecutor = null;
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdown();
+      checkTgtExecutor = null;
     }
 
     File keytabFile = new File(String.format("tmp/gravitino-%s-keytab", entity.id()));
