@@ -26,8 +26,10 @@ public class LockManager {
   @VisibleForTesting final TreeLockNode treeLockRootNode;
   final AtomicLong totalNodeCount = new AtomicLong(1);
 
-  // TODO (yuqi) make this configurable
-  private static final long MAX_TREE_NODE_IN_MEMORY = 10000L;
+  // TODO (yuqi) make these two configurable
+  static final long MAX_TREE_NODE_IN_MEMORY = 10000L;
+  // If the total node count is less than this value, we will not do the cleanup.
+  @VisibleForTesting static final long MIN_TREE_NODE_IN_MEMORY = 1000L;
 
   private final ScheduledThreadPoolExecutor lockCleaner;
 
@@ -64,6 +66,13 @@ public class LockManager {
    */
   @VisibleForTesting
   void evictStaleNodes(TreeLockNode treeNode, TreeLockNode parent) {
+    // We will not evict the root node if the total node count is less than the
+    // MIN_TREE_NODE_IN_MEMORY.
+    // Do not need to consider thread-safe issues.
+    if (totalNodeCount.get() < MIN_TREE_NODE_IN_MEMORY) {
+      return;
+    }
+
     // Handle from leaf nodes first.
     treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
 

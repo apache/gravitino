@@ -239,7 +239,7 @@ public class TestLockManager {
               lockManager.evictStaleNodes(child, lockManager.treeLockRootNode);
             });
 
-    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
+    Assertions.assertFalse(lockManager.treeLockRootNode.getAllChildren().isEmpty());
 
     for (int i = 0; i < 10; i++) {
       service.submit(
@@ -469,6 +469,7 @@ public class TestLockManager {
         .treeLockRootNode
         .getAllChildren()
         .forEach(node -> lockManager.evictStaleNodes(node, lockManager.treeLockRootNode));
-    Assertions.assertEquals(1, lockManager.totalNodeCount.get());
+    Assertions.assertTrue(lockManager.totalNodeCount.get() > 1);
+    Assertions.assertTrue(lockManager.totalNodeCount.get() < LockManager.MAX_TREE_NODE_IN_MEMORY);
   }
 }
