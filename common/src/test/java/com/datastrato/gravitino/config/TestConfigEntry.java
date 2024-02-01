@@ -27,6 +27,7 @@ public class TestConfigEntry {
     configMap.put("gravitino.test.string.alt2", "test-string2");
     configMap.put("gravitino.test.stringList", "test-string1,test-string2,test-string3");
     configMap.put("gravitino.test.integerList", "1,2,3");
+    configMap.put("gravitino.test.integerList.invalid", "1,xxx,3");
   }
 
   @AfterEach
@@ -42,6 +43,18 @@ public class TestConfigEntry {
             .internal()
             .stringConf()
             .toSequence()
+            .checkValue(
+                valueList ->
+                    (!Objects.equals(valueList.get(0), "test-string0")
+                        && !Objects.equals(valueList.get(1), "test-string0")
+                        && !Objects.equals(valueList.get(2), "test-string0")),
+                "error")
+            .checkValue(
+                valueList ->
+                    (Objects.equals(valueList.get(0), "test-string1")
+                        && Objects.equals(valueList.get(1), "test-string2")
+                        && Objects.equals(valueList.get(2), "test-string3")),
+                "error")
             .create();
 
     List<String> valueList = testConf.readFrom(configMap);
@@ -65,6 +78,18 @@ public class TestConfigEntry {
             .internal()
             .intConf()
             .toSequence()
+            .checkValue(
+                valueList ->
+                    (!Objects.equals(valueList.get(0), 4)
+                        && !Objects.equals(valueList.get(1), 5)
+                        && !Objects.equals(valueList.get(2), 6)),
+                "error")
+            .checkValue(
+                valueList ->
+                    (Objects.equals(valueList.get(0), 1)
+                        && Objects.equals(valueList.get(1), 2)
+                        && Objects.equals(valueList.get(2), 3)),
+                "error")
             .create();
 
     List<Integer> valueList = testConf.readFrom(configMap);
@@ -77,6 +102,25 @@ public class TestConfigEntry {
     valueList.set(2, 6);
     testConf.writeTo(configMap, valueList);
     Assertions.assertEquals("4,5,6", configMap.get("gravitino.test.integerList"));
+  }
+
+  @Test
+  public void testIntConfInvalidValueList() {
+    ConfigEntry<List<Integer>> testConf =
+        new ConfigBuilder("gravitino.test.integerList.invalid")
+            .doc("test")
+            .internal()
+            .intConf()
+            .toSequence()
+            .create();
+    Assertions.assertThrows(
+        NumberFormatException.class,
+        () -> {
+          List<Integer> valueList = testConf.readFrom(configMap);
+          Assertions.assertEquals(1, valueList.get(0));
+          Assertions.assertEquals("xxx", valueList.get(1));
+          Assertions.assertEquals(3, valueList.get(2));
+        });
   }
 
   @Test
