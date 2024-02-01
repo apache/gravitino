@@ -102,7 +102,7 @@ public class LockManager {
           LOG.info("Finish to check the dead lock...");
         },
         0,
-        10,
+        60,
         TimeUnit.SECONDS);
   }
 

@@ -88,7 +88,10 @@ public class TreeLock {
     }
 
     LOG.trace(
-        "Locked the tree lock: [{}], lock type: {}, ident: {}", lockNodes, lockType, identifier);
+        "Locked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+        identifier,
+        lockNodes,
+        lockType);
   }
 
   /** Unlock the tree lock. */
@@ -114,6 +117,9 @@ public class TreeLock {
     }
 
     LOG.trace(
-        "Unlocked the tree lock: [{}], lock type: {}, ident: {}", lockNodes, lockType, identifier);
+        "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+        identifier,
+        lockNodes,
+        lockType);
   }
 }
