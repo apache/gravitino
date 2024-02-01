@@ -24,7 +24,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * LockManager is a lock manager that manages the tree locks. It will service as a factory to create
- * the tree lock and do the cleanup for the stale tree locks node.
+ * the tree lock and do the cleanup for the stale tree locks node. For more, please refer to {@link
+ * TreeLock} and {@link TreeLockNode}.
+ *
+ * <p>It has two main functions: 1. Create the tree lock. 2. Clean up the stale tree lock nodes
+ * shared by all tree lock instances.
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
@@ -135,7 +139,8 @@ public class LockManager {
     // Handle self node.
     if (treeNode.getReference() == 0) {
       synchronized (parent) {
-        // Once goes here, the parent node has been locked, so the reference could not be changed.
+        // Once goes here, the parent node has been locked, so the reference of child (treeNode)
+        // could not be changed.
         if (treeNode.getReference() == 0) {
           parent.removeChild(treeNode.getName());
           long leftNodeCount = totalNodeCount.decrementAndGet();
@@ -173,9 +178,9 @@ public class LockManager {
       levels = ArrayUtils.add(levels, identifier.name());
 
       TreeLockNode child;
-      for (int i = 0; i < levels.length; i++) {
+      for (String level : levels) {
         synchronized (lockNode) {
-          child = lockNode.getOrCreateChild(levels[i]);
+          child = lockNode.getOrCreateChild(level);
         }
         treeLockNodes.add(child);
         lockNode = child;

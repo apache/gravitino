@@ -13,11 +13,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ThreadSafe
+/**
+ * TreeLockNode is a node in the tree lock; all tree lock nodes will be assembled to a tree
+ * structure, which corresponds to the resource path like name identifier space.
+ *
+ * <p>Each node will have a read-write lock to protect the node. The node will also have a map to
+ * store the children. For more, please refer to {@link TreeLock}.
+ */
 public class TreeLockNode {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLockNode.class);
   private final String name;
@@ -30,7 +35,7 @@ public class TreeLockNode {
   // using this node, and this node can be removed from the tree.
   private final AtomicLong referenceCount = new AtomicLong();
 
-  public TreeLockNode(String name, LockManager manager) {
+  protected TreeLockNode(String name, LockManager manager) {
     this.name = name;
     this.readWriteLock = new ReentrantReadWriteLock();
     this.childMap = new ConcurrentHashMap<>();
@@ -67,7 +72,7 @@ public class TreeLockNode {
    *
    * @param lockType The lock type to lock the node.
    */
-  public void lock(LockType lockType) {
+  void lock(LockType lockType) {
     if (lockType == LockType.READ) {
       readWriteLock.readLock().lock();
     } else {
@@ -84,7 +89,7 @@ public class TreeLockNode {
    *
    * @param lockType The lock type to unlock the node.
    */
-  public void unlock(LockType lockType) {
+  void unlock(LockType lockType) {
     if (lockType == LockType.READ) {
       readWriteLock.readLock().unlock();
     } else {

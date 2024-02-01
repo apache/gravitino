@@ -14,8 +14,19 @@ import org.slf4j.LoggerFactory;
  * TreeLock is a lock that manages the lock process of the resource path. It will lock the whole
  * path from root to the resource path.
  *
- * <p>Assuming we need to alter the table `metalake.catalog.db1.table1`, the lock manager will lock
+ * <p>Assuming we need to load the table `metalake.catalog.db1.table1`, the lock manager will lock
  * the following
+ *
+ * <pre>
+ *   /                                    readLock
+ *   /metalake                            readLock
+ *   /metalake/catalog                    readLock
+ *   /metalake/catalog/db1                readLock
+ *   /metalake/catalog/db/table1          readLock
+ * </pre>
+ *
+ * If we need to alter a table `metalake.catalog.db1.table1` (without changing the name of it), the
+ * lock manager will lock the following:
  *
  * <pre>
  *   /                                    readLock
@@ -25,13 +36,30 @@ import org.slf4j.LoggerFactory;
  *   /metalake/catalog/db/table1          writeLock
  * </pre>
  *
+ * When we need to rename a table or drop a table `metalake.catalog.db1.table1`, the lock manager
+ * will lock the following:
+ *
+ * <pre>
+ *   /                                    readLock
+ *   /metalake                            readLock
+ *   /metalake/catalog                    readLock
+ *   /metalake/catalog/db1                writeLock
+ * </pre>
+ *
  * If the lock manager fails to lock the resource path, it will release all the locks that have been
  * locked in the inverse sequences it locks the resource path.
+ *
+ * <p>The core of {@link TreeLock} is {@link TreeLockNode}. A TreeLock will hold several tree lock
+ * nodes, all treeLock nodes shared by all tree lock instances will be stored in the {@link
+ * LockManager} and can be reused later.
  */
 public class TreeLock {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLock.class);
 
+  // TreeLockNode to be locked
   private final List<TreeLockNode> lockNodes;
+
+  // TreeLockNode that has been locked.
   private final Stack<TreeLockNode> heldLocks = new Stack<>();
   private LockType lockType;
 
