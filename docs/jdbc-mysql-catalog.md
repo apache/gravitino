@@ -9,6 +9,9 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage MySQL metadata.
@@ -100,9 +103,168 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 :::
 
+#### Table column auto-increment
+
+- Supports setting auto-increment.
+
+:::notice
+MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
+:::
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "name": "my_mysql_table",
+  "comment": "This is my MySQL table",
+  "columns": [
+    {
+      "name": "id",
+      "type": "int",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "comment": "name column comment",
+      "nullable": true
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [ [ "id" ] ]
+    }
+  ],
+  "properties": {
+    "auto-increment-offset": "1"
+  }
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.createTable(
+        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
+        new ColumnDTO[] {
+        ColumnDTO.builder()
+        .withComment("id column comment")
+        .withName("id")
+        .withDataType(Types.IntegerType.get())
+        .withNullable(false)
+        .withAutoIncrement(true)
+        .build(),
+        ColumnDTO.builder()
+        .withComment("Name of the user")
+        .withName("name")
+        .withDataType(Types.StringType.get())
+        .withNullable(true)
+        .build(),
+        "This is my MySQL table",
+        new HashMap<String,String>(){{
+         put("auto-increment-offset", "1");
+        }},
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+        });
+```
+
+</TabItem>
+</Tabs>
+
 ### Table properties
 
-- Doesn't support table properties.
+Table properties support the following properties:
+
+| Property Name           | Description                                                                                                                                                                             | Required  | Since version |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
+| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No        | 0.4.0         |
+| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No        | 0.4.0         |
+
+- Doesn't support remove table properties. You can only modify values, not delete properties.
+
+### Table indexes
+
+- Supports PRIMARY_KEY and UNIQUE_KEY.
+
+:::notice
+The index name of the PRIMARY_KEY must be PRIMARY
+[Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
+:::
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "name": "my_mysql_table",
+  "comment": "This is my MySQL table",
+  "columns": [
+    {
+      "name": "id",
+      "type": "int",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [ [ "id" ] ]
+    },
+    {
+      "indexType": "unique_key",
+      "name": "id_name_uk",
+      "fieldNames": [ [ "id" ] , [ "name" ] ]
+    }
+  ],
+  "properties": {
+    "auto-increment-offset": "1"
+  }
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.createTable(
+        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
+        new Column[] {
+        Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+        Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)},
+        "This is my MySQL table",
+        new HashMap<String,String>(){{
+         put("auto-increment-offset", "1");
+        }},
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+        Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+        });
+```
+
+</TabItem>
+</Tabs>
 
 ### Table operations
 

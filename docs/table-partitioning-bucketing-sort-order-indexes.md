@@ -1,9 +1,12 @@
 ---
 title: "Table partitioning, bucketing and sort ordering"
-slug: /table-partitioning-bucketing-sort-order
+slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+last_update:
+  date: 2024-02-02
+  author: Clearvive
 ---
 
 import Tabs from '@theme/Tabs';
@@ -280,6 +283,119 @@ tableCatalog.createTable(
     new SortOrder[] {
       SortOrders.of(
         NamedReference.field("age"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST),
+    });
+```
+
+</TabItem>
+</Tabs>
+
+## Indexing
+
+To define an indexed table, you should utilize the following three components to construct a valid indexed table.
+
+- IndexType. Represents the type of index, such as primary key or unique key.
+
+| IndexType     | Description                                                                                                                                                                                                                                                                                            | JSON            | Java                      |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|
+| PRIMARY_KEY   | The PRIMARY KEY is a column or set of columns that uniquely identifies each row in a table. It enforces uniqueness and ensures that no two rows have the same values in the specified columns. Additionally, the PRIMARY KEY constraint automatically creates a unique index on the specified columns. | `PRIMARY_KEY`   | `IndexType.PRIMARY_KEY`   |
+| UNIQUE_KEY    | The UNIQUE KEY constraint ensures that all values in a specified column or set of columns are unique across the entire table. Unlike the PRIMARY KEY constraint, a table can have multiple UNIQUE KEY constraints, allowing for unique values in multiple columns or sets of columns.                  | `UNIQUE_KEY`    | `IndexType.UNIQUE_KEY`    |
+
+- Name. It defines the name of the index.
+
+- FieldNames. It defines which table fields Gravitino uses to index the table.
+
+<Tabs>
+<TabItem value="Json" label="Json">
+
+```json
+ {
+  "indexType": "PRIMARY_KEY",
+  "name": "PRIMARY",
+  "fieldNames": [["col_1"],["col_2"]]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"col_1"}, {"col_2"}});
+```
+
+</TabItem>
+</Tabs>
+
+The following is an example of creating a index table:
+
+<Tabs>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "table",
+  "columns": [
+    {
+      "name": "id",
+      "type": "integer",
+      "nullable": true,
+      "comment": "Id of the user"
+    },
+    {
+      "name": "name",
+      "type": "varchar(2000)",
+      "nullable": true,
+      "comment": "Name of the user"
+    },
+    {
+      "name": "age",
+      "type": "short",
+      "nullable": true,
+      "comment": "Age of the user"
+    },
+    {
+      "name": "score",
+      "type": "double",
+      "nullable": true,
+      "comment": "Score of the user"
+    }
+  ],
+  "comment": "Create a new Table",
+  "indexes": [
+    {
+      "indexType": "PRIMARY_KEY",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    },
+    {
+      "indexType": "UNIQUE_KEY",
+      "name": "name_age_score_uk",
+      "fieldNames": [["name"],["age"],["score]]
+    }
+  ]
+}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.createTable(
+    NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+    new Column[] {
+      Column.of("id", Types.IntegerType.get(), "Id of the user", false, true, null),
+      Column.of("name", Types.VarCharType.of(1000), "Name of the user", true, false, null),
+      Column.of("age", Types.ShortType.get(), "Age of the user", true, false, null),
+      Column.of("score", Types.DoubleType.get(), "Score of the user", true, false, null)
+    },
+    "Create a new Table",
+    tablePropertiesMap,
+    Transforms.EMPTY_TRANSFORM,
+    Distributions.NONE,
+    new SortOrder[0],
+        new Index[] {
+      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+      Indexes.of(IndexType.UNIQUE_KEY, "name_age_score_uk", new String[][]{{"name"}, {"age"}, {"score"}})
     });
 ```
 

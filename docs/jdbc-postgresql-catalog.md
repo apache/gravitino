@@ -9,6 +9,9 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage PostgreSQL metadata.
@@ -107,9 +110,77 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 :::
 
+#### Table column auto-increment
+
+- Supports setting auto-increment.
+
 ### Table properties
 
 - Doesn't support table properties.
+
+### Table indexes
+
+- Supports PRIMARY_KEY and UNIQUE_KEY.
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "name": "my_postgresql_table",
+  "comment": "This is my PostgreSQL table",
+  "columns": [
+    {
+      "name": "id",
+      "type": "int",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "id_pk",
+      "fieldNames": [ [ "id" ] ]
+    },
+    {
+      "indexType": "unique_key",
+      "name": "id_name_uk",
+      "fieldNames": [ [ "id" ] , [ "name" ] ]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.createTable(
+        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
+        new Column[] {
+        Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+        Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)},
+        "This is my PostgreSQL table",
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+        Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+        });
+```
+
+</TabItem>
+</Tabs>
 
 ### Table operations
 
