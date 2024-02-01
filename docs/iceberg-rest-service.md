@@ -44,9 +44,19 @@ Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the 
 | `gravitino.auxService.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                      | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.customFilters`           | Comma separated list of filter class names to apply to the APIs.                                                                                                                                                                                           | (none)                                                                       | No       | 0.4.0         |
 
-
 The filter in the customFilters should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
+
+### Iceberg metrics configuration
+
+Gravitino provides a pluggable metrics store to save and delete Iceberg metrics.
+
+| Configuration item                                         | Description                                                                                                                                                                                   | Default value | Required | Since Version |
+|------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.auxService.iceberg-rest.metricsStore`           | The storage class name for metrics, designed to support the storage of Iceberg metrics, is pluggable and should extend from `com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics`. | (none)        | No       | 0.4.0         |
+| `gravitino.auxService.iceberg-rest.metricsStoreRetainDays` | The retain days of Iceberg metrics, the value not greater than 0 means retain forever                                                                                                         | -1            | No       | 0.4.0         |
+| `gravitino.auxService.iceberg-rest.metricsQueueCapacity`   | The metrics queue capacity is designated for buffering Iceberg metrics before writing to IcebergMetricsStore. Should the metrics exceed the queue's capacity, they will be dropped.           | 1000          | No       | 0.4.0         |
+
 
 ### Iceberg catalog configuration
 
