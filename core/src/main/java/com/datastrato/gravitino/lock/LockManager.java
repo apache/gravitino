@@ -5,9 +5,9 @@
 
 package com.datastrato.gravitino.lock;
 
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.NameIdentifier;
@@ -19,12 +19,13 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * LockManager is a lock manager that manages the tree locks. It will service as a factory to create
- * the tree lock and do the cleanup for the stale tree locks node. For more, please refer to {@link
+ * LockManager is a lock manager that manages the tree locks. It will serve as a factory to create
+ * the tree lock and do the cleanup for the stale tree lock nodes. For more, please refer to {@link
  * TreeLock} and {@link TreeLockNode}.
  *
  * <p>It has two main functions: 1. Create the tree lock. 2. Clean up the stale tree lock nodes
@@ -97,10 +98,18 @@ public class LockManager {
         () -> {
           long nodeCount = totalNodeCount.get();
           LOG.trace("Total tree lock node count: {}", nodeCount);
-          if (nodeCount > maxTreeNodeInMemory) {
+          // If the total node count is greater than the maxTreeNodeInMemory * 0.8, we will do the
+          // clear up in case of the memory explosion.
+          if (nodeCount > maxTreeNodeInMemory * 0.8) {
+            StopWatch watch = StopWatch.createStarted();
+            LOG.trace("Start to clean up the stale tree lock nodes...");
             treeLockRootNode
                 .getAllChildren()
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));
+            LOG.trace(
+                "Finish to clean up the stale tree lock nodes, cost: {}, after clean node count: {}",
+                watch.getTime(),
+                totalNodeCount.get());
           }
         },
         cleanTreeNodeIntervalInSecs,
@@ -148,8 +157,6 @@ public class LockManager {
               "Evict stale tree lock node '{}', current left nodes '{}'",
               treeNode.getName(),
               leftNodeCount);
-        } else {
-          treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
         }
       }
     }

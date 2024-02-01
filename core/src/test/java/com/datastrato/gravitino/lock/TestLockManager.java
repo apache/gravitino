@@ -5,9 +5,9 @@
 
 package com.datastrato.gravitino.lock;
 
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.lock.TreeLockConfigs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.NameIdentifier;
