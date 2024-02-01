@@ -609,22 +609,86 @@ You can create a table by sending a `POST` request to the `/api/metalakes/{metal
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "table",
+  "name": "my_table",
+  "comment": "This is my table",
   "columns": [
     {
       "name": "id",
       "type": "integer",
-      "nullable": true,
-      "comment": "Id of the user"
+      "comment": "id column comment",
+      "nullable": true
     },
     {
       "name": "name",
-      "type": "varchar(2000)",
-      "nullable": true,
-      "comment": "Name of the user"
+      "type": "string",
+      "comment": "name column comment",
+      "nullable": true
+    },
+    {
+      "name": "age",
+      "type": "integer",
+      "comment": "age column comment",
+      "nullable": true
+    },
+    {
+      "name": "info",
+      "type": {
+        "type": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "string",
+            "nullable": true,
+            "comment": "position field comment"
+          },
+          {
+            "name": "contact",
+            "type": {
+              "type": "list",
+              "elementType": "integer",
+              "containsNull": false
+            },
+            "nullable": true,
+            "comment": "contact field comment"
+          }
+        ]
+      },
+      "comment": "info column comment",
+      "nullable": true
+    },
+    {
+      "name": "dt",
+      "type": "date",
+      "comment": "dt column comment",
+      "nullable": true
     }
   ],
-  "comment": "Create a new Table",
+  "partitioning": [
+    {
+      "strategy": "identity",
+      "fieldName": [ "dt" ]
+    }
+  ],
+  "distribution": {
+    "strategy": "hash",
+    "number": 32,
+    "funcArgs": [
+      {
+        "type": "field",
+        "fieldName": [ "id" ]
+      }
+    ]
+  },
+  "sortOrders": [
+    {
+      "sortTerm": {
+        "type": "field",
+        "fieldName": [ "age" ]
+      },
+      "direction": "asc",
+      "nullOrdering": "nulls_first"
+    }
+  ],
   "properties": {
     "format": "ORC"
   }
@@ -711,8 +775,7 @@ The following types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types
-
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
 
 The related java doc is [here](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
