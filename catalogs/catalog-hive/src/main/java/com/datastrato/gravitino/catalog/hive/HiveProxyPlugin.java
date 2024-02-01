@@ -42,6 +42,10 @@ class HiveProxyPlugin implements ProxyPlugin {
 
       if (UserGroupInformation.isSecurityEnabled() && ops != null) {
 
+        // The Gravitino server may use multiple KDC servers.
+        // The http authentication use one KDC server, the Hive catalog may use another KDC server. 
+        // The KerberosAuthenticator will remove realm of principal.
+        // And then we add the realm of Hive catalog to the user.
         String proxyKerberosPrincipalName = principal.getName();
         if (!proxyKerberosPrincipalName.contains("@")) {
           proxyKerberosPrincipalName =
