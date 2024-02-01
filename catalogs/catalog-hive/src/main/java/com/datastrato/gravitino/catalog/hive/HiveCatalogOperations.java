@@ -1105,6 +1105,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public String getKerberosRealm() {
     return kerberosRealm;
   }
+
   void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {
     this.proxyPlugin = hiveProxyPlugin;
   }
