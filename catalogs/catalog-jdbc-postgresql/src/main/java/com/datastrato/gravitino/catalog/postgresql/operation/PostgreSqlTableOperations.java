@@ -16,6 +16,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -82,6 +84,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         sqlBuilder.append(",\n");
       }
     }
+    appendIndexesSql(indexes, sqlBuilder);
     sqlBuilder.append("\n)");
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
@@ -118,6 +121,40 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  @VisibleForTesting
+  static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    for (Index index : indexes) {
+      String fieldStr =
+          Arrays.stream(index.fieldNames())
+              .map(
+                  colNames -> {
+                    if (colNames.length > 1) {
+                      throw new IllegalArgumentException(
+                          "Index does not support complex fields in PostgreSQL");
+                    }
+                    return PG_QUOTE + colNames[0] + PG_QUOTE;
+                  })
+              .collect(Collectors.joining(", "));
+      sqlBuilder.append(",\n");
+      switch (index.type()) {
+        case PRIMARY_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          break;
+        default:
+          throw new IllegalArgumentException("PostgreSQL doesn't support index : " + index.type());
+      }
+    }
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
@@ -438,6 +475,18 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + " IS '"
         + newComment
         + "';";
+  }
+
+  @Override
+  protected ResultSet getIndexInfo(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getIndexInfo(database, schemaName, tableName, false, false);
+  }
+
+  @Override
+  protected ResultSet getPrimaryKeys(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getPrimaryKeys(database, schemaName, tableName);
   }
 
   @Override
