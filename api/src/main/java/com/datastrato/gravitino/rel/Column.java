@@ -23,7 +23,16 @@ import java.util.Objects;
  */
 public interface Column {
 
+  /**
+   * A default value that indicates the default value is not set. This is used in {@link
+   * #defaultValue()}.
+   */
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+
+  /**
+   * A default value that indicates the default value will be set to the current timestamp. This is
+   * used in {@link #defaultValue()}.
+   */
   Expression DEFAULT_VALUE_OF_CURRENT_TIMESTAMP = FunctionExpression.of("current_timestamp");
 
   /** @return The name of this column. */

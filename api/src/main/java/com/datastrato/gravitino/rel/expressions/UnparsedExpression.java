@@ -39,6 +39,7 @@ public interface UnparsedExpression extends Expression {
       this.unparsedExpression = unparsedExpression;
     }
 
+    /** @return The unparsed expression as a string. */
     @Override
     public String unparsedExpression() {
       return unparsedExpression;

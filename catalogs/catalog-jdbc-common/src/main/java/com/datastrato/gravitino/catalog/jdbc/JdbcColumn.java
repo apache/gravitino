@@ -26,7 +26,7 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.comment = comment;
       jdbcColumn.dataType = dataType;
       jdbcColumn.nullable = nullable;
-      // In theoretically, defaultValue should never be null, because we set it to
+      // In theory, defaultValue should never be null, because we set it to
       // DEFAULT_VALUE_NOT_SET if it is null in JSONSerde. But in case of the JdbcColumn is created
       // by other ways(e.g. integration test), we still need to handle the null case.
       jdbcColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;

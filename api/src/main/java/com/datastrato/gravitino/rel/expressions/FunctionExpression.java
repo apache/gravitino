@@ -64,6 +64,7 @@ public interface FunctionExpression extends Expression {
       return arguments;
     }
 
+    /** @return The string representation of the function expression. */
     @Override
     public String toString() {
       if (arguments.length == 0) {
