@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,33 +124,23 @@ public class TreeLockNode {
    * <p>Note: This method should always be guarded by object lock.
    *
    * @param name The name of a resource such as entity or others.
-   * @return The tree lock node of this ident.
+   * @return A pair of the tree lock node and a boolean value indicating whether the node is newly
+   *     created.
    */
-  TreeLockNode getOrCreateChild(String name) {
+  Pair<TreeLockNode, Boolean> getOrCreateChild(String name) {
+    boolean[] newCreated = new boolean[] {false};
     TreeLockNode childNode =
         childMap.computeIfAbsent(
             name,
             k -> {
-              // If the total node count is greater than the max node counts, in case of memory
-              // leak and explosion, we should throw an exception.
-              long currentNodeCount = lockManager.totalNodeCount.get();
-              if (currentNodeCount > lockManager.maxTreeNodeInMemory) {
-                throw new IllegalStateException(
-                    "The total node count '"
-                        + currentNodeCount
-                        + "' has reached the max node count '"
-                        + lockManager.maxTreeNodeInMemory
-                        + "', please increase the max node count or wait for a while to avoid the performance issue.");
-              }
-
               TreeLockNode newNode = new TreeLockNode(name, lockManager);
-              lockManager.totalNodeCount.getAndIncrement();
               LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
+              newCreated[0] = true;
               return newNode;
             });
 
     childNode.addReference();
-    return childNode;
+    return Pair.of(childNode, newCreated[0]);
   }
 
   /**

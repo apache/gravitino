@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.time.StopWatch;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,7 @@ public class LockManager {
 
   // The maximum number of tree lock nodes to keep in memory. If the total node count is greater
   // than this value, we will do the cleanup.
-  @VisibleForTesting long maxTreeNodeInMemory;
+  long maxTreeNodeInMemory;
   // If the total node count is less than this value, we will not do the cleanup.
   @VisibleForTesting long minTreeNodeInMemory;
 
@@ -169,8 +170,9 @@ public class LockManager {
    * @return The created tree lock.
    */
   public TreeLock createTreeLock(NameIdentifier identifier) {
-    List<TreeLockNode> treeLockNodes = Lists.newArrayList();
+    checkTreeNodeIsFull();
 
+    List<TreeLockNode> treeLockNodes = Lists.newArrayList();
     try {
       TreeLockNode lockNode = treeLockRootNode;
       lockNode.addReference();
@@ -187,7 +189,12 @@ public class LockManager {
       TreeLockNode child;
       for (String level : levels) {
         synchronized (lockNode) {
-          child = lockNode.getOrCreateChild(level);
+          Pair<TreeLockNode, Boolean> pair = lockNode.getOrCreateChild(level);
+          child = pair.getKey();
+          // If the child node is newly created, we should increase the total node counts.
+          if (pair.getValue()) {
+            totalNodeCount.incrementAndGet();
+          }
         }
         treeLockNodes.add(child);
         lockNode = child;
@@ -202,6 +209,24 @@ public class LockManager {
       }
 
       throw e;
+    }
+  }
+
+  /**
+   * Check if the total node count is greater than the maxTreeNodeInMemory, if so, we should throw
+   * an exception.
+   */
+  private void checkTreeNodeIsFull() {
+    // If the total node count is greater than the max node counts, in case of memory
+    // leak and explosion, we should throw an exception.
+    long currentNodeCount = totalNodeCount.get();
+    if (currentNodeCount > maxTreeNodeInMemory) {
+      throw new IllegalStateException(
+          "The total node count '"
+              + currentNodeCount
+              + "' has reached the max node count '"
+              + maxTreeNodeInMemory
+              + "', please increase the max node count or wait for a while to avoid the performance issue.");
     }
   }
 }
