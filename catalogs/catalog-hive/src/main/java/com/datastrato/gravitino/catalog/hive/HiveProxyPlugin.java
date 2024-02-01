@@ -39,28 +39,36 @@ class HiveProxyPlugin implements ProxyPlugin {
       Principal principal, Executable<Object, Exception> action, Map<String, String> properties)
       throws Throwable {
     try {
-      UserGroupInformation proxyUser =
-          UserGroupInformation.createProxyUser(
-              PrincipalUtils.getCurrentPrincipal().getName(), currentUser);
+      UserGroupInformation proxyUser;
 
-      if (UserGroupInformation.isSecurityEnabled()) {
-        if (ops != null) {
+      if (UserGroupInformation.isSecurityEnabled() && ops != null) {
 
-          String token =
-              ops.getClientPool()
-                  .run(
-                      client -> {
-                        return client.getDelegationToken(
-                            currentUser.getUserName(),
-                            PrincipalUtils.getCurrentPrincipal().getName());
-                      });
-
-          Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
-          delegationToken.decodeFromUrlString(token);
-          delegationToken.setService(
-              new Text(ops.getHiveConf().getVar(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE)));
-          proxyUser.addToken(delegationToken);
+        String kerberosPrincipalName = principal.getName();
+        if (!kerberosPrincipalName.contains("@")) {
+          kerberosPrincipalName =
+              String.format("%s@%s", kerberosPrincipalName, ops.getKerberosRealm());
         }
+
+        proxyUser = UserGroupInformation.createProxyUser(kerberosPrincipalName, currentUser);
+
+        String token =
+            ops.getClientPool()
+                .run(
+                    client -> {
+                      return client.getDelegationToken(
+                          currentUser.getUserName(),
+                          PrincipalUtils.getCurrentPrincipal().getName());
+                    });
+
+        Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
+        delegationToken.decodeFromUrlString(token);
+        delegationToken.setService(
+            new Text(ops.getHiveConf().getVar(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE)));
+
+        proxyUser.addToken(delegationToken);
+      } else {
+
+        proxyUser = UserGroupInformation.createProxyUser(principal.getName(), currentUser);
       }
 
       return proxyUser.doAs((PrivilegedExceptionAction<Object>) action::execute);
