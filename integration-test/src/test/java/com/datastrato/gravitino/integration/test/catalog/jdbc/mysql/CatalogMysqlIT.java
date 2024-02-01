@@ -589,8 +589,8 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
         };
 
     NameIdentifier tableIdentifier =
