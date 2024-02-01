@@ -650,6 +650,17 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
             },
             "nullable": true,
             "comment": "contact field comment"
+          },
+          {
+            "name": "rating",
+            "type": {
+              "type": "map",
+              "keyType": "string",
+              "valueType": "integer",
+              "valueContainsNull": false
+            },
+            "nullable": true,
+            "comment": "rating field comment"
           }
         ]
       },
