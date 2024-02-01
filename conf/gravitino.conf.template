@@ -31,8 +31,8 @@ gravitino.server.webserver.responseHeaderSize = 131072
 gravitino.entity.store = kv
 # The RocksDB entity store
 gravitino.entity.store.kv = RocksDBKvBackend
-# The RocksDB backend path for entity store, default value is as below, please change it in your production environment.
-# gravitino.entity.store.kv.rocksdbPath = ${GRAVITINO_HOME}/data/rocksdb
+# The RocksDB backend path for entity store
+# gravitino.entity.store.kv.rocksdbPath = /tmp/gravitino
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache
