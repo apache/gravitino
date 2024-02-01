@@ -106,6 +106,7 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
       case TIMESTAMP_TZ:
         return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
+        return Literals.varcharLiteral(Integer.parseInt(type.getColumnSize()), columnDefaultValue);
       case BPCHAR:
       case TEXT:
         return Literals.stringLiteral(columnDefaultValue);

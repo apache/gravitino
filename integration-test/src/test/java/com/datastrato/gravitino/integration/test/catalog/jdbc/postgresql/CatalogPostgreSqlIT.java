@@ -39,6 +39,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -785,9 +786,120 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[2].defaultValue());
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
-        toFunctionArg(Literals.stringLiteral("current_timestamp")),
+        toFunctionArg(Literals.varcharLiteral(255, "current_timestamp")),
         createdTable.columns()[4].defaultValue());
     Assertions.assertEquals(
         toFunctionArg(Literals.integerLiteral(1000)), createdTable.columns()[5].defaultValue());
+  }
+
+  @Test
+  void testColumnDefaultValueConverter() {
+    // test convert from MySQL to Gravitino
+    String tableName = GravitinoITUtils.genRandomName("test_default_value");
+    String fullTableName = TEST_DB_NAME + "." + schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "    int_col_1 int default 431,\n"
+            + "    int_col_2 int default floor(random() * 100),\n"
+            + "    /*Default values must be specified as the same type in PostgreSQL\n"
+            + "    int_col_3 int default '3.321'::int,*/\n"
+            + "    double_col_1 double precision default 123.45,\n"
+            + "    varchar20_col_1 varchar(20) default (10),\n"
+            + "    varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
+            + "    varchar200_col_1 varchar(200) default 'curdate()',\n"
+            + "    varchar200_col_2 varchar(200) default current_date,\n"
+            + "    varchar200_col_3 varchar(200) default current_timestamp,\n"
+            + "    date_col_1 date default current_date,\n"
+            + "    date_col_2 date,\n"
+            + "    date_col_3 date default (current_date + interval '1 year'),\n"
+            + "    date_col_4 date default current_date,\n"
+            // todo: uncomment when we support timestamp in PG catalog
+            // + "    timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
+            + "    decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
+            + ");";
+    System.out.println(sql);
+    postgreSqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "int_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.integerLiteral(431)), column.defaultValue());
+          break;
+        case "int_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("floor((random() * (100)::double precision))")),
+              column.defaultValue());
+          break;
+        case "int_col_3":
+          Assertions.assertEquals(toFunctionArg(Literals.integerLiteral(3)), column.defaultValue());
+          break;
+        case "double_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.doubleLiteral(123.45)), column.defaultValue());
+          break;
+        case "varchar20_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(20, "10")), column.defaultValue());
+          break;
+        case "varchar100_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(100, "CURRENT_TIMESTAMP")),
+              column.defaultValue());
+          break;
+        case "varchar200_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "curdate()")), column.defaultValue());
+          break;
+        case "varchar200_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "CURRENT_DATE")), column.defaultValue());
+          break;
+        case "varchar200_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "CURRENT_TIMESTAMP")),
+              column.defaultValue());
+          break;
+        case "date_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("CURRENT_DATE")), column.defaultValue());
+          break;
+        case "date_col_2":
+          Assertions.assertEquals(toFunctionArg(Literals.NULL), column.defaultValue());
+          break;
+        case "date_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("(CURRENT_DATE + '1 year'::interval)")),
+              column.defaultValue());
+          break;
+        case "date_col_4":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("CURRENT_DATE")), column.defaultValue());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("2012-12-31T11:30:45")),
+              column.defaultValue());
+          break;
+        case "timestamp_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("1983-09-05T00:00:00")),
+              column.defaultValue());
+          break;
+        case "decimal_6_2_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.decimalLiteral(Decimal.of("1.2", 6, 2))),
+              column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
   }
 }
