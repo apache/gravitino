@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.lock;
 
+import com.datastrato.gravitino.NameIdentifier;
 import java.util.List;
 import java.util.Stack;
 import org.slf4j.Logger;
@@ -56,6 +57,8 @@ import org.slf4j.LoggerFactory;
 public class TreeLock {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLock.class);
 
+  // The name identifier of the resource path.
+  private final NameIdentifier identifier;
   // TreeLockNode to be locked
   private final List<TreeLockNode> lockNodes;
 
@@ -63,8 +66,9 @@ public class TreeLock {
   private final Stack<TreeLockNode> heldLocks = new Stack<>();
   private LockType lockType;
 
-  TreeLock(List<TreeLockNode> lockNodes) {
+  TreeLock(List<TreeLockNode> lockNodes, NameIdentifier identifier) {
     this.lockNodes = lockNodes;
+    this.identifier = identifier;
   }
 
   /**
@@ -83,7 +87,8 @@ public class TreeLock {
       heldLocks.push(treeLockNode);
     }
 
-    LOG.trace("Locked the tree lock: [{}], lock type: {}", lockNodes, lockType);
+    LOG.trace(
+        "Locked the tree lock: [{}], lock type: {}, ident: {}", lockNodes, lockType, identifier);
   }
 
   /** Unlock the tree lock. */
@@ -108,6 +113,7 @@ public class TreeLock {
       current.unlock(type);
     }
 
-    LOG.trace("Unlocked the tree lock: [{}], lock type: {}", lockNodes, lockType);
+    LOG.trace(
+        "Unlocked the tree lock: [{}], lock type: {}, ident: {}", lockNodes, lockType, identifier);
   }
 }

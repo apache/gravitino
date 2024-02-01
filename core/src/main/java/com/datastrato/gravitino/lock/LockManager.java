@@ -86,6 +86,50 @@ public class LockManager {
     this.cleanTreeNodeIntervalInSecs = cleanIntervalInSecs;
   }
 
+  private void startDeadLockChecker() {
+    ScheduledThreadPoolExecutor deadLockChecker =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("tree-lock-dead-lock-checker-%d")
+                .build());
+
+    deadLockChecker.scheduleAtFixedRate(
+        () -> {
+          LOG.info("Start to check the dead lock...");
+          checkDeadLock(treeLockRootNode);
+          LOG.info("Finish to check the dead lock...");
+        },
+        0,
+        10,
+        TimeUnit.SECONDS);
+  }
+
+  /**
+   * Check the deadlock for the given root node.
+   *
+   * @param node The root node to check.
+   */
+  void checkDeadLock(TreeLockNode node) {
+    // Check child first
+    node.getAllChildren().forEach(this::checkDeadLock);
+
+    // Check self
+    node.getHoldingThreadTimestamp()
+        .forEach(
+            (thread, ts) -> {
+              // If the thread is holding the lock for more than 30 seconds, we will log it.
+              if (System.currentTimeMillis() - ts > 30000) {
+                LOG.warn(
+                    "Dead lock detected for thread {} on node {}, threads that holding the node: {} ",
+                    thread,
+                    node,
+                    node.getHoldingThreadTimestamp());
+              }
+            });
+  }
+
   private void startNodeCleaner() {
     ScheduledThreadPoolExecutor lockCleaner =
         new ScheduledThreadPoolExecutor(
@@ -98,7 +142,7 @@ public class LockManager {
     lockCleaner.scheduleAtFixedRate(
         () -> {
           long nodeCount = totalNodeCount.get();
-          LOG.trace("Total tree lock node count: {}", nodeCount);
+          LOG.info("Total tree lock node count: {}", nodeCount);
           // If the total node count is greater than the maxTreeNodeInMemory * 0.5, we will do the
           // clear up in case of the memory explosion.
           if (nodeCount > maxTreeNodeInMemory * 0.5) {
@@ -107,7 +151,7 @@ public class LockManager {
             treeLockRootNode
                 .getAllChildren()
                 .forEach(child -> evictStaleNodes(child, treeLockRootNode));
-            LOG.trace(
+            LOG.info(
                 "Finish to clean up the stale tree lock nodes, cost: {}, after clean node count: {}",
                 watch.getTime(),
                 totalNodeCount.get());
@@ -119,13 +163,16 @@ public class LockManager {
   }
 
   public LockManager(Config config) {
-    treeLockRootNode = new TreeLockNode(ROOT.name(), this);
+    treeLockRootNode = new TreeLockNode(ROOT.name());
 
     // Init the parameters.
     initParameters(config);
 
     // Start tree lock cleaner.
     startNodeCleaner();
+
+    // Start deadlock checker.
+    startDeadLockChecker();
   }
 
   /**
@@ -180,7 +227,7 @@ public class LockManager {
 
       if (identifier == ROOT) {
         // The lock tree root node
-        return new TreeLock(treeLockNodes);
+        return new TreeLock(treeLockNodes, identifier);
       }
 
       String[] levels = identifier.namespace().levels();
@@ -200,7 +247,7 @@ public class LockManager {
         lockNode = child;
       }
 
-      return new TreeLock(treeLockNodes);
+      return new TreeLock(treeLockNodes, identifier);
     } catch (Exception e) {
       LOG.error("Failed to create tree lock {}", identifier, e);
       // Release reference if fails.

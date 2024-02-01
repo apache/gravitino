@@ -30,7 +30,6 @@ public class TreeLockNode {
   private final String name;
   private final ReentrantReadWriteLock readWriteLock;
   @VisibleForTesting final Map<String, TreeLockNode> childMap;
-  private final LockManager lockManager;
   private final Map<Thread, Long> holdingThreadTimestamp = new ConcurrentHashMap<>();
 
   // The reference count of this node. The reference count is used to track the number of the
@@ -38,15 +37,18 @@ public class TreeLockNode {
   // using this node, and this node can be removed from the tree.
   private final AtomicLong referenceCount = new AtomicLong();
 
-  protected TreeLockNode(String name, LockManager manager) {
+  protected TreeLockNode(String name) {
     this.name = name;
     this.readWriteLock = new ReentrantReadWriteLock();
     this.childMap = new ConcurrentHashMap<>();
-    this.lockManager = manager;
   }
 
   public String getName() {
     return name;
+  }
+
+  Map<Thread, Long> getHoldingThreadTimestamp() {
+    return holdingThreadTimestamp;
   }
 
   /**
@@ -133,7 +135,7 @@ public class TreeLockNode {
         childMap.computeIfAbsent(
             name,
             k -> {
-              TreeLockNode newNode = new TreeLockNode(name, lockManager);
+              TreeLockNode newNode = new TreeLockNode(name);
               LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
               newCreated[0] = true;
               return newNode;

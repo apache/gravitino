@@ -607,4 +607,40 @@ public class TestLockManager {
 
     checkReferenceCount(lockManager.treeLockRootNode);
   }
+
+  @Test
+  void testDeadLockChecker() throws InterruptedException, ExecutionException {
+    LockManager lockManager = new LockManager(getConfig());
+    CompletionService<Integer> service = createCompletionService();
+    int concurrentThreadCount = 9;
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 1000; j++) {
+              TreeLock lock = lockManager.createTreeLock(completeRandomNameIdentifier());
+              lock.lock(j % 2 == 0 ? LockType.READ : LockType.WRITE);
+              try {
+                Thread.sleep(1);
+              } catch (Exception e) {
+                // Ignore
+              } finally {
+                lock.unlock();
+              }
+            }
+            return 0;
+          });
+    }
+
+    service.submit(
+        () -> {
+          for (int i = 0; i < 1000; i++) {
+            lockManager.checkDeadLock(lockManager.treeLockRootNode);
+          }
+          return 0;
+        });
+
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.take().get();
+    }
+  }
 }
