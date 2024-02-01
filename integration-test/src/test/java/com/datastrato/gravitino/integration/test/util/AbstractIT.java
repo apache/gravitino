@@ -33,7 +33,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -247,10 +246,11 @@ public class AbstractIT {
         Assertions.assertEquals(
             indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
         for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
-          Set<String> colNames =
-              Arrays.stream(indexByName.get(table.index()[i].name()).fieldNames()[j])
-                  .collect(Collectors.toSet());
-          colNames.containsAll(Arrays.asList(table.index()[i].fieldNames()[j]));
+          for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
+            Assertions.assertEquals(
+                indexByName.get(table.index()[i].name()).fieldNames()[j][k],
+                table.index()[i].fieldNames()[j][k]);
+          }
         }
       }
     }

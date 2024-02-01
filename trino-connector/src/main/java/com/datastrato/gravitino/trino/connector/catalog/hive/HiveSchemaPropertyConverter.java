@@ -4,13 +4,15 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SCHEMA_LOCATION;
+
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
-import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 
 public class HiveSchemaPropertyConverter extends PropertyConverter {
   private final BasePropertiesMetadata hiveSchemaPropertiesMetadata =
@@ -21,7 +23,7 @@ public class HiveSchemaPropertyConverter extends PropertyConverter {
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              .put("location", HiveSchemaPropertiesMetadata.LOCATION)
+              .put(HIVE_SCHEMA_LOCATION, HiveSchemaPropertiesMetadata.LOCATION)
               .build());
 
   @Override

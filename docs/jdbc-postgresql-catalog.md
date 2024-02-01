@@ -13,12 +13,16 @@ This software is licensed under the Apache License version 2."
 
 Gravitino provides the ability to manage PostgreSQL metadata.
 
+:::caution
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+:::
+
 ## Catalog
 
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the PostgreSQL database.
-- Supports metadata management of PostgreSQL (9.2, 12.0, 13.0).
+- Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Doesn't support table index operations.
 - Doesn't support setting certain column properties, such as default value and check constraints
@@ -50,7 +54,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -67,7 +71,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -110,7 +114,7 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 

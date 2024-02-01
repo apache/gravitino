@@ -6,10 +6,14 @@
 package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KET_TAB_URI;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.catalog.PropertyEntry;
@@ -63,7 +67,7 @@ class TestHiveCatalogOperations {
 
     Map<String, PropertyEntry<?>> propertyEntryMap =
         hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
-    Assertions.assertEquals(7, propertyEntryMap.size());
+    Assertions.assertEquals(11, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
@@ -75,6 +79,10 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(
         propertyEntryMap.get(CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(IMPERSONATION_ENABLE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(KET_TAB_URI).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(PRINCIPAL).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
   }
 
   @Test

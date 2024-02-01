@@ -7,7 +7,6 @@ package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.PropertyEntry;
-import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -15,6 +14,7 @@ import io.trino.spi.TrinoException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 
 public class IcebergCatalogPropertyConverter extends PropertyConverter {
 

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.utils.Executable;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -14,11 +15,16 @@ import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 
 class HiveProxyPlugin implements ProxyPlugin {
 
   private final UserGroupInformation currentUser;
+  private HiveCatalogOperations ops;
 
   HiveProxyPlugin() {
     try {
@@ -36,6 +42,27 @@ class HiveProxyPlugin implements ProxyPlugin {
       UserGroupInformation proxyUser =
           UserGroupInformation.createProxyUser(
               PrincipalUtils.getCurrentPrincipal().getName(), currentUser);
+
+      if (UserGroupInformation.isSecurityEnabled()) {
+        if (ops != null) {
+
+          String token =
+              ops.getClientPool()
+                  .run(
+                      client -> {
+                        return client.getDelegationToken(
+                            currentUser.getUserName(),
+                            PrincipalUtils.getCurrentPrincipal().getName());
+                      });
+
+          Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
+          delegationToken.decodeFromUrlString(token);
+          delegationToken.setService(
+              new Text(ops.getHiveConf().getVar(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE)));
+          proxyUser.addToken(delegationToken);
+        }
+      }
+
       return proxyUser.doAs((PrivilegedExceptionAction<Object>) action::execute);
     } catch (UndeclaredThrowableException e) {
       Throwable innerException = e.getCause();
@@ -47,5 +74,10 @@ class HiveProxyPlugin implements ProxyPlugin {
         throw innerException;
       }
     }
+  }
+
+  @Override
+  public void bindCatalogOperation(CatalogOperations ops) {
+    this.ops = ((HiveCatalogOperations) ops);
   }
 }
