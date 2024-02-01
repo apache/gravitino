@@ -589,8 +589,8 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
         };
 
     NameIdentifier tableIdentifier =
@@ -753,6 +753,11 @@ public class CatalogMysqlIT extends AbstractIT {
           col3,
           col4,
           col5
+        };
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
         };
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
