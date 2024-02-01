@@ -23,12 +23,12 @@ import org.apache.hadoop.security.token.Token;
 
 class HiveProxyPlugin implements ProxyPlugin {
 
-  private final UserGroupInformation currentUser;
+  private final UserGroupInformation realUser;
   private HiveCatalogOperations ops;
 
   HiveProxyPlugin() {
     try {
-      currentUser = UserGroupInformation.getCurrentUser();
+      realUser = UserGroupInformation.getCurrentUser();
     } catch (IOException ioe) {
       throw new IllegalStateException("Fail to init HiveCatalogProxyPlugin");
     }
@@ -43,21 +43,21 @@ class HiveProxyPlugin implements ProxyPlugin {
 
       if (UserGroupInformation.isSecurityEnabled() && ops != null) {
 
-        String kerberosPrincipalName = principal.getName();
-        if (!kerberosPrincipalName.contains("@")) {
-          kerberosPrincipalName =
-              String.format("%s@%s", kerberosPrincipalName, ops.getKerberosRealm());
+        String proxyKerberosPrincipalName = principal.getName();
+        if (!proxyKerberosPrincipalName.contains("@")) {
+          proxyKerberosPrincipalName =
+              String.format("%s@%s", proxyKerberosPrincipalName, ops.getKerberosRealm());
         }
 
-        proxyUser = UserGroupInformation.createProxyUser(kerberosPrincipalName, currentUser);
+        proxyUser = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, realUser);
 
         String token =
             ops.getClientPool()
                 .run(
                     client -> {
                       return client.getDelegationToken(
-                          currentUser.getUserName(),
-                          PrincipalUtils.getCurrentPrincipal().getName());
+                          realUser.getUserName(),
+                          principal.getName());
                     });
 
         Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
@@ -68,7 +68,7 @@ class HiveProxyPlugin implements ProxyPlugin {
         proxyUser.addToken(delegationToken);
       } else {
 
-        proxyUser = UserGroupInformation.createProxyUser(principal.getName(), currentUser);
+        proxyUser = UserGroupInformation.createProxyUser(principal.getName(), realUser);
       }
 
       return proxyUser.doAs((PrivilegedExceptionAction<Object>) action::execute);
