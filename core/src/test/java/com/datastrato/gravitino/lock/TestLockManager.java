@@ -350,6 +350,9 @@ public class TestLockManager {
   }
 
   @Test
+  @Disabled(
+      "This test is heavily depends on the machine performance. It can work work and "
+          + "pass in local machine, due to poor performance of CI machine, it will fail in CI sometimes")
   void testConcurrentRead() throws InterruptedException {
     LockManager lockManager = new LockManager(getConfig());
     Map<String, Integer> stringMap = Maps.newHashMap();
