@@ -25,10 +25,10 @@ public interface Configs {
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
-  long MAX_NODE_IN_MEMORY = 10000L;
-  //
+  long MAX_NODE_IN_MEMORY = 100000L;
+
   long MIN_NODE_IN_MEMORY = 1000L;
-  //
+
   long CLEAN_INTERVAL_IN_SECS = 60L;
 
   ConfigEntry<String> ENTITY_STORE =

@@ -55,7 +55,7 @@ public class TestLockManager {
 
   static Config getConfig() {
     Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(10000L);
+    Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(100000L);
     Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(1000L);
     Mockito.when(config.get(TREE_LOCK_CLEAN_INTERVAL)).thenReturn(60L);
     return config;
@@ -460,7 +460,7 @@ public class TestLockManager {
       service.submit(
           () -> {
             TreeLock treeLock;
-            for (int j = 0; j < 10000; j++) {
+            for (int j = 0; j < 1000; j++) {
               NameIdentifier nameIdentifier = completeRandomNameIdentifier();
               treeLock = lockManager.createTreeLock(nameIdentifier);
               treeLock.lock(LockType.READ);
@@ -474,7 +474,7 @@ public class TestLockManager {
       service.take().get();
     }
 
-    Assertions.assertEquals(10 * 10000 * 4 + 1, lockManager.totalNodeCount.get());
+    Assertions.assertEquals(10 * 1000 * 4 + 1, lockManager.totalNodeCount.get());
 
     // Pay attention to the lockCleaner thread.
     lockManager

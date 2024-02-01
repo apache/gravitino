@@ -98,9 +98,9 @@ public class LockManager {
         () -> {
           long nodeCount = totalNodeCount.get();
           LOG.trace("Total tree lock node count: {}", nodeCount);
-          // If the total node count is greater than the maxTreeNodeInMemory * 0.8, we will do the
+          // If the total node count is greater than the maxTreeNodeInMemory * 0.5, we will do the
           // clear up in case of the memory explosion.
-          if (nodeCount > maxTreeNodeInMemory * 0.8) {
+          if (nodeCount > maxTreeNodeInMemory * 0.5) {
             StopWatch watch = StopWatch.createStarted();
             LOG.trace("Start to clean up the stale tree lock nodes...");
             treeLockRootNode

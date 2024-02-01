@@ -112,6 +112,18 @@ public class TreeLockNode {
         childMap.computeIfAbsent(
             name,
             k -> {
+              // If the total node count is greater than the max node count, in case of memory
+              // leak and explosion, we should throw an exception.
+              long currentNodeCount = lockManager.totalNodeCount.get();
+              if (currentNodeCount > lockManager.maxTreeNodeInMemory) {
+                throw new IllegalStateException(
+                    "The total node count '"
+                        + currentNodeCount
+                        + "' has reached the max node count '"
+                        + lockManager.maxTreeNodeInMemory
+                        + "', please increase the max node count or wait for a while to avoid the performance issue.");
+              }
+
               TreeLockNode newNode = new TreeLockNode(name, lockManager);
               lockManager.totalNodeCount.getAndIncrement();
               LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
