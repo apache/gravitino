@@ -7,14 +7,18 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.bean.JdbcIndexBean;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
@@ -24,6 +28,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -47,15 +52,19 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcExceptionConverter exceptionMapper;
   protected JdbcTypeConverter typeConverter;
 
+  protected JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
   @Override
   public void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
+    this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
   }
 
   @Override
@@ -333,6 +342,33 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
+  protected abstract JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable);
+
+  protected void validateUpdateColumnNullable(
+      TableChange.UpdateColumnNullability change, JdbcTable table) {
+    if (change.fieldName().length > 1) {
+      throw new UnsupportedOperationException("Nested column names are not supported");
+    }
+    String col = change.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromTable(table, col);
+    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
+      throw new IllegalArgumentException(
+          "column " + col + " with null default value cannot be changed to not null");
+    }
+  }
+
+  protected JdbcColumn getJdbcColumnFromTable(JdbcTable jdbcTable, String colName) {
+    return (JdbcColumn)
+        Arrays.stream(jdbcTable.columns())
+            .filter(column -> column.name().equals(colName))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new NoSuchColumnException(
+                        "Column " + colName + " does not exist in table " + jdbcTable.name()));
+  }
+
   protected Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(catalog);
@@ -352,10 +388,18 @@ public abstract class JdbcTableOperations implements TableOperation {
     typeBean.setColumnSize(column.getString("COLUMN_SIZE"));
     typeBean.setScale(column.getString("DECIMAL_DIGITS"));
     String comment = column.getString("REMARKS");
+    boolean nullable = column.getBoolean("NULLABLE");
+
+    String columnDef = column.getString("COLUMN_DEF");
+    boolean isExpression = "YES".equals(column.getString("IS_GENERATEDCOLUMN"));
+    Expression defaultValue =
+        columnDefaultValueConverter.toGravitino(typeBean, columnDef, isExpression, nullable);
+
     return new JdbcColumn.Builder()
         .withName(column.getString("COLUMN_NAME"))
         .withType(typeConverter.toGravitinoType(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
-        .withNullable(column.getBoolean("NULLABLE"));
+        .withNullable(nullable)
+        .withDefaultValue(defaultValue);
   }
 }
