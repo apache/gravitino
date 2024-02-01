@@ -79,5 +79,6 @@ class HiveProxyPlugin implements ProxyPlugin {
   @Override
   public void bindCatalogOperation(CatalogOperations ops) {
     this.ops = ((HiveCatalogOperations) ops);
+    this.ops.setProxyPlugin(this);
   }
 }
