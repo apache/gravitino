@@ -358,10 +358,10 @@ public class TestLockManager {
     CompletionService<Integer> service = createCompletionService();
     NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
 
-    CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
+    CyclicBarrier cyclicBarrier = new CyclicBarrier(5);
     // Can 2000 times ensure that the test is correct?
-    for (int t = 0; t < 100000; t++) {
-      for (int i = 0; i < 10; i++) {
+    for (int t = 0; t < 200000; t++) {
+      for (int i = 0; i < 5; i++) {
         service.submit(
             () -> {
               TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
@@ -378,12 +378,12 @@ public class TestLockManager {
             });
       }
 
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 5; i++) {
         service.take();
       }
 
       int total = stringMap.get("total");
-      if (total < 10) {
+      if (total < 5) {
         return;
       }
 
