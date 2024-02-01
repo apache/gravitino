@@ -559,4 +559,52 @@ public class TestLockManager {
     Assertions.assertEquals(2000L, manager.minTreeNodeInMemory);
     Assertions.assertEquals(2000L, manager.cleanTreeNodeIntervalInSecs);
   }
+
+  @Test
+  void testMaxTreeNode() {
+    Config config = getConfig();
+    Mockito.when(config.get(TREE_LOCK_MAX_NODE_IN_MEMORY)).thenReturn(2000L);
+    Mockito.when(config.get(TREE_LOCK_MIN_NODE_IN_MEMORY)).thenReturn(100L);
+
+    LockManager manager = new LockManager(config);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> {
+          for (int i = 0; i < 1000; i++) {
+            TreeLock lock = manager.createTreeLock(completeRandomNameIdentifier());
+          }
+        });
+  }
+
+  @Test
+  void testReferenceCount() throws InterruptedException, ExecutionException {
+    LockManager lockManager = new LockManager(getConfig());
+    CompletionService<Integer> service = createCompletionService();
+    int concurrentThreadCount = 10;
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 1000; j++) {
+              TreeLock lock = lockManager.createTreeLock(NameIdentifier.of("a", "b", "c", "d"));
+              lock.lock(j % 2 == 0 ? LockType.READ : LockType.WRITE);
+              try {
+                // Deliberately throw an exception here.
+                int a = 1 / 0;
+              } catch (Exception e) {
+                // Ignore
+              } finally {
+                lock.unlock();
+              }
+            }
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < concurrentThreadCount; i++) {
+      service.take().get();
+    }
+
+    checkReferenceCount(lockManager.treeLockRootNode);
+  }
 }
