@@ -7,11 +7,11 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.PropertyEntry;
-import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 
 public class JDBCCatalogPropertyConverter extends PropertyConverter {
 

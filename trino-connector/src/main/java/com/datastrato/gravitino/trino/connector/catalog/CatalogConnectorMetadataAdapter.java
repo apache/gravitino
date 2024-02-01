@@ -89,8 +89,11 @@ public class CatalogConnectorMetadataAdapter {
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
               column.getComment(),
-              column.isNullable()));
+              column.isNullable(),
+              false,
+              column.getProperties()));
     }
+
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
 
@@ -114,6 +117,7 @@ public class CatalogConnectorMetadataAdapter {
         .setComment(Optional.ofNullable(column.getComment()))
         .setNullable(column.isNullable())
         .setHidden(column.isHidden())
+        .setProperties(column.getProperties())
         .build();
   }
 
@@ -172,6 +176,8 @@ public class CatalogConnectorMetadataAdapter {
         dataTypeTransformer.getGravitinoType(column.getType()),
         -1,
         column.getComment(),
-        column.isNullable());
+        column.isNullable(),
+        false,
+        column.getProperties());
   }
 }
