@@ -28,6 +28,7 @@ public class JdbcColumnDefaultValueConverter {
     if (defaultValue instanceof FunctionExpression) {
       FunctionExpression functionExpression = (FunctionExpression) defaultValue;
       if (functionExpression.functionName().equalsIgnoreCase(CURRENT_TIMESTAMP)) {
+        // CURRENT_TIMESTAMP is a special case(key word), it should not be wrapped in parentheses
         return CURRENT_TIMESTAMP;
       } else {
         return String.format("(%s)", functionExpression);
