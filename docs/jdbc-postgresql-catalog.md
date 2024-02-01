@@ -85,23 +85,23 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 #### Table column types
 
-| Gravitino Type | PostgreSQL Type               |
-|----------------|-------------------------------|
-| `Boolean`      | `boolean`                     |
-| `Short`        | `Smallint`                    |
-| `Integer`      | `Integer`                     |
-| `Long`         | `Bigint`                      |
-| `Float`        | `Real`                        |
-| `Double`       | `Double precision`            |
-| `String`       | `Text`                        |
-| `Date`         | `Date`                        |
-| `Time`         | `Time without time zone`      |
-| `Timestamp`    | `Timestamp without time zone` |
-| `Timestamp_tz` | `Timestamp with time zone`    |
-| `Decimal`      | `Numeric`                     |
-| `VarChar`      | `Character varying`           |
-| `FixedChar`    | `FixedChar`                   |
-| `Binary`       | `Bytea`                       |
+| Gravitino Type | PostgreSQL Type |
+|----------------|-----------------|
+| `Boolean`      | `Bool`          |
+| `Short`        | `Int2`          |
+| `Integer`      | `Int4`          |
+| `Long`         | `Int8`          |
+| `Float`        | `Float4`        |
+| `Double`       | `Float8`        |
+| `String`       | `Text`          |
+| `Date`         | `Date`          |
+| `Time`         | `Time`          |
+| `Timestamp`    | `Timestamp`     |
+| `Timestamp_tz` | `Timestamptz`   |
+| `Decimal`      | `Numeric`       |
+| `VarChar`      | `Varchar`       |
+| `FixedChar`    | `Bpchar`        |
+| `Binary`       | `Bytea`         |
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
