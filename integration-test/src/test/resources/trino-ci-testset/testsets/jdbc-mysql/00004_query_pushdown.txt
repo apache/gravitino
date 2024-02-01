@@ -38,6 +38,12 @@ INSERT: 15000 rows
 %
 "
 
+"Trino version: %
+%
+    └─ TableScan[table = test.gt_mysql:Query[SELECT % INNER JOIN %] limit=10 columns=%]]
+%
+"
+
 DROP TABLE
 
 DROP TABLE

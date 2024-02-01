@@ -13,12 +13,16 @@ This software is licensed under the Apache License version 2."
 
 Gravitino provides the ability to manage PostgreSQL metadata.
 
+:::caution
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+:::
+
 ## Catalog
 
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the PostgreSQL database.
-- Supports metadata management of PostgreSQL (9.2, 12.0, 13.0).
+- Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Doesn't support table index operations.
 - Doesn't support setting certain column properties, such as default value and check constraints

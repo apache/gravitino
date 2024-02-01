@@ -74,6 +74,7 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
       field: 'id',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -109,6 +110,7 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
       field: 'id',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -142,6 +144,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 90,
       sortable: false,
+      disableColumnMenu: true,
       field: 'actions',
       headerName: 'Actions',
       renderCell: ({ row }) => (
@@ -181,6 +184,7 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -205,6 +209,7 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
       field: 'type',
       headerName: 'Type',
       renderCell: ({ row }) => {
@@ -220,6 +225,7 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -236,7 +242,7 @@ const TableView = props => {
                 textDecoration: 'none'
               }}
             >
-              {`${nullable}`}
+              {typeof nullable !== 'undefined' && `${nullable}`}
             </Typography>
           </Box>
         )
