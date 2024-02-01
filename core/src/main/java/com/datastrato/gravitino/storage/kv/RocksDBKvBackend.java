@@ -14,6 +14,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -70,9 +72,11 @@ public class RocksDBKvBackend implements KvBackend {
       return Configs.DEFAULT_KV_ROCKSDB_BACKEND_PATH;
     }
 
+    Path path = Paths.get(dbPath);
     // Relative Path
-    if (!dbPath.startsWith(File.separator)) {
-      return String.join(File.separator, System.getenv("GRAVITINO_HOME"), dbPath);
+    if (!path.isAbsolute()) {
+      path = Paths.get(System.getenv("GRAVITINO_HOME"), dbPath);
+      return path.toString();
     }
 
     return dbPath;
