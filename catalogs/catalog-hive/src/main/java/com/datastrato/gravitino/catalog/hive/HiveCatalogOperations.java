@@ -97,6 +97,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
@@ -201,6 +202,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
+        String[] principalComponents = catalogPrincipal.split("@");
+        Preconditions.checkArgument(
+            principalComponents.length == 2, "The principal has the wrong format");
+        this.kerberosRealm = principalComponents[1];
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
@@ -1095,6 +1100,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  }
+
+  public String getKerberosRealm() {
+    return kerberosRealm;
   }
 
   void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {

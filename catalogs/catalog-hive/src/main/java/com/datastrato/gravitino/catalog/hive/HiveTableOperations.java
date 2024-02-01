@@ -197,7 +197,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     // todo: support custom serde and location if necessary
     StorageDescriptor sd;
     if (table.storageDescriptor() == null) {
-      // In theoretically, this should not happen because the Hive table will reload after creating
+      // In theory, this should not happen because the Hive table will reload after creating
       // in CatalogOperationDispatcher and the storage descriptor will be set. But in case of the
       // Hive table is created by other ways(such as UT), we need to handle this.
       sd = new StorageDescriptor();

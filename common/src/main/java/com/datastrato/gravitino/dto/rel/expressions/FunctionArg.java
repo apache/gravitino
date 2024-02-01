@@ -23,6 +23,7 @@ public interface FunctionArg extends Expression {
   enum ArgType {
     LITERAL,
     FIELD,
-    FUNCTION
+    FUNCTION,
+    UNPARSED
   }
 }

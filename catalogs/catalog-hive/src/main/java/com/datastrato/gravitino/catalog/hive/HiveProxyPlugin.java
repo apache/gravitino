@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.hive;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.utils.Executable;
-import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
@@ -23,12 +22,12 @@ import org.apache.hadoop.security.token.Token;
 
 class HiveProxyPlugin implements ProxyPlugin {
 
-  private final UserGroupInformation currentUser;
+  private final UserGroupInformation realUser;
   private HiveCatalogOperations ops;
 
   HiveProxyPlugin() {
     try {
-      currentUser = UserGroupInformation.getCurrentUser();
+      realUser = UserGroupInformation.getCurrentUser();
     } catch (IOException ioe) {
       throw new IllegalStateException("Fail to init HiveCatalogProxyPlugin");
     }
@@ -39,28 +38,38 @@ class HiveProxyPlugin implements ProxyPlugin {
       Principal principal, Executable<Object, Exception> action, Map<String, String> properties)
       throws Throwable {
     try {
-      UserGroupInformation proxyUser =
-          UserGroupInformation.createProxyUser(
-              PrincipalUtils.getCurrentPrincipal().getName(), currentUser);
+      UserGroupInformation proxyUser;
 
-      if (UserGroupInformation.isSecurityEnabled()) {
-        if (ops != null) {
+      if (UserGroupInformation.isSecurityEnabled() && ops != null) {
 
-          String token =
-              ops.getClientPool()
-                  .run(
-                      client -> {
-                        return client.getDelegationToken(
-                            currentUser.getUserName(),
-                            PrincipalUtils.getCurrentPrincipal().getName());
-                      });
-
-          Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
-          delegationToken.decodeFromUrlString(token);
-          delegationToken.setService(
-              new Text(ops.getHiveConf().getVar(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE)));
-          proxyUser.addToken(delegationToken);
+        // The Gravitino server may use multiple KDC servers.
+        // The http authentication use one KDC server, the Hive catalog may use another KDC server.
+        // The KerberosAuthenticator will remove realm of principal.
+        // And then we add the realm of Hive catalog to the user.
+        String proxyKerberosPrincipalName = principal.getName();
+        if (!proxyKerberosPrincipalName.contains("@")) {
+          proxyKerberosPrincipalName =
+              String.format("%s@%s", proxyKerberosPrincipalName, ops.getKerberosRealm());
         }
+
+        proxyUser = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, realUser);
+
+        String token =
+            ops.getClientPool()
+                .run(
+                    client -> {
+                      return client.getDelegationToken(realUser.getUserName(), principal.getName());
+                    });
+
+        Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
+        delegationToken.decodeFromUrlString(token);
+        delegationToken.setService(
+            new Text(ops.getHiveConf().getVar(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE)));
+
+        proxyUser.addToken(delegationToken);
+      } else {
+
+        proxyUser = UserGroupInformation.createProxyUser(principal.getName(), realUser);
       }
 
       return proxyUser.doAs((PrivilegedExceptionAction<Object>) action::execute);

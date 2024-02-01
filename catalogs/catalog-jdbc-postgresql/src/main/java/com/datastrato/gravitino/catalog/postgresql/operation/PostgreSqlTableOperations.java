@@ -4,10 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -45,8 +48,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
+    super.initialize(
+        dataSource, exceptionMapper, jdbcTypeConverter, jdbcColumnDefaultValueConverter, conf);
     database = new JdbcConfig(conf).getJdbcDatabase();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
@@ -182,10 +187,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    // TODO: uncomment this once we support column default values.
-    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    // }
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
+    }
 
     return sqlBuilder;
   }
@@ -246,9 +253,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        alterSql.add(
-            updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, tableName));
+        TableChange.UpdateColumnNullability updateColumnNullability =
+            (TableChange.UpdateColumnNullability) change;
+
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
+
+        alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -398,7 +409,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
-  private JdbcTable getOrCreateTable(
+  public JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadTable) {
     if (null == lazyLoadTable) {
       return load(databaseName, tableName);

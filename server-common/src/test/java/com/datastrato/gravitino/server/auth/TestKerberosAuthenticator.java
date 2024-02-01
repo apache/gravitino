@@ -52,6 +52,15 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
             });
     Assertions.assertTrue(e.getMessage().contains("The value can't be blank"));
 
+    config.set(PRINCIPAL, "xx@xxx@");
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              kerberosAuthenticator.initialize(config);
+            });
+    Assertions.assertTrue(e.getMessage().contains("Principal must starts with"));
+
     config.set(PRINCIPAL, KerberosTestUtils.getServerPrincipal());
     e =
         Assertions.assertThrows(

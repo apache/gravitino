@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import com.datastrato.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
@@ -45,6 +46,8 @@ public class TestJdbcTableOperations {
 
   private static SqliteTypeConverter TYPE_CONVERTER;
 
+  private static SqliteColumnDefaultValueConverter COLUMN_DEFAULT_VALUE_CONVERTER;
+
   private static SqliteTableOperations JDBC_TABLE_OPERATIONS;
 
   private static File BASE_FILE_DIR;
@@ -62,6 +65,7 @@ public class TestJdbcTableOperations {
     createDataSource();
     createExceptionConverter();
     createTypeConverter();
+    createColumnDefaultValueConverter();
     createJdbcDatabaseOperations();
   }
 
@@ -72,6 +76,10 @@ public class TestJdbcTableOperations {
 
   private static void createTypeConverter() {
     TYPE_CONVERTER = new SqliteTypeConverter();
+  }
+
+  private static void createColumnDefaultValueConverter() {
+    COLUMN_DEFAULT_VALUE_CONVERTER = new SqliteColumnDefaultValueConverter();
   }
 
   private static void createExceptionConverter() {
@@ -90,7 +98,11 @@ public class TestJdbcTableOperations {
   private static void createJdbcDatabaseOperations() {
     JDBC_TABLE_OPERATIONS = new SqliteTableOperations();
     JDBC_TABLE_OPERATIONS.initialize(
-        DATA_SOURCE, EXCEPTION_CONVERTER, TYPE_CONVERTER, Collections.emptyMap());
+        DATA_SOURCE,
+        EXCEPTION_CONVERTER,
+        TYPE_CONVERTER,
+        COLUMN_DEFAULT_VALUE_CONVERTER,
+        Collections.emptyMap());
   }
 
   @Test
@@ -145,9 +157,7 @@ public class TestJdbcTableOperations {
       Assertions.assertEquals(jdbcColumn.comment(), column.comment());
       Assertions.assertEquals(jdbcColumn.dataType(), column.dataType());
       Assertions.assertEquals(jdbcColumn.nullable(), column.nullable());
-      // TODO: uncomment this once we support column default values.
-      // Assertions.assertEquals(
-      //    jdbcColumn.getDefaultValue(), ((JdbcColumn) column).getDefaultValue());
+      Assertions.assertEquals(jdbcColumn.defaultValue(), column.defaultValue());
     }
 
     String newName = "table2";
