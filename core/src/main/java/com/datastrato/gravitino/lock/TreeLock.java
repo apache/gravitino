@@ -103,12 +103,9 @@ public class TreeLock {
         type = LockType.READ;
       }
 
-      current = heldLocks.peek();
-
+      current = heldLocks.pop();
       // Unlock the node and decrease the reference count.
       current.unlock(type);
-      current.decReference();
-      heldLocks.pop();
     }
 
     LOG.trace("Unlocked the tree lock: [{}], lock type: {}", lockNodes, lockType);

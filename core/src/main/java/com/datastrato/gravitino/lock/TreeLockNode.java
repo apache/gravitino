@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.lock;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +30,7 @@ public class TreeLockNode {
   private final ReentrantReadWriteLock readWriteLock;
   @VisibleForTesting final Map<String, TreeLockNode> childMap;
   private final LockManager lockManager;
+  private final Map<Thread, Long> holdingThreadTimestamp = new ConcurrentHashMap<>();
 
   // The reference count of this node. The reference count is used to track the number of the
   // TreeLocks that are using this node. If the reference count is 0, it means that no TreeLock is
@@ -79,7 +81,14 @@ public class TreeLockNode {
       readWriteLock.writeLock().lock();
     }
 
-    LOG.trace("Node {} has been lock with '{}' lock", name, lockType);
+    holdingThreadTimestamp.put(Thread.currentThread(), System.currentTimeMillis());
+    LOG.trace(
+        "Node {} has been lock with '{}' lock, hold by {} at {}, current holding threads: {}",
+        this,
+        lockType,
+        Thread.currentThread(),
+        System.currentTimeMillis(),
+        holdingThreadTimestamp);
   }
 
   /**
@@ -96,7 +105,16 @@ public class TreeLockNode {
       readWriteLock.writeLock().unlock();
     }
 
-    LOG.trace("Node {} has been unlock with '{}' lock", name, lockType);
+    this.referenceCount.decrementAndGet();
+
+    long holdStartTime = holdingThreadTimestamp.remove(Thread.currentThread());
+    LOG.trace(
+        "Node {} has been unlock with '{}' lock, hold by {} for {} ms, current holding threads: {}",
+        this,
+        lockType,
+        Thread.currentThread(),
+        System.currentTimeMillis() - holdStartTime,
+        holdingThreadTimestamp);
   }
 
   /**
@@ -112,7 +130,7 @@ public class TreeLockNode {
         childMap.computeIfAbsent(
             name,
             k -> {
-              // If the total node count is greater than the max node count, in case of memory
+              // If the total node count is greater than the max node counts, in case of memory
               // leak and explosion, we should throw an exception.
               long currentNodeCount = lockManager.totalNodeCount.get();
               if (currentNodeCount > lockManager.maxTreeNodeInMemory) {
@@ -163,8 +181,26 @@ public class TreeLockNode {
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("TreeLockNode{");
-    sb.append("ident=").append(name);
+    sb.append("ident=").append(name).append(",");
+    sb.append("hashCode=").append(hashCode());
     sb.append('}');
     return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    TreeLockNode that = (TreeLockNode) o;
+    return Objects.equal(name, that.name);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(name);
   }
 }
