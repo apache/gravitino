@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.hive;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.utils.Executable;
-import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
@@ -55,9 +54,7 @@ class HiveProxyPlugin implements ProxyPlugin {
             ops.getClientPool()
                 .run(
                     client -> {
-                      return client.getDelegationToken(
-                          realUser.getUserName(),
-                          principal.getName());
+                      return client.getDelegationToken(realUser.getUserName(), principal.getName());
                     });
 
         Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
