@@ -378,6 +378,7 @@ public class HiveTable extends BaseTable {
       hiveTable.schemaName = schemaName;
       hiveTable.clientPool = clientPool;
       hiveTable.sd = sd;
+      hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters
       if (comment != null) {

@@ -18,6 +18,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -96,6 +97,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private String kerberosRealm;
+  private ProxyPlugin proxyPlugin;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -199,6 +202,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
+        String[] principalComponents = catalogPrincipal.split("@");
+        Preconditions.checkArgument(
+            principalComponents.length == 2, "The principal has the wrong format");
+        this.kerberosRealm = principalComponents[1];
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
@@ -527,7 +534,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
-    HiveTable hiveTable = HiveTable.fromHiveTable(table).withClientPool(clientPool).build();
+    HiveTable hiveTable =
+        HiveTable.fromHiveTable(table)
+            .withProxyPlugin(proxyPlugin)
+            .withClientPool(clientPool)
+            .build();
 
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
@@ -709,6 +720,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
+              .withProxyPlugin(proxyPlugin)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -819,7 +831,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return HiveTable.fromHiveTable(alteredHiveTable).withClientPool(clientPool).build();
+      return HiveTable.fromHiveTable(alteredHiveTable)
+          .withProxyPlugin(proxyPlugin)
+          .withClientPool(clientPool)
+          .build();
 
     } catch (TException | InterruptedException e) {
       if (e.getMessage() != null
@@ -1085,5 +1100,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  }
+
+  public String getKerberosRealm() {
+    return kerberosRealm;
+  }
+
+  void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {
+    this.proxyPlugin = hiveProxyPlugin;
   }
 }
