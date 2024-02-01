@@ -84,7 +84,6 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 | Gravitino Type | PostgreSQL Type               |
 |----------------|-------------------------------|
 | `Boolean`      | `boolean`                     |
-| `Byte`         | `Tinyint`                     |
 | `Short`        | `Smallint`                    |
 | `Integer`      | `Integer`                     |
 | `Long`         | `Bigint`                      |
