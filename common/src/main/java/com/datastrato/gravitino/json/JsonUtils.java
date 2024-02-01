@@ -12,6 +12,7 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.expressions.UnparsedExpressionDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
@@ -31,6 +32,7 @@ import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
@@ -86,6 +88,7 @@ public class JsonUtils {
   private static final String EXPRESSION_TYPE = "type";
   private static final String DATA_TYPE = "dataType";
   private static final String LITERAL_VALUE = "value";
+  private static final String UNPARSED_EXPRESSION = "unparsedExpression";
   private static final String SORT_TERM = "sortTerm";
   private static final String DIRECTION = "direction";
   private static final String NULL_ORDERING = "nullOrdering";
@@ -330,6 +333,14 @@ public class JsonUtils {
             .withFunctionName(functionName)
             .withFunctionArgs(args.toArray(FunctionArg.EMPTY_ARGS))
             .build();
+      case UNPARSED:
+        Preconditions.checkArgument(
+            node.has(UNPARSED_EXPRESSION) && node.get(UNPARSED_EXPRESSION).isTextual(),
+            "Cannot parse unparsed expression from missing string field unparsedExpression: %s",
+            node);
+        return UnparsedExpressionDTO.builder()
+            .withUnparsedExpression(getString(UNPARSED_EXPRESSION, node))
+            .build();
       default:
         throw new IllegalArgumentException("Unknown function argument type: " + type);
     }
@@ -355,6 +366,9 @@ public class JsonUtils {
           writeFunctionArg(funcArg, gen);
         }
         gen.writeEndArray();
+        break;
+      case UNPARSED:
+        gen.writeStringField(UNPARSED_EXPRESSION, ((UnparsedExpression) arg).unparsedExpression());
         break;
       default:
         throw new IOException("Unknown function argument type: " + arg.argType());
