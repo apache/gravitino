@@ -270,6 +270,7 @@
    @types/use-sync-external-store
    @xobotyi/scrollbar-width
    ansi-styles
+   antd
    asynckit
    axios
    babel-plugin-macros
