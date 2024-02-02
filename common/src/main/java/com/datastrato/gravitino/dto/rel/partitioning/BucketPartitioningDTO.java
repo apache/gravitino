@@ -12,9 +12,17 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 
+/** Data transfer object representing bucket partitioning. */
 @EqualsAndHashCode
 public final class BucketPartitioningDTO implements Partitioning {
 
+  /**
+   * Creates a new instance of {@link BucketPartitioningDTO}.
+   *
+   * @param numBuckets The number of buckets.
+   * @param fieldNames The field names.
+   * @return The new instance.
+   */
   public static BucketPartitioningDTO of(int numBuckets, String[]... fieldNames) {
     return new BucketPartitioningDTO(numBuckets, fieldNames);
   }
@@ -27,10 +35,20 @@ public final class BucketPartitioningDTO implements Partitioning {
     this.fieldNames = fieldNames;
   }
 
+  /**
+   * Returns the number of buckets.
+   *
+   * @return The number of buckets.
+   */
   public int numBuckets() {
     return numBuckets;
   }
 
+  /**
+   * Returns the field names.
+   *
+   * @return The field names.
+   */
   public String[][] fieldNames() {
     return fieldNames;
   }

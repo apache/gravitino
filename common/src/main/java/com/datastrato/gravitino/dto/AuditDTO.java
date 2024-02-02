@@ -72,11 +72,20 @@ public class AuditDTO implements Audit {
    * @param <S> The type of the builder instance.
    */
   public static class Builder<S extends Builder> {
+
+    /** The creator of the audit. */
     protected String creator;
+
+    /** The create time for the audit. */
     protected Instant createTime;
+
+    /** The last modifier of the audit. */
     protected String lastModifier;
+
+    /** The last modified time for the audit. */
     protected Instant lastModifiedTime;
 
+    /** * Default constructor for the builder. */
     public Builder() {}
 
     /**
