@@ -168,7 +168,7 @@ const TableView = props => {
       disableColumnMenu: true,
       type: 'string',
       field: 'name',
-      headerName: 'name',
+      headerName: 'Name',
       renderCell: ({ row }) => {
         const { name } = row
 
@@ -194,7 +194,7 @@ const TableView = props => {
       disableColumnMenu: true,
       type: 'string',
       field: 'type',
-      headerName: 'type',
+      headerName: 'Type',
       renderCell: ({ row }) => {
         const { type } = row
 
@@ -211,7 +211,7 @@ const TableView = props => {
       disableColumnMenu: true,
       type: 'boolean',
       field: 'nullable',
-      headerName: 'nullable',
+      headerName: 'Nullable',
       renderCell: ({ row }) => {
         const { nullable } = row
 
@@ -238,7 +238,7 @@ const TableView = props => {
       disableColumnMenu: true,
       type: 'boolean',
       field: 'autoIncrement',
-      headerName: 'autoIncrement',
+      headerName: 'AutoIncrement',
       renderCell: ({ row }) => {
         const { autoIncrement } = row
 
@@ -265,7 +265,7 @@ const TableView = props => {
       disableColumnMenu: true,
       type: 'string',
       field: 'comment',
-      headerName: 'comment',
+      headerName: 'Comment',
       renderCell: ({ row }) => {
         const { comment } = row
 

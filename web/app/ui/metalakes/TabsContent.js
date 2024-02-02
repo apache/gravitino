@@ -25,7 +25,7 @@ const CustomTab = props => {
       label={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Icon icon={icon} />
-          <Typography className={`twc-font-bold twc-ml-1`} color={'inherit'}>
+          <Typography className={`twc-font-bold twc-ml-1 twc-normal-case`} color={'inherit'}>
             {label}
           </Typography>
         </Box>
