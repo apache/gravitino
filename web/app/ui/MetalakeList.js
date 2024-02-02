@@ -13,7 +13,7 @@ import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import Icon from '@/components/Icon'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } from '@/lib/store/metalakes'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake, resetTree } from '@/lib/store/metalakes'
 
 import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
@@ -81,6 +81,10 @@ const MetalakeList = () => {
     setOpenDrawer(true)
   }
 
+  const handleClickLink = () => {
+    dispatch(resetTree())
+  }
+
   useEffect(() => {
     dispatch(fetchMetalakes())
   }, [dispatch])
@@ -116,6 +120,7 @@ const MetalakeList = () => {
                 noWrap
                 component={Link}
                 href={`/ui/metalakes?metalake=${name}`}
+                onClick={() => handleClickLink()}
                 sx={{
                   fontWeight: 500,
                   color: 'primary.main',
