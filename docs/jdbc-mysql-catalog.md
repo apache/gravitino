@@ -128,7 +128,7 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
     },
     {
       "name": "name",
-      "type": "string",
+      "type": "varchar(500)",
       "comment": "name column comment",
       "nullable": true
     }
@@ -152,20 +152,10 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
 ```java
 tableCatalog.createTable(
         NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
-        new ColumnDTO[] {
-        ColumnDTO.builder()
-        .withComment("id column comment")
-        .withName("id")
-        .withDataType(Types.IntegerType.get())
-        .withNullable(false)
-        .withAutoIncrement(true)
-        .build(),
-        ColumnDTO.builder()
-        .withComment("Name of the user")
-        .withName("name")
-        .withDataType(Types.StringType.get())
-        .withNullable(true)
-        .build(),
+        new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+            Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+        }},
         "This is my MySQL table",
         new HashMap<String,String>(){{
          put("auto-increment-offset", "1");
@@ -174,7 +164,8 @@ tableCatalog.createTable(
         Distributions.NONE,
         new SortOrder[0],
         new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+            Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
         });
 ```
 
