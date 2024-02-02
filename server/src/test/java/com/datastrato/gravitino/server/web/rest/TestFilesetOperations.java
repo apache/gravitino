@@ -194,9 +194,14 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateManagedFilesetByDefault() {
+  public void testCreateFileset() {
     Fileset fileset =
-        mockFileset("fileset1", null, "mock comment", "mock location", ImmutableMap.of("k1", "v1"));
+        mockFileset(
+            "fileset1",
+            Fileset.Type.MANAGED,
+            "mock comment",
+            "mock location",
+            ImmutableMap.of("k1", "v1"));
     when(dispatcher.createFileset(any(), any(), any(), any(), any())).thenReturn(fileset);
 
     FilesetCreateRequest req =
@@ -277,44 +282,6 @@ public class TestFilesetOperations extends JerseyTest {
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
-  }
-
-  @Test
-  public void testCreateExternalFileset() {
-    Fileset externalFileset =
-        mockFileset(
-            "fileset1",
-            Fileset.Type.EXTERNAL,
-            "mock comment",
-            "mock location",
-            ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createFileset(any(), any(), any(), any(), any())).thenReturn(externalFileset);
-    FilesetCreateRequest req1 =
-        FilesetCreateRequest.builder()
-            .name("fileset1")
-            .comment("mock comment")
-            .type(Fileset.Type.EXTERNAL)
-            .storageLocation("mock location")
-            .properties(ImmutableMap.of("k1", "v1"))
-            .build();
-
-    Response resp1 =
-        target(filesetPath(metalake, catalog, schema))
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req1, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
-
-    FilesetResponse filesetResp1 = resp1.readEntity(FilesetResponse.class);
-    Assertions.assertEquals(0, filesetResp1.getCode());
-
-    FilesetDTO filesetDTO1 = filesetResp1.getFileset();
-    Assertions.assertEquals("fileset1", filesetDTO1.name());
-    Assertions.assertEquals("mock comment", filesetDTO1.comment());
-    Assertions.assertEquals(Fileset.Type.EXTERNAL, filesetDTO1.type());
-    Assertions.assertEquals("mock location", filesetDTO1.storageLocation());
-    Assertions.assertEquals(ImmutableMap.of("k1", "v1"), filesetDTO1.properties());
   }
 
   @Test

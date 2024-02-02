@@ -9,6 +9,7 @@ import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,14 +17,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
 @Getter
 @EqualsAndHashCode
 @ToString
-@Builder
-@Jacksonized
 @NoArgsConstructor
 @AllArgsConstructor
 public class FilesetCreateRequest implements RESTRequest {
@@ -35,7 +33,6 @@ public class FilesetCreateRequest implements RESTRequest {
   @JsonProperty("comment")
   private String comment;
 
-  @Nullable
   @JsonProperty("type")
   private Fileset.Type type;
 
@@ -51,5 +48,21 @@ public class FilesetCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    Preconditions.checkNotNull(type, "\"type\" field is required and cannot be empty");
+  }
+
+  @Builder
+  private static FilesetCreateRequest internalBuilder(
+      String name,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> properties) {
+    return new FilesetCreateRequest(
+        name,
+        comment,
+        Optional.ofNullable(type).orElse(Fileset.Type.MANAGED),
+        storageLocation,
+        properties);
   }
 }

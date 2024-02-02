@@ -36,5 +36,9 @@ public class FilesetResponse extends BaseResponse {
     Preconditions.checkArgument(fileset != null, "fileset must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(fileset.name()), "fileset 'name' must not be null and empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(fileset.storageLocation()),
+        "fileset 'storageLocation' must not be null and empty");
+    Preconditions.checkNotNull(fileset.type(), "fileset 'type' must not be null and empty");
   }
 }

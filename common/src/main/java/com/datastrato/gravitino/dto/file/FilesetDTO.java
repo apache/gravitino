@@ -9,12 +9,12 @@ import com.datastrato.gravitino.file.Fileset;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a Fileset DTO (Data Transfer Object). */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -78,15 +78,10 @@ public class FilesetDTO implements Fileset {
       String storageLocation,
       Map<String, String> properties,
       AuditDTO audit) {
-    Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
-    Preconditions.checkArgument(audit != null, "audit cannot be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
+    Preconditions.checkNotNull(type, "type cannot be null");
+    Preconditions.checkNotNull(audit, "audit cannot be null");
 
-    return new FilesetDTO(
-        name,
-        comment,
-        Optional.ofNullable(type).orElse(Type.MANAGED),
-        storageLocation,
-        properties,
-        audit);
+    return new FilesetDTO(name, comment, type, storageLocation, properties, audit);
   }
 }
