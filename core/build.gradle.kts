@@ -20,14 +20,14 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.protobuf.java.util) {
-      exclude("com.google.guava", "guava")
-          .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
+    exclude("com.google.guava", "guava")
+      .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
   }
   implementation(libs.rocksdbjni)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
-  
+
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 

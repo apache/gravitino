@@ -97,10 +97,10 @@ public class KerberosUtils {
       if (keyTabFile != null) {
         options.put("useKeyTab", "true");
         options.put("keyTab", keyTabFile);
+        options.put("storeKey", "true");
       }
 
       options.put("principal", principal);
-      options.put("storeKey", "true");
       options.put("doNotPrompt", "true");
       options.put("useTicketCache", "true");
       options.put("renewTGT", "true");

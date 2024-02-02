@@ -16,12 +16,17 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":common"))
   implementation(project(":core"))
-
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jsqlparser)
+
+  testImplementation(libs.guava)
+  testImplementation(libs.commons.lang3)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {

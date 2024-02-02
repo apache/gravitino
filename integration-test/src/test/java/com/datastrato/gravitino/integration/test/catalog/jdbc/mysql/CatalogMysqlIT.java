@@ -5,6 +5,9 @@
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -13,6 +16,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -27,13 +31,17 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -55,6 +63,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
@@ -76,10 +85,12 @@ public class CatalogMysqlIT extends AbstractIT {
   public String MYSQL_COL_NAME1 = "mysql_col_name1";
   public String MYSQL_COL_NAME2 = "mysql_col_name2";
   public String MYSQL_COL_NAME3 = "mysql_col_name3";
+  public String MYSQL_COL_NAME4 = "mysql_col_name4";
+  public String MYSQL_COL_NAME5 = "mysql_col_name5";
 
   private GravitinoMetaLake metalake;
 
-  private Catalog catalog;
+  protected Catalog catalog;
 
   private MysqlService mysqlService;
 
@@ -90,6 +101,10 @@ public class CatalogMysqlIT extends AbstractIT {
   public static final String defaultMysqlImageName = "mysql:8.0";
 
   protected String mysqlImageName = defaultMysqlImageName;
+
+  boolean SupportColumnDefaultValueExpression() {
+    return true;
+  }
 
   @BeforeAll
   public void startup() throws IOException {
@@ -313,7 +328,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(createdTable.columns()[i], columns[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -326,7 +341,7 @@ public class CatalogMysqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(columns[i], loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -392,6 +407,193 @@ public class CatalogMysqlIT extends AbstractIT {
             distribution,
             sortOrders);
     Assertions.assertEquals(createdTable.name(), name);
+  }
+
+  @Test
+  // MySQL support column default value expression after 8.0.13
+  // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
+  @EnabledIf("SupportColumnDefaultValueExpression")
+  void testColumnDefaultValue() {
+    Column col1 =
+        Column.of(
+            MYSQL_COL_NAME1,
+            Types.IntegerType.get(),
+            "col_1_comment",
+            false,
+            false,
+            FunctionExpression.of("rand"));
+    Column col2 =
+        Column.of(
+            MYSQL_COL_NAME2,
+            Types.TimestampType.withoutTimeZone(),
+            "col_2_comment",
+            false,
+            false,
+            FunctionExpression.of("current_timestamp"));
+    Column col3 =
+        Column.of(
+            MYSQL_COL_NAME3,
+            Types.VarCharType.of(255),
+            "col_3_comment",
+            true,
+            false,
+            Literals.NULL);
+    Column col4 =
+        Column.of(MYSQL_COL_NAME4, Types.StringType.get(), "col_4_comment", false, false, null);
+    Column col5 =
+        Column.of(
+            MYSQL_COL_NAME5,
+            Types.VarCharType.of(255),
+            "col_5_comment",
+            true,
+            false,
+            Literals.stringLiteral("current_timestamp"));
+
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(
+                    metalakeName,
+                    catalogName,
+                    schemaName,
+                    GravitinoITUtils.genRandomName("mysql_it_table")),
+                newColumns,
+                null,
+                ImmutableMap.of());
+
+    Assertions.assertEquals(
+        toFunctionArg(UnparsedExpression.of("rand()")), createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
+        createdTable.columns()[1].defaultValue());
+    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[2].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        new LiteralDTO.Builder()
+            .withValue("current_timestamp")
+            .withDataType(Types.VarCharType.of(255))
+            .build(),
+        createdTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  // MySQL support column default value expression after 8.0.13
+  // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
+  @EnabledIf("SupportColumnDefaultValueExpression")
+  void testColumnDefaultValueConverter() {
+    // test convert from MySQL to Gravitino
+    String tableName = GravitinoITUtils.genRandomName("test_default_value");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  int_col_1 int default 0x01AF,\n"
+            + "  int_col_2 int default (rand()),\n"
+            + "  int_col_3 int default '3.321',\n"
+            + "  double_col_1 double default 123.45,\n"
+            + "  varchar20_col_1 varchar(20) default (10),\n"
+            + "  varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
+            + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
+            + "  varchar200_col_2 varchar(200) default (curdate()),\n"
+            + "  varchar200_col_3 varchar(200) default (CURRENT_TIMESTAMP),\n"
+            // todo: uncomment when we support datetime type
+            + "  /* we don't support datetime type now\n"
+            + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
+            + "  datetime_col_2 datetime default current_timestamp,\n"
+            + "  datetime_col_3 datetime default null,\n"
+            + "  datetime_col_4 datetime default 19830905, */\n"
+            + "  date_col_1 date default (CURRENT_DATE),\n"
+            + "  date_col_2 date,\n"
+            + "  date_col_3 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),\n"
+            + "  date_col_4 date DEFAULT (CURRENT_DATE),\n"
+            + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
+            + "  timestamp_col_2 timestamp default 19830905,\n"
+            + "  decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
+            + ");\n";
+
+    mysqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "int_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.integerLiteral(431)), column.defaultValue());
+          break;
+        case "int_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("rand()")), column.defaultValue());
+          break;
+        case "int_col_3":
+          Assertions.assertEquals(toFunctionArg(Literals.integerLiteral(3)), column.defaultValue());
+          break;
+        case "double_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.doubleLiteral(123.45)), column.defaultValue());
+          break;
+        case "varchar20_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("10")), column.defaultValue());
+          break;
+        case "varchar100_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(100, "CURRENT_TIMESTAMP")),
+              column.defaultValue());
+          break;
+        case "varchar200_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "curdate()")), column.defaultValue());
+          break;
+        case "varchar200_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          break;
+        case "varchar200_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("now()")), column.defaultValue());
+          break;
+        case "date_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          break;
+        case "date_col_2":
+          Assertions.assertEquals(toFunctionArg(Literals.NULL), column.defaultValue());
+          break;
+        case "date_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("(curdate() + interval 1 year)")),
+              column.defaultValue());
+          break;
+        case "date_col_4":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("2012-12-31T11:30:45")),
+              column.defaultValue());
+          break;
+        case "timestamp_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("1983-09-05T00:00:00")),
+              column.defaultValue());
+          break;
+        case "decimal_6_2_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.decimalLiteral(Decimal.of("1.2", 6, 2))),
+              column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
   }
 
   @Test
@@ -589,8 +791,8 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
         };
 
     NameIdentifier tableIdentifier =
@@ -753,6 +955,11 @@ public class CatalogMysqlIT extends AbstractIT {
           col3,
           col4,
           col5
+        };
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
         };
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);

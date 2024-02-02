@@ -10,11 +10,11 @@ import java.util.Objects;
 /** @param <TO> Implement the corresponding JDBC data type to be converted */
 public abstract class JdbcTypeConverter<TO> {
 
-  protected static final String DATE = "date";
-  protected static final String TIME = "time";
-  protected static final String TIMESTAMP = "timestamp";
-  protected static final String VARCHAR = "varchar";
-  protected static final String TEXT = "text";
+  public static final String DATE = "date";
+  public static final String TIME = "time";
+  public static final String TIMESTAMP = "timestamp";
+  public static final String VARCHAR = "varchar";
+  public static final String TEXT = "text";
 
   /**
    * Convert from JDBC type to Gravitino type
@@ -35,8 +35,10 @@ public abstract class JdbcTypeConverter<TO> {
   public static class JdbcTypeBean {
     /** Data type name. */
     private String typeName;
+
     /** Column size. For example: 20 in varchar (20) and 10 in decimal (10,2). */
     private String columnSize;
+
     /** Scale. For example: 2 in decimal (10,2). */
     private String scale;
 

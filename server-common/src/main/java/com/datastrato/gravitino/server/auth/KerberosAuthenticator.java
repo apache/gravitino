@@ -125,6 +125,7 @@ public class KerberosAuthenticator implements Authenticator {
             }
           });
     } catch (Exception e) {
+      LOG.warn("Fail to validate the token, exception: ", e);
       throw new UnauthorizedException("Fail to validate the token", AuthConstants.NEGOTIATE);
     }
   }
@@ -163,12 +164,7 @@ public class KerberosAuthenticator implements Authenticator {
         throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
       }
 
-      String[] userAndInstance = principalComponents[0].split("/");
-      if (userAndInstance.length > 2) {
-        throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
-      }
-
-      String user = userAndInstance[0];
+      String user = principalComponents[0];
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,

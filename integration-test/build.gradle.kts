@@ -293,6 +293,9 @@ tasks.test {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
 
+      // Change poll image pause time from 30s to 60s
+      environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
       delete(buildDir.path + "/integration-test.log")

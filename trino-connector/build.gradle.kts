@@ -20,6 +20,7 @@ dependencies {
   implementation(libs.httpclient5)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
+  implementation(libs.commons.collections4)
   implementation(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }

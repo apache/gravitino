@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -32,6 +34,12 @@ public class SqliteTableOperations extends JdbcTableOperations {
       if (!column.nullable()) {
         sqlBuilder.append(" NOT NULL");
       }
+
+      if (!Column.DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+        sqlBuilder.append(" DEFAULT ");
+        sqlBuilder.append(columnDefaultValueConverter.fromGravitino(column.defaultValue()));
+      }
+
       sqlBuilder.append(",");
     }
 
@@ -72,6 +80,12 @@ public class SqliteTableOperations extends JdbcTableOperations {
   protected String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes) {
     throw new UnsupportedOperationException("Alter table is not supported in sqlite.");
+  }
+
+  @Override
+  protected JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    throw new UnsupportedOperationException("Sqlite does not support lazy load create table.");
   }
 
   @Override

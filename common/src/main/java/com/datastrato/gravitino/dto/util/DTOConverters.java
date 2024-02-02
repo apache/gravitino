@@ -22,6 +22,7 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.expressions.UnparsedExpressionDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
@@ -44,6 +45,7 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -59,6 +61,7 @@ import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
+import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -260,6 +263,9 @@ public class DTOConverters {
     }
 
     if (expression instanceof Literal) {
+      if (Literals.NULL.equals(expression)) {
+        return LiteralDTO.NULL;
+      }
       return new LiteralDTO.Builder()
           .withValue((((Literal) expression).value().toString()))
           .withDataType(((Literal) expression).dataType())
@@ -275,6 +281,10 @@ public class DTOConverters {
               Arrays.stream(((FunctionExpression) expression).arguments())
                   .map(DTOConverters::toFunctionArg)
                   .toArray(FunctionArg[]::new))
+          .build();
+    } else if (expression instanceof UnparsedExpression) {
+      return UnparsedExpressionDTO.builder()
+          .withUnparsedExpression(((UnparsedExpression) expression).unparsedExpression())
           .build();
     } else {
       throw new IllegalArgumentException("Unsupported expression type: " + expression.getClass());
@@ -344,7 +354,8 @@ public class DTOConverters {
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
-        if (((LiteralDTO) arg).value() == null) {
+        if (((LiteralDTO) arg).value() == null
+            || ((LiteralDTO) arg).dataType().equals(Types.NullType.get())) {
           return Literals.NULL;
         }
         return Literals.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());

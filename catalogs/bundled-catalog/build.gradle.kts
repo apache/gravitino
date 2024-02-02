@@ -12,6 +12,7 @@ plugins {
 
 dependencies {
   implementation(project(":catalogs:catalog-hive"))
+  implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
