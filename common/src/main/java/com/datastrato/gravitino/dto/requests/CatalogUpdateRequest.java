@@ -40,6 +40,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
    */
   CatalogChange catalogChange();
 
+  /** Request to rename a catalog. */
   @EqualsAndHashCode
   @ToString
   class RenameCatalogRequest implements CatalogUpdateRequest {
@@ -79,6 +80,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to update the comment of a catalog. */
   @EqualsAndHashCode
   @ToString
   class UpdateCatalogCommentRequest implements CatalogUpdateRequest {
@@ -119,6 +121,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to set a property on a catalog. */
   @EqualsAndHashCode
   @ToString
   class SetCatalogPropertyRequest implements CatalogUpdateRequest {
@@ -166,6 +169,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to remove a property from a catalog. */
   @EqualsAndHashCode
   @ToString
   class RemoveCatalogPropertyRequest implements CatalogUpdateRequest {

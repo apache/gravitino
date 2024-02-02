@@ -22,9 +22,19 @@ public interface Partitioning extends Transform {
 
   Partitioning[] EMPTY_PARTITIONING = new Partitioning[0];
 
+  /**
+   * Returns the name of the partitioning strategy.
+   *
+   * @return The name of the partitioning strategy.
+   */
   Strategy strategy();
 
-  // columns of table
+  /**
+   * Validates the partitioning columns.
+   *
+   * @param columns The columns to be validated.
+   * @throws IllegalArgumentException If the columns are invalid, this exception is thrown.
+   */
   void validate(ColumnDTO[] columns) throws IllegalArgumentException;
 
   enum Strategy {
