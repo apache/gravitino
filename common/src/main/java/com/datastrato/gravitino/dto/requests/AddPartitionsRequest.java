@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 
+/** Request to add partitions to a table. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -24,10 +25,16 @@ public class AddPartitionsRequest implements RESTRequest {
   @JsonProperty("partitions")
   private final PartitionDTO[] partitions;
 
+  /** Default constructor for Jackson. */
   public AddPartitionsRequest() {
     this(null);
   }
 
+  /**
+   * Constructor for the request.
+   *
+   * @param partitions The partitions to add.
+   */
   public AddPartitionsRequest(PartitionDTO[] partitions) {
     this.partitions = partitions;
   }

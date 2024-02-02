@@ -121,11 +121,22 @@ public class ColumnDTO implements Column {
    */
   public static class Builder<S extends Builder> {
 
+    /** The name of the column. */
     protected String name;
+
+    /** The data type of the column. */
     protected Type dataType;
+
+    /** The comment associated with the column. */
     protected String comment;
+
+    /** * Whether the column value can be null. */
     protected boolean nullable = true;
+
+    /** Whether the column is an auto-increment column. */
     protected boolean autoIncrement = false;
+
+    /** The default value of the column. */
     protected Expression defaultValue;
 
     public Builder() {}

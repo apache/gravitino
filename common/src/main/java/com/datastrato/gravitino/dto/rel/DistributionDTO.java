@@ -17,10 +17,12 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
+/** Data transfer object representing distribution information. */
 @JsonSerialize(using = JsonUtils.DistributionSerializer.class)
 @JsonDeserialize(using = JsonUtils.DistributionDeserializer.class)
 public class DistributionDTO implements Distribution {
 
+  /** A DistributionDTO instance that represents no distribution. */
   public static final DistributionDTO NONE =
       builder().withStrategy(Strategy.NONE).withNumber(0).withArgs(EMPTY_ARGS).build();
 
@@ -65,6 +67,7 @@ public class DistributionDTO implements Distribution {
     Arrays.stream(args).forEach(expression -> expression.validate(columns));
   }
 
+  /** Builder for {@link DistributionDTO}. */
   public static class Builder {
     private FunctionArg[] args;
     private int number = 0;
