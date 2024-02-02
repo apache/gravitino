@@ -11,10 +11,14 @@ import java.io.File;
 public interface Configs {
 
   String DEFAULT_ENTITY_STORE = "kv";
+  String RELATION_ENTITY_STORE = "rel";
   String ENTITY_STORE_KEY = "gravitino.entity.store";
 
   String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
+
+  String DEFAULT_ENTITY_RELATION_STORE = "MysqlBackend";
+  String ENTITY_RELATION_STORE_KEY = "gravitino.entity.store.rel";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
@@ -44,6 +48,13 @@ public interface Configs {
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_KV_STORE);
+
+  ConfigEntry<String> ENTITY_RELATION_STORE =
+      new ConfigBuilder(ENTITY_RELATION_STORE_KEY)
+          .doc("Detailed implementation of relation storage")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault(DEFAULT_ENTITY_RELATION_STORE);
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)

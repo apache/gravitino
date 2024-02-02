@@ -12,6 +12,7 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.relation.RelationEntityStore;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +75,9 @@ public class GravitinoEnv {
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    entityStore.setSerDe(entitySerDe);
+    if (!(entityStore instanceof RelationEntityStore)) {
+      entityStore.setSerDe(entitySerDe);
+    }
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
