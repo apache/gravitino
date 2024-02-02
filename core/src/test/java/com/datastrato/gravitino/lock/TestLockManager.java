@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -27,7 +28,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.checkerframework.checker.units.qual.C;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -350,51 +353,35 @@ public class TestLockManager {
   }
 
   @Test
-  @Disabled(
-      "This test is heavily depends on the machine performance. It can work work and "
-          + "pass in local machine, due to poor performance of CI machine, it will fail in CI sometimes")
-  void testConcurrentRead() throws InterruptedException {
+  void testConcurrentRead() throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager(getConfig());
-    Map<String, Integer> stringMap = Maps.newHashMap();
-    stringMap.put("total", 0);
 
     CompletionService<Integer> service = createCompletionService();
     NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
-
-    CyclicBarrier cyclicBarrier = new CyclicBarrier(5);
-    // Can 2000 times ensure that the test is correct?
-    for (int t = 0; t < 200000; t++) {
-      for (int i = 0; i < 5; i++) {
-        service.submit(
-            () -> {
-              TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
-              treeLock.lock(LockType.READ);
-              try {
-                cyclicBarrier.await();
-                stringMap.compute("total", (k, v) -> ++v);
-              } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-              } finally {
-                treeLock.unlock();
-              }
-              return 0;
-            });
-      }
-
-      for (int i = 0; i < 5; i++) {
-        service.take();
-      }
-
-      int total = stringMap.get("total");
-      if (total < 5) {
-        return;
-      }
-
-      cyclicBarrier.reset();
-      stringMap.put("total", 0);
+    long startTime = System.currentTimeMillis();
+    for (int i = 0; i < 10; i++) {
+      service.submit(
+          () -> {
+            TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
+            treeLock.lock(LockType.READ);
+            try {
+              Thread.sleep(100);
+            } catch (InterruptedException e) {
+              throw new RuntimeException(e);
+            } finally {
+              treeLock.unlock();
+            }
+            return 0;
+          });
     }
 
-    Assertions.fail("This should not happen...");
+    for (int i = 0; i < 10; i++) {
+      service.take().get();
+    }
+
+    long take = System.currentTimeMillis() - startTime;
+    System.out.println("Total take: " + take);
+    Assertions.assertTrue(take < 1000);
   }
 
   @Test
