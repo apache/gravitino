@@ -54,7 +54,7 @@ Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#
 The Gravitino schema:
 
 - corresponds to the MySQL database.
-- Ssupports create schema with comments.
+- supports create schema with comments.
 - supports drop schema.
 - doesn't support cascade drop database.
 
