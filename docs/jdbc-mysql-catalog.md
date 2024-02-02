@@ -131,6 +131,13 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
       "nullable": true,
       "autoIncrement": false
     }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    }
   ]
 }
 ```
@@ -143,6 +150,9 @@ Column[] cols = new Column[] {
             Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
             Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
         };
+Index[] indexes = new Index[] {
+            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+        }
 ```
 
 </TabItem>
