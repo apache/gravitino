@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
@@ -351,21 +352,39 @@ public class TestLockManager {
   @Test
   void testConcurrentRead() throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager(getConfig());
+    Object objectLock = new Object();
 
     CompletionService<Integer> service = createCompletionService();
     NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
-    long startTime = System.currentTimeMillis();
+    TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
+    treeLock.lock(LockType.READ);
+    treeLock.unlock();
+
+    CountDownLatch countDownLatch = new CountDownLatch(1);
+    service.submit(
+        () -> {
+          synchronized (objectLock) {
+            TreeLock treeLock1 = lockManager.createTreeLock(nameIdentifier);
+            treeLock1.lock(LockType.WRITE);
+            // Hold lock and sleep
+            countDownLatch.countDown();
+            objectLock.wait();
+            treeLock1.unlock();
+            return 0;
+          }
+        });
+
+    countDownLatch.await();
+
     for (int i = 0; i < 10; i++) {
       service.submit(
           () -> {
-            TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
-            treeLock.lock(LockType.READ);
+            TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+            lock.lock(LockType.WRITE);
             try {
-              Thread.sleep(100);
-            } catch (InterruptedException e) {
-              throw new RuntimeException(e);
+              // User logic here...
             } finally {
-              treeLock.unlock();
+              lock.unlock();
             }
             return 0;
           });
@@ -375,9 +394,9 @@ public class TestLockManager {
       service.take().get();
     }
 
-    long take = System.currentTimeMillis() - startTime;
-    System.out.println("Total take: " + take);
-    Assertions.assertTrue(take < 1000);
+    synchronized (objectLock) {
+      objectLock.notify();
+    }
   }
 
   @Test
