@@ -18,6 +18,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.commons.dbcp2)
   implementation(libs.commons.io)
+  implementation(libs.commons.dbcp2)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.mybatis)
@@ -26,6 +27,7 @@ dependencies {
       .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
   }
   implementation(libs.rocksdbjni)
+  implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
