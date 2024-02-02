@@ -147,12 +147,12 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
 
 ```java
 Column[] cols = new Column[] {
-            Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
-            Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
-        };
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+    Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+};
 Index[] indexes = new Index[] {
-            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-        }
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+}
 ```
 
 </TabItem>
@@ -203,9 +203,9 @@ The index name of the PRIMARY_KEY must be PRIMARY
 
 ```java
 Index[] indexes = new Index[] {
-            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-            Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-        }
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+}
 ```
 
 </TabItem>
