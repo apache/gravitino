@@ -393,7 +393,7 @@ tableCatalog.createTable(
     Transforms.EMPTY_TRANSFORM,
     Distributions.NONE,
     new SortOrder[0],
-        new Index[] {
+    new Index[] {
       Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
       Indexes.of(IndexType.UNIQUE_KEY, "name_age_score_uk", new String[][]{{"name"}, {"age"}, {"score"}})
     });
