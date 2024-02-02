@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletionService;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
@@ -350,48 +350,53 @@ public class TestLockManager {
   }
 
   @Test
-  void testConcurrentRead() throws InterruptedException {
+  void testConcurrentRead() throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager(getConfig());
-    Map<String, Integer> stringMap = Maps.newHashMap();
-    stringMap.put("total", 0);
+    Object objectLock = new Object();
 
     CompletionService<Integer> service = createCompletionService();
     NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
+    TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
+    treeLock.lock(LockType.READ);
+    treeLock.unlock();
 
-    CyclicBarrier cyclicBarrier = new CyclicBarrier(5);
-    // Can 2000 times ensure that the test is correct?
-    for (int t = 0; t < 200000; t++) {
-      for (int i = 0; i < 5; i++) {
-        service.submit(
-            () -> {
-              TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
-              treeLock.lock(LockType.READ);
-              try {
-                cyclicBarrier.await();
-                stringMap.compute("total", (k, v) -> ++v);
-              } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-              } finally {
-                treeLock.unlock();
-              }
-              return 0;
-            });
-      }
+    CountDownLatch countDownLatch = new CountDownLatch(1);
+    service.submit(
+        () -> {
+          synchronized (objectLock) {
+            TreeLock treeLock1 = lockManager.createTreeLock(nameIdentifier);
+            treeLock1.lock(LockType.READ);
+            // Hold lock and sleep
+            countDownLatch.countDown();
+            objectLock.wait();
+            treeLock1.unlock();
+            return 0;
+          }
+        });
 
-      for (int i = 0; i < 5; i++) {
-        service.take();
-      }
+    countDownLatch.await();
 
-      int total = stringMap.get("total");
-      if (total < 5) {
-        return;
-      }
-
-      cyclicBarrier.reset();
-      stringMap.put("total", 0);
+    for (int i = 0; i < 10; i++) {
+      service.submit(
+          () -> {
+            TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+            lock.lock(LockType.READ);
+            try {
+              // User logic here...
+            } finally {
+              lock.unlock();
+            }
+            return 0;
+          });
     }
 
-    Assertions.fail("This should not happen...");
+    for (int i = 0; i < 10; i++) {
+      service.take().get();
+    }
+
+    synchronized (objectLock) {
+      objectLock.notify();
+    }
   }
 
   @Test

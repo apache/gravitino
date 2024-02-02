@@ -10,17 +10,17 @@ import com.datastrato.gravitino.rel.types.Types;
 
 public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
 
-  protected static final String BOOL = "bool";
-  protected static final String INT_2 = "int2";
-  protected static final String INT_4 = "int4";
-  protected static final String INT_8 = "int8";
-  protected static final String FLOAT_4 = "float4";
-  protected static final String FLOAT_8 = "float8";
+  static final String BOOL = "bool";
+  static final String INT_2 = "int2";
+  static final String INT_4 = "int4";
+  static final String INT_8 = "int8";
+  static final String FLOAT_4 = "float4";
+  static final String FLOAT_8 = "float8";
 
-  protected static final String TIMESTAMP_TZ = "timestamptz";
-  protected static final String NUMERIC = "numeric";
-  protected static final String BPCHAR = "bpchar";
-  protected static final String BYTEA = "bytea";
+  static final String TIMESTAMP_TZ = "timestamptz";
+  static final String NUMERIC = "numeric";
+  static final String BPCHAR = "bpchar";
+  static final String BYTEA = "bytea";
 
   @Override
   public Type toGravitinoType(JdbcTypeBean typeBean) {
