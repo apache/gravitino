@@ -104,7 +104,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       return;
     }
 
-    Instant limit = Instant.now().plusSeconds(60);
+    Instant limit = Instant.now().plusSeconds(120);
     int retryNum = 0;
     IOException last = null;
 
