@@ -208,6 +208,13 @@ public class Namespace {
     return DOT.join(levels);
   }
 
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
+   *
+   * @param expression The expression to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
   public static void check(boolean expression, String message, Object... args) {
     if (!expression) {
       throw new IllegalNamespaceException(String.format(message, args));

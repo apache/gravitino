@@ -53,21 +53,30 @@ public final class BucketPartitioningDTO implements Partitioning {
     return fieldNames;
   }
 
+  /** @return The strategy of the partitioning. */
   @Override
   public Strategy strategy() {
     return Strategy.BUCKET;
   }
 
+  /**
+   * Validates the partitioning columns.
+   *
+   * @param columns The columns to be validated.
+   * @throws IllegalArgumentException If the columns are invalid, this exception is thrown.
+   */
   @Override
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
     Arrays.stream(fieldNames).forEach(fieldName -> validateFieldExistence(columns, fieldName));
   }
 
+  /** @return The name of the partitioning strategy. */
   @Override
   public String name() {
     return strategy().name().toLowerCase();
   }
 
+  /** @return The arguments of the partitioning strategy. */
   @Override
   public Expression[] arguments() {
     return bucket(numBuckets, fieldNames).arguments();

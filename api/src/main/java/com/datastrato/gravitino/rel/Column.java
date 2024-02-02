@@ -120,6 +120,7 @@ public interface Column {
         defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue);
   }
 
+  /** The implementation of {@link Column} for users to use API. */
   class ColumnImpl implements Column {
     private String name;
     private Type dataType;

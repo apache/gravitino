@@ -46,7 +46,7 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     return new Builder();
   }
 
-  /* Builder class for configuring and creating instances of DefaultOAuth2TokenProvider. */
+  /** Builder class for configuring and creating instances of DefaultOAuth2TokenProvider. */
   public static class Builder
       extends OAuth2TokenProviderBuilder<Builder, DefaultOAuth2TokenProvider> {
 
