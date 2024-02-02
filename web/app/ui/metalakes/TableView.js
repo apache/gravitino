@@ -53,7 +53,8 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
-      field: 'id',
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -89,7 +90,8 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
-      field: 'id',
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -123,6 +125,7 @@ const TableView = props => {
       minWidth: 90,
       sortable: false,
       disableColumnMenu: true,
+      type: 'actions',
       field: 'actions',
       headerName: 'Actions',
       renderCell: ({ row }) => (
@@ -163,6 +166,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'string',
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -188,6 +192,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'string',
       field: 'type',
       headerName: 'Type',
       renderCell: ({ row }) => {
@@ -204,6 +209,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'boolean',
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -221,6 +227,60 @@ const TableView = props => {
               }}
             >
               {typeof nullable !== 'undefined' && `${nullable}`}
+            </Typography>
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'boolean',
+      field: 'autoIncrement',
+      headerName: 'AutoIncrement',
+      renderCell: ({ row }) => {
+        const { autoIncrement } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {typeof autoIncrement !== 'undefined' && `${autoIncrement}`}
+            </Typography>
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
+      field: 'comment',
+      headerName: 'Comment',
+      renderCell: ({ row }) => {
+        const { comment } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {typeof comment !== 'undefined' && `${comment}`}
             </Typography>
           </Box>
         )
