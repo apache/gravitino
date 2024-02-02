@@ -19,16 +19,18 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
-@Getter
 @EqualsAndHashCode
 @ToString
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FilesetCreateRequest implements RESTRequest {
 
+  @Getter
   @JsonProperty("name")
   private String name;
 
+  @Getter
   @Nullable
   @JsonProperty("comment")
   private String comment;
@@ -36,10 +38,12 @@ public class FilesetCreateRequest implements RESTRequest {
   @JsonProperty("type")
   private Fileset.Type type;
 
+  @Getter
   @Nullable
   @JsonProperty("storageLocation")
   private String storageLocation;
 
+  @Getter
   @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
@@ -48,21 +52,9 @@ public class FilesetCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
-    Preconditions.checkNotNull(type, "\"type\" field is required and cannot be empty");
   }
 
-  @Builder
-  private static FilesetCreateRequest internalBuilder(
-      String name,
-      String comment,
-      Fileset.Type type,
-      String storageLocation,
-      Map<String, String> properties) {
-    return new FilesetCreateRequest(
-        name,
-        comment,
-        Optional.ofNullable(type).orElse(Fileset.Type.MANAGED),
-        storageLocation,
-        properties);
+  public Fileset.Type getType() {
+    return Optional.ofNullable(type).orElse(Fileset.Type.MANAGED);
   }
 }
