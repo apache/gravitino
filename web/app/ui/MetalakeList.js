@@ -143,7 +143,7 @@ const MetalakeList = () => {
       minWidth: 150,
       disableColumnMenu: true,
       field: 'createdBy',
-      headerName: 'Created By',
+      headerName: 'Created by',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
@@ -158,7 +158,7 @@ const MetalakeList = () => {
       disableColumnMenu: true,
       valueGetter: params => `${params.row.audit?.createTime}`,
       field: 'createdAt',
-      headerName: 'Created At',
+      headerName: 'Created at',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
