@@ -114,6 +114,43 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 
 - Supports setting auto-increment.
 
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "int",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Column[] cols = new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+            Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+        };
+```
+
+</TabItem>
+</Tabs>
+
 ### Table properties
 
 - Doesn't support table properties.
@@ -127,33 +164,16 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 
 ```json
 {
-  "name": "my_postgresql_table",
-  "comment": "This is my PostgreSQL table",
-  "columns": [
-    {
-      "name": "id",
-      "type": "int",
-      "comment": "id column comment",
-      "nullable": false,
-      "autoIncrement": true
-    },
-    {
-      "name": "name",
-      "type": "varchar(500)",
-      "comment": "name column comment",
-      "nullable": true
-    }
-  ],
   "indexes": [
     {
       "indexType": "primary_key",
       "name": "id_pk",
-      "fieldNames": [ [ "id" ] ]
+      "fieldNames": [["id"]]
     },
     {
       "indexType": "unique_key",
       "name": "id_name_uk",
-      "fieldNames": [ [ "id" ] , [ "name" ] ]
+      "fieldNames": [["id"] ,["name"]]
     }
   ]
 }
@@ -163,21 +183,10 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 <TabItem value="java" label="Java">
 
 ```java
-tableCatalog.createTable(
-        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
-        new Column[] {
-            Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
-            Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
-        },
-        "This is my PostgreSQL table",
-        Collections.emptyMap(),
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[] {
-            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-            Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-        });
+Index[] indexes = new Index[] {
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+        Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+        }
 ```
 
 </TabItem>

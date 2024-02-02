@@ -116,8 +116,6 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
 
 ```json
 {
-  "name": "my_mysql_table",
-  "comment": "This is my MySQL table",
   "columns": [
     {
       "name": "id",
@@ -130,19 +128,10 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
       "name": "name",
       "type": "varchar(500)",
       "comment": "name column comment",
-      "nullable": true
+      "nullable": true,
+      "autoIncrement": false
     }
-  ],
-  "indexes": [
-    {
-      "indexType": "primary_key",
-      "name": "PRIMARY",
-      "fieldNames": [ [ "id" ] ]
-    }
-  ],
-  "properties": {
-    "auto-increment-offset": "1"
-  }
+  ]
 }
 ```
 
@@ -150,23 +139,10 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
 <TabItem value="java" label="Java">
 
 ```java
-tableCatalog.createTable(
-        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
-        new Column[] {
+Column[] cols = new Column[] {
             Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
             Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
-        }},
-        "This is my MySQL table",
-        new HashMap<String,String>(){{
-         put("auto-increment-offset", "1");
-        }},
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[] {
-            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-            Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-        });
+        };
 ```
 
 </TabItem>
@@ -197,38 +173,18 @@ The index name of the PRIMARY_KEY must be PRIMARY
 
 ```json
 {
-  "name": "my_mysql_table",
-  "comment": "This is my MySQL table",
-  "columns": [
-    {
-      "name": "id",
-      "type": "int",
-      "comment": "id column comment",
-      "nullable": false,
-      "autoIncrement": true
-    },
-    {
-      "name": "name",
-      "type": "varchar(500)",
-      "comment": "name column comment",
-      "nullable": true
-    }
-  ],
   "indexes": [
     {
       "indexType": "primary_key",
       "name": "PRIMARY",
-      "fieldNames": [ [ "id" ] ]
+      "fieldNames": [["id"]]
     },
     {
       "indexType": "unique_key",
       "name": "id_name_uk",
-      "fieldNames": [ [ "id" ] , [ "name" ] ]
+      "fieldNames": [["id"] ,["name"]]
     }
-  ],
-  "properties": {
-    "auto-increment-offset": "1"
-  }
+  ]
 }
 ```
 
@@ -236,22 +192,10 @@ The index name of the PRIMARY_KEY must be PRIMARY
 <TabItem value="java" label="Java">
 
 ```java
-tableCatalog.createTable(
-        NameIdentifier.of("metalake", "hive_catalog", "schema", "my_mysql_table"),
-        new Column[] {
-        Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
-        Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)},
-        "This is my MySQL table",
-        new HashMap<String,String>(){{
-         put("auto-increment-offset", "1");
-        }},
-        Transforms.EMPTY_TRANSFORM,
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-        Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-        });
+Index[] indexes = new Index[] {
+            Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+            Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+        }
 ```
 
 </TabItem>

@@ -809,17 +809,17 @@ components:
           {
             "indexType": "primary_key",
             "name": "PRIMARY",
-            "fieldNames": [ [ "id" ] ]
+            "fieldNames": [["id"]]
           },
           {
             "indexType": "unique_key",
             "name": "uk_1",
-            "fieldNames": [ [ "name" ] ]
+            "fieldNames": [["name"]]
           },
           {
             "indexType": "unique_key",
             "name": "uk_2",
-            "fieldNames": [ [ "name" ] ,[ "age" ] ,[ "dt" ] ]
+            "fieldNames": [["name"] ,["age"] ,["dt"]]
           }
         ],
         "properties": {
@@ -863,17 +863,17 @@ components:
           {
             "indexType": "primary_key",
             "name": "PRIMARY",
-            "fieldNames": [ [ "id" ] ]
+            "fieldNames": [["id"]]
           },
           {
             "indexType": "unique_key",
             "name": "uk_1",
-            "fieldNames": [ [ "name" ] ]
+            "fieldNames": [["name"]]
           },
           {
             "indexType": "unique_key",
             "name": "uk_2",
-            "fieldNames": [ [ "name" ] ,[ "age" ] ,[ "dt" ] ]
+            "fieldNames": [["name"] ,["age"] ,["dt"]]
           }
         ],
         "properties": { }
@@ -1009,17 +1009,17 @@ components:
             {
               "indexType": "primary_key",
               "name": "PRIMARY",
-              "fieldNames": [ [ "id" ] ]
+              "fieldNames": [["id"]]
             },
             {
               "indexType": "unique_key",
               "name": "uk_1",
-              "fieldNames": [ [ "name" ] ]
+              "fieldNames": [["name"]]
             },
             {
               "indexType": "unique_key",
               "name": "uk_2",
-              "fieldNames": [ [ "name" ] ,[ "age" ] ,[ "dt" ] ]
+              "fieldNames": [["name"] ,["age"] ,["dt"]]
             }
           ]
         }
@@ -1070,17 +1070,17 @@ components:
             {
               "indexType": "primary_key",
               "name": "PRIMARY",
-              "fieldNames": [ [ "id" ] ]
+              "fieldNames": [["id"]]
             },
             {
               "indexType": "unique_key",
               "name": "uk_1",
-              "fieldNames": [ [ "name" ] ]
+              "fieldNames": [["name"]]
             },
             {
               "indexType": "unique_key",
               "name": "uk_2",
-              "fieldNames": [ [ "name" ] ,[ "age" ] ,[ "dt" ] ]
+              "fieldNames": [["name"] ,["age"] ,["dt"]]
             }
           ]
         }
