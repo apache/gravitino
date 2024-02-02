@@ -365,7 +365,7 @@ public class TestLockManager {
         () -> {
           synchronized (objectLock) {
             TreeLock treeLock1 = lockManager.createTreeLock(nameIdentifier);
-            treeLock1.lock(LockType.WRITE);
+            treeLock1.lock(LockType.READ);
             // Hold lock and sleep
             countDownLatch.countDown();
             objectLock.wait();
@@ -380,7 +380,7 @@ public class TestLockManager {
       service.submit(
           () -> {
             TreeLock lock = lockManager.createTreeLock(nameIdentifier);
-            lock.lock(LockType.WRITE);
+            lock.lock(LockType.READ);
             try {
               // User logic here...
             } finally {
