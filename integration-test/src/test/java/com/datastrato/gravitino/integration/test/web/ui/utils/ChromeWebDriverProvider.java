@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.openqa.selenium.WebDriver;
@@ -103,19 +104,34 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       return;
     }
 
-    try {
-      LOG.info("Download the zip file from " + url + " to " + downLoadDir);
-      File chromeDriverZip = new File(ChromeWebDriverProvider.downLoadDir, zipFileName);
-      FileUtils.copyURLToFile(new URL(url), chromeDriverZip);
+    Instant limit = Instant.now().plusSeconds(60);
+    int retryNum = 0;
+    IOException last = null;
 
-      LOG.info("Extract the zip file from " + chromeDriverZip.getAbsolutePath());
-      Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
-      archiver.extract(new File(downLoadDir, zipFileName), new File(downLoadDir));
-    } catch (IOException e) {
-      LOG.error(
-          "Download of: " + url + ", failed in path " + ChromeWebDriverProvider.downLoadDir, e);
-      throw new RuntimeException(e);
+    while (retryNum < 3 && Instant.now().isBefore(limit)) {
+      try {
+        LOG.info("Download the zip file from " + url + " to " + downLoadDir);
+        File chromeDriverZip = new File(ChromeWebDriverProvider.downLoadDir, zipFileName);
+        if (chromeDriverZip.exists()) {
+          chromeDriverZip.delete();
+        }
+        FileUtils.copyURLToFile(new URL(url), chromeDriverZip, 30000, 30000);
+
+        if (targetFile.exists()) {
+          targetFile.delete();
+        }
+        LOG.info("Extract the zip file from " + chromeDriverZip.getAbsolutePath());
+        Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
+        archiver.extract(new File(downLoadDir, zipFileName), new File(downLoadDir));
+        LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
+        return;
+      } catch (IOException e) {
+        LOG.error(
+            "Download of: " + url + ", failed in path " + ChromeWebDriverProvider.downLoadDir, e);
+        retryNum += 1;
+        last = e;
+      }
     }
-    LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
+    throw new RuntimeException(last);
   }
 }
