@@ -140,6 +140,10 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 | `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
 | `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
 
+### Table indexes
+
+- Doesn't support table indexes.
+
 ### Table operations
 
 Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.

@@ -17,9 +17,9 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from './CreateCatalogDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { setIntoTreeAction, updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
+import { updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
 
-import { extractPlaceholder, to } from '@/lib/utils'
+import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
 
 const TableView = props => {
@@ -46,28 +46,6 @@ const TableView = props => {
     if (!path) {
       return
     }
-    const [metalake, catalog, schema, table] = new URLSearchParams(path)
-
-    const id = `${metalake && metalake[1] ? '{{' + metalake[1] + '}}' : ''}${
-      catalog && catalog[1]
-        ? `{{${catalog[1]}}}${
-            schema && schema[1] ? `{{${schema[1]}}}${table && table[1] ? `{{${table[1]}}}` : ''}` : ''
-          }`
-        : ''
-    }`
-
-    if (extractPlaceholder(id).length <= 2) {
-      if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
-        dispatch(setIntoTreeAction({ nodeIds: [id] }))
-      }
-    } else if (table) {
-      const removedLastSegment = extractPlaceholder(id).slice(0, -1)
-      const removedLastSegmentId = removedLastSegment.map(i => `{{${i}}}`).join('')
-
-      dispatch(setIntoTreeAction({ nodeIds: [removedLastSegmentId] }))
-    } else {
-      dispatch(setIntoTreeAction({ nodeIds: [id] }))
-    }
   }
 
   const columns = [
@@ -75,7 +53,8 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
-      field: 'id',
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -111,7 +90,8 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
-      field: 'id',
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -145,6 +125,7 @@ const TableView = props => {
       minWidth: 90,
       sortable: false,
       disableColumnMenu: true,
+      type: 'actions',
       field: 'actions',
       headerName: 'Actions',
       renderCell: ({ row }) => (
@@ -185,6 +166,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'string',
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -210,6 +192,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'string',
       field: 'type',
       headerName: 'Type',
       renderCell: ({ row }) => {
@@ -226,6 +209,7 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 60,
       disableColumnMenu: true,
+      type: 'boolean',
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -243,6 +227,60 @@ const TableView = props => {
               }}
             >
               {typeof nullable !== 'undefined' && `${nullable}`}
+            </Typography>
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'boolean',
+      field: 'autoIncrement',
+      headerName: 'AutoIncrement',
+      renderCell: ({ row }) => {
+        const { autoIncrement } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {typeof autoIncrement !== 'undefined' && `${autoIncrement}`}
+            </Typography>
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
+      field: 'comment',
+      headerName: 'Comment',
+      renderCell: ({ row }) => {
+        const { comment } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {typeof comment !== 'undefined' && `${comment}`}
             </Typography>
           </Box>
         )

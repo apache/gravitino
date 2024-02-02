@@ -232,6 +232,10 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `identifier-fields`             | The identifier fields for defining the table.           |
 | `write.distribution-mode`       | Defines distribution of write data                      |
 
+### Table indexes
+
+- Doesn't support table indexes.
+
 ### Table operations
 
 Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
