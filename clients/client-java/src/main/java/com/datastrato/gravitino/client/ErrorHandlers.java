@@ -47,6 +47,11 @@ public class ErrorHandlers {
     return MetalakeErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to Catalog operations.
+   *
+   * @return A Consumer representing the Catalog error handler.
+   */
   public static Consumer<ErrorResponse> catalogErrorHandler() {
     return CatalogErrorHandler.INSTANCE;
   }
@@ -87,6 +92,11 @@ public class ErrorHandlers {
     return RestErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to OAuth2 requests.
+   *
+   * @return A Consumer representing the OAuth2 error handler.
+   */
   public static Consumer<ErrorResponse> oauthErrorHandler() {
     return OAuthErrorHandler.INSTANCE;
   }
@@ -293,9 +303,18 @@ public class ErrorHandlers {
     }
   }
 
+  /** * Error handler specific to OAuth2 requests. */
   public static class OAuthErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new OAuthErrorHandler();
 
+    /**
+     * Parses the error response from the server.
+     *
+     * @param code The response code indicating the error status.
+     * @param json The JSON data representing the error response.
+     * @param mapper The ObjectMapper used to deserialize the JSON data.
+     * @return An ErrorResponse object representing the error response.
+     */
     @Override
     public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
       try {
@@ -308,6 +327,11 @@ public class ErrorHandlers {
       return ErrorResponse.unknownError(errorMsg);
     }
 
+    /**
+     * Accepts the error response and throws an exception based on the error type.
+     *
+     * @param errorResponse the input argument
+     */
     @Override
     public void accept(ErrorResponse errorResponse) {
       if (errorResponse.getType() != null) {

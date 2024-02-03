@@ -40,6 +40,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
    */
   MetalakeChange metalakeChange();
 
+  /** Represents a request to rename a Metalake. */
   @EqualsAndHashCode
   @ToString
   class RenameMetalakeRequest implements MetalakeUpdateRequest {
@@ -79,6 +80,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Represents a request to update the comment on a Metalake. */
   @EqualsAndHashCode
   @ToString
   class UpdateMetalakeCommentRequest implements MetalakeUpdateRequest {
@@ -119,6 +121,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Represents a request to set a property on a Metalake. */
   @EqualsAndHashCode
   @ToString
   class SetMetalakePropertyRequest implements MetalakeUpdateRequest {
@@ -165,6 +168,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Represents a request to remove a property from a Metalake. */
   @EqualsAndHashCode
   @ToString
   class RemoveMetalakePropertyRequest implements MetalakeUpdateRequest {

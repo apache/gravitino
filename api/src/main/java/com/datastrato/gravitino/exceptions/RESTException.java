@@ -25,11 +25,25 @@ import com.google.errorprone.annotations.FormatMethod;
 
 /** An exception thrown when a REST request fails. */
 public class RESTException extends RuntimeException {
+
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
   @FormatMethod
   public RESTException(String message, Object... args) {
     super(String.format(message, args));
   }
 
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
   @FormatMethod
   public RESTException(Throwable cause, String message, Object... args) {
     super(String.format(message, args), cause);
