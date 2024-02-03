@@ -737,9 +737,10 @@ tableCatalog.createTable(
     Column.of("name", Types.VarCharType.of(1000), "name column comment", true, false, null),
     Column.of("age", Types.IntegerType.get(), "age column comment", true, false, null),
     Column.of("info", Types.StructType.of(
-      Field.nullableField("position", Types.StringType.get(), "Position of the user"),
-      Field.nullableField("contact", Types.ListType.of(Types.IntegerType.get(), false), "contact field comment"),
-      Field.nullableField("rating", Types.MapType.of(Types.VarCharType.of(1000), Types.IntegerType.get(), false), "rating field comment")), "info column comment", true, false, null),
+        Field.nullableField("position", Types.StringType.get(), "Position of the user"),
+        Field.nullableField("contact", Types.ListType.of(Types.IntegerType.get(), false), "contact field comment"),
+        Field.nullableField("rating", Types.MapType.of(Types.VarCharType.of(1000), Types.IntegerType.get(), false), "rating field comment")
+      ), "info column comment", true, false, null),
     Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
   },
   "Create a new Table",
