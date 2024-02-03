@@ -230,6 +230,13 @@ public class NameIdentifier {
     }
   }
 
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNameIdentifierException} if it's not.
+   *
+   * @param condition The condition to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
   public static void check(boolean condition, String message, Object... args) {
     if (!condition) {
       throw new IllegalNameIdentifierException(String.format(message, args));

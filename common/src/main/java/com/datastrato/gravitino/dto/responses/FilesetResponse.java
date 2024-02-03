@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
+/** Response for fileset creation. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -20,16 +21,27 @@ public class FilesetResponse extends BaseResponse {
   @JsonProperty("fileset")
   private final FilesetDTO fileset;
 
+  /** Constructor for FilesetResponse. */
   public FilesetResponse() {
     super(0);
     this.fileset = null;
   }
 
+  /**
+   * Constructor for FilesetResponse.
+   *
+   * @param fileset the fileset DTO object.
+   */
   public FilesetResponse(FilesetDTO fileset) {
     super(0);
     this.fileset = fileset;
   }
 
+  /**
+   * Validates the response.
+   *
+   * @throws IllegalArgumentException if the response is invalid.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();

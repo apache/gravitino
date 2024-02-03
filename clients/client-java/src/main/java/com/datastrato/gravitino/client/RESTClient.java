@@ -46,6 +46,13 @@ public interface RESTClient extends Closeable {
     head(path, headers.get(), errorHandler);
   }
 
+  /**
+   * Perform a HEAD request on the specified path with the given headers and error handling.
+   *
+   * @param path The path to be requested.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   */
   void head(String path, Map<String, String> headers, Consumer<ErrorResponse> errorHandler);
 
   /**
@@ -265,6 +272,17 @@ public interface RESTClient extends Closeable {
     return post(path, body, responseType, headers, errorHandler);
   }
 
+  /**
+   * Perform a POST request on the specified path with given information.
+   *
+   * @param path The path to be requested.
+   * @param body The request body to be included in the POST request.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @return The response of the POST request.
+   * @param <T> The type of the response.
+   */
   <T extends RESTResponse> T post(
       String path,
       RESTRequest body,
@@ -343,6 +361,17 @@ public interface RESTClient extends Closeable {
     return put(path, body, responseType, headers, errorHandler);
   }
 
+  /**
+   * Perform a PUT request on the specified path with given information.
+   *
+   * @param path The path to be requested.
+   * @param body The request body to be included in the PUT request.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @return The response of the PUT request.
+   * @param <T> The type of the response.
+   */
   <T extends RESTResponse> T put(
       String path,
       RESTRequest body,
@@ -370,6 +399,17 @@ public interface RESTClient extends Closeable {
     return postForm(path, formData, responseType, headers.get(), errorHandler);
   }
 
+  /**
+   * Perform a POST request with form data on the specified path with the given information.
+   *
+   * @param path The path to be requested.
+   * @param formData The form data to be included in the POST request body.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @return The response of the POST request.
+   * @param <T> The type of the response.
+   */
   <T extends RESTResponse> T postForm(
       String path,
       Map<String, String> formData,
