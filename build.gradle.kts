@@ -204,22 +204,9 @@ subprojects {
 
     val projectName = project.name
     if (projectName == "common" || projectName == "api" || projectName == "client-java") {
-      val outputEvents = mutableListOf<String>()
-      val listener = StandardOutputListener { message -> outputEvents.add(message.toString()) }
-
-      doFirst {
-        logging.addStandardOutputListener(listener)
-        logging.addStandardErrorListener(listener)
-      }
-
-      doLast {
-        logging.removeStandardErrorListener(listener)
-        logging.removeStandardErrorListener(listener)
-        outputEvents.forEach { e ->
-          if (e.contains(" warning: ")) {
-            throw GradleException("Javadoc has warnings, please fix them!")
-          }
-        }
+      options {
+        (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
+        isFailOnError = true
       }
     }
   }
