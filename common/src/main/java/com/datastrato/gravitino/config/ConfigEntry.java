@@ -27,6 +27,7 @@ public class ConfigEntry<T> {
   @Getter private List<String> alternatives;
 
   @Getter private T defaultValue;
+  @Getter private List<T> defaultValueList;
 
   private Function<String, T> valueConverter;
 
@@ -97,6 +98,15 @@ public class ConfigEntry<T> {
    */
   void setDefaultValue(T t) {
     this.defaultValue = t;
+  }
+
+  /**
+   * Sets the default value list for this configuration.
+   *
+   * @param tl The default value list to be used when no value is provided.
+   */
+  void setDefaultValueList(List<T> tl) {
+    this.defaultValueList = tl;
   }
 
   /**
@@ -188,6 +198,23 @@ public class ConfigEntry<T> {
     conf.setValueConverter(valueConverter);
     conf.setStringConverter(stringConverter);
     conf.setDefaultValue(t);
+    conf.setValidator(validator);
+
+    return conf;
+  }
+
+  /**
+   * Creates a new ConfigEntry instance based on this configuration entry with a default value list.
+   *
+   * @param tl The default value list to be used when no value is provided.
+   * @return A new ConfigEntry instance with the specified default value list.
+   */
+  public ConfigEntry<T> createWithDefault(List<T> tl) {
+    ConfigEntry<T> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    conf.setValueConverter(valueConverter);
+    conf.setStringConverter(stringConverter);
+    conf.setDefaultValueList(tl);
     conf.setValidator(validator);
 
     return conf;
