@@ -36,7 +36,7 @@ const DetailsView = props => {
   }
 
   return (
-    <Box sx={{ p: 4 }}>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Grid container spacing={6}>
         {page && page === 'catalogs' ? (
           <>

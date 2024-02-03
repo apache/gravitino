@@ -22,7 +22,7 @@ import {
   getCatalogDetails,
   getSchemaDetails,
   getTableDetails,
-  setSelectedTreeNode
+  setSelectedNodes
 } from '@/lib/store/metalakes'
 
 const MetalakeView = props => {
@@ -66,12 +66,14 @@ const MetalakeView = props => {
     }
 
     dispatch(
-      setSelectedTreeNode(
+      setSelectedNodes(
         routeParams.catalog
-          ? `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
-              routeParams.schema ? `{{${routeParams.schema}}}` : ''
-            }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
-          : null
+          ? [
+              `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
+                routeParams.schema ? `{{${routeParams.schema}}}` : ''
+              }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
+            ]
+          : []
       )
     )
 

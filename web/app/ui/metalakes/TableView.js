@@ -175,6 +175,7 @@ const TableView = props => {
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
+              title={name}
               noWrap
               sx={{
                 fontWeight: 400,
@@ -272,6 +273,7 @@ const TableView = props => {
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
+              title={comment}
               noWrap
               variant='body2'
               sx={{
@@ -356,7 +358,7 @@ const TableView = props => {
   }, [store.tableLoading])
 
   return (
-    <>
+    <Box className={`twc-h-full`}>
       <DataGrid
         sx={{
           '& .MuiDataGrid-columnHeaders': {
@@ -365,7 +367,6 @@ const TableView = props => {
             borderTop: 0
           }
         }}
-        autoHeight
         loading={store.tableLoading}
         rows={store.tableData}
         getRowId={row => row?.name}
@@ -392,7 +393,7 @@ const TableView = props => {
         type={dialogType}
         routeParams={routeParams}
       />
-    </>
+    </Box>
   )
 }
 
