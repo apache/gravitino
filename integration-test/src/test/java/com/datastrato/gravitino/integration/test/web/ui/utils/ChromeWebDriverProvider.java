@@ -97,6 +97,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     return new ChromeDriver(chromeOptions);
   }
 
+  // Be careful, fileName contains directory path.
   private void downloadZipFile(String url, String zipFileName, String fileName) {
     File targetFile = new File(downLoadDir, fileName);
     if (targetFile.exists()) {
@@ -109,20 +110,27 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     IOException last = null;
 
     while (retryNum < 3 && Instant.now().isBefore(limit)) {
+      String downLoadTmpDir =
+          ITUtils.joinPath(
+              System.getenv("IT_PROJECT_DIR"),
+              String.format("chrome-%d", Instant.now().toEpochMilli()));
       try {
-        LOG.info("Download the zip file from " + url + " to " + downLoadDir);
-        File chromeDriverZip = new File(ChromeWebDriverProvider.downLoadDir, zipFileName);
-        if (chromeDriverZip.exists()) {
-          chromeDriverZip.delete();
-        }
+        LOG.info("Download the zip file from " + url + " to " + downLoadTmpDir);
+        File chromeDriverZip = new File(downLoadTmpDir, zipFileName);
         FileUtils.copyURLToFile(new URL(url), chromeDriverZip, 30000, 30000);
 
-        if (targetFile.exists()) {
-          targetFile.delete();
-        }
-        LOG.info("Extract the zip file from " + chromeDriverZip.getAbsolutePath());
+        LOG.info(
+            "Extract the zip file from "
+                + chromeDriverZip.getAbsolutePath()
+                + " to "
+                + downLoadTmpDir);
         Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
-        archiver.extract(new File(downLoadDir, zipFileName), new File(downLoadDir));
+        archiver.extract(chromeDriverZip, new File(downLoadTmpDir));
+
+        File unzipFile = new File(downLoadTmpDir, fileName);
+        LOG.info(
+            "Move file from " + unzipFile.getAbsolutePath() + " to " + targetFile.getParentFile());
+        FileUtils.moveToDirectory(unzipFile, targetFile.getParentFile(), true);
         LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
         return;
       } catch (IOException e) {
@@ -130,6 +138,9 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
             "Download of: " + url + ", failed in path " + ChromeWebDriverProvider.downLoadDir, e);
         retryNum += 1;
         last = e;
+      } finally {
+        LOG.info("Remove temp directory: " + downLoadTmpDir);
+        FileUtils.deleteQuietly(new File(downLoadTmpDir));
       }
     }
     throw new RuntimeException(last);
