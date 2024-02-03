@@ -57,6 +57,8 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
 } else {
   listOf(
+    "-Duser.language=en",
+    "-Duser.country=US",
     "-XX:+IgnoreUnrecognizedVMOptions",
     "--add-opens", "java.base/java.io=ALL-UNNAMED",
     "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
@@ -199,6 +201,27 @@ subprojects {
   tasks.withType<Javadoc> {
     options.encoding = "UTF-8"
     options.locale = "en_US"
+
+    val projectName = project.name
+    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+      val outputEvents = mutableListOf<String>()
+      val listener = StandardOutputListener { message -> outputEvents.add(message.toString()) }
+
+      doFirst {
+        logging.addStandardOutputListener(listener)
+        logging.addStandardErrorListener(listener)
+      }
+
+      doLast {
+        logging.removeStandardErrorListener(listener)
+        logging.removeStandardErrorListener(listener)
+        outputEvents.forEach { e ->
+          if (e.contains(" warning: ")) {
+            throw GradleException("Javadoc has warnings, please fix them!")
+          }
+        }
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {
