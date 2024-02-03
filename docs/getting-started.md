@@ -318,7 +318,7 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 1. **Explore documentation:**
    - Delve deeper into the Gravitino documentation for advanced features and configuration options.
-   - Check out https://datastrato.ai/docs/0.3.1/
+   - Check out https://datastrato.ai/docs/0.4.0/
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
