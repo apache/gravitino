@@ -147,6 +147,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     return new Builder();
   }
 
+  /** Builder class for configuring and creating instances of KerberosTokenProvider. */
   public static class Builder {
     private String clientPrincipal;
     private File keyTabFile;

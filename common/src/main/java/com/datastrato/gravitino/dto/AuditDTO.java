@@ -37,21 +37,25 @@ public class AuditDTO implements Audit {
     this.lastModifiedTime = lastModifiedTime;
   }
 
+  /** @return The creator of the audit. */
   @Override
   public String creator() {
     return creator;
   }
 
+  /** @return The create time of the audit. */
   @Override
   public Instant createTime() {
     return createTime;
   }
 
+  /** @return The last modifier of the audit. */
   @Override
   public String lastModifier() {
     return lastModifier;
   }
 
+  /** @return The last modified time of the audit. */
   @Override
   public Instant lastModifiedTime() {
     return lastModifiedTime;
