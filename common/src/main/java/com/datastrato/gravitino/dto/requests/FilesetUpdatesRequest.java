@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+/** Request to represent updates to a fileset. */
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(force = true)

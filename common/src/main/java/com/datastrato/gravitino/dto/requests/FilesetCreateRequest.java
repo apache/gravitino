@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a fileset. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -45,6 +46,11 @@ public class FilesetCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
+  /**
+   * Validates the request.
+   *
+   * @throws IllegalArgumentException if the request is invalid.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(

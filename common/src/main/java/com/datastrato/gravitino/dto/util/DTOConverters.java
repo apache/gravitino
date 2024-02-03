@@ -380,10 +380,10 @@ public class DTOConverters {
   }
 
   /**
-   * Converts an array of Columns to an array of ColumnDTOs.
+   * Converts a Fileset to a FilesetDTO.
    *
-   * @param columns The columns to be converted.
-   * @return The array of ColumnDTOs.
+   * @param fileset The fileset to be converted.
+   * @return The fileset DTO.
    */
   public static FilesetDTO toDTO(Fileset fileset) {
     return FilesetDTO.builder()
@@ -396,6 +396,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts an array of Columns to an array of ColumnDTOs.
+   *
+   * @param columns The columns to be converted.
+   * @return The array of ColumnDTOs.
+   */
   public static ColumnDTO[] toDTOs(Column[] columns) {
     if (ArrayUtils.isEmpty(columns)) {
       return new ColumnDTO[0];
