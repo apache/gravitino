@@ -24,10 +24,12 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog capabilities
 
-- Supports metadata management of MySQL (5.6, 5.7, 8.0).
+- Gravitino catalog corresponds to the MySQL instance.
+- Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
-- Doesn't support table index operations.
-- Doesn't support setting certain column properties, such as default value and check constraints.
+- Supports table index.
+- Supports column default value and auto-increment.
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
 
@@ -58,13 +60,13 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the MySQL database.
-- Supports create schema, but does not explicitly support setting comments.
-- Supports drop schema.
-- Doesn't support cascade drop database.
+- Supports creating schema, but does not support setting comment.
+- Supports dropping schema.
+- Doesn't support cascade dropping schema.
 
 ### Schema properties
 
-- Doesn't support any database property settings.
+- Doesn't support any schema property settings.
 
 ### Schema operations
 
@@ -76,9 +78,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 - Gravitino table corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
-- Doesn't support setting certain column properties, such as default value and check constraints.
-- Doesn't support index definition.
-- Doesn't support table property settings.
+- Supports index.
+- Support column default value and auto-increment.
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 #### Table column types
 
@@ -160,7 +162,7 @@ Index[] indexes = new Index[] {
 
 ### Table properties
 
-Table properties support the following properties:
+Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
 | Property Name           | Description                                                                                                                                                                             | Required  | Since version |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
@@ -227,6 +229,7 @@ Supports operations:
 - `UpdateColumnPosition`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `SetProperty`
 
 :::info
 You cannot submit the `RenameTable` operation at the same time as other operations.
