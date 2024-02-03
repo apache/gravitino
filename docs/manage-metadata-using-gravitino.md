@@ -21,7 +21,7 @@ but they may have some differences, especially in catalog property, table proper
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
-Assuming Gravitino has just started, and the host and port is <http://localhost:8090>.
+Assuming Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
 
 ## Metalake operations
 
@@ -791,6 +791,22 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
+#### Table column default value
+You can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value when defining a table column. This default value is applied to new rows inserted into the table by the underlying catalog.
+
+When defining a table column, you can specify a [literal](./expression.md#field-reference) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
+
+:::note
+When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an [Unparsed Expression](./expression.md#unparsed-expression) to preserve the original default value, ensuring that the table can be loaded successfully.
+:::
+
+The following catalogs support setting the table column default value.
+
+| Catalog provider  | Default value mapping                                                                       |
+|-------------------|---------------------------------------------------------------------------------------------|
+| `jdbc-mysql`      | [MySQL default value mapping](./jdbc-mysql-catalog.md#table-column-default-value)           |
+| `jdbc-postgresql` | [PostgreSQL default value mapping](./jdbc-postgresql-catalog.md#table-column-default-value) |
+
 #### Table column auto-increment
 
 Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
@@ -911,7 +927,7 @@ Currently, Gravitino supports the following changes to a table:
 | Set a table property               | `{"@type":"setProperty","property":"key1","value":"value1"}`                                                          | `TableChange.setProperty("key1", "value1")` |
 | Remove a table property            | `{"@type":"removeProperty","property":"key1"}`                                                                        | `TableChange.removeProperty("key1")`        |
 | Add a column                       | `{"@type":"addColumn","fieldName":["position"],"type":"varchar(20)","comment":"Position of user","position":"FIRST"}` | `TableChange.addColumn(...)`                |
-| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExists": true}`                                                     | `TableChange.deleteColumn(...)`             |
+| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExists": true}`                                                    | `TableChange.deleteColumn(...)`             |
 | Rename a column                    | `{"@type":"renameColumn","oldFieldName":["name_old"], "newFieldName":"name_new"}`                                     | `TableChange.renameColumn(...)`             |
 | Update the column comment          | `{"@type":"updateColumnComment", "fieldName": ["name"], "newComment": "new comment"}`                                 | `TableChange.updateColumnCommment(...)`     |
 | Update the type of a column        | `{"@type":"updateColumnType","fieldName": ["name"], "newType":"varchar(100)"}`                                        | `TableChange.updateColumnType(...)`         |

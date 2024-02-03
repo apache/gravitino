@@ -67,7 +67,8 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schem
 
 ### Table capabilities
 
-The Hive catalog supports creating, updating, and deleting tables in the HMS.
+- The Hive catalog supports creating, updating, and deleting tables in the HMS.
+- Doesn't support column default value.
 
 #### Table partitions
 
