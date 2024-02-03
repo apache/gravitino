@@ -102,7 +102,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       const idx = errMessage.indexOf(keyword)
 
       if (idx !== -1) {
-        errMessage = 'reason ' + errMessage.substring(idx + keyword.length + 1)
+        errMessage = errMessage.substring(idx + keyword.length + 1).replace(/^\[|\]$/g, '')
       }
 
       toast.error(errMessage, { id: `global_error_message_status_${status}` })
