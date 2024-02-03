@@ -199,6 +199,14 @@ subprojects {
   tasks.withType<Javadoc> {
     options.encoding = "UTF-8"
     options.locale = "en_US"
+
+    val projectName = project.name
+    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+      options {
+        (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
+        isFailOnError = true
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {
