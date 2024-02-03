@@ -729,24 +729,25 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .put("format", "ORC")
         // For more table properties, please refer to the related doc.
         .build();
+
 tableCatalog.createTable(
-    NameIdentifier.of("metalake", "catalog", "schema", "table"),
-    new ColumnDTO[] {
-        ColumnDTO.builder()
-            .withComment("Id of the user")
-            .withName("id")
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .build(),
-        ColumnDTO.builder()
-            .withComment("Name of the user")
-            .withName("name")
-            .withDataType(Types.VarCharType.of(1000))
-            .withNullable(true)
-            .build(),
-    },
-    "Create a new Table",
-    tablePropertiesMap
+  NameIdentifier.of("metalake", "catalog", "schema", "table"),
+  new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", true, false, null),
+    Column.of("name", Types.VarCharType.of(1000), "name column comment", true, false, null),
+    Column.of("age", Types.IntegerType.get(), "age column comment", true, false, null),
+    Column.of("info", Types.StructType.of(
+        Field.nullableField("position", Types.StringType.get(), "Position of the user"),
+        Field.nullableField("contact", Types.ListType.of(Types.IntegerType.get(), false), "contact field comment"),
+        Field.nullableField("rating", Types.MapType.of(Types.VarCharType.of(1000), Types.IntegerType.get(), false), "rating field comment")
+      ), "info column comment", true, false, null),
+    Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
+  },
+  "Create a new Table",
+  tablePropertiesMap,
+  new Transform[] {Transforms.identity("id")},
+  Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
+  new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))}
 );
 ```
 
@@ -819,7 +820,7 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
 |---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                           | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                           | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
 | Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.                 | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                             | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexing      | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations.   | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |

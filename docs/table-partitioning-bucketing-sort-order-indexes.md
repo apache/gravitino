@@ -125,7 +125,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 <TabItem value="java" label="Java">
 
 ```java
-SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST);
+SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST);
 ```
 
 </TabItem>
@@ -210,31 +210,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 tableCatalog.createTable(
     NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
-    new ColumnDTO[] {
-      ColumnDTO.builder()
-        .withComment("Id of the user")
-        .withName("id")
-        .withDataType(Types.IntegerType.get())
-        .withNullable(true)
-      .build(),
-      ColumnDTO.builder()
-        .withComment("Name of the user")
-        .withName("name")
-        .withDataType(Types.VarCharType.of(1000))
-        .withNullable(true)
-        .build(),
-      ColumnDTO.builder()
-        .withComment("Age of the user")
-        .withName("age")
-        .withDataType(Types.ShortType.get())
-        .withNullable(true)
-        .build(),
-      ColumnDTO.builder()
-        .withComment("Score of the user")
-        .withName("score")
-        .withDataType(Types.DoubleType.get())
-        .withNullable(true)
-        .build(),
+    new Column[] {
+      Column.of("id", Types.IntegerType.get(), "Id of the user", true, false, null),
+      Column.of("name", Types.VarCharType.of(2000), "Name of the user", true, false, null),
+      Column.of("age", Types.ShortType.get(), "Age of the user", true, false, null),
+      Column.of("score", Types.DoubleType.get(), "Score of the user", false, false, null)
     },
     "Create a new Table",
     tablePropertiesMap,
@@ -243,7 +223,7 @@ tableCatalog.createTable(
       Transforms.identity("score")
     },
     // CLUSTERED BY id
-    Distributions.of(Strategy.HASH, 4, NamedReference.field("id")),,
+    Distributions.of(Strategy.HASH, 4, NamedReference.field("id")),
     // SORTED BY name asc
     new SortOrder[] {
       SortOrders.of(
