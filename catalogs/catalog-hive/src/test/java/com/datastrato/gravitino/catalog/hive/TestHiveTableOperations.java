@@ -41,7 +41,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   private static Partition existingPartition;
 
   @BeforeAll
-  private static void setup() {
+  public static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveSchema = initHiveSchema(hiveCatalog);
     hiveTable = createPartitionedTable();

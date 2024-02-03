@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -58,30 +60,23 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public Partition[] listPartitions() {
-    List<String> partitionNames;
     List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
     try {
-      partitionNames =
-          table
-              .clientPool()
-              .run(c -> c.listPartitionNames(table.schemaName(), table.name(), (short) -1));
       partitions =
           table
               .clientPool()
-              .run(c -> c.getPartitionsByNames(table.schemaName(), table.name(), partitionNames));
+              .run(c -> c.listPartitions(table.schemaName(), table.name(), (short) -1));
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(e);
     }
+    List<String> partCols =
+        table.buildPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
 
-    // should never happen
-    Preconditions.checkArgument(
-        partitionNames.size() == partitions.size(),
-        "oops?! partition names and partitions size are not equal: %s vs %s",
-        partitionNames.size(),
-        partitions.size());
-
-    return IntStream.range(0, partitionNames.size())
-        .mapToObj(i -> fromHivePartition(partitionNames.get(i), partitions.get(i)))
+    return partitions.stream()
+        .map(
+            partition ->
+                fromHivePartition(
+                    FileUtils.makePartName(partCols, partition.getValues()), partition))
         .toArray(Partition[]::new);
   }
 

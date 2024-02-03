@@ -92,6 +92,18 @@ public class Namespace {
   }
 
   /**
+   * Create a namespace for fileset.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for fileset
+   */
+  public static Namespace ofFileset(String metalake, String catalog, String schema) {
+    return of(metalake, catalog, schema);
+  }
+
+  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
