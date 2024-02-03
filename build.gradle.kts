@@ -57,8 +57,6 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
 } else {
   listOf(
-    "-Duser.language=en",
-    "-Duser.country=US",
     "-XX:+IgnoreUnrecognizedVMOptions",
     "--add-opens", "java.base/java.io=ALL-UNNAMED",
     "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
