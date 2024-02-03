@@ -6,41 +6,69 @@
 import { useEffect, useRef, useState } from 'react'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
-import { IconButton, styled } from '@mui/material'
+import { IconButton, Typography } from '@mui/material'
 import { Tree } from 'antd'
 
 import Icon from '@/components/Icon'
 import clsx from 'clsx'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { setExpandedNodes, setIntoTreeNodeWithFetch, removeExpandedNode } from '@/lib/store/metalakes'
+import {
+  setExpandedNodes,
+  setIntoTreeNodeWithFetch,
+  removeExpandedNode,
+  setSelectedNodes,
+  setLoadedNodes,
+  getTableDetails
+} from '@/lib/store/metalakes'
 
-const StyledLink = styled(Link)(({ theme }) => ({
-  textDecoration: 'none',
-  color: theme.palette.text.secondary,
-  '&:hover': {
-    color: theme.palette.text.secondary
-  }
-}))
+import { extractPlaceholder } from '@/lib/utils'
 
 const MetalakeTree = props => {
   const { height: offsetHeight } = props
 
+  const router = useRouter()
   const treeRef = useRef()
   const [height, setHeight] = useState(0)
-  const [loadedKeys, setLoadedKeys] = useState([])
-  const [selectedKeys, setSelectedKeys] = useState([])
+  const [isHover, setIsHover] = useState(null)
 
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
 
-  const handleClickIcon = () => {}
+  const handleClickIcon = (e, nodeProps) => {
+    e.stopPropagation()
 
-  const onLoadData = treeNode => {
-    const { key, children } = treeNode
+    if (nodeProps.data.node === 'table') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        const pathArr = extractPlaceholder(nodeProps.data.key)
+        const [metalake, catalog, schema, table] = pathArr
+        dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+      }
+    } else {
+      dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
+    }
+  }
 
-    setLoadedKeys([...loadedKeys, key])
+  const onMouseEnter = (e, nodeProps) => {
+    if (nodeProps.data.node === 'table') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        setIsHover(nodeProps.data.key)
+      }
+    } else {
+      setIsHover(nodeProps.data.key)
+    }
+  }
+
+  const onMouseLeave = (e, nodeProps) => {
+    setIsHover(null)
+  }
+
+  const onLoadData = node => {
+    const { key, children } = node
+
+    dispatch(setLoadedNodes([...store.loadedNodes, key]))
 
     return new Promise(resolve => {
       if (children && children.length !== 0) {
@@ -63,25 +91,55 @@ const MetalakeTree = props => {
     }
   }
 
+  const onSelect = (keys, { selected, node }) => {
+    if (!selected) {
+      dispatch(setSelectedNodes([node.key]))
+
+      return
+    }
+
+    dispatch(setSelectedNodes(keys))
+    router.push(node.path)
+  }
+
   const renderIcon = nodeProps => {
     switch (nodeProps.data.node) {
       case 'catalog':
         return (
-          <IconButton size='small' sx={{ color: '#666' }} onClick={() => handleClickIcon()}>
-            <Icon icon={'bx:book'} fontSize='inherit' />
+          <IconButton
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:book' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
 
       case 'schema':
         return (
-          <IconButton size='small' sx={{ color: '#666' }} onClick={() => handleClickIcon()}>
-            <Icon icon={'bx:coin-stack'} fontSize='inherit' />
+          <IconButton
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:coin-stack' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
       case 'table':
         return (
-          <IconButton size='small' sx={{ color: '#666' }} onClick={() => handleClickIcon()}>
-            <Icon icon={'bx:table'} fontSize='inherit' />
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:table' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
 
@@ -92,11 +150,7 @@ const MetalakeTree = props => {
 
   const renderNode = nodeData => {
     if (nodeData.path) {
-      return (
-        <StyledLink className='twc-w-full twc-text-base twc-pl-1' href={nodeData.path}>
-          {nodeData.title}
-        </StyledLink>
-      )
+      return <Typography sx={{ color: theme => theme.palette.text.secondary }}>{nodeData.title}</Typography>
     }
 
     return nodeData.title
@@ -109,11 +163,10 @@ const MetalakeTree = props => {
   }, [offsetHeight])
 
   useEffect(() => {
-    if (store.selectedTreeNode) {
-      setSelectedKeys([store.selectedTreeNode])
-      treeRef.current.scrollTo({ key: store.selectedTreeNode })
+    if (store.selectedNodes.length !== 0) {
+      treeRef.current.scrollTo({ key: store.selectedNodes[0] })
     }
-  }, [store.selectedTreeNode])
+  }, [store.selectedNodes])
 
   return (
     <>
@@ -125,11 +178,12 @@ const MetalakeTree = props => {
           }
         }}
         treeData={store.metalakeTree}
-        loadData={node => onLoadData(node)}
-        loadedKeys={loadedKeys}
-        selectedKeys={selectedKeys}
+        loadData={onLoadData}
+        loadedKeys={store.loadedNodes}
+        selectedKeys={store.selectedNodes}
         expandedKeys={store.expandedNodes}
         onExpand={onExpand}
+        onSelect={onSelect}
         height={height}
         defaultExpandAll
         blockNode
