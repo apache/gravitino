@@ -223,7 +223,7 @@ public class HiveTable extends BaseTable {
     return parameters;
   }
 
-  private List<FieldSchema> buildPartitionKeys() {
+  public List<FieldSchema> buildPartitionKeys() {
     return Arrays.stream(partitioning)
         .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName()))
         .collect(Collectors.toList());
