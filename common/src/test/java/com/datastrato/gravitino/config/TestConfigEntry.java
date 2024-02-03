@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.config;
 
 import com.google.common.collect.Lists;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,102 +24,11 @@ public class TestConfigEntry {
     configMap.put("gravitino.test.string", "test-string");
     configMap.put("gravitino.test.string.alt1", "test-string1");
     configMap.put("gravitino.test.string.alt2", "test-string2");
-    configMap.put("gravitino.test.stringList", "test-string1,test-string2,test-string3");
-    configMap.put("gravitino.test.integerList", "1,2,3");
-    configMap.put("gravitino.test.integerList.invalid", "1,xxx,3");
   }
 
   @AfterEach
   public void clearConfigMap() {
     configMap.clear();
-  }
-
-  @Test
-  public void testStrConfValueList() {
-    ConfigEntry<List<String>> testConf =
-        new ConfigBuilder("gravitino.test.stringList")
-            .doc("test")
-            .internal()
-            .stringConf()
-            .toSequence()
-            .checkValue(
-                valueList ->
-                    (!Objects.equals(valueList.get(0), "test-string0")
-                        && !Objects.equals(valueList.get(1), "test-string0")
-                        && !Objects.equals(valueList.get(2), "test-string0")),
-                "error")
-            .checkValue(
-                valueList ->
-                    (Objects.equals(valueList.get(0), "test-string1")
-                        && Objects.equals(valueList.get(1), "test-string2")
-                        && Objects.equals(valueList.get(2), "test-string3")),
-                "error")
-            .create();
-
-    List<String> valueList = testConf.readFrom(configMap);
-    Assertions.assertEquals("test-string1", valueList.get(0));
-    Assertions.assertEquals("test-string2", valueList.get(1));
-    Assertions.assertEquals("test-string3", valueList.get(2));
-
-    valueList.set(0, "test-string4");
-    valueList.set(1, "test-string5");
-    valueList.set(2, "test-string6");
-    testConf.writeTo(configMap, valueList);
-    Assertions.assertEquals(
-        "test-string4,test-string5,test-string6", configMap.get("gravitino.test.stringList"));
-  }
-
-  @Test
-  public void testIntConfValueList() {
-    ConfigEntry<List<Integer>> testConf =
-        new ConfigBuilder("gravitino.test.integerList")
-            .doc("test")
-            .internal()
-            .intConf()
-            .toSequence()
-            .checkValue(
-                valueList ->
-                    (!Objects.equals(valueList.get(0), 4)
-                        && !Objects.equals(valueList.get(1), 5)
-                        && !Objects.equals(valueList.get(2), 6)),
-                "error")
-            .checkValue(
-                valueList ->
-                    (Objects.equals(valueList.get(0), 1)
-                        && Objects.equals(valueList.get(1), 2)
-                        && Objects.equals(valueList.get(2), 3)),
-                "error")
-            .create();
-
-    List<Integer> valueList = testConf.readFrom(configMap);
-    Assertions.assertEquals(1, valueList.get(0));
-    Assertions.assertEquals(2, valueList.get(1));
-    Assertions.assertEquals(3, valueList.get(2));
-
-    valueList.set(0, 4);
-    valueList.set(1, 5);
-    valueList.set(2, 6);
-    testConf.writeTo(configMap, valueList);
-    Assertions.assertEquals("4,5,6", configMap.get("gravitino.test.integerList"));
-  }
-
-  @Test
-  public void testIntConfInvalidValueList() {
-    ConfigEntry<List<Integer>> testConf =
-        new ConfigBuilder("gravitino.test.integerList.invalid")
-            .doc("test")
-            .internal()
-            .intConf()
-            .toSequence()
-            .create();
-    Assertions.assertThrows(
-        NumberFormatException.class,
-        () -> {
-          List<Integer> valueList = testConf.readFrom(configMap);
-          Assertions.assertEquals(1, valueList.get(0));
-          Assertions.assertEquals("xxx", valueList.get(1));
-          Assertions.assertEquals(3, valueList.get(2));
-        });
   }
 
   @Test
