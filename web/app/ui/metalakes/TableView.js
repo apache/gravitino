@@ -22,6 +22,14 @@ import { updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
 
+const EmptyText = () => {
+  return (
+    <Typography variant='caption' color={theme => theme.palette.text.disabled}>
+      N/A
+    </Typography>
+  )
+}
+
 const TableView = props => {
   const { page, routeParams } = props
   const { metalake, catalog } = routeParams
@@ -173,7 +181,7 @@ const TableView = props => {
         const { name } = row
 
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
             <Typography
               title={name}
               noWrap
@@ -243,7 +251,7 @@ const TableView = props => {
       renderCell: ({ row }) => {
         const { autoIncrement } = row
 
-        return (
+        return typeof autoIncrement !== 'undefined' ? (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
               noWrap
@@ -254,9 +262,11 @@ const TableView = props => {
                 textDecoration: 'none'
               }}
             >
-              {typeof autoIncrement !== 'undefined' && `${autoIncrement}`}
+              {`${autoIncrement}`}
             </Typography>
           </Box>
+        ) : (
+          <EmptyText />
         )
       }
     },
@@ -270,11 +280,11 @@ const TableView = props => {
       renderCell: ({ row }) => {
         const { comment } = row
 
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        return typeof comment !== 'undefined' ? (
+          <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
             <Typography
-              title={comment}
               noWrap
+              title={comment}
               variant='body2'
               sx={{
                 fontWeight: 400,
@@ -282,9 +292,11 @@ const TableView = props => {
                 textDecoration: 'none'
               }}
             >
-              {typeof comment !== 'undefined' && `${comment}`}
+              {comment}
             </Typography>
           </Box>
+        ) : (
+          <EmptyText />
         )
       }
     }
