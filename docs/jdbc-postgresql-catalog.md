@@ -64,9 +64,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
-- Supports create schema with comments.
-- Supports drop schema.
-- Supports cascade drop schema.
+- Supports creating schema with comments.
+- Supports dropping schema.
+- Supports cascade dropping schema.
 
 ### Schema properties
 

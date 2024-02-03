@@ -29,7 +29,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
 - Supports column default value and auto-increment.
-- Supports manage MySQL table features though table properties, like using `engine` to set MySQL storage engine.
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
 
@@ -60,9 +60,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the MySQL database.
-- Supports create schema, but does not support setting comment.
-- Supports drop schema.
-- Doesn't support cascade drop schema.
+- Supports creating schema, but does not support setting comment.
+- Supports dropping schema.
+- Doesn't support cascade dropping schema.
 
 ### Schema properties
 
@@ -80,7 +80,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 - Supports DDL operation for MySQL tables.
 - Supports index.
 - Support column default value and auto-increment.
-- Supports manage MySQL table features though table properties, like using `engine` to set MySQL storage engine.
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 #### Table column types
 
