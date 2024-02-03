@@ -20,6 +20,7 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -91,7 +92,7 @@ public class FilesetOperations {
                 dispatcher.createFileset(
                     ident,
                     request.getComment(),
-                    request.getType(),
+                    Optional.ofNullable(request.getType()).orElse(Fileset.Type.MANAGED),
                     request.getStorageLocation(),
                     request.getProperties());
             return Utils.ok(new FilesetResponse(DTOConverters.toDTO(fileset)));
