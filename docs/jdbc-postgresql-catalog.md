@@ -27,8 +27,8 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Gravitino catalog corresponds to the PostgreSQL database.
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
-- Doesn't support table index operations.
-- Doesn't support setting certain column properties, such as default value and check constraints
+- Supports table index.
+- Supports column default value and auto-increment. 
 
 ### Catalog properties
 
@@ -64,9 +64,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
-- Supports create schema with comments.
-- Supports drop schema.
-- Supports cascade drop schema.
+- Supports creating schema with comments.
+- Supports dropping schema.
+- Supports cascade dropping schema.
 
 ### Schema properties
 
@@ -82,8 +82,8 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
-- Doesn't support setting certain column properties, such as default value and check constraints.
-- Doesn't support index definition.
+- Supports index.
+- Support column default value and auto-increment.
 - Doesn't support table property settings.
 
 #### Table column types
