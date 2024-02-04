@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
@@ -117,18 +118,36 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    // We should handle case sensitivity and wild card issue in MySQL
+    // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
+    // like utf8mb4.
+    // 2. MySQL will view 'a_b' as a wild card, and it will match any table name that starts with
+    // 'a',then any character and then 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1.Get table information
-      ResultSet table = getTable(connection, databaseName, tableName);
-      if (!table.next() || !tableName.equals(table.getString("TABLE_NAME"))) {
+      ResultSet table = getTable(connection, escapeSQL(databaseName), escapeSQL(tableName));
+      // The result of tables may be more than one due to the reason above, so we need to check the
+      // result
+      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      boolean found = false;
+      while (table.next()) {
+        if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
+          jdbcTableBuilder.withName(tableName);
+          jdbcTableBuilder.withComment(table.getString("REMARKS"));
+          jdbcTableBuilder.withAuditInfo(AuditInfo.EMPTY);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
         throw new NoSuchTableException(
             String.format("Table %s does not exist in %s.", tableName, databaseName));
       }
-      JdbcTable.Builder jdbcTableBuilder = getBasicJdbcTableInfo(table);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
-      ResultSet columns = getColumns(connection, databaseName, tableName);
+      ResultSet columns = getColumns(connection, escapeSQL(databaseName), escapeSQL(tableName));
       while (columns.next()) {
         JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
         boolean autoIncrement = getAutoIncrementInfo(columns);
@@ -403,6 +422,8 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withDefaultValue(defaultValue);
   }
 
+  // Different JDBC catalog may have different escape character, please overwrite this method if
+  // necessary
   protected String escapeSQL(String s) {
     if (s == null) {
       return null;
