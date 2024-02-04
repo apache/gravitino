@@ -132,4 +132,9 @@ public class FromHiveType {
             "Unknown category of Hive type: " + hiveTypeInfo.getCategory());
     }
   }
+
+  // private constructor
+  private FromHiveType(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

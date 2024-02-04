@@ -156,4 +156,8 @@ public class Indexes {
       }
     }
   }
+
+  private Indexes(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

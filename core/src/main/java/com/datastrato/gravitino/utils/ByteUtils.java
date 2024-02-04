@@ -79,4 +79,9 @@ public class ByteUtils {
     }
     return sb.toString();
   }
+
+  // private constructor
+  private ByteUtils(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

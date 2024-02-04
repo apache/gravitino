@@ -1024,4 +1024,9 @@ public class Types {
   public static boolean allowAutoIncrement(Type dataType) {
     return dataType instanceof IntegerType || dataType instanceof LongType;
   }
+
+  // private constructor
+  private Types() {
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

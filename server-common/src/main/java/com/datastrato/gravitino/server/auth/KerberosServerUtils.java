@@ -393,4 +393,9 @@ public class KerberosServerUtils {
       return "[tag=0x" + Integer.toHexString(tag) + " bb=" + bb + "]";
     }
   }
+
+  // private constructor
+  private KerberosServerUtils(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

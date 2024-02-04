@@ -85,4 +85,9 @@ public class SortOrders {
       return nullOrdering;
     }
   }
+
+  // private constructor
+  private SortOrders(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

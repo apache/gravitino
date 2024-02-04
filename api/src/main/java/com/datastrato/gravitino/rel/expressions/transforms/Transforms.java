@@ -622,4 +622,9 @@ public class Transforms {
       return result;
     }
   }
+
+  // private constructor
+  private Transforms() {
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

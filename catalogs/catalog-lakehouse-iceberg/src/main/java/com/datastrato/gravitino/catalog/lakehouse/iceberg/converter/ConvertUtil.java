@@ -61,4 +61,9 @@ public class ConvertUtil {
         .withType(ConvertUtil.formIcebergType(nestedField.type()))
         .build();
   }
+
+  // private constructor
+  private ConvertUtil(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

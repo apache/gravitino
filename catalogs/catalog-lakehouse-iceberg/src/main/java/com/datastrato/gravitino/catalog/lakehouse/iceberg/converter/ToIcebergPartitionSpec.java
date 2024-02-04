@@ -72,4 +72,8 @@ public class ToIcebergPartitionSpec {
     }
     return builder.build();
   }
+
+  private ToIcebergPartitionSpec(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

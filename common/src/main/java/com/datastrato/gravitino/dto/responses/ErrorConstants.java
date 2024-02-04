@@ -30,4 +30,9 @@ public class ErrorConstants {
 
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
+
+  // private constructor
+  private ErrorConstants(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

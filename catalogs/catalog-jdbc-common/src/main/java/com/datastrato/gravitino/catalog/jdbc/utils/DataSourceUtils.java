@@ -72,4 +72,9 @@ public class DataSourceUtils {
       }
     }
   }
+
+  // private constructor
+  private DataSourceUtils(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

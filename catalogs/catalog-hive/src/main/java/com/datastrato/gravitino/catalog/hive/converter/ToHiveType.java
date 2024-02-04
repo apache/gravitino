@@ -95,4 +95,9 @@ public class ToHiveType {
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }
   }
+
+  // private constructor
+  private ToHiveType(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }

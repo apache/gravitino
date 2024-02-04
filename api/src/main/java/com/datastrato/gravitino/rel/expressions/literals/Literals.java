@@ -217,4 +217,9 @@ public class Literals {
       return "LiteralImpl{" + "value=" + value + ", dataType=" + dataType + '}';
     }
   }
+
+  // private constructor
+  private Literals(){
+    throw new UnsupportedOperationException("This utility class cannot be instantiated");
+  }
 }
