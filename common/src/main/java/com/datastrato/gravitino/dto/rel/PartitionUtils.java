@@ -38,7 +38,7 @@ public class PartitionUtils {
   }
 
   // private constructor
-  private PartitionUtils(){
+  private PartitionUtils() {
     throw new UnsupportedOperationException("This utility class cannot be instantiated");
   }
 }

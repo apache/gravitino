@@ -32,7 +32,7 @@ public class ErrorConstants {
   public static final int UNKNOWN_ERROR_CODE = 1100;
 
   // private constructor
-  private ErrorConstants(){
+  private ErrorConstants() {
     throw new UnsupportedOperationException("This utility class cannot be instantiated");
   }
 }
