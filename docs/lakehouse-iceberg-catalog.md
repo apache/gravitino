@@ -78,6 +78,8 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Table capabilities
 
+- Doesn't support column default value.
+
 #### Table partitions
 
 Supports transforms:
