@@ -111,6 +111,53 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "integer",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Column[] cols = new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+    Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+};
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+}
+```
+
+</TabItem>
+</Tabs>
+
 ### Table properties
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
