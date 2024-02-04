@@ -30,6 +30,11 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/PartitionNameListResponse"
                   - $ref: "#/components/schemas/PartitionListResponse"
+              examples:
+                PartitionNameListResponse:
+                  $ref: "#/components/examples/PartitionNameListResponse"
+                PartitionListResponse:
+                  $ref: "#/components/examples/PartitionListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
@@ -159,9 +164,6 @@ components:
           description: A list of partition names
           items:
             type: string
-      example:
-        PartitionNameListResponse:
-          $ref: "#/components/examples/PartitionNameListResponse"
 
     PartitionListResponse:
       type: object
@@ -178,9 +180,6 @@ components:
           description: A list of partitions
           items:
             $ref: "#/components/schemas/PartitionSpec"
-      example:
-        PartitionListResponse:
-          $ref: "#/components/examples/PartitionListResponse"
 
 
     Properties:
