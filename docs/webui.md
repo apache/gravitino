@@ -3,7 +3,7 @@ title: 'Gravitino web UI'
 slug: /webui
 keyword: webui
 last_update:
-  date: 2024-01-11
+  date: 2024-02-04
   author: ch3yne
 license: 'Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.'
 ---
