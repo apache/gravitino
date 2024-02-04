@@ -22,7 +22,7 @@ public class ITUtils {
   }
 
   public static String[] splitPath(String path) {
-    return File.separator.split(path);
+    return path.split(File.separator);
   }
 
   public static void rewriteConfigFile(
