@@ -28,7 +28,6 @@ SOFTWARE.
 
 import type { ErrorMessageMode } from '@/types/axios'
 import toast from 'react-hot-toast'
-import Swal from 'sweetalert2'
 import { useRouter as Router } from 'next/navigation'
 
 export function checkStatus(status: number, msg: string, errorMessageMode: ErrorMessageMode = 'message'): void {
@@ -45,7 +44,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       localStorage.removeItem('accessToken')
       localStorage.removeItem('version')
 
-      Router().replace('/login')
+      Router().push('/ui/login')
 
       break
     case 403:
@@ -97,8 +96,15 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
 
   if (errMessage) {
     if (errorMessageMode === 'modal') {
-      Swal.fire({ title: 'Error Tip', text: errMessage, icon: 'error' })
+      console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
     } else if (errorMessageMode === 'message') {
+      const keyword = 'reason'
+      const idx = errMessage.indexOf(keyword)
+
+      if (idx !== -1) {
+        errMessage = errMessage.substring(idx + keyword.length + 1).replace(/^\[|\]$/g, '')
+      }
+
       toast.error(errMessage, { id: `global_error_message_status_${status}` })
     }
   }

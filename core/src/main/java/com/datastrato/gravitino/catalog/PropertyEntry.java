@@ -178,6 +178,28 @@ public final class PropertyEntry<T> {
         .build();
   }
 
+  public static PropertyEntry<Long> longPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      long defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Long>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Long.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Long::parseLong)
+        .withEncoder(String::valueOf)
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public static PropertyEntry<Integer> integerPropertyEntry(
       String name,
       String description,
@@ -239,12 +261,17 @@ public final class PropertyEntry<T> {
 
   public static PropertyEntry<String> stringOptionalPropertyEntry(
       String name, String description, boolean immutable, String defaultValue, boolean hidden) {
-    return stringPropertyEntry(name, description, false, immutable, null, hidden, false);
+    return stringPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
   public static PropertyEntry<Integer> integerOptionalPropertyEntry(
-      String name, String description, boolean immutable, int defaultValue, boolean hidden) {
+      String name, String description, boolean immutable, Integer defaultValue, boolean hidden) {
     return integerPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
+  }
+
+  public static PropertyEntry<Long> longOptionalPropertyEntry(
+      String name, String description, boolean immutable, long defaultValue, boolean hidden) {
+    return longPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
   public static PropertyEntry<String> stringImmutablePropertyEntry(

@@ -2,6 +2,8 @@ CREATE SCHEMA "test.gt_mysql".gt_db1;
 
 SHOW SCHEMAS FROM "test.gt_mysql" like 'gt_db1';
 
+SHOW CREATE SCHEMA  "test.gt_mysql".gt_db1;
+
 CREATE SCHEMA "test.gt_mysql".gt_db1;
 
 CREATE SCHEMA IF NOT EXISTS "test.gt_mysql".gt_db1;
@@ -14,6 +16,8 @@ CREATE TABLE "test.gt_mysql".gt_db1.tb01 (
     name varchar(200),
     salary int
 );
+
+SHOW CREATE TABLE "test.gt_mysql".gt_db1.tb01;
 
 SHOW tables FROM "test.gt_mysql".gt_db1 like 'tb01';
 

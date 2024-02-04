@@ -5,10 +5,12 @@
 package com.datastrato.gravitino.catalog.postgresql;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalog;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
@@ -39,5 +41,10 @@ public class PostgreSqlCatalog extends JdbcCatalog {
   @Override
   protected JdbcTableOperations createJdbcTableOperations() {
     return new PostgreSqlTableOperations();
+  }
+
+  @Override
+  protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
+    return new PostgreSqlColumnDefaultValueConverter();
   }
 }

@@ -65,7 +65,7 @@ public class KvEntityStore implements EntityStore {
       Bytes.concat(
           new byte[] {0x1D, 0x00, 0x02}, "layout_version".getBytes(StandardCharsets.UTF_8));
 
-  @Getter @VisibleForTesting private KvBackend backend;
+  @Getter @VisibleForTesting KvBackend backend;
 
   // Lock to control the concurrency of the entity store, to be more exact, the concurrency of
   // accessing the underlying kv store.
@@ -80,7 +80,7 @@ public class KvEntityStore implements EntityStore {
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   private TransactionIdGenerator txIdGenerator;
-  private KvGarbageCollector kvGarbageCollector;
+  @VisibleForTesting KvGarbageCollector kvGarbageCollector;
   private TransactionalKvBackend transactionalKvBackend;
 
   @Override
@@ -93,13 +93,14 @@ public class KvEntityStore implements EntityStore {
 
     this.transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
 
-    this.kvGarbageCollector = new KvGarbageCollector(backend, config);
-    kvGarbageCollector.start();
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
 
     this.nameMappingService =
         new KvNameMappingService(transactionalKvBackend, reentrantReadWriteLock);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
+
+    this.kvGarbageCollector = new KvGarbageCollector(backend, config, entityKeyEncoder);
+    kvGarbageCollector.start();
 
     this.storageLayoutVersion = initStorageVersionInfo();
   }
@@ -127,7 +128,7 @@ public class KvEntityStore implements EntityStore {
                 executeInTransaction(
                     () ->
                         transactionalKvBackend.scan(
-                            new KvRangeScan.KvRangeScanBuilder()
+                            new KvRange.KvRangeBuilder()
                                 .start(startKey)
                                 .end(endKey)
                                 .startInclusive(true)
@@ -371,7 +372,7 @@ public class KvEntityStore implements EntityStore {
                   byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
                   List<Pair<byte[], byte[]>> kvs =
                       transactionalKvBackend.scan(
-                          new KvRangeScan.KvRangeScanBuilder()
+                          new KvRange.KvRangeBuilder()
                               .start(directChild)
                               .end(endKey)
                               .startInclusive(true)
@@ -380,15 +381,20 @@ public class KvEntityStore implements EntityStore {
                               .build());
 
                   if (!cascade && !kvs.isEmpty()) {
+                    List<NameIdentifier> subEntities = Lists.newArrayListWithCapacity(kvs.size());
+                    for (Pair<byte[], byte[]> pair : kvs) {
+                      subEntities.add(entityKeyEncoder.decode(pair.getLeft()).getLeft());
+                    }
+
                     throw new NonEmptyEntityException(
                         String.format(
-                            "Entity %s has sub-entities, you should remove sub-entities first",
-                            ident));
+                            "Entity %s has sub-entities %s, you should remove sub-entities first",
+                            ident, subEntities));
                   }
 
                   for (byte[] prefix : subEntityPrefix) {
                     transactionalKvBackend.deleteRange(
-                        new KvRangeScan.KvRangeScanBuilder()
+                        new KvRange.KvRangeBuilder()
                             .start(prefix)
                             .startInclusive(true)
                             .end(Bytes.increment(Bytes.wrap(prefix)).get())

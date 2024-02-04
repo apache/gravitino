@@ -5,8 +5,17 @@
 
 package com.datastrato.gravitino.auth;
 
+/** The type of authenticator for http/https request. */
 public enum AuthenticatorType {
+  /** No authentication. */
   NONE,
+
+  /** Simple authentication. */
   SIMPLE,
-  OAUTH
+
+  /** Authentication that uses OAuth. */
+  OAUTH,
+
+  /** Authentication that uses Kerberos. */
+  KERBEROS
 }

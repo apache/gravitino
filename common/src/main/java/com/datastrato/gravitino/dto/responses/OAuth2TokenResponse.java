@@ -29,6 +29,8 @@ import org.apache.commons.lang3.StringUtils;
 
 // Referred from Apache Iceberg's OAuthTokenResponse implementation
 // core/src/main/java/org/apache/iceberg/rest/auth/responses/OAuthTokenResponse.java
+
+/** Represents the response of an OAuth2 token request. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
@@ -53,6 +55,16 @@ public class OAuth2TokenResponse extends BaseResponse {
   @JsonProperty("refresh_token")
   private final String refreshToken;
 
+  /**
+   * Creates a new OAuth2TokenResponse.
+   *
+   * @param accessToken The access token.
+   * @param issuedTokenType The issued token type.
+   * @param tokenType The token type.
+   * @param expiresIn The expiration time of the token in seconds.
+   * @param scope The scope of the token.
+   * @param refreshToken The refresh token.
+   */
   public OAuth2TokenResponse(
       String accessToken,
       String issuedTokenType,
@@ -68,7 +80,9 @@ public class OAuth2TokenResponse extends BaseResponse {
     this.refreshToken = refreshToken;
   }
 
-  // This is the constructor that is used by Jackson deserializer
+  /**
+   * Creates a new OAuth2TokenResponse. This is the constructor that is used by Jackson deserializer
+   */
   public OAuth2TokenResponse() {
     super();
     this.accessToken = null;
@@ -79,6 +93,11 @@ public class OAuth2TokenResponse extends BaseResponse {
     this.refreshToken = null;
   }
 
+  /**
+   * Validates the response.
+   *
+   * @throws IllegalArgumentException If the response is invalid, this exception is thrown.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(accessToken), "Invalid access token: null");

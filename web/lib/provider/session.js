@@ -48,7 +48,7 @@ const AuthProvider = ({ children }) => {
 
     dispatch(setStoreVersion(''))
     dispatch(setAuthToken(''))
-    router.push('/login')
+    router.push('/ui/login')
   }
 
   useEffect(() => {
@@ -58,13 +58,13 @@ const AuthProvider = ({ children }) => {
 
       if (authType === 'simple') {
         dispatch(initialVersion())
-      } else {
+      } else if (authType === 'oauth') {
         if (token) {
           dispatch(setIntervalId())
           dispatch(setAuthToken(token))
           dispatch(initialVersion())
         } else {
-          router.replace('/login')
+          router.push('/ui/login')
         }
       }
     }

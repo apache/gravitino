@@ -5,11 +5,12 @@
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Collections;
 import java.util.Map;
 
 public class SqliteTableOperations extends JdbcTableOperations {
@@ -20,7 +21,8 @@ public class SqliteTableOperations extends JdbcTableOperations {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning) {
+      Transform[] partitioning,
+      Index[] indexes) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (");
 
@@ -32,6 +34,12 @@ public class SqliteTableOperations extends JdbcTableOperations {
       if (!column.nullable()) {
         sqlBuilder.append(" NOT NULL");
       }
+
+      if (!Column.DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+        sqlBuilder.append(" DEFAULT ");
+        sqlBuilder.append(columnDefaultValueConverter.fromGravitino(column.defaultValue()));
+      }
+
       sqlBuilder.append(",");
     }
 
@@ -75,20 +83,13 @@ public class SqliteTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) throws SQLException {
-    return new JdbcColumn.Builder()
-        .withName(resultSet.getString("COLUMN_NAME"))
-        .withComment(null)
-        .withType(typeConverter.toGravitinoType(resultSet.getString("TYPE_NAME")))
-        .withNullable(resultSet.getBoolean("NULLABLE"))
-        // TODO: uncomment this once we support column default values.
-        // .withDefaultValue(resultSet.getString("COLUMN_DEF"))
-        .build();
+  protected JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    throw new UnsupportedOperationException("Sqlite does not support lazy load create table.");
   }
 
   @Override
-  protected Map<String, String> extractPropertiesFromResultSet(ResultSet table) {
-    // Sqlite does not support table properties.
-    return Collections.emptyMap();
+  protected boolean getAutoIncrementInfo(ResultSet columns) {
+    return false;
   }
 }

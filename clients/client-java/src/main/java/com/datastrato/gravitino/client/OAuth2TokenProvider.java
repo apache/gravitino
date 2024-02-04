@@ -13,11 +13,12 @@ import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * OAuthDataProvider will request the access token from the authorization server and then provide
+ * OAuth2TokenProvider will request the access token from the authorization server and then provide
  * the access token for every request.
  */
 public abstract class OAuth2TokenProvider implements AuthDataProvider {
 
+  /** The HTTP client used to request the access token from the authorization server. */
   protected HTTPClient client;
 
   /**
@@ -55,6 +56,11 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     }
   }
 
+  /**
+   * Get the access token from the authorization server.
+   *
+   * @return The access token.
+   */
   protected abstract String getAccessToken();
 
   interface Builder<SELF extends Builder<SELF, T>, T extends OAuth2TokenProvider> {
@@ -74,6 +80,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
       implements Builder<SELF, T> {
 
     private String uri;
+    /** The HTTP client used to request the access token from the authorization server. */
     protected HTTPClient client;
 
     /**
@@ -95,7 +102,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
      */
     @Override
     public T build() {
-      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuthDataProvider must set url");
+      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuth2TokenProvider must set url");
       client = HTTPClient.builder(Collections.emptyMap()).uri(uri).build();
       T t = internalBuild();
       return t;
@@ -105,6 +112,11 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
       return (SELF) this;
     }
 
+    /**
+     * Builds the instance of the OAuth2TokenProvider.
+     *
+     * @return The built OAuth2TokenProvider instance.
+     */
     protected abstract T internalBuild();
   }
 }

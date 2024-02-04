@@ -123,6 +123,11 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   implementation(libs.commons.cli)
+  testImplementation(libs.selenium)
+  testImplementation(libs.rauschig)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
 }
 
 /* Optimizing integration test execution conditions */
@@ -269,6 +274,7 @@ tasks.test {
 
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
+      environment("IT_PROJECT_DIR", buildDir.path)
       environment("HADOOP_USER_NAME", "datastrato")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
@@ -284,8 +290,11 @@ tasks.test {
       }
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.7")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
+
+      // Change poll image pause time from 30s to 60s
+      environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
@@ -296,6 +305,7 @@ tasks.test {
       } else if (testMode == "embedded") {
         environment("GRAVITINO_HOME", rootDir.path)
         environment("GRAVITINO_TEST", "true")
+        environment("GRAVITINO_WAR", rootDir.path + "/web/dist/")
         systemProperty("testMode", "embedded")
       } else {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")

@@ -24,11 +24,13 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -43,11 +45,11 @@ import org.junit.jupiter.api.Test;
 
 public class TestHiveTable extends MiniHiveMetastoreService {
 
-  private static final String META_LAKE_NAME = "metalake";
+  protected static final String META_LAKE_NAME = "metalake";
 
-  private static final String HIVE_CATALOG_NAME = "test_catalog";
-  private static final String HIVE_SCHEMA_NAME = "test_schema";
-  private static final String HIVE_COMMENT = "test_comment";
+  protected static final String HIVE_CATALOG_NAME = "test_catalog";
+  protected static final String HIVE_SCHEMA_NAME = "test_schema";
+  protected static final String HIVE_COMMENT = "test_comment";
   private static HiveCatalog hiveCatalog;
   private static HiveSchema hiveSchema;
   private static final NameIdentifier schemaIdent =
@@ -55,28 +57,27 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   @BeforeAll
   private static void setup() {
-    initHiveCatalog();
-    initHiveSchema();
+    hiveCatalog = initHiveCatalog();
+    hiveSchema = initHiveSchema(hiveCatalog);
   }
 
   @AfterEach
   private void resetSchema() {
     hiveCatalog.asSchemas().dropSchema(schemaIdent, true);
-    initHiveSchema();
+    hiveSchema = initHiveSchema(hiveCatalog);
   }
 
-  private static void initHiveSchema() {
+  protected static HiveSchema initHiveSchema(HiveCatalog hiveCatalog) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    hiveSchema =
-        (HiveSchema) hiveCatalog.asSchemas().createSchema(schemaIdent, HIVE_COMMENT, properties);
+    return (HiveSchema) hiveCatalog.asSchemas().createSchema(schemaIdent, HIVE_COMMENT, properties);
   }
 
-  private static void initHiveCatalog() {
+  protected static HiveCatalog initHiveCatalog() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()
@@ -104,7 +105,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
         hiveConf.get(HiveConf.ConfVars.HIVE_IN_TEST.varname));
 
-    hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    return new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 
   private Distribution createDistribution() {
@@ -229,6 +230,36 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .contains(
                 "The NOT NULL constraint for column is only supported since Hive 3.0, "
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+
+    HiveColumn withDefault =
+        new HiveColumn.Builder()
+            .withName("col_3")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        new Column[] {withDefault},
+                        HIVE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM,
+                        distribution,
+                        sortOrders));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test

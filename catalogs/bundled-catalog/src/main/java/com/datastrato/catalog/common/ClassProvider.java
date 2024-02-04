@@ -11,9 +11,11 @@ import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -66,7 +68,8 @@ public class ClassProvider {
   private static final Set<Class<?>> MYSQL_NEED_CLASS =
       new HashSet<Class<?>>() {
         {
-          // TODO
+          add(MysqlTablePropertiesMetadata.class);
+          add(JdbcTablePropertiesMetadata.class);
         }
       };
 

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -16,9 +17,14 @@ public interface Catalog extends Auditable {
 
   /** The type of the catalog. */
   enum Type {
-    RELATIONAL, // Catalog Type for Relational Data Structure, like db.table, catalog.db.table.
-    FILE, // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file
-    STREAM, // Catalog Type for Streaming Data, like kafka://topic
+    /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
+    RELATIONAL,
+
+    /** Catalog Type for File System (including HDFS, S3, etc.), like path/to/file */
+    FILE,
+
+    /** Catalog Type for Message Queue, like kafka://topic */
+    STREAM,
   }
 
   /**
@@ -73,5 +79,13 @@ public interface Catalog extends Auditable {
    */
   default TableCatalog asTableCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support table operations");
+  }
+
+  /**
+   * @return the {@link FilesetCatalog} if the catalog supports fileset operations.
+   * @throws UnsupportedOperationException if the catalog does not support fileset operations.
+   */
+  default FilesetCatalog asFilesetCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support fileset operations");
   }
 }

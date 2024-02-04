@@ -31,8 +31,12 @@ import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
 
+  // Auto start docker containers and gravitino server
   protected static boolean autoStart = true;
+
+  // Auto start gravitino server
   protected static boolean autoStartGravitino = true;
+
   protected static boolean started = false;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
@@ -196,21 +200,17 @@ public class TrinoQueryITBase {
                             Namespace.ofTable(metalakeName, catalogName, schema.name())))
                     .forEach(
                         table -> {
-                          try {
-                            tableCatalog.purgeTable(
-                                NameIdentifier.ofTable(
-                                    metalakeName, catalogName, schema.name(), table.name()));
-                          } catch (UnsupportedOperationException e) {
-                            tableCatalog.dropTable(
-                                NameIdentifier.ofTable(
-                                    metalakeName, catalogName, schema.name(), table.name()));
-                            LOG.info(
-                                "Drop table \"{}.{}\".{}.{}",
-                                metalakeName,
-                                catalogName,
-                                schema.name(),
-                                table.name());
-                          } catch (Exception e) {
+                          boolean dropped =
+                              tableCatalog.dropTable(
+                                  NameIdentifier.ofTable(
+                                      metalakeName, catalogName, schema.name(), table.name()));
+                          LOG.info(
+                              "Drop table \"{}.{}\".{}.{}",
+                              metalakeName,
+                              catalogName,
+                              schema.name(),
+                              table.name());
+                          if (!dropped) {
                             LOG.error("Failed to drop table {}", table);
                           }
                         });

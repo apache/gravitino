@@ -2,6 +2,8 @@ CREATE SCHEMA
 
 "gt_db1"
 
+"CREATE SCHEMA ""test.gt_mysql"".gt_db1"
+
 <QUERY_FAILED> Schema 'test.gt_mysql.gt_db1' already exists
 
 CREATE SCHEMA
@@ -11,6 +13,15 @@ CREATE SCHEMA
 "gt_db2"
 
 CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 "tb01"
 

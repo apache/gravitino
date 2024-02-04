@@ -2,7 +2,7 @@ call gravitino.system.create_catalog(
     'gt_postgresql',
     'jdbc-postgresql',
     map(
-        array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-database', 'jdbc-driver'],
-        array['${postgresql_uri}/gt_db', 'trino', 'ds123', 'gt_db', 'org.postgresql.Driver']
+        array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-database', 'jdbc-driver', 'join-pushdown.strategy'],
+        array['${postgresql_uri}/gt_db', 'trino', 'ds123', 'gt_db', 'org.postgresql.Driver', 'EAGER']
     )
 );

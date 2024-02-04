@@ -19,15 +19,34 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
-## Create table
+## Schema operations
 
-The Gravitino connector currently supports basic Iceberg table creation statements, such as defining fields, 
-allowing null values, and adding comments. 
-However, it does not support advanced features like partitioning, sorting, and distribution.
+### Create a schema
 
-The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+Users can create a schema through Gravitino Trino connector as follows:
 
-## Alter table
+```SQL
+CREATE SCHEMA "metalake.catalog".schema_name 
+```
+
+## Table operations
+
+### Create table
+
+The Gravitino connector currently supports basic Iceberg table creation statements, such as defining fields,
+allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+
+The following example shows how to create a table in the Iceberg catalog:
+
+```shell
+CREATE TABLE "metalake.catalog".schema_name.table_name
+(
+  name varchar,
+  salary int
+)
+```
+
+### Alter table
 
 Support for the following alter table operations:
 - Rename table
@@ -44,7 +63,34 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 
 ## Table and Schema properties
 
-Iceberg's tables and schemas do not support properties.
+### Create a schema with properties
+
+Iceberg schema does not support properties.
+
+### Create a table with properties
+
+Users can use the following example to create a table with properties:
+
+```sql
+CREATE TABLE "metalake.catalog".dbname.tabname
+(
+  name varchar,
+  salary int
+) WITH (
+  format = 'TEXTFILE',
+  KEY = 'VALUE',
+  ...      
+);
+```
+
+The following tables are the properties supported by the Iceberg table:
+
+| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
+|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
+| partitioning   | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |
+| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         | 
+
+Reserved properties: A reserved property is one can't be set by users but can be read by users. 
 
 ## Basic usage examples
 
@@ -120,6 +166,9 @@ CREATE TABLE  "test.iceberg_test".database_01.table_01
 (
 name varchar,
 salary int
+) with (
+  partitioning = ARRAY['salary'],
+  sorted_by = ARRAY['name']
 );
 ```
 

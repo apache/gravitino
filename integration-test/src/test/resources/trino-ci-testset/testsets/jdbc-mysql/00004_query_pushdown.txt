@@ -1,0 +1,51 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 1500 rows
+
+INSERT: 15000 rows
+
+"Trino version: %
+%
+    └─ TableScan[table = test.gt_mysql:gt_db1.customer gt_db1.customer limit=10 columns=[custkey:bigint:BIGINT]]
+           Layout: [custkey:bigint]
+%
+"
+
+"Trino version: %
+%
+    └─ ScanFilter[table = test.gt_mysql:gt_db1:customer, filterPredicate = ""$like""(""phone"", ""$literal$""(from_base64('DgAAAFZBUklBQkxFX1dJRFRIAQAAAAEAAAALAAAAAAsAAAAGAAAAJTIzNDIlAA==')))]
+           Layout: [custkey:bigint, name:varchar(25), address:varchar(40), nationkey:bigint, phone:varchar(15), acctbal:decimal(12,2), mktsegment:varchar(10), comment:varchar(117)]
+%
+"
+
+"Trino version: %
+%
+    └─ TableScan[table = test.gt_mysql:Query[SELECT sum(`totalprice`) AS `_pfgnrtd_0` FROM `gt_db1`.`orders`] columns=[_pfgnrtd_0:decimal(38,2):decimal]]
+           Layout: [_pfgnrtd:decimal(38,2)]
+%
+"
+
+"Trino version: %
+%
+    └─ TableScan[table = test.gt_mysql:Query[SELECT `orderdate`, sum(`totalprice`) AS `_pfgnrtd_0` FROM `gt_db1`.`orders` GROUP BY `orderdate`] sortOrder=[orderdate:date:DATE ASC NULLS LAST] limit=10 columns=[orderdate:date:DATE, _pfgnrtd_0:decimal(38,2):decimal]]
+           Layout: [orderdate:date, _pfgnrtd:decimal(38,2)]
+%
+"
+
+"Trino version: %
+%
+    └─ TableScan[table = test.gt_mysql:Query[SELECT % INNER JOIN %] limit=10 columns=%]]
+%
+"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

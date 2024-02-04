@@ -18,8 +18,9 @@ import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
@@ -186,7 +187,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(table);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", SortDirection.DESCENDING);
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     TableCreateRequest req =
@@ -197,7 +199,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            IndexDTO.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -237,7 +240,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            IndexDTO.EMPTY_INDEXES);
 
     resp =
         target(tablePath(metalake, catalog, schema))
@@ -255,7 +259,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any(), any());
 
     Response resp1 =
         target(tablePath(metalake, catalog, schema))
@@ -272,7 +276,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw TableAlreadyExistsException
     doThrow(new TableAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any(), any());
 
     Response resp2 =
         target(tablePath(metalake, catalog, schema))
@@ -290,7 +294,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any(), any());
 
     Response resp3 =
         target(tablePath(metalake, catalog, schema))
@@ -318,7 +322,8 @@ public class TestTableOperations extends JerseyTest {
         new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())};
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), partitioning);
-    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(table);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -328,7 +333,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            partitioning);
+            partitioning,
+            IndexDTO.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -376,7 +382,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             null,
-            new Partitioning[] {errorPartition});
+            new Partitioning[] {errorPartition},
+            IndexDTO.EMPTY_INDEXES);
     resp =
         target(tablePath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -769,7 +776,7 @@ public class TestTableOperations extends JerseyTest {
         .toString();
   }
 
-  private static Column mockColumn(String name, Type type) {
+  public static Column mockColumn(String name, Type type) {
     return mockColumn(name, type, true);
   }
 
@@ -816,7 +823,7 @@ public class TestTableOperations extends JerseyTest {
     return table;
   }
 
-  private static Table mockTable(
+  public static Table mockTable(
       String tableName,
       Column[] columns,
       String comment,

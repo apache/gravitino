@@ -1,0 +1,13 @@
+CALL
+
+"test.gt_hive_xxx1"
+
+CALL
+
+<BLANK_LINE>
+
+CALL
+
+"test.gt_hive_xxx1"
+
+CALL

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -13,19 +14,36 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for MySQL. */
 public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
+
+  public static final Set<String> SYS_MYSQL_DATABASE_NAMES =
+      Collections.unmodifiableSet(
+          new HashSet<String>() {
+            {
+              add("information_schema");
+              add("mysql");
+              add("performance_schema");
+              add("sys");
+            }
+          });
+
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    if (StringUtils.isNotEmpty(comment)) {
-      LOG.warn(
-          "Ignoring comment option on database create. mysql does not support comment option on database create.");
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "MySQL doesn't support set schema comment: " + originComment);
     }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 
@@ -106,5 +124,10 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  @Override
+  protected boolean isSystemDatabase(String dbName) {
+    return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
   }
 }
