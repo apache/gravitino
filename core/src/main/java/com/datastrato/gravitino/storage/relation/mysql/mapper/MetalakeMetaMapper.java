@@ -72,13 +72,20 @@ public interface MetalakeMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET metalake_name = #{metalakeMeta.metalakeName},"
-          + " metalake_comment = #{metalakeMeta.metalakeComment},"
-          + " properties = #{metalakeMeta.properties},"
-          + " audit_info = #{metalakeMeta.auditInfo},"
-          + " schema_version = #{metalakeMeta.schemaVersion}"
-          + " WHERE id = #{metalakeMeta.id}")
-  void updateMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO);
+          + " SET metalake_name = #{newMetalakeMeta.metalakeName},"
+          + " metalake_comment = #{newMetalakeMeta.metalakeComment},"
+          + " properties = #{newMetalakeMeta.properties},"
+          + " audit_info = #{newMetalakeMeta.auditInfo},"
+          + " schema_version = #{newMetalakeMeta.schemaVersion}"
+          + " WHERE id = #{oldMetalakeMeta.id}"
+          + " and metalake_name = #{oldMetalakeMeta.metalakeComment}"
+          + " and metalake_comment = #{oldMetalakeMeta.metalakeComment}"
+          + " and properties = #{oldMetalakeMeta.properties}"
+          + " and audit_info = #{oldMetalakeMeta.auditInfo}"
+          + " and schema_version = #{oldMetalakeMeta.schemaVersion}")
+  void updateMetalakeMeta(
+      @Param("newMetalakeMeta") MetalakePO newMetalakePO,
+      @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
   @Delete("DELETE FROM " + TABLE_NAME + " WHERE id = #{id}")
   Integer deleteMetalakeMetaById(@Param("id") Long id);
