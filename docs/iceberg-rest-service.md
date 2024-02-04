@@ -159,3 +159,6 @@ DESCRIBE TABLE EXTENDED dml.test;
 INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test
 ```
+
+For the details, review the
+[playground example](./how-to-use-the-playground.md#lakehouse-practice).

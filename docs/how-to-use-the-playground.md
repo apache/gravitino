@@ -174,6 +174,3 @@ select * from "metalake_demo.catalog_hive".sales.customers
 union
 select * from "metalake_demo.catalog_iceberg".sales.customers;
 ```
-
-For the details, review the
-[playground example](./how-to-use-the-playground.md#lakehouse-practice).
