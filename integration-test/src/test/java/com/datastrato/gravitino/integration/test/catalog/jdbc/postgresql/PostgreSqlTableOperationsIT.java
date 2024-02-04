@@ -9,12 +9,16 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.sql.Connection;
@@ -32,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
 @Tag("gravitino-docker-it")
-public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
+public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
@@ -75,7 +79,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     // list table
     List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -83,7 +88,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
 
     // rename table
     String newName = "new_table";
@@ -126,7 +131,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -152,7 +157,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // alter column Nullability
     TABLE_OPERATIONS.alterTable(
@@ -176,7 +181,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -184,7 +189,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.remove(newColumn);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
@@ -203,9 +208,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
                 TEST_DB_NAME,
                 newName,
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
-    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
     Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
   }
 
   @Test
@@ -303,10 +308,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         Collections.emptyMap(),
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), load);
+    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
   }
 
   @Test
@@ -336,7 +342,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     PostgreSqlTableOperations postgreSqlTableOperations = new PostgreSqlTableOperations();
 
     postgreSqlTableOperations.initialize(
-        dataSource, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+        dataSource,
+        JDBC_EXCEPTION_CONVERTER,
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        config);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(
@@ -352,7 +362,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         },
         null,
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     List<String> tableNames = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_1));
@@ -379,7 +390,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         },
         null,
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
     tableNames = postgreSqlTableOperations.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_2));
 
@@ -389,7 +401,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         NoSuchTableException.class, () -> postgreSqlTableOperations.load("other_schema", table_2));
     Assertions.assertThrows(
         NoSuchTableException.class, () -> TABLE_OPERATIONS.load("other_schema", table_2));
-    postgreSqlTableOperations.purge(TEST_DB_NAME, table_1);
+    postgreSqlTableOperations.drop(TEST_DB_NAME, table_1);
 
     Assertions.assertThrows(
         NoSuchTableException.class,
@@ -429,7 +441,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     // list table
     List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -437,7 +450,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
 
     columns.clear();
     columns.add(
@@ -467,9 +480,91 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
                     columns.toArray(new JdbcColumn[0]),
                     tableComment,
                     properties,
-                    null));
+                    null,
+                    Indexes.EMPTY_INDEXES));
 
     Assertions.assertTrue(
         StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
+  }
+
+  @Test
+  public void testCreateIndexTable() {
+    String tableName = GravitinoITUtils.genRandomName("index_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(Types.LongType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("id-1")
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withComment("name")
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_4")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withComment("city")
+            .build());
+    Map<String, String> properties = new HashMap<>();
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary("test_pk", new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}})
+        };
+
+    // Test create table index success.
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
+    TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
+
+    // Test create table index failed.
+    GravitinoRuntimeException gravitinoRuntimeException =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    tableName,
+                    columns.toArray(new JdbcColumn[0]),
+                    tableComment,
+                    properties,
+                    null,
+                    new Index[] {
+                      Indexes.primary("no_exist_pk", new String[][] {{"no_exist_1"}}),
+                      Indexes.unique(
+                          "no_exist_key", new String[][] {{"no_exist_2"}, {"no_exist_3"}})
+                    }));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            gravitinoRuntimeException.getMessage(),
+            "column \"no_exist_1\" named in key does not exist"));
   }
 }

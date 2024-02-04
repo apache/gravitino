@@ -7,43 +7,52 @@ package com.datastrato.gravitino.catalog.mysql.converter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
-import java.util.Objects;
 
 /** Type converter for MySQL. */
-public class MysqlTypeConverter
-    extends JdbcTypeConverter<MysqlTypeConverter.MysqlTypeBean, String> {
+public class MysqlTypeConverter extends JdbcTypeConverter<String> {
+
+  static final String TINYINT = "tinyint";
+  static final String SMALLINT = "smallint";
+  static final String INT = "int";
+  static final String BIGINT = "bigint";
+  static final String FLOAT = "float";
+  static final String DOUBLE = "double";
+  static final String DECIMAL = "decimal";
+  static final String CHAR = "char";
+  static final String BINARY = "binary";
+  static final String DATETIME = "datetime";
 
   @Override
-  public Type toGravitinoType(MysqlTypeBean typeBean) {
+  public Type toGravitinoType(JdbcTypeBean typeBean) {
     switch (typeBean.getTypeName().toLowerCase()) {
-      case "tinyint":
+      case TINYINT:
         return Types.ByteType.get();
-      case "smallint":
+      case SMALLINT:
         return Types.ShortType.get();
-      case "int":
+      case INT:
         return Types.IntegerType.get();
-      case "bigint":
+      case BIGINT:
         return Types.LongType.get();
-      case "float":
+      case FLOAT:
         return Types.FloatType.get();
-      case "double":
+      case DOUBLE:
         return Types.DoubleType.get();
-      case "date":
+      case DATE:
         return Types.DateType.get();
-      case "time":
+      case TIME:
         return Types.TimeType.get();
-      case "timestamp":
+      case TIMESTAMP:
         return Types.TimestampType.withoutTimeZone();
-      case "decimal":
+      case DECIMAL:
         return Types.DecimalType.of(
             Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
-      case "varchar":
+      case VARCHAR:
         return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
-      case "char":
+      case CHAR:
         return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
-      case "text":
+      case TEXT:
         return Types.StringType.get();
-      case "binary":
+      case BINARY:
         return Types.BinaryType.get();
       default:
         throw new IllegalArgumentException("Not a supported type: " + typeBean.getTypeName());
@@ -53,19 +62,19 @@ public class MysqlTypeConverter
   @Override
   public String fromGravitinoType(Type type) {
     if (type instanceof Types.ByteType) {
-      return "tinyint";
+      return TINYINT;
     } else if (type instanceof Types.ShortType) {
-      return "smallint";
+      return SMALLINT;
     } else if (type instanceof Types.IntegerType) {
-      return "int";
+      return INT;
     } else if (type instanceof Types.LongType) {
-      return "bigint";
+      return BIGINT;
     } else if (type instanceof Types.FloatType) {
       return type.simpleString();
     } else if (type instanceof Types.DoubleType) {
       return type.simpleString();
     } else if (type instanceof Types.StringType) {
-      return "text";
+      return TEXT;
     } else if (type instanceof Types.DateType) {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
@@ -82,54 +91,5 @@ public class MysqlTypeConverter
       return type.simpleString();
     }
     throw new IllegalArgumentException("Not a supported type: " + type.toString());
-  }
-
-  public static class MysqlTypeBean {
-    private String typeName;
-    private String columnSize;
-    private String scale;
-
-    public MysqlTypeBean(String typeName) {
-      this.typeName = typeName;
-    }
-
-    public String getTypeName() {
-      return typeName;
-    }
-
-    public void setTypeName(String typeName) {
-      this.typeName = typeName;
-    }
-
-    public String getColumnSize() {
-      return columnSize;
-    }
-
-    public void setColumnSize(String columnSize) {
-      this.columnSize = columnSize;
-    }
-
-    public String getScale() {
-      return scale;
-    }
-
-    public void setScale(String scale) {
-      this.scale = scale;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-      MysqlTypeBean typeBean = (MysqlTypeBean) o;
-      return Objects.equals(typeName, typeBean.typeName)
-          && Objects.equals(columnSize, typeBean.columnSize)
-          && Objects.equals(scale, typeBean.scale);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(typeName, columnSize, scale);
-    }
   }
 }

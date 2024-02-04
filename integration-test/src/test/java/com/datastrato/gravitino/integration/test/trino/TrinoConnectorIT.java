@@ -10,7 +10,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
@@ -22,6 +21,7 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
@@ -34,6 +34,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -522,84 +524,62 @@ public class TrinoConnectorIT extends AbstractIT {
     return false;
   }
 
-  private ColumnDTO[] createHiveFullTypeColumns() {
-    ColumnDTO[] columnDTO = createFullTypeColumns();
+  private Column[] createHiveFullTypeColumns() {
+    Column[] columnDTO = createFullTypeColumns();
     Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimeType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
         .filter(c -> !unsupportedType.contains(c.name()))
-        .toArray(ColumnDTO[]::new);
+        .toArray(Column[]::new);
   }
 
-  private ColumnDTO[] createMySQLFullTypeColumns() {
-    ColumnDTO[] columnDTO = createFullTypeColumns();
+  private Column[] createMySQLFullTypeColumns() {
+    Column[] columnDTO = createFullTypeColumns();
     Set<String> unsupportedType =
         Sets.newHashSet("FixedType", "StringType", "TimestampType", "BooleanType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
         .filter(c -> !unsupportedType.contains(c.name()))
-        .toArray(ColumnDTO[]::new);
+        .toArray(Column[]::new);
   }
 
-  private ColumnDTO[] createIcebergFullTypeColumns() {
-    ColumnDTO[] columnDTO = createFullTypeColumns();
+  private Column[] createIcebergFullTypeColumns() {
+    Column[] columnDTO = createFullTypeColumns();
 
     Set<String> unsupportedType =
         Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
     return Arrays.stream(columnDTO)
         .filter(c -> !unsupportedType.contains(c.name()))
-        .toArray(ColumnDTO[]::new);
+        .toArray(Column[]::new);
   }
 
-  private ColumnDTO[] createFullTypeColumns() {
+  private Column[] createFullTypeColumns() {
     // Generate all types of columns that in class Types
-    return new ColumnDTO[] {
-      new ColumnDTO.Builder<>()
-          .withName("BooleanType")
-          .withDataType(Types.BooleanType.get())
-          .build(),
-
+    return new Column[] {
       // Int type
-      new ColumnDTO.Builder<>().withName("ByteType").withDataType(Types.ByteType.get()).build(),
-      new ColumnDTO.Builder<>().withName("ShortType").withDataType(Types.ShortType.get()).build(),
-      new ColumnDTO.Builder<>()
-          .withName("IntegerType")
-          .withDataType(Types.IntegerType.get())
-          .build(),
-      new ColumnDTO.Builder<>().withName("LongType").withDataType(Types.LongType.get()).build(),
+      Column.of("BooleanType", Types.BooleanType.get()),
+      Column.of("ByteType", Types.ByteType.get()),
+      Column.of("ShortType", Types.ShortType.get()),
+      Column.of("IntegerType", Types.IntegerType.get()),
+      Column.of("LongType", Types.LongType.get()),
 
       // float type
-      new ColumnDTO.Builder<>().withName("FloatType").withDataType(Types.FloatType.get()).build(),
-      new ColumnDTO.Builder<>().withName("DoubleType").withDataType(Types.DoubleType.get()).build(),
-      new ColumnDTO.Builder<>()
-          .withName("DecimalType")
-          .withDataType(Types.DecimalType.of(10, 3))
-          .build(),
+      Column.of("FloatType", Types.FloatType.get()),
+      Column.of("DoubleType", Types.DoubleType.get()),
+      Column.of("DecimalType", Types.DecimalType.of(10, 3)),
 
       // Date Type
-      new ColumnDTO.Builder<>().withName("DateType").withDataType(Types.DateType.get()).build(),
-      new ColumnDTO.Builder<>().withName("TimeType").withDataType(Types.TimeType.get()).build(),
-      new ColumnDTO.Builder<>()
-          .withName("TimestampType")
-          .withDataType(Types.TimestampType.withTimeZone())
-          .build(),
+      Column.of("DateType", Types.DateType.get()),
+      Column.of("TimeType", Types.TimeType.get()),
+      Column.of("TimestampType", Types.TimestampType.withTimeZone()),
 
       // String Type
-      new ColumnDTO.Builder<>()
-          .withName("VarCharType")
-          .withDataType(Types.VarCharType.of(100))
-          .build(),
-      new ColumnDTO.Builder<>()
-          .withName("FixedCharType")
-          .withDataType(Types.FixedCharType.of(100))
-          .build(),
-      new ColumnDTO.Builder<>().withName("StringType").withDataType(Types.StringType.get()).build(),
-      new ColumnDTO.Builder<>()
-          .withName("FixedType")
-          .withDataType(Types.FixedType.of(1000))
-          .build(),
+      Column.of("VarCharType", Types.VarCharType.of(100)),
+      Column.of("FixedCharType", Types.FixedCharType.of(100)),
+      Column.of("FixedType", Types.FixedType.of(1000)),
+
       // Binary Type
-      new ColumnDTO.Builder<>().withName("BinaryType").withDataType(Types.BinaryType.get()).build()
+      Column.of("BinaryType", Types.BinaryType.get())
       // No Interval Type and complex type like map, struct, and list
     };
   }
@@ -1146,7 +1126,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .asSchemas()
             .createSchema(
                 NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
+                null,
                 ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
@@ -1174,6 +1154,47 @@ public class TrinoConnectorIT extends AbstractIT {
     if (!success) {
       Assertions.fail("Trino fail to load table created by gravitino: " + sql);
     }
+
+    // Create a table with primary key
+    Column[] columnDTOS = createMySQLFullTypeColumns();
+    columnDTOS =
+        Arrays.stream(columnDTOS)
+            .map(
+                c -> {
+                  if ("IntegerType".equals(c.name())) {
+                    return Column.of(c.name(), c.dataType(), "", false, true, null);
+                  }
+                  return c;
+                })
+            .toArray(Column[]::new);
+
+    tableName = GravitinoITUtils.genRandomName("mysql_table_with_primary").toLowerCase();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columnDTOS,
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[] {
+              Indexes.createMysqlPrimaryKey(new String[][] {new String[] {"IntegerType"}})
+            });
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+
+    success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+    }
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+
+    Assertions.assertTrue(data.contains("engine = 'InnoDB'"));
+    Assertions.assertTrue(
+        data.contains("integertype integer NOT NULL WITH ( auto_increment = true )"));
   }
 
   @Test

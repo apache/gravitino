@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_OPERATION_FAILED;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS;
@@ -124,7 +125,7 @@ public class CatalogConnectorMetadata {
     try {
       tableCatalog.createTable(
           identifier,
-          table.getColumnDTOs(),
+          table.getRawColumns(),
           table.getComment(),
           table.getProperties(),
           table.getPartitioning(),
@@ -166,20 +167,12 @@ public class CatalogConnectorMetadata {
   }
 
   public void dropTable(SchemaTableName tableName) {
-    try {
-      tableCatalog.purgeTable(
-          NameIdentifier.ofTable(
-              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
-    } catch (UnsupportedOperationException e) {
-      LOG.warn("Purge table is not supported", e);
-      boolean dropped =
-          tableCatalog.dropTable(
-              NameIdentifier.ofTable(
-                  metalake.name(),
-                  catalogName,
-                  tableName.getSchemaName(),
-                  tableName.getTableName()));
-      if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    boolean dropped =
+        tableCatalog.dropTable(
+            NameIdentifier.ofTable(
+                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
+    if (!dropped) {
+      throw new TrinoException(GRAVITINO_OPERATION_FAILED, "Failed to drop table " + tableName);
     }
   }
 

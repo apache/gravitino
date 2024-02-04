@@ -55,7 +55,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     ciTestsets.add("lakehouse-iceberg");
     ciTestsets.add("jdbc-mysql");
     ciTestsets.add("jdbc-postgresql");
-    ciTestsets.add("tpcds");
+    ciTestsets.add("tpch");
   }
 
   @BeforeAll
@@ -190,7 +190,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     Matcher sqlMatcher =
         Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     Matcher resultMatcher =
-        Pattern.compile("(\\S.*?)\\n{2,}", Pattern.DOTALL | Pattern.UNIX_LINES)
+        Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL | Pattern.UNIX_LINES)
             .matcher(testResults);
 
     while (sqlMatcher.find()) {
@@ -198,10 +198,15 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       sql = resolveParameters(sql);
       String expectResult = "";
       if (resultMatcher.find()) {
-        expectResult = resultMatcher.group(1).trim();
+        if (resultMatcher.group(2) != null) {
+          expectResult = resultMatcher.group(2).trim();
+        } else {
+          expectResult = resultMatcher.group(4).trim();
+        }
       }
 
       String result = queryRunner.runQuery(sql).trim();
+      result = result.replaceAll("WARNING:.*?\\n", "");
       boolean match = match(expectResult, result);
 
       if (match) {
@@ -216,7 +221,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         queryRunner.stop();
         String errorMessage =
             String.format(
-                "Execute sql in the tester %s under catalog %s failed.\nSql:\n%s\nExpect:\n%s\nActual:\n%s",
+                "Execute sql in the tester %s under catalog %s failed.\nSql:\n%s;\nExpect:\n%s\nActual:\n%s",
                 simpleTesterName(path), catalog, sql, expectResult, result);
         LOG.error(errorMessage);
         Assertions.fail(errorMessage);
@@ -285,7 +290,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     //    location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
     //    ...
     expectResult = expectResult.replace("\n", "");
-    expectResult = "\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E";
+    expectResult = "^\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E$";
     result = result.replace("\n", "");
     match = Pattern.compile(expectResult).matcher(result).find();
     return match;

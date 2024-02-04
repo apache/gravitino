@@ -3,255 +3,212 @@
  * This software is licensed under the Apache License version 2.
  */
 
-'use client'
-
-import { forwardRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
-import { Box, styled, Typography, Skeleton } from '@mui/material'
-import { TreeView } from '@mui/x-tree-view/TreeView'
-import { TreeItem, useTreeItem } from '@mui/x-tree-view/TreeItem'
+import { IconButton, Typography } from '@mui/material'
+import { Tree } from 'antd'
 
 import Icon from '@/components/Icon'
-
 import clsx from 'clsx'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import {
-  setExpandedTreeNode,
-  setIntoTreeAction,
-  setClickedExpandedNode,
+  setExpandedNodes,
+  setIntoTreeNodeWithFetch,
   removeExpandedNode,
-  resetTree
+  setSelectedNodes,
+  setLoadedNodes,
+  getTableDetails
 } from '@/lib/store/metalakes'
 
-const StyledLink = styled(Link)(({ theme }) => ({
-  textDecoration: 'none'
-}))
-
-const CustomContent = forwardRef(function CustomContent(props, ref) {
-  const dispatch = useAppDispatch()
-  const { classes, className, label, nodeId, icon: iconProp, expansionIcon, displayIcon } = props
-
-  const { disabled, expanded, selected, focused, handleExpansion, handleSelection, preventSelection } =
-    useTreeItem(nodeId)
-
-  const icon = iconProp || expansionIcon || displayIcon
-
-  const handleMouseDown = event => {
-    preventSelection(event)
-  }
-
-  const handleExpansionClick = async (event, nodeId, expanded) => {
-    new Promise(resolve => {
-      dispatch(setClickedExpandedNode({ nodeId, expanded }))
-      resolve()
-    }).then(() => {
-      handleExpansion(event)
-    })
-  }
-
-  const handleSelectionClick = event => {
-    handleSelection(event)
-  }
-
-  return (
-    <div
-      className={clsx(className, classes.root, {
-        [classes.expanded]: expanded,
-        [classes.selected]: selected,
-        [classes.focused]: focused,
-        [classes.disabled]: disabled
-      })}
-      onMouseDown={handleMouseDown}
-      ref={ref}
-    >
-      <div
-        onClick={e => handleExpansionClick(e, nodeId, expanded)}
-        className={classes.iconContainer}
-        data-node-id={nodeId}
-      >
-        {icon}
-      </div>
-      <Typography onClick={handleSelectionClick} component='div' className={classes.label}>
-        {label}
-      </Typography>
-    </div>
-  )
-})
-
-const StyledTreeItemRoot = styled(TreeItem)(({ theme, level = 0 }) => ({
-  '&:hover > .MuiTreeItem-content:not(.Mui-selected)': {
-    backgroundColor: theme.palette.action.hover
-  },
-  '& .MuiTreeItem-content': {
-    cursor: 'default',
-    paddingRight: theme.spacing(3),
-    fontWeight: theme.typography.fontWeightMedium
-  },
-  '& .MuiTreeItem-label': {
-    fontWeight: 'inherit',
-    paddingRight: theme.spacing(3)
-  },
-  '& .MuiTreeItem-group': {
-    marginLeft: 0,
-    '& .MuiTreeItem-content': {
-      paddingLeft: theme.spacing(4 + level * 4),
-      fontWeight: theme.typography.fontWeightRegular
-    }
-  }
-}))
-
-const StyledTreeItem = props => {
-  const { labelText, labelIcon, labelInfo, href, dispatch, ...other } = props
-
-  return (
-    <StyledTreeItemRoot
-      {...other}
-      label={
-        <Box sx={{ py: 1, display: 'flex', alignItems: 'center', '& svg': { mr: 1 } }}>
-          <Icon icon={labelIcon} color='inherit' />
-          <Typography
-            variant='body2'
-            sx={{ fontWeight: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
-            title={labelText}
-            {...(href
-              ? {
-                  component: StyledLink,
-                  href
-                }
-              : {})}
-          >
-            {labelText}
-          </Typography>
-          {labelInfo ? (
-            <Typography variant='caption' color='inherit'>
-              {labelInfo}
-            </Typography>
-          ) : null}
-        </Box>
-      }
-    />
-  )
-}
-
-const CustomTreeItem = forwardRef(function CustomTreeItem(props, ref) {
-  return <StyledTreeItem ContentComponent={CustomContent} {...props} ref={ref} />
-})
-
-const CatalogTreeItem = props => {
-  return <CustomTreeItem labelIcon={'bx:book'} level={0} {...props} />
-}
-
-const SchemaTreeItem = props => {
-  return <CustomTreeItem labelIcon={'bx:coin-stack'} level={1} {...props} />
-}
-
-const TableTreeItem = props => {
-  return <CustomTreeItem labelIcon={'bx:table'} level={2} {...props} />
-}
+import { extractPlaceholder } from '@/lib/utils'
 
 const MetalakeTree = props => {
-  const { routeParams } = props
+  const { height: offsetHeight } = props
+
+  const router = useRouter()
+  const treeRef = useRef()
+  const [height, setHeight] = useState(0)
+  const [isHover, setIsHover] = useState(null)
+
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
 
-  const handleToggle = async (event, nodeIds = []) => {
-    nodeIds = Array.from(new Set(nodeIds.flat()))
+  const handleClickIcon = (e, nodeProps) => {
+    e.stopPropagation()
 
-    const isExpanding = nodeIds.some(nodeId => !store.expandedTreeNode.includes(nodeId))
-
-    if (isExpanding) {
-      dispatch(setExpandedTreeNode({ nodeIds: store.clickedExpandedNode.nodeId }))
-      dispatch(setIntoTreeAction({ nodeIds: [store.clickedExpandedNode.nodeId] }))
+    if (nodeProps.data.node === 'table') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        const pathArr = extractPlaceholder(nodeProps.data.key)
+        const [metalake, catalog, schema, table] = pathArr
+        dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+      }
     } else {
-      dispatch(removeExpandedNode(store.clickedExpandedNode.nodeId))
+      dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
     }
   }
 
-  const handleSelect = (event, nodeId) => {
-    event.stopPropagation()
+  const onMouseEnter = (e, nodeProps) => {
+    if (nodeProps.data.node === 'table') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        setIsHover(nodeProps.data.key)
+      }
+    } else {
+      setIsHover(nodeProps.data.key)
+    }
+  }
+
+  const onMouseLeave = (e, nodeProps) => {
+    setIsHover(null)
+  }
+
+  const onLoadData = node => {
+    const { key, children } = node
+
+    dispatch(setLoadedNodes([...store.loadedNodes, key]))
+
+    return new Promise(resolve => {
+      if (children && children.length !== 0) {
+        resolve()
+
+        return
+      }
+
+      dispatch(setIntoTreeNodeWithFetch({ key }))
+
+      resolve()
+    })
+  }
+
+  const onExpand = (keys, { expanded, node }) => {
+    if (expanded) {
+      dispatch(setExpandedNodes(keys))
+    } else {
+      dispatch(removeExpandedNode(node.key))
+    }
+  }
+
+  const onSelect = (keys, { selected, node }) => {
+    if (!selected) {
+      dispatch(setSelectedNodes([node.key]))
+
+      return
+    }
+
+    dispatch(setSelectedNodes(keys))
+    router.push(node.path)
+  }
+
+  const renderIcon = nodeProps => {
+    switch (nodeProps.data.node) {
+      case 'catalog':
+        return (
+          <IconButton
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:book' : 'mdi:reload'} fontSize='inherit' />
+          </IconButton>
+        )
+
+      case 'schema':
+        return (
+          <IconButton
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:coin-stack' : 'mdi:reload'} fontSize='inherit' />
+          </IconButton>
+        )
+      case 'table':
+        return (
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:table' : 'mdi:reload'} fontSize='inherit' />
+          </IconButton>
+        )
+
+      default:
+        return <></>
+    }
+  }
+
+  const renderNode = nodeData => {
+    if (nodeData.path) {
+      return <Typography sx={{ color: theme => theme.palette.text.secondary }}>{nodeData.title}</Typography>
+    }
+
+    return nodeData.title
   }
 
   useEffect(() => {
-    return () => {
-      dispatch(resetTree())
+    if (offsetHeight) {
+      setHeight(offsetHeight)
     }
-  }, [dispatch])
+  }, [offsetHeight])
+
+  useEffect(() => {
+    if (store.selectedNodes.length !== 0) {
+      treeRef.current.scrollTo({ key: store.selectedNodes[0] })
+    }
+  }, [store.selectedNodes])
 
   return (
-    <TreeView
-      onNodeToggle={handleToggle}
-      onNodeSelect={handleSelect}
-      expanded={store.expandedTreeNode}
-      selected={store.selectedTreeNode}
-      defaultExpandIcon={
-        <Box sx={{ display: 'flex' }}>
-          <Icon icon='bx:chevron-right' />
-        </Box>
-      }
-      defaultCollapseIcon={
-        <Box sx={{ display: 'flex' }}>
-          <Icon icon='bx:chevron-down' />
-        </Box>
-      }
-    >
-      {store.isLoadedTree ? (
-        store.metalakeTree.length !== 0 ? (
-          (store.metalakeTree || []).map((catalog, catalogIndex) => {
-            return (
-              <CatalogTreeItem key={catalogIndex} nodeId={catalog.id} labelText={catalog.name} href={catalog.path}>
-                {catalog.schemas.length === 0 ? (
-                  <SchemaTreeItem
-                    key={`${catalog.name}-${catalogIndex}-no-schema`}
-                    nodeId={`${catalog.name}-${catalogIndex}-no-schema`}
-                    labelIcon=''
-                    labelText={'No Schemas'}
-                    disabled
-                  />
-                ) : (
-                  (catalog.schemas || []).map((schema, schemaIndex) => {
-                    return (
-                      <SchemaTreeItem key={schemaIndex} nodeId={schema.id} labelText={schema.name} href={schema.path}>
-                        {schema.tables.length === 0 ? (
-                          <TableTreeItem
-                            key={`${catalog.name}-${catalogIndex}-${schema.name}-${schemaIndex}-no-schema`}
-                            nodeId={`${catalog.name}-${catalogIndex}-${schema.name}-${schemaIndex}-no-schema`}
-                            labelIcon=''
-                            labelText={'No Tables'}
-                            disabled
-                          />
-                        ) : (
-                          (schema.tables || []).map((table, tableIndex) => {
-                            return (
-                              <TableTreeItem
-                                key={tableIndex}
-                                nodeId={table.id}
-                                labelText={table.name}
-                                href={table.path}
-                              />
-                            )
-                          })
-                        )}
-                      </SchemaTreeItem>
-                    )
-                  })
-                )}
-              </CatalogTreeItem>
-            )
-          })
-        ) : (
-          <Box className={`twc-text-center`}>No Catalogs</Box>
-        )
-      ) : (
-        <Box className={`twc-w-full twc-text-center twc-h-full`}>
-          {Array.from(new Array(4)).map((item, index) => {
-            return <Skeleton sx={{ mx: 'auto' }} width={'80%'} key={index} height={'2.8rem'} animation='wave' />
-          })}
-        </Box>
-      )}
-    </TreeView>
+    <>
+      <Tree
+        ref={treeRef}
+        rootStyle={{
+          '& .antTreeTitle': {
+            width: '100%'
+          }
+        }}
+        treeData={store.metalakeTree}
+        loadData={onLoadData}
+        loadedKeys={store.loadedNodes}
+        selectedKeys={store.selectedNodes}
+        expandedKeys={store.expandedNodes}
+        onExpand={onExpand}
+        onSelect={onSelect}
+        height={height}
+        defaultExpandAll
+        blockNode
+        showIcon
+        className={clsx([
+          '[&_.ant-tree-switcher]:twc-inline-flex',
+          '[&_.ant-tree-switcher]:twc-justify-center',
+          '[&_.ant-tree-switcher]:twc-items-center',
+
+          '[&_.ant-tree-iconEle]:twc-w-[unset]',
+          '[&_.ant-tree-iconEle]:twc-inline-flex',
+          '[&_.ant-tree-iconEle]:twc-items-center',
+
+          '[&_.ant-tree-title]:twc-inline-flex',
+          '[&_.ant-tree-title]:twc-w-[calc(100%-24px)]',
+          '[&_.ant-tree-title]:twc-text-lg',
+
+          '[&_.ant-tree-node-content-wrapper]:twc-inline-flex',
+          '[&_.ant-tree-node-content-wrapper]:twc-items-center',
+          '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]'
+        ])}
+        icon={nodeProps => renderIcon(nodeProps)}
+        titleRender={nodeData => renderNode(nodeData)}
+      />
+    </>
   )
 }
 

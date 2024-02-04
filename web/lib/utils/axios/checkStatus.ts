@@ -44,7 +44,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       localStorage.removeItem('accessToken')
       localStorage.removeItem('version')
 
-      Router().replace('/login')
+      Router().push('/ui/login')
 
       break
     case 403:
@@ -98,6 +98,13 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
     if (errorMessageMode === 'modal') {
       console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
     } else if (errorMessageMode === 'message') {
+      const keyword = 'reason'
+      const idx = errMessage.indexOf(keyword)
+
+      if (idx !== -1) {
+        errMessage = errMessage.substring(idx + keyword.length + 1).replace(/^\[|\]$/g, '')
+      }
+
       toast.error(errMessage, { id: `global_error_message_status_${status}` })
     }
   }

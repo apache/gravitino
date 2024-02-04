@@ -17,7 +17,7 @@ public class TestAuditInfo {
     String lastModifier = "test1";
 
     AuditInfo auditInfo =
-        new AuditInfo.Builder()
+        AuditInfo.builder()
             .withCreator(creator)
             .withCreateTime(now)
             .withLastModifier(lastModifier)
@@ -38,19 +38,19 @@ public class TestAuditInfo {
     String creator = "test";
     String lastModifier = "test1";
 
-    AuditInfo auditInfo = new AuditInfo.Builder().withCreator(creator).withCreateTime(now).build();
+    AuditInfo auditInfo = AuditInfo.builder().withCreator(creator).withCreateTime(now).build();
 
     auditInfo.validate();
     Assertions.assertNull(auditInfo.lastModifier());
     Assertions.assertNull(auditInfo.lastModifiedTime());
 
     AuditInfo auditInfo1 =
-        new AuditInfo.Builder().withLastModifier(lastModifier).withLastModifiedTime(now).build();
+        AuditInfo.builder().withLastModifier(lastModifier).withLastModifiedTime(now).build();
     auditInfo1.validate();
     Assertions.assertNull(auditInfo1.creator());
     Assertions.assertNull(auditInfo1.createTime());
 
-    AuditInfo auditInfo2 = new AuditInfo.Builder().build();
+    AuditInfo auditInfo2 = AuditInfo.builder().build();
     auditInfo2.validate();
     Assertions.assertNull(auditInfo2.creator());
     Assertions.assertNull(auditInfo2.createTime());

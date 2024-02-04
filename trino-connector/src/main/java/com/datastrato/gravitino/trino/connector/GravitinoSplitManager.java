@@ -26,16 +26,22 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
       ConnectorTableHandle connectorTableHandle,
       DynamicFilter dynamicFilter,
       Constraint constraint) {
+    if (!(connectorTableHandle instanceof GravitinoTableHandle)) {
+      if (transaction instanceof GravitinoTransactionHandle) {
+        transaction = ((GravitinoTransactionHandle) transaction).getInternalTransactionHandle();
+      }
+      return internalSplitManager.getSplits(
+          transaction, session, connectorTableHandle, dynamicFilter, constraint);
+    }
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) connectorTableHandle;
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transaction;
 
-    // TODO(yuhui) add dynamic filter
     return internalSplitManager.getSplits(
         gravitinoTransactionHandle.getInternalTransactionHandle(),
         session,
         gravitinoTableHandle.getInternalTableHandle(),
-        DynamicFilter.EMPTY,
+        dynamicFilter,
         constraint);
   }
 }

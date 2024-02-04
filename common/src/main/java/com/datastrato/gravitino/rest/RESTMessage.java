@@ -20,6 +20,13 @@ package com.datastrato.gravitino.rest;
 
 // Referred from Apache Iceberg's RESTMessage implementation
 // core/src/main/java/org/apache/iceberg/rest/RESTMessage.java
+
+/**
+ * Interface for REST messages.
+ *
+ * <p>REST messages are objects that are sent to and received from REST endpoints. They are
+ * typically used to represent the request and response bodies of REST API calls.
+ */
 public interface RESTMessage {
 
   /**

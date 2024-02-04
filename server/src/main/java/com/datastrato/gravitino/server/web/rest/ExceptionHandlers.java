@@ -5,10 +5,12 @@
 package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
@@ -23,6 +25,11 @@ public class ExceptionHandlers {
   private static final Logger LOG = LoggerFactory.getLogger(ExceptionHandlers.class);
 
   private ExceptionHandlers() {}
+
+  public static Response handlePartitionException(
+      OperationType op, String partition, String table, Exception e) {
+    return PartitionExceptionHandler.INSTANCE.handle(op, partition, table, e);
+  }
 
   public static Response handleTableException(
       OperationType op, String table, String schema, Exception e) {
@@ -41,6 +48,43 @@ public class ExceptionHandlers {
 
   public static Response handleMetalakeException(OperationType op, String metalake, Exception e) {
     return MetalakeExceptionHandler.INSTANCE.handle(op, metalake, "", e);
+  }
+
+  public static Response handleFilesetException(
+      OperationType op, String fileset, String schema, Exception e) {
+    return FilesetExceptionHandler.INSTANCE.handle(op, fileset, schema, e);
+  }
+
+  private static class PartitionExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
+
+    private static final String PARTITION_MSG_TEMPLATE =
+        "Failed to operate partition(s)%s operation [%s] of table [%s], reason [%s]";
+
+    @Override
+    public Response handle(OperationType op, String partition, String table, Exception e) {
+      String formatted = StringUtil.isBlank(partition) ? "" : " [" + partition + "]";
+      String errorMsg =
+          String.format(PARTITION_MSG_TEMPLATE, formatted, op.name(), table, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof PartitionAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
+      } else {
+        return super.handle(op, partition, table, e);
+      }
+    }
   }
 
   private static class TableExceptionHandler extends BaseExceptionHandler {
@@ -160,6 +204,34 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, metalake, parent, e);
+      }
+    }
+  }
+
+  private static class FilesetExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new FilesetExceptionHandler();
+
+    private static final String FILESET_MSG_TEMPLATE =
+        "Failed to operate fileset(s)%s operation [%s] under schema [%s], reason [%s]";
+
+    @Override
+    public Response handle(OperationType op, String fileset, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(fileset) ? "" : " [" + fileset + "]";
+      String errorMsg =
+          String.format(FILESET_MSG_TEMPLATE, formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof FilesetAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, fileset, schema, e);
       }
     }
   }

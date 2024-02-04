@@ -26,6 +26,7 @@ import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -55,7 +56,6 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -72,13 +72,13 @@ import org.junit.jupiter.api.Test;
 
 public class TestRelationalCatalog extends TestBase {
 
-  private static Catalog catalog;
+  protected static Catalog catalog;
 
   private static GravitinoMetaLake metalake;
 
-  private static final String metalakeName = "testMetalake";
+  protected static final String metalakeName = "testMetalake";
 
-  private static final String catalogName = "testCatalog";
+  protected static final String catalogName = "testCatalog";
 
   private static final String provider = "test";
 
@@ -362,7 +362,7 @@ public class TestRelationalCatalog extends TestBase {
             sortOrderDTOs,
             DistributionDTO.NONE,
             EMPTY_PARTITIONING,
-            Indexes.EMPTY_INDEXES);
+            IndexDTO.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -481,7 +481,7 @@ public class TestRelationalCatalog extends TestBase {
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
             EMPTY_PARTITIONING,
-            Indexes.EMPTY_INDEXES);
+            IndexDTO.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -514,7 +514,7 @@ public class TestRelationalCatalog extends TestBase {
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
             partitioning,
-            Indexes.EMPTY_INDEXES);
+            IndexDTO.EMPTY_INDEXES);
     resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -567,6 +567,93 @@ public class TestRelationalCatalog extends TestBase {
                         errorPartitioning));
     Assertions.assertTrue(
         ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
+  }
+
+  @Test
+  public void testCreateIndexTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "index1");
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          createMockColumn("id", Types.IntegerType.get(), "id"),
+          createMockColumn("city", Types.IntegerType.get(), "comment1"),
+          createMockColumn("dt", Types.DateType.get(), "comment2")
+        };
+    IndexDTO[] indexDTOS =
+        new IndexDTO[] {
+          IndexDTO.builder()
+              .withIndexType(IndexDTO.IndexType.PRIMARY_KEY)
+              .withFieldNames(new String[][] {{"id"}})
+              .build(),
+          IndexDTO.builder()
+              .withName("uk_1")
+              .withIndexType(IndexDTO.IndexType.UNIQUE_KEY)
+              .withFieldNames(new String[][] {{"dt"}, {"city"}})
+              .build()
+        };
+
+    // Test create success.
+    TableDTO expectedTable =
+        createMockTable(
+            tableId.name(),
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT,
+            indexDTOS);
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            tableId.name(),
+            "comment",
+            columns,
+            Collections.emptyMap(),
+            SortOrderDTO.EMPTY_SORT,
+            DistributionDTO.NONE,
+            EMPTY_PARTITIONING,
+            indexDTOS);
+    TableResponse resp = new TableResponse(expectedTable);
+    buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableId,
+                columns,
+                "comment",
+                Collections.emptyMap(),
+                EMPTY_PARTITIONING,
+                DistributionDTO.NONE,
+                SortOrderDTO.EMPTY_SORT,
+                indexDTOS);
+    assertTableEquals(expectedTable, table);
+
+    // Test throw TableAlreadyExistsException
+    ErrorResponse errorResp1 =
+        ErrorResponse.alreadyExists(
+            TableAlreadyExistsException.class.getSimpleName(), "table already exists");
+    buildMockResource(Method.POST, tablePath, req, errorResp1, SC_CONFLICT);
+
+    Throwable ex1 =
+        Assertions.assertThrows(
+            TableAlreadyExistsException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableId,
+                        columns,
+                        "comment",
+                        Collections.emptyMap(),
+                        EMPTY_PARTITIONING,
+                        DistributionDTO.NONE,
+                        SortOrderDTO.EMPTY_SORT,
+                        indexDTOS));
+    Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
   private void assertTableEquals(TableDTO expected, Table actual) {
@@ -1034,11 +1121,11 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(updatedSchema.properties(), alteredSchema.properties());
   }
 
-  private static String withSlash(String path) {
+  protected static String withSlash(String path) {
     return "/" + path;
   }
 
-  private static SchemaDTO createMockSchema(
+  protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
     return new SchemaDTO.Builder()
         .withName(name)
@@ -1049,7 +1136,7 @@ public class TestRelationalCatalog extends TestBase {
         .build();
   }
 
-  private static ColumnDTO createMockColumn(String name, Type type, String comment) {
+  protected static ColumnDTO createMockColumn(String name, Type type, String comment) {
     return createMockColumn(name, type, comment, true);
   }
 
@@ -1074,7 +1161,7 @@ public class TestRelationalCatalog extends TestBase {
         .build();
   }
 
-  private static TableDTO createMockTable(
+  protected static TableDTO createMockTable(
       String name,
       ColumnDTO[] columns,
       String comment,
@@ -1082,6 +1169,26 @@ public class TestRelationalCatalog extends TestBase {
       Partitioning[] partitioning,
       DistributionDTO distributionDTO,
       SortOrderDTO[] sortOrderDTOs) {
+    return createMockTable(
+        name,
+        columns,
+        comment,
+        properties,
+        partitioning,
+        distributionDTO,
+        sortOrderDTOs,
+        IndexDTO.EMPTY_INDEXES);
+  }
+
+  private static TableDTO createMockTable(
+      String name,
+      ColumnDTO[] columns,
+      String comment,
+      Map<String, String> properties,
+      Partitioning[] partitioning,
+      DistributionDTO distributionDTO,
+      SortOrderDTO[] sortOrderDTOs,
+      IndexDTO[] indexDTOS) {
     return new TableDTO.Builder()
         .withName(name)
         .withColumns(columns)
@@ -1092,6 +1199,7 @@ public class TestRelationalCatalog extends TestBase {
         .withAudit(
             new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
         .withPartitioning(partitioning)
+        .withIndex(indexDTOS)
         .build();
   }
 }

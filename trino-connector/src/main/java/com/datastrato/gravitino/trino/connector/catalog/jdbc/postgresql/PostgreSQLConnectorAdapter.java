@@ -17,6 +17,7 @@ import java.util.Map;
 /** Transforming PostgreSQL connector configuration and components into Gravitino connector. */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;
+  private static int version = 0;
 
   public PostgreSQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
@@ -25,7 +26,8 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
     config.put("connectorName", "postgresql");
 
     Map<String, String> properties =

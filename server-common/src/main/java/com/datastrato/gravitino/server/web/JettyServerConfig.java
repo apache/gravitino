@@ -14,6 +14,7 @@ import com.google.common.collect.Sets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +26,10 @@ import org.slf4j.LoggerFactory;
 public final class JettyServerConfig {
   private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
   private static final String SPLITTER = ",";
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
+  public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT = 8090;
+  public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTPS_PORT = 8433;
 
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
@@ -39,7 +44,7 @@ public final class JettyServerConfig {
           .version("0.1.0")
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(8090);
+          .createWithDefault(DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT);
 
   public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
       new ConfigBuilder("minThreads")
@@ -111,7 +116,7 @@ public final class JettyServerConfig {
           .version("0.3.0")
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(8433);
+          .createWithDefault(DEFAULT_GRAVITINO_WEBSERVER_HTTPS_PORT);
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PATH =
       new ConfigBuilder("keyStorePath")
@@ -398,6 +403,9 @@ public final class JettyServerConfig {
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
     Map<String, String> configs = config.getConfigsWithPrefix(prefix);
+    if (config instanceof OverwriteDefaultConfig) {
+      configs = overwriteJettyDefaultConfig(configs, (OverwriteDefaultConfig) config);
+    }
     return new JettyServerConfig(configs);
   }
 
@@ -565,5 +573,13 @@ public final class JettyServerConfig {
       return Collections.emptySet();
     }
     return Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites());
+  }
+
+  private static Map<String, String> overwriteJettyDefaultConfig(
+      Map<String, String> properties, OverwriteDefaultConfig config) {
+    if (config.getOverwriteDefaultConfig().isEmpty()) return properties;
+    Map<String, String> newProperties = new HashMap<>(properties);
+    config.getOverwriteDefaultConfig().forEach((k, v) -> newProperties.putIfAbsent(k, v));
+    return newProperties;
   }
 }

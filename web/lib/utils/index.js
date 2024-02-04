@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
+import _, { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
 import { isArray, isObject } from './is'
 
 export const isDevEnv = process.env.NODE_ENV === 'development'
@@ -111,4 +111,52 @@ export function setObjToUrlParams(baseUrl, obj) {
   parameters = parameters.replace(/&$/, '')
 
   return /\?$/.test(baseUrl) ? baseUrl + parameters : baseUrl.replace(/\/?$/, '?') + parameters
+}
+
+export function extractPlaceholder(str) {
+  const regex = /\{\{(.*?)\}\}/g
+  let matches = []
+  let match
+
+  while ((match = regex.exec(str)) !== null) {
+    matches.push(match[1])
+  }
+
+  return matches
+}
+
+export const updateTreeData = (list = [], key, children = []) => {
+  return list.map(node => {
+    if (node.key === key) {
+      return {
+        ...node,
+        children
+      }
+    }
+    if (node.children) {
+      return {
+        ...node,
+        children: updateTreeData(node.children, key, children)
+      }
+    }
+
+    return node
+  })
+}
+
+export const findInTree = (tree, key, value) => {
+  let result = null
+
+  const found = _.find(tree, node => node[key] === value)
+  if (found) {
+    result = found
+  } else {
+    _.forEach(tree, node => {
+      if (_.isEmpty(result) && node.children) {
+        result = findInTree(node.children, key, value)
+      }
+    })
+  }
+
+  return result
 }

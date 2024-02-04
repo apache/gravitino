@@ -125,6 +125,9 @@ dependencies {
   implementation(libs.commons.cli)
   testImplementation(libs.selenium)
   testImplementation(libs.rauschig)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
 }
 
 /* Optimizing integration test execution conditions */
@@ -289,6 +292,9 @@ tasks.test {
       // Gravitino CI Docker image
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
+
+      // Change poll image pause time from 30s to 60s
+      environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
