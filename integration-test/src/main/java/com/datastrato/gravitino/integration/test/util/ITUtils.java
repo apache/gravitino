@@ -21,6 +21,10 @@ public class ITUtils {
     return String.join(File.separator, dirs);
   }
 
+  public static String[] splitPath(String path) {
+    return File.separator.split(path);
+  }
+
   public static void rewriteConfigFile(
       String configTempFileName, String configFileName, Map<String, String> configMap)
       throws IOException {

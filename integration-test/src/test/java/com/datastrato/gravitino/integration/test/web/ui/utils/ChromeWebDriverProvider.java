@@ -127,20 +127,19 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
         Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
         archiver.extract(chromeDriverZip, new File(downLoadTmpDir));
 
-        File unzipFile = new File(downLoadTmpDir, fileName);
+        File unzipFile = new File(downLoadTmpDir, ITUtils.splitPath(fileName)[0]);
         LOG.info(
             "Move file from " + unzipFile.getAbsolutePath() + " to " + targetFile.getParentFile());
-        FileUtils.moveToDirectory(unzipFile, targetFile.getParentFile(), true);
+        FileUtils.moveToDirectory(unzipFile, new File(downLoadDir), true);
         LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
         return;
       } catch (IOException e) {
-        LOG.error(
-            "Download of: " + url + ", failed in path " + ChromeWebDriverProvider.downLoadDir, e);
+        LOG.error("Download of: " + url + ", failed in path " + downLoadDir, e);
         retryNum += 1;
         last = e;
       } finally {
         LOG.info("Remove temp directory: " + downLoadTmpDir);
-        // FileUtils.deleteQuietly(new File(downLoadTmpDir));
+        FileUtils.deleteQuietly(new File(downLoadTmpDir));
       }
     }
     throw new RuntimeException(last);
