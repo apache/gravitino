@@ -130,10 +130,10 @@ public class MySQLBackend implements RelationalBackend {
       try {
         switch (entityType) {
           case METALAKE:
-            BaseMetalake oldMetalakeEntity =
-                POConverters.fromMetalakePO(
-                    ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                        .selectMetalakeMetaByName(ident.name()));
+            MetalakePO oldMetalakePO =
+                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
+                    .selectMetalakeMetaByName(ident.name());
+            BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
             BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
             Preconditions.checkArgument(
                 Objects.equals(oldMetalakeEntity.id(), newMetalakeEntity.id()),
@@ -141,7 +141,7 @@ public class MySQLBackend implements RelationalBackend {
                     "The updated metalake entity id: %s is not same with the metalake entity id before: %s",
                     newMetalakeEntity.id(), oldMetalakeEntity.id()));
             ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .updateMetalakeMeta(POConverters.toMetalakePO(newMetalakeEntity));
+                .updateMetalakeMeta(POConverters.toMetalakePO(newMetalakeEntity), oldMetalakePO);
             SqlSessions.commitAndCloseSqlSession();
             return (E) newMetalakeEntity;
           case CATALOG:
