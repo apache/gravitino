@@ -125,8 +125,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     /** Constructs a new {@link Builder}. */
     private Builder() {
       catalog = new CatalogEntity();
-    } 
-
+    }
 
     /**
      * Sets the unique identifier of the catalog.

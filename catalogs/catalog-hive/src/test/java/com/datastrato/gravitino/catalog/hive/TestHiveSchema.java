@@ -30,7 +30,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-         CatalogEntity.builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
