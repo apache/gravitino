@@ -59,8 +59,8 @@ const RightContent = props => {
         )}
       </Box>
 
-      <Box sx={{ height: 'calc(100% - 4rem)' }}>
-        <TabsContent tableTitle={tableTitle} store={store} page={page} />
+      <Box sx={{ height: 'calc(100% - 4.1rem)' }}>
+        <TabsContent tableTitle={tableTitle} store={store} page={page} routeParams={routeParams} />
       </Box>
     </Box>
   )

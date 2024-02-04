@@ -12,6 +12,9 @@ import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
@@ -25,11 +28,16 @@ import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
@@ -130,6 +138,15 @@ public class AbstractIT {
         .toLowerCase()
         .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
       client = GravitinoClient.builder(uri).withSimpleAuth().build();
+    } else if (AuthenticatorType.KERBEROS
+        .name()
+        .toLowerCase()
+        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      uri = "http://localhost:" + jettyServerConfig.getHttpPort();
+      client =
+          GravitinoClient.builder(uri)
+              .withKerberosAuth(KerberosProviderHelper.getProvider())
+              .build();
     } else {
       client = GravitinoClient.builder(uri).build();
     }
@@ -137,14 +154,14 @@ public class AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    if (client != null) {
-      client.close();
-    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
       recoverGravitinoServerConfig();
+    }
+    if (client != null) {
+      client.close();
     }
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
@@ -195,6 +212,47 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
+    }
+  }
+
+  protected static void assertionsTableInfo(
+      String tableName,
+      String tableComment,
+      List<Column> columns,
+      Map<String, String> properties,
+      Index[] indexes,
+      Table table) {
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertEquals(tableComment, table.comment());
+    Assertions.assertEquals(columns.size(), table.columns().length);
+    for (int i = 0; i < columns.size(); i++) {
+      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
+      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
+      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
+      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
+      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
+    }
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
+    }
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      Assertions.assertEquals(indexes.length, table.index().length);
+
+      Map<String, Index> indexByName =
+          Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
+
+      for (int i = 0; i < table.index().length; i++) {
+        Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
+        Assertions.assertEquals(
+            indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
+        for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
+          for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
+            Assertions.assertEquals(
+                indexByName.get(table.index()[i].name()).fieldNames()[j][k],
+                table.index()[i].fieldNames()[j][k]);
+          }
+        }
+      }
     }
   }
 }

@@ -79,7 +79,8 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.base/sun.nio.cs=ALL-UNNAMED",
     "--add-opens", "java.base/sun.security.action=ALL-UNNAMED",
     "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
-    "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+    "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED"
   )
 }
 
@@ -198,6 +199,14 @@ subprojects {
   tasks.withType<Javadoc> {
     options.encoding = "UTF-8"
     options.locale = "en_US"
+
+    val projectName = project.name
+    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+      options {
+        (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
+        isFailOnError = true
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {

@@ -16,7 +16,10 @@ DROP COLUMN
    name varchar(200),
    salary integer
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 SET COLUMN TYPE
 
@@ -24,7 +27,10 @@ SET COLUMN TYPE
    name varchar(200),
    salary bigint
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 ADD COLUMN
 
@@ -33,7 +39,10 @@ ADD COLUMN
    salary bigint,
    city varchar(50) COMMENT 'aaa'
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 ADD COLUMN
 
@@ -43,7 +52,10 @@ ADD COLUMN
    city varchar(50) COMMENT 'aaa',
    age integer NOT NULL COMMENT 'age of users'
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 ADD COLUMN
 
@@ -54,7 +66,10 @@ ADD COLUMN
    age integer NOT NULL COMMENT 'age of users',
    address varchar(200) NOT NULL COMMENT 'address of users'
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
 
 DROP TABLE
 

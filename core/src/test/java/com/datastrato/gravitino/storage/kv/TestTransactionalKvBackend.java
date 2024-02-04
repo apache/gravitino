@@ -152,7 +152,7 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.begin();
     List<Pair<byte[], byte[]>> pairs =
         transactionalKvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start("k".getBytes())
                 .end("kez".getBytes())
                 .startInclusive(false)
@@ -168,7 +168,7 @@ class TestTransactionalKvBackend {
 
     pairs =
         transactionalKvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start("key1".getBytes())
                 .end("kez".getBytes())
                 .startInclusive(false)
@@ -183,7 +183,7 @@ class TestTransactionalKvBackend {
 
     pairs =
         transactionalKvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start("key1".getBytes())
                 .end("key3".getBytes())
                 .startInclusive(false)
@@ -198,7 +198,7 @@ class TestTransactionalKvBackend {
 
     pairs =
         transactionalKvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start("key3".getBytes())
                 .end("kez".getBytes())
                 .startInclusive(true)
@@ -213,7 +213,7 @@ class TestTransactionalKvBackend {
 
     pairs =
         transactionalKvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start("kf".getBytes())
                 .end("kg".getBytes())
                 .startInclusive(true)
@@ -239,7 +239,7 @@ class TestTransactionalKvBackend {
 
     transactionalKvBackend.begin();
     transactionalKvBackend.deleteRange(
-        new KvRangeScan.KvRangeScanBuilder()
+        new KvRange.KvRangeBuilder()
             .start("key1".getBytes())
             .end("key3".getBytes())
             .startInclusive(true)
@@ -502,7 +502,7 @@ class TestTransactionalKvBackend {
     // start is 'mb' and end is 'mc'
     List<Pair<byte[], byte[]>> data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -512,7 +512,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -523,7 +523,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -534,7 +534,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -546,7 +546,7 @@ class TestTransactionalKvBackend {
     // Start is 'mb' and end is 'mbcde'
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbcde".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -557,7 +557,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbcde".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -568,7 +568,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbcde".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -580,7 +580,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbcde".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -593,7 +593,7 @@ class TestTransactionalKvBackend {
     // Start is 'mb' and end is 'mbc'
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -604,7 +604,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -614,7 +614,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -625,7 +625,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mbc".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -637,7 +637,7 @@ class TestTransactionalKvBackend {
 
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("mb".getBytes(StandardCharsets.UTF_8))
                 .end("mb".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -648,7 +648,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("mb", new String(data.get(0).getKey()));
 
     transactionalKvBackend.scan(
-        KvRangeScan.builder()
+        KvRange.builder()
             .start("mb".getBytes(StandardCharsets.UTF_8))
             .end("mc".getBytes(StandardCharsets.UTF_8))
             .startInclusive(true)
@@ -684,7 +684,7 @@ class TestTransactionalKvBackend {
     // Start is "bc" and end is "bcef"
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bcef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -695,7 +695,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bce", new String(data.get(2).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bcef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -706,7 +706,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bcef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -717,7 +717,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bcef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -730,7 +730,7 @@ class TestTransactionalKvBackend {
     // Start is "bc" and end is "bef"
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -741,7 +741,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -752,7 +752,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bef", new String(data.get(4).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -763,7 +763,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bef", new String(data.get(5).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -776,7 +776,7 @@ class TestTransactionalKvBackend {
     // Start is "bc" and end is "be"
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("be".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -787,7 +787,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("be".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(false)
@@ -798,7 +798,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("be".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -809,7 +809,7 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
     data =
         transactionalKvBackend.scan(
-            KvRangeScan.builder()
+            KvRange.builder()
                 .start("bc".getBytes(StandardCharsets.UTF_8))
                 .end("bef".getBytes(StandardCharsets.UTF_8))
                 .startInclusive(true)
@@ -818,5 +818,15 @@ class TestTransactionalKvBackend {
     Assertions.assertEquals(5, data.size());
     Assertions.assertEquals("bc", new String(data.get(0).getKey()));
     Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
+  }
+
+  @Test
+  void testRevertByte() {
+    byte[] bytes = {0x01, 0x02, 0x03, 0x04};
+    byte[] copy = ArrayUtils.clone(bytes);
+    byte[] revertBytes = TransactionalKvBackendImpl.revertByteArray(bytes);
+    Assertions.assertArrayEquals(copy, bytes);
+    revertBytes = TransactionalKvBackendImpl.revertByteArray(revertBytes);
+    Assertions.assertArrayEquals(bytes, revertBytes);
   }
 }

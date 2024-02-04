@@ -28,7 +28,7 @@ public class KvNameMappingService implements NameMappingService {
   @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
 
   // To separate it from user keys, we will add three control flag 0x1D, 0x00, 0x00 as the prefix.
-  private static final byte[] GENERAL_NAME_MAPPING_PREFIX = new byte[] {0x1D, 0x00, 0x00};
+  static final byte[] GENERAL_NAME_MAPPING_PREFIX = new byte[] {0x1D, 0x00, 0x00};
 
   // Name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -73,7 +73,7 @@ public class KvNameMappingService implements NameMappingService {
             FunctionUtils.executeInTransaction(
                 () -> {
                   byte[] name = transactionalKvBackend.get(idByte);
-                  return idByte == null ? null : new String(name);
+                  return name == null ? null : new String(name);
                 },
                 transactionalKvBackend),
         lock);

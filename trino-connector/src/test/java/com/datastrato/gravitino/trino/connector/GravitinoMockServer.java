@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.metadata.TestGravitinoSchema.mockSchema;
+import static com.datastrato.gravitino.trino.connector.metadata.TestGravitinoTable.mockTable;
 import static java.util.Collections.emptyMap;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -231,7 +233,10 @@ public class GravitinoMockServer implements AutoCloseable {
                         .getMetadataAdapter();
                 GravitinoSchema schema = new GravitinoSchema(schemaName.name(), properties, "");
                 metadata.createSchema(null, schemaName.name(), emptyMap(), null);
-                return schema.getSchemaDTO();
+
+                Schema mockSchema =
+                    mockSchema(schema.getName(), schema.getComment(), schema.getProperties());
+                return mockSchema;
               }
             });
 
@@ -302,7 +307,13 @@ public class GravitinoMockServer implements AutoCloseable {
                         schemaName.name(),
                         metadataAdapter.toGravitinoSchemaProperties(schemaProperties),
                         "");
-                return gravitinoSchema.getSchemaDTO();
+
+                Schema mockSchema =
+                    mockSchema(
+                        gravitinoSchema.getName(),
+                        gravitinoSchema.getComment(),
+                        gravitinoSchema.getProperties());
+                return mockSchema;
               }
             });
     return schemas;
@@ -452,7 +463,17 @@ public class GravitinoMockServer implements AutoCloseable {
                         .getCatalogConnector(catalogName.toString())
                         .getMetadataAdapter();
                 GravitinoTable gravitinoTable = metadataAdapter.createTable(tableMetadata);
-                return gravitinoTable.getTableDTO();
+
+                Table table =
+                    mockTable(
+                        gravitinoTable.getName(),
+                        gravitinoTable.getRawColumns(),
+                        gravitinoTable.getComment(),
+                        gravitinoTable.getProperties(),
+                        gravitinoTable.getPartitioning(),
+                        gravitinoTable.getSortOrders(),
+                        gravitinoTable.getDistribution());
+                return table;
               }
             });
 

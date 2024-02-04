@@ -8,7 +8,9 @@ import { defHttp } from '@/lib/utils/axios'
 const Apis = {
   GET: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
   GET_DETAIL: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,
-  CREATE: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`
+  CREATE: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
+  UPDATE: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,
+  DELETE: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`
 }
 
 export const getCatalogsApi = params => {
@@ -27,5 +29,18 @@ export const createCatalogApi = ({ data, metalake }) => {
   return defHttp.post({
     url: `${Apis.CREATE({ metalake })}`,
     data
+  })
+}
+
+export const updateCatalogApi = ({ metalake, catalog, data }) => {
+  return defHttp.put({
+    url: `${Apis.UPDATE({ metalake, catalog })}`,
+    data
+  })
+}
+
+export const deleteCatalogApi = ({ metalake, catalog }) => {
+  return defHttp.delete({
+    url: `${Apis.DELETE({ metalake, catalog })}`
   })
 }

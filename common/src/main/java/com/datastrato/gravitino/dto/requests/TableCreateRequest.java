@@ -8,8 +8,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -25,6 +25,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a table. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -60,12 +61,25 @@ public class TableCreateRequest implements RESTRequest {
 
   @Nullable
   @JsonProperty("indexes")
-  private final Index[] indexes;
+  private final IndexDTO[] indexes;
 
+  /** Default constructor for Jackson deserialization. */
   public TableCreateRequest() {
     this(null, null, null, null, null, null, null, null);
   }
 
+  /**
+   * Creates a new TableCreateRequest.
+   *
+   * @param name The name of the table.
+   * @param comment The comment of the table.
+   * @param columns The columns of the table.
+   * @param properties The properties of the table.
+   * @param sortOrders The sort orders of the table.
+   * @param distribution The distribution of the table.
+   * @param partitioning The partitioning of the table.
+   * @param indexes The indexes of the table.
+   */
   public TableCreateRequest(
       String name,
       @Nullable String comment,
@@ -74,7 +88,7 @@ public class TableCreateRequest implements RESTRequest {
       @Nullable SortOrderDTO[] sortOrders,
       @Nullable DistributionDTO distribution,
       @Nullable Partitioning[] partitioning,
-      @Nullable Index[] indexes) {
+      @Nullable IndexDTO[] indexes) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
@@ -85,6 +99,11 @@ public class TableCreateRequest implements RESTRequest {
     this.indexes = indexes;
   }
 
+  /**
+   * Validates the {@link TableCreateRequest} request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -119,7 +138,13 @@ public class TableCreateRequest implements RESTRequest {
             + autoIncrementColsStr);
 
     if (indexes != null && indexes.length > 0) {
-      throw new UnsupportedOperationException("Support for indexing is currently not implemented");
+      Arrays.stream(indexes)
+          .forEach(
+              index -> {
+                Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0, "Index field names cannot be null");
+              });
     }
   }
 }

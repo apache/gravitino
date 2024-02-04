@@ -2,6 +2,15 @@ CREATE SCHEMA
 
 CREATE TABLE
 
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
 DROP TABLE
 
 DROP SCHEMA

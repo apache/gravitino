@@ -97,6 +97,21 @@ public class NameIdentifier {
   }
 
   /**
+   * Create the fileset {@link NameIdentifier} with the given metalake, catalog, schema and fileset
+   * name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param fileset The fileset name
+   * @return The created fileset {@link NameIdentifier}
+   */
+  public static NameIdentifier ofFileset(
+      String metalake, String catalog, String schema, String fileset) {
+    return NameIdentifier.of(metalake, catalog, schema, fileset);
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -215,6 +230,13 @@ public class NameIdentifier {
     }
   }
 
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNameIdentifierException} if it's not.
+   *
+   * @param condition The condition to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
   public static void check(boolean condition, String message, Object... args) {
     if (!condition) {
       throw new IllegalNameIdentifierException(String.format(message, args));

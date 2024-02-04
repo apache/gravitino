@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a schema. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -30,16 +31,29 @@ public class SchemaCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  /** Default constructor for Jackson deserialization. */
   public SchemaCreateRequest() {
     this(null, null, null);
   }
 
+  /**
+   * Creates a new SchemaCreateRequest.
+   *
+   * @param name The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   */
   public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
   }
 
+  /**
+   * Validates the request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(

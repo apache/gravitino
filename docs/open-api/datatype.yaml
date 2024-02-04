@@ -53,6 +53,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DataType"
+      example: {
+        "type": "union",
+        "types": [
+          "string",
+          "integer"
+        ]
+      }
 
     MapType:
       type: object
@@ -74,6 +81,12 @@ components:
           description: Whether the value of the map contains null values
           nullable: true
           default: true
+      example: {
+        "type": "map",
+        "keyType": "string",
+        "valueType": "integer",
+        "valueContainsNull": false
+      }
 
     ListType:
       type: object
@@ -92,6 +105,11 @@ components:
           default: true
         elementType:
           $ref: "#/components/schemas/DataType"
+      example: {
+        "type": "list",
+        "elementType": "integer",
+        "containsNull": false
+      }
 
     StructType:
       type: object
@@ -107,6 +125,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StructField"
+      example: {
+        "type": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "integer",
+            "nullable": false,
+            "comment": "The id of the user"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "nullable": false,
+            "comment": "The name of the user"
+          }
+        ]
+      }
 
     StructField:
       type: object
