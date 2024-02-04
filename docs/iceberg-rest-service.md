@@ -30,14 +30,11 @@ Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you
 
 1. [**REST Catalog Server Configuration**](#rest-catalog-server-configuration): you can specify the HTTP server properties like host and port.
 
-2. **Gravitino Iceberg metrics store Configuration:**
+2. [**Gravitino Iceberg metrics store Configuration**](#iceberg-metrics-store-configuration): you could implement a custom Iceberg metrics store and set corresponding configuration.
 
-You could implement a custom Iceberg metrics store and set corresponding Iceberg metrics store configuration.
-
-2. [**Iceberg Catalog Configuration**](#iceberg-catalog-configuration): you have the option to set the specified catalog-backend to either `jdbc` or `hive`.
+3. [**Gravitino Iceberg Catalog backend Configuration**](#gravitino-iceberg-catalog-backend-configuration): you have the option to set the specified catalog-backend to either `jdbc` or `hive`.
 
 4. [**Other Iceberg Catalog Properties Defined by Apache Iceberg**](#other-apache-iceberg-catalog-properties): allows you to configure additional properties defined by Apache Iceberg.
-
 
 Please refer to the following sections for details.
 
