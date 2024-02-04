@@ -11,24 +11,24 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is essential. Examples include managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Gravitino provides capabilities for partition management.
+Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is necessary. Usage scenarios like managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Gravitino provides capabilities of partition management.
 
 ### Requirements and limitations
 
 - Partition management is based on the partitioned table, so please ensure that you are operating on a partitioned table.
 
-The following is a table of partition management support across various catalogs in Gravitino:
+The following table shows the partition operations supported across various catalogs in Gravitino:
 
 | Operation             | Hive catalog                                                       | Iceberg catalog                                                    | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
 |-----------------------|--------------------------------------------------------------------|--------------------------------------------------------------------|--------------------|-------------------------|
-| Add Partition         | Supported                                                          | Not supported                                                      | Not supported      | Not supported           |
-| Get Partition by Name | Supported                                                          | Not supported                                                      | Not supported      | Not supported           |
-| List Partition Names  | Supported                                                          | Not supported                                                      | Not supported      | Not supported           |
-| List Partitions       | Supported                                                          | Not supported                                                      | Not supported      | Not supported           |
-| Drop Partition        | [Coming Soon](https://github.com/datastrato/gravitino/issues/1655) | [Coming Soon](https://github.com/datastrato/gravitino/issues/1655) | Not supported      | Not supported           |
+| Add Partition         | YES                                                                | NO                                                                 | NO                 | NO                      |
+| Get Partition by Name | YES                                                                | NO                                                                 | NO                 | NO                      |
+| List Partition Names  | YES                                                                | NO                                                                 | NO                 | NO                      |
+| List Partitions       | YES                                                                | NO                                                                 | NO                 | NO                      |
+| Drop Partition        | [Coming Soon](https://github.com/datastrato/gravitino/issues/1655) | [Coming Soon](https://github.com/datastrato/gravitino/issues/1655) | NO                 | NO                      |
 
 :::tip[WELCOME FEEDBACK]
-If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/datastrato/gravitino/issues/new/choose) on the [Gravitino open-source repository](https://github.com/datastrato/gravitino).
+If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/datastrato/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/datastrato/gravitino).
 :::
 
 ## Partition operations
@@ -76,9 +76,9 @@ For JSON examples:
 ```
 
 :::note
-The values must in the same order as the field names.
+The values of the field `values` must be the same ordering as the values of `fieldNames`.
 
-When adding an identity partition to a Hive partitioned table, the specified partition name is disregarded. This is because Hive generates the partition name based on field names and values.
+When adding an identity partition to a partitioned Hive table, the specified partition name is ignored. This is because Hive generates the partition name based on field names and values.
 :::
 
 </TabItem>
@@ -163,7 +163,7 @@ Partition partition =
 :::note
 The values are in the same order as the field names.
 
-When adding an identity partition to a Hive partitioned table, the specified partition name is disregarded. This is because Hive generates the partition name based on field names and values.
+When adding an identity partition to a partitioned Hive table, the specified partition name is ignored. This is because Hive generates the partition name based on field names and values.
 :::
 
 </TabItem>
@@ -207,7 +207,7 @@ Each list in the lists must have the same length. The values in each list must c
 </Tabs>
 
 You can add a partition to a partitioned table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
-The following is an example of adding a range partition to a partitioned table:
+The following is an example of adding a identity partition to a Hive partitioned table:
 
 <Tabs>
 <TabItem value="shell" label="Shell">
@@ -217,18 +217,27 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "partitions": [
     {
-      "type": "range",
-      "name": "p20200321",
-      "upper": {
-        "type": "literal",
-        "dataType": "date",
-        "value": "2020-03-21"
-      },
-      "lower": {
-        "type": "literal",
-        "dataType": "null",
-        "value": "null"
-      }
+      "type": "identity",
+      "fieldNames": [
+        [
+          "dt"
+        ],
+        [
+          "country"
+        ]
+      ],
+      "values": [
+        {
+          "type": "literal",
+          "dataType": "date",
+          "value": "2008-08-08"
+        },
+        {
+          "type": "literal",
+          "dataType": "string",
+          "value": "us"
+        }
+      ]
     }
   ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table/partitions
@@ -251,11 +260,11 @@ Partition addedPartition =
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
         .supportPartitions()
         .addPartition(
-            Partitions.range(
-                "p20200321",
-                Literals.dateLiteral(LocalDate.parse("2020-03-21")),
-                Literals.NULL,
-                Maps.newHashMap()));
+            Partitions.identity(
+              new String[][] {{"dt"}, {"country"}},
+              new Literal[] {
+              Literals.dateLiteral(LocalDate.parse("2008-08-08")), Literals.stringLiteral("us")},
+              Maps.newHashMap()));
 ```
 
 </TabItem>
