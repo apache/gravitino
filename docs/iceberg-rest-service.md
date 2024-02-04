@@ -170,3 +170,5 @@ DESCRIBE TABLE EXTENDED dml.test;
 INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test
 ```
+
+You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-iceberg-rest-service).
