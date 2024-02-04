@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relation;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATION_STORE;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntitySerDe;
@@ -16,7 +17,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.storage.relation.mysql.MysqlBackend;
+import com.datastrato.gravitino.storage.relation.mysql.MySQLBackend;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -26,10 +27,15 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Relation store to store entities. This means we can store entities in a relational store. I.e.,
+ * MYSQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
+ * RelationBackend} interface
+ */
 public class RelationEntityStore implements EntityStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationEntityStore.class);
   public static final ImmutableMap<String, String> RELATION_BACKENDS =
-      ImmutableMap.of("MysqlBackend", MysqlBackend.class.getCanonicalName());
+      ImmutableMap.of(Configs.DEFAULT_ENTITY_RELATION_STORE, MySQLBackend.class.getCanonicalName());
   private RelationBackend backend;
 
   @Override
@@ -75,7 +81,7 @@ public class RelationEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.put(e, overwritten);
+    backend.insert(e, overwritten);
   }
 
   @Override
@@ -99,8 +105,7 @@ public class RelationEntityStore implements EntityStore {
   }
 
   @Override
-  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException {
+  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) {
     throw new UnsupportedOperationException("Unsupported operation in relation entity store.");
   }
 
