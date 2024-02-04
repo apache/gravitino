@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.openqa.selenium.WebDriver;
@@ -96,6 +97,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     return new ChromeDriver(chromeOptions);
   }
 
+  // Be careful, fileName contains directory path.
   private void downloadZipFile(String url, String zipFileName, String fileName) {
     File targetFile = new File(downLoadDir, fileName);
     if (targetFile.exists()) {
@@ -103,19 +105,48 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       return;
     }
 
-    try {
-      LOG.info("Download the zip file from " + url + " to " + downLoadDir);
-      File chromeDriverZip = new File(ChromeWebDriverProvider.downLoadDir, zipFileName);
-      FileUtils.copyURLToFile(new URL(url), chromeDriverZip);
+    Instant limit = Instant.now().plusSeconds(120);
+    int retryNum = 0;
+    IOException last = null;
 
-      LOG.info("Extract the zip file from " + chromeDriverZip.getAbsolutePath());
-      Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
-      archiver.extract(new File(downLoadDir, zipFileName), new File(downLoadDir));
-    } catch (IOException e) {
-      LOG.error(
-          "Download of: " + url + ", failed in path " + ChromeWebDriverProvider.downLoadDir, e);
-      throw new RuntimeException(e);
+    while (retryNum < 3 && Instant.now().isBefore(limit)) {
+      String downLoadTmpDir =
+          ITUtils.joinPath(
+              System.getenv("IT_PROJECT_DIR"),
+              String.format("chrome-%d", Instant.now().toEpochMilli()));
+      try {
+        LOG.info("Download the zip file from " + url + " to " + downLoadTmpDir);
+        File chromeDriverZip = new File(downLoadTmpDir, zipFileName);
+        FileUtils.copyURLToFile(new URL(url), chromeDriverZip, 30000, 30000);
+
+        LOG.info(
+            "Extract the zip file from "
+                + chromeDriverZip.getAbsolutePath()
+                + " to "
+                + downLoadTmpDir);
+        Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
+        archiver.extract(chromeDriverZip, new File(downLoadTmpDir));
+
+        // fileName contains directory path like "chrome-linux/chrome", there's an assumption
+        // that the zip file is extracted to the firstPath "chrome-linux"
+        String firstPath = ITUtils.splitPath(fileName)[0];
+        LOG.info("filename:{}, firstPath:{}, {}", fileName, firstPath, ITUtils.splitPath(fileName));
+        File unzipFile = new File(downLoadTmpDir, firstPath);
+        File dstFile = new File(downLoadDir);
+        LOG.info(
+            "Move file from " + unzipFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
+        FileUtils.moveToDirectory(unzipFile, dstFile, true);
+        LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
+        return;
+      } catch (IOException e) {
+        LOG.error("Download of: " + url + ", failed in path " + downLoadDir, e);
+        retryNum += 1;
+        last = e;
+      } finally {
+        LOG.info("Remove temp directory: " + downLoadTmpDir);
+        FileUtils.deleteQuietly(new File(downLoadTmpDir));
+      }
     }
-    LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
+    throw new RuntimeException(last);
   }
 }
