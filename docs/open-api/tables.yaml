@@ -320,6 +320,13 @@ components:
       items:
         type: string
 
+    ColumnDefaultValue:
+      $ref: "./expression.yaml#/components/schemas/FunctionArg"
+      description: The default value of the column
+      required: false
+      nullable: true
+      default: null
+
     Column:
       type: object
       required:
@@ -340,6 +347,8 @@ components:
           description: Whether the column is nullable
           nullable: true
           default: true
+        defaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
         autoIncrement:
           type: boolean
           description: Whether the column is auto increment

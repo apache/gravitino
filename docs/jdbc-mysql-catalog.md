@@ -28,7 +28,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
-- Supports column default value and auto-increment.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment).
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
@@ -79,7 +79,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 - Gravitino table corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Supports index.
-- Support column default value and auto-increment.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 #### Table column types
@@ -107,9 +107,7 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 
 #### Table column auto-increment
 
-- Supports setting auto-increment.
-
-:::notice
+:::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
@@ -121,7 +119,7 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
   "columns": [
     {
       "name": "id",
-      "type": "int",
+      "type": "integer",
       "comment": "id column comment",
       "nullable": false,
       "autoIncrement": true
@@ -175,7 +173,7 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
-:::notice
+:::note
 The index name of the PRIMARY_KEY must be PRIMARY
 [Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
 :::
