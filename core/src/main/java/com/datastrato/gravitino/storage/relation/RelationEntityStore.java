@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Relation store to store entities. This means we can store entities in a relational store. I.e.,
- * MYSQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
+ * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationBackend} interface
  */
 public class RelationEntityStore implements EntityStore {
@@ -95,7 +95,11 @@ public class RelationEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return backend.get(ident, entityType);
+    E entity = backend.get(ident, entityType);
+    if (entity == null) {
+      throw new NoSuchEntityException(ident.toString());
+    }
+    return entity;
   }
 
   @Override
