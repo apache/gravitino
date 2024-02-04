@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO.Builder;
@@ -39,6 +40,7 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -65,10 +67,17 @@ import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
+/** Utility class for converting between DTOs and domain objects. */
 public class DTOConverters {
 
   private DTOConverters() {}
 
+  /**
+   * Converts a {@link Audit} to a {@link AuditDTO}.
+   *
+   * @param audit The audit.
+   * @return The audit DTO.
+   */
   public static AuditDTO toDTO(Audit audit) {
     return AuditDTO.builder()
         .withCreator(audit.creator())
@@ -78,6 +87,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a {@link Metalake} to a {@link MetalakeDTO}.
+   *
+   * @param metalake The metalake.
+   * @return The metalake DTO.
+   */
   public static MetalakeDTO toDTO(Metalake metalake) {
     return new MetalakeDTO.Builder()
         .withName(metalake.name())
@@ -87,6 +102,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a {@link Partition} to a {@link PartitionDTO}.
+   *
+   * @param partition The partition.
+   * @return The partition DTO.
+   */
   public static PartitionDTO toDTO(Partition partition) {
     if (partition instanceof RangePartition) {
       RangePartition rangePartition = (RangePartition) partition;
@@ -126,6 +147,12 @@ public class DTOConverters {
     }
   }
 
+  /**
+   * Converts a {@link Catalog} to a {@link CatalogDTO}.
+   *
+   * @param catalog The catalog.
+   * @return The catalog DTO.
+   */
   public static CatalogDTO toDTO(Catalog catalog) {
     return new CatalogDTO.Builder()
         .withName(catalog.name())
@@ -137,6 +164,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a {@link Schema} to a {@link SchemaDTO}.
+   *
+   * @param schema The schema.
+   * @return The schema DTO.
+   */
   public static SchemaDTO toDTO(Schema schema) {
     return new SchemaDTO.Builder()
         .withName(schema.name())
@@ -146,6 +179,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a {@link Column} to a {@link ColumnDTO}.
+   *
+   * @param column The column.
+   * @return The column DTO.
+   */
   public static ColumnDTO toDTO(Column column) {
     return new ColumnDTO.Builder()
         .withName(column.name())
@@ -161,6 +200,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a table implementation to a {@link TableDTO}.
+   *
+   * @param table The table implementation.
+   * @return The table DTO.
+   */
   public static TableDTO toDTO(Table table) {
     return new TableDTO.Builder()
         .withName(table.name())
@@ -176,6 +221,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a Distribution implementation to a DistributionDTO.
+   *
+   * @param distribution The distribution implementation.
+   * @return The distribution DTO.
+   */
   public static DistributionDTO toDTO(Distribution distribution) {
     if (Distributions.NONE.equals(distribution) || null == distribution) {
       return DistributionDTO.NONE;
@@ -195,6 +246,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a SortOrder implementation to a SortOrderDTO.
+   *
+   * @param sortOrder The sort order implementation.
+   * @return The sort order DTO.
+   */
   public static SortOrderDTO toDTO(SortOrder sortOrder) {
     if (sortOrder instanceof SortOrderDTO) {
       return (SortOrderDTO) sortOrder;
@@ -206,6 +263,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a Transform implementation to a Partitioning DTO.
+   *
+   * @param transform The transform implementation.
+   * @return The partitioning DTO.
+   */
   public static Partitioning toDTO(Transform transform) {
     if (transform instanceof Partitioning) {
       return (Partitioning) transform;
@@ -246,6 +309,12 @@ public class DTOConverters {
     }
   }
 
+  /**
+   * Converts an index implementation to an IndexDTO.
+   *
+   * @param index The index implementation.
+   * @return The index DTO.
+   */
   public static IndexDTO toDTO(Index index) {
     if (index instanceof IndexDTO) {
       return (IndexDTO) index;
@@ -257,6 +326,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a Expression to an FunctionArg DTO.
+   *
+   * @param expression The expression to be converted.
+   * @return The expression DTO.
+   */
   public static FunctionArg toFunctionArg(Expression expression) {
     if (expression instanceof FunctionArg) {
       return (FunctionArg) expression;
@@ -291,6 +366,12 @@ public class DTOConverters {
     }
   }
 
+  /**
+   * Converts an array of Expressions to an array of FunctionArg DTOs.
+   *
+   * @param expressions The expressions to be converted.
+   * @return The array of FunctionArg DTOs.
+   */
   public static FunctionArg[] toFunctionArg(Expression[] expressions) {
     if (ArrayUtils.isEmpty(expressions)) {
       return FunctionArg.EMPTY_ARGS;
@@ -298,6 +379,29 @@ public class DTOConverters {
     return Arrays.stream(expressions).map(DTOConverters::toFunctionArg).toArray(FunctionArg[]::new);
   }
 
+  /**
+   * Converts a Fileset to a FilesetDTO.
+   *
+   * @param fileset The fileset to be converted.
+   * @return The fileset DTO.
+   */
+  public static FilesetDTO toDTO(Fileset fileset) {
+    return FilesetDTO.builder()
+        .name(fileset.name())
+        .comment(fileset.comment())
+        .type(fileset.type())
+        .storageLocation(fileset.storageLocation())
+        .properties(fileset.properties())
+        .audit(toDTO(fileset.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts an array of Columns to an array of ColumnDTOs.
+   *
+   * @param columns The columns to be converted.
+   * @return The array of ColumnDTOs.
+   */
   public static ColumnDTO[] toDTOs(Column[] columns) {
     if (ArrayUtils.isEmpty(columns)) {
       return new ColumnDTO[0];
@@ -305,6 +409,12 @@ public class DTOConverters {
     return Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new);
   }
 
+  /**
+   * Converts an array of SortOrders to an array of SortOrderDTOs.
+   *
+   * @param sortOrders The sort orders to be converted.
+   * @return The array of SortOrderDTOs.
+   */
   public static SortOrderDTO[] toDTOs(SortOrder[] sortOrders) {
     if (ArrayUtils.isEmpty(sortOrders)) {
       return new SortOrderDTO[0];
@@ -312,6 +422,12 @@ public class DTOConverters {
     return Arrays.stream(sortOrders).map(DTOConverters::toDTO).toArray(SortOrderDTO[]::new);
   }
 
+  /**
+   * Converts an array of Transforms to an array of Partitioning DTOs.
+   *
+   * @param transforms The transforms to be converted.
+   * @return The array of Partitioning DTOs.
+   */
   public static Partitioning[] toDTOs(Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
       return new Partitioning[0];
@@ -319,6 +435,12 @@ public class DTOConverters {
     return Arrays.stream(transforms).map(DTOConverters::toDTO).toArray(Partitioning[]::new);
   }
 
+  /**
+   * Converts an array of Indexes to an array of IndexDTOs.
+   *
+   * @param indexes The indexes to be converted.
+   * @return The array of IndexDTOs.
+   */
   public static IndexDTO[] toDTOs(Index[] indexes) {
     if (ArrayUtils.isEmpty(indexes)) {
       return IndexDTO.EMPTY_INDEXES;
@@ -326,6 +448,12 @@ public class DTOConverters {
     return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
 
+  /**
+   * Converts an array of Partitions to an array of PartitionDTOs.
+   *
+   * @param partitions The partitions to be converted.
+   * @return The array of PartitionDTOs.
+   */
   public static PartitionDTO[] toDTOs(Partition[] partitions) {
     if (ArrayUtils.isEmpty(partitions)) {
       return new PartitionDTO[0];
@@ -333,6 +461,12 @@ public class DTOConverters {
     return Arrays.stream(partitions).map(DTOConverters::toDTO).toArray(PartitionDTO[]::new);
   }
 
+  /**
+   * Converts a DistributionDTO to a Distribution.
+   *
+   * @param distributionDTO The distribution DTO.
+   * @return The distribution.
+   */
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
     if (DistributionDTO.NONE.equals(distributionDTO) || null == distributionDTO) {
       return Distributions.NONE;
@@ -344,6 +478,12 @@ public class DTOConverters {
         fromFunctionArgs(distributionDTO.args()));
   }
 
+  /**
+   * Converts a FunctionArg DTO to an Expression.
+   *
+   * @param args The function argument DTOs to be converted.
+   * @return The array of Expressions.
+   */
   public static Expression[] fromFunctionArgs(FunctionArg[] args) {
     if (ArrayUtils.isEmpty(args)) {
       return Expression.EMPTY_EXPRESSION;
@@ -351,6 +491,12 @@ public class DTOConverters {
     return Arrays.stream(args).map(DTOConverters::fromFunctionArg).toArray(Expression[]::new);
   }
 
+  /**
+   * Converts a FunctionArg DTO to an Expression.
+   *
+   * @param arg The function argument DTO to be converted.
+   * @return The expression.
+   */
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
@@ -370,10 +516,22 @@ public class DTOConverters {
     }
   }
 
+  /**
+   * Converts a IndexDTO to an Index.
+   *
+   * @param indexDTO The Index DTO to be converted.
+   * @return The index.
+   */
   public static Index fromDTO(IndexDTO indexDTO) {
     return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
   }
 
+  /**
+   * Converts an array of IndexDTOs to an array of Indexes.
+   *
+   * @param indexDTOS The Index DTOs to be converted.
+   * @return The array of Indexes.
+   */
   public static Index[] fromDTOs(IndexDTO[] indexDTOS) {
     if (ArrayUtils.isEmpty(indexDTOS)) {
       return Indexes.EMPTY_INDEXES;
@@ -382,6 +540,12 @@ public class DTOConverters {
     return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
   }
 
+  /**
+   * Converts a PartitionDTO to a Partition.
+   *
+   * @param partitionDTO The partition DTO to be converted.
+   * @return The partition.
+   */
   public static Partition fromDTO(PartitionDTO partitionDTO) {
     switch (partitionDTO.type()) {
       case IDENTITY:
@@ -407,6 +571,12 @@ public class DTOConverters {
     }
   }
 
+  /**
+   * Converts a SortOrderDTO to a SortOrder.
+   *
+   * @param sortOrderDTO The sort order DTO to be converted.
+   * @return The sort order.
+   */
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrders.of(
         fromFunctionArg(sortOrderDTO.sortTerm()),
@@ -414,6 +584,12 @@ public class DTOConverters {
         sortOrderDTO.nullOrdering());
   }
 
+  /**
+   * Converts an array of SortOrderDTOs to an array of SortOrders.
+   *
+   * @param sortOrderDTO The sort order DTOs to be converted.
+   * @return The array of SortOrders.
+   */
   public static SortOrder[] fromDTOs(SortOrderDTO[] sortOrderDTO) {
     if (ArrayUtils.isEmpty(sortOrderDTO)) {
       return new SortOrder[0];
@@ -422,6 +598,12 @@ public class DTOConverters {
     return Arrays.stream(sortOrderDTO).map(DTOConverters::fromDTO).toArray(SortOrder[]::new);
   }
 
+  /**
+   * Converts an array of Partitioning DTOs to an array of Transforms.
+   *
+   * @param partitioning The partitioning DTOs to be converted.
+   * @return The array of Transforms.
+   */
   public static Transform[] fromDTOs(Partitioning[] partitioning) {
     if (ArrayUtils.isEmpty(partitioning)) {
       return new Transform[0];
@@ -429,6 +611,12 @@ public class DTOConverters {
     return Arrays.stream(partitioning).map(DTOConverters::fromDTO).toArray(Transform[]::new);
   }
 
+  /**
+   * Converts a ColumnDTO to a Column.
+   *
+   * @param columns The column DTO to be converted.
+   * @return The column.
+   */
   public static Column[] fromDTOs(ColumnDTO[] columns) {
     if (ArrayUtils.isEmpty(columns)) {
       return new Column[0];
@@ -436,6 +624,12 @@ public class DTOConverters {
     return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
   }
 
+  /**
+   * Converts a ColumnDTO to a Column.
+   *
+   * @param column The column DTO to be converted.
+   * @return The column.
+   */
   public static Column fromDTO(ColumnDTO column) {
     if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
       return column;
@@ -449,6 +643,12 @@ public class DTOConverters {
         fromFunctionArg((FunctionArg) column.defaultValue()));
   }
 
+  /**
+   * Converts a partitioning DTO to a Transform.
+   *
+   * @param partitioning The partitioning DTO to be converted.
+   * @return The transform.
+   */
   public static Transform fromDTO(Partitioning partitioning) {
     switch (partitioning.strategy()) {
       case IDENTITY:

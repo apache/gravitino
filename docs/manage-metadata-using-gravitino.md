@@ -609,22 +609,97 @@ You can create a table by sending a `POST` request to the `/api/metalakes/{metal
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "table",
+  "name": "my_table",
+  "comment": "This is my table",
   "columns": [
     {
       "name": "id",
       "type": "integer",
-      "nullable": true,
-      "comment": "Id of the user"
+      "comment": "id column comment",
+      "nullable": true
     },
     {
       "name": "name",
-      "type": "varchar(2000)",
-      "nullable": true,
-      "comment": "Name of the user"
+      "type": "string",
+      "comment": "name column comment",
+      "nullable": true
+    },
+    {
+      "name": "age",
+      "type": "integer",
+      "comment": "age column comment",
+      "nullable": true
+    },
+    {
+      "name": "info",
+      "type": {
+        "type": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "string",
+            "nullable": true,
+            "comment": "position field comment"
+          },
+          {
+            "name": "contact",
+            "type": {
+              "type": "list",
+              "elementType": "integer",
+              "containsNull": false
+            },
+            "nullable": true,
+            "comment": "contact field comment"
+          },
+          {
+            "name": "rating",
+            "type": {
+              "type": "map",
+              "keyType": "string",
+              "valueType": "integer",
+              "valueContainsNull": false
+            },
+            "nullable": true,
+            "comment": "rating field comment"
+          }
+        ]
+      },
+      "comment": "info column comment",
+      "nullable": true
+    },
+    {
+      "name": "dt",
+      "type": "date",
+      "comment": "dt column comment",
+      "nullable": true
     }
   ],
-  "comment": "Create a new Table",
+  "partitioning": [
+    {
+      "strategy": "identity",
+      "fieldName": [ "dt" ]
+    }
+  ],
+  "distribution": {
+    "strategy": "hash",
+    "number": 32,
+    "funcArgs": [
+      {
+        "type": "field",
+        "fieldName": [ "id" ]
+      }
+    ]
+  },
+  "sortOrders": [
+    {
+      "sortTerm": {
+        "type": "field",
+        "fieldName": [ "age" ]
+      },
+      "direction": "asc",
+      "nullOrdering": "nulls_first"
+    }
+  ],
   "properties": {
     "format": "ORC"
   }
@@ -654,24 +729,25 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .put("format", "ORC")
         // For more table properties, please refer to the related doc.
         .build();
+
 tableCatalog.createTable(
-    NameIdentifier.of("metalake", "catalog", "schema", "table"),
-    new ColumnDTO[] {
-        ColumnDTO.builder()
-            .withComment("Id of the user")
-            .withName("id")
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .build(),
-        ColumnDTO.builder()
-            .withComment("Name of the user")
-            .withName("name")
-            .withDataType(Types.VarCharType.of(1000))
-            .withNullable(true)
-            .build(),
-    },
-    "Create a new Table",
-    tablePropertiesMap
+  NameIdentifier.of("metalake", "catalog", "schema", "table"),
+  new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", true, false, null),
+    Column.of("name", Types.VarCharType.of(1000), "name column comment", true, false, null),
+    Column.of("age", Types.IntegerType.get(), "age column comment", true, false, null),
+    Column.of("info", Types.StructType.of(
+        Field.nullableField("position", Types.StringType.get(), "Position of the user"),
+        Field.nullableField("contact", Types.ListType.of(Types.IntegerType.get(), false), "contact field comment"),
+        Field.nullableField("rating", Types.MapType.of(Types.VarCharType.of(1000), Types.IntegerType.get(), false), "rating field comment")
+      ), "info column comment", true, false, null),
+    Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
+  },
+  "Create a new Table",
+  tablePropertiesMap,
+  new Transform[] {Transforms.identity("id")},
+  Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
+  new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))}
 );
 ```
 
@@ -711,10 +787,20 @@ The following types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
 
+The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
-The related java doc is [here](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/types/Type.html).
+#### Table column auto-increment
+
+Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
+The following catalogs support setting the table column auto-increment.
+
+| Catalog provider    | Auto-increment mapping                                                                        |
+|---------------------|-----------------------------------------------------------------------------------------------|
+| `jdbc-mysql`        | [MySQL auto-increment mapping](./jdbc-mysql-catalog.md#table-column-auto-increment)           |
+| `jdbc-postgresql`   | [PostgreSQL auto-increment mapping](./jdbc-postgresql-catalog.md#table-column-auto-increment) |
+
 
 #### Table property and type mapping
 
@@ -728,16 +814,19 @@ The following is the table property that Gravitino supports:
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 
 
+#### Table partitioning, bucketing, sort ordering and indexing
+
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
-|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Feature             | Description                                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                           | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.                 | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                             | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexing      | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations.   | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
 
 
-For more information, please see the related document on [partitioning, bucketing, and sorting](table-partitioning-bucketing-sort-order.md).
+For more information, please see the related document on [partitioning, bucketing, sorting, and indexing](table-partitioning-bucketing-sort-order-indexes.md).
 
 :::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.

@@ -11,16 +11,16 @@ import com.datastrato.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter<String> {
 
-  protected static final String TINYINT = "tinyint";
-  protected static final String SMALLINT = "smallint";
-  protected static final String INT = "int";
-  protected static final String BIGINT = "bigint";
-  protected static final String FLOAT = "float";
-  protected static final String DOUBLE = "double";
-  protected static final String DECIMAL = "decimal";
-  protected static final String CHAR = "char";
-  protected static final String BINARY = "binary";
-  protected static final String DATETIME = "datetime";
+  static final String TINYINT = "tinyint";
+  static final String SMALLINT = "smallint";
+  static final String INT = "int";
+  static final String BIGINT = "bigint";
+  static final String FLOAT = "float";
+  static final String DOUBLE = "double";
+  static final String DECIMAL = "decimal";
+  static final String CHAR = "char";
+  static final String BINARY = "binary";
+  static final String DATETIME = "datetime";
 
   @Override
   public Type toGravitinoType(JdbcTypeBean typeBean) {

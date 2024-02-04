@@ -22,6 +22,8 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.jsqlparser)
 
+  testImplementation(project(":catalogs:catalog-jdbc-common"))
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.guava)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.junit.jupiter.api)

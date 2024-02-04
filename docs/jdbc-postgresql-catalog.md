@@ -9,6 +9,9 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage PostgreSQL metadata.
@@ -24,8 +27,8 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Gravitino catalog corresponds to the PostgreSQL database.
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
-- Doesn't support table index operations.
-- Doesn't support setting certain column properties, such as default value and check constraints
+- Supports table index.
+- Supports column default value and auto-increment. 
 
 ### Catalog properties
 
@@ -61,9 +64,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
-- Supports create schema with comments.
-- Supports drop schema.
-- Supports cascade drop schema.
+- Supports creating schema with comments.
+- Supports dropping schema.
+- Supports cascade dropping schema.
 
 ### Schema properties
 
@@ -79,8 +82,8 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
-- Doesn't support setting certain column properties, such as default value and check constraints.
-- Doesn't support index definition.
+- Supports index.
+- Support column default value and auto-increment.
 - Doesn't support table property settings.
 
 #### Table column types
@@ -107,9 +110,87 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 :::
 
+#### Table column auto-increment
+
+- Supports setting auto-increment.
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "int",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Column[] cols = new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+    Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+};
+```
+
+</TabItem>
+</Tabs>
+
 ### Table properties
 
 - Doesn't support table properties.
+
+### Table indexes
+
+- Supports PRIMARY_KEY and UNIQUE_KEY.
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "id_pk",
+      "fieldNames": [["id"]]
+    },
+    {
+      "indexType": "unique_key",
+      "name": "id_name_uk",
+      "fieldNames": [["id"] ,["name"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+}
+```
+
+</TabItem>
+</Tabs>
 
 ### Table operations
 

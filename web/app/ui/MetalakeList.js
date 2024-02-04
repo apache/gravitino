@@ -13,7 +13,7 @@ import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import Icon from '@/components/Icon'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } from '@/lib/store/metalakes'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake, resetTree } from '@/lib/store/metalakes'
 
 import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
@@ -81,6 +81,10 @@ const MetalakeList = () => {
     setOpenDrawer(true)
   }
 
+  const handleClickLink = () => {
+    dispatch(resetTree())
+  }
+
   useEffect(() => {
     dispatch(fetchMetalakes())
   }, [dispatch])
@@ -116,6 +120,7 @@ const MetalakeList = () => {
                 noWrap
                 component={Link}
                 href={`/ui/metalakes?metalake=${name}`}
+                onClick={() => handleClickLink()}
                 sx={{
                   fontWeight: 500,
                   color: 'primary.main',
@@ -138,7 +143,7 @@ const MetalakeList = () => {
       minWidth: 150,
       disableColumnMenu: true,
       field: 'createdBy',
-      headerName: 'Created By',
+      headerName: 'Created by',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
@@ -153,7 +158,7 @@ const MetalakeList = () => {
       disableColumnMenu: true,
       valueGetter: params => `${params.row.audit?.createTime}`,
       field: 'createdAt',
-      headerName: 'Created At',
+      headerName: 'Created at',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>

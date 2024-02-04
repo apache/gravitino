@@ -21,7 +21,12 @@ package com.datastrato.gravitino.rel.expressions.sorts;
 
 /** A null order used in sorting expressions. */
 public enum NullOrdering {
+  /**
+   * Nulls appear before non-nulls. For ascending order, this means nulls appear at the beginning,
+   */
   NULLS_FIRST,
+
+  /** Nulls appear after non-nulls. For ascending order, this means nulls appear at the end. */
   NULLS_LAST;
 
   @Override

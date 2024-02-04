@@ -170,11 +170,21 @@ public class JsonUtils {
       this.elements = pNode.elements();
     }
 
+    /**
+     * Judge whether it has more elements in the JSON array.
+     *
+     * @return
+     */
     @Override
     public boolean hasNext() {
       return elements.hasNext();
     }
 
+    /**
+     * Get a next element from the JSON array.
+     *
+     * @return
+     */
     @Override
     public T next() {
       JsonNode element = elements.next();
@@ -237,7 +247,7 @@ public class JsonUtils {
    * @param node The JSON node.
    * @return The list of strings or null if property is missing or null.
    */
-  public static List<String> getStringListOrNull(String property, JsonNode node) {
+  static List<String> getStringListOrNull(String property, JsonNode node) {
     if (!node.has(property) || node.get(property).isNull()) {
       return null;
     }
@@ -254,14 +264,14 @@ public class JsonUtils {
    * @return The list of strings.
    * @throws IllegalArgumentException if the property is missing in the JSON node.
    */
-  public static List<String> getStringList(String property, JsonNode node) {
+  private static List<String> getStringList(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     return ImmutableList.<String>builder()
         .addAll(new JsonStringArrayIterator(property, node))
         .build();
   }
 
-  public static String[] getStringArray(ArrayNode node) {
+  private static String[] getStringArray(ArrayNode node) {
     String[] array = new String[node.size()];
     for (int i = 0; i < node.size(); i++) {
       array[i] = node.get(i).asText();
@@ -269,6 +279,13 @@ public class JsonUtils {
     return array;
   }
 
+  /**
+   * Get a int value from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The int value.
+   */
   public static int getInt(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     JsonNode pNode = node.get(property);
@@ -280,6 +297,13 @@ public class JsonUtils {
     return pNode.asInt();
   }
 
+  /**
+   * Get a long value from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The long value.
+   */
   public static long getLong(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     JsonNode pNode = node.get(property);
@@ -291,7 +315,7 @@ public class JsonUtils {
     return pNode.asLong();
   }
 
-  public static FunctionArg readFunctionArg(JsonNode node) {
+  private static FunctionArg readFunctionArg(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull() && node.isObject(),
         "Cannot parse function arg from invalid JSON: %s",
@@ -346,7 +370,7 @@ public class JsonUtils {
     }
   }
 
-  public static void writeFunctionArg(FunctionArg arg, JsonGenerator gen) throws IOException {
+  private static void writeFunctionArg(FunctionArg arg, JsonGenerator gen) throws IOException {
     gen.writeStartObject();
     gen.writeStringField(EXPRESSION_TYPE, arg.argType().name().toLowerCase());
     switch (arg.argType()) {
@@ -733,6 +757,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for SortOrderDTO objects. */
   public static class ColumnPositionSerializer extends JsonSerializer<TableChange.ColumnPosition> {
     @Override
     public void serialize(
@@ -755,6 +780,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for ColumnPosition objects. */
   public static class ColumnPositionDeserializer
       extends JsonDeserializer<TableChange.ColumnPosition> {
 
@@ -783,6 +809,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for PartitionDTO objects. */
   public static class PartitioningSerializer extends JsonSerializer<Partitioning> {
     @Override
     public void serialize(Partitioning value, JsonGenerator gen, SerializerProvider serializers)
@@ -837,6 +864,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Partitioning objects. */
   public static class PartitioningDeserializer extends JsonDeserializer<Partitioning> {
     @Override
     public Partitioning deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -889,6 +917,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for SortOrderDTO objects. */
   public static class SortOrderSerializer extends JsonSerializer<SortOrderDTO> {
     @Override
     public void serialize(SortOrderDTO value, JsonGenerator gen, SerializerProvider serializers)
@@ -902,6 +931,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for SortOrderDTO objects. */
   public static class SortOrderDeserializer extends JsonDeserializer<SortOrderDTO> {
     @Override
     public SortOrderDTO deserialize(JsonParser p, DeserializationContext ctxt)
@@ -925,6 +955,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {
     @Override
     public void serialize(DistributionDTO value, JsonGenerator gen, SerializerProvider serializers)
@@ -941,6 +972,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for DistributionDTO objects. */
   public static class DistributionDeserializer extends JsonDeserializer<DistributionDTO> {
     @Override
     public DistributionDTO deserialize(JsonParser p, DeserializationContext ctxt)
@@ -962,6 +994,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for Column default value. */
   public static class ColumnDefaultValueSerializer extends JsonSerializer<Expression> {
     @Override
     public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
@@ -978,6 +1011,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Column default value. */
   public static class ColumnDefaultValueDeserializer extends JsonDeserializer<Expression> {
     @Override
     public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -989,6 +1023,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for PartitionDTO objects. */
   public static class PartitionDTOSerializer extends JsonSerializer<PartitionDTO> {
     @Override
     public void serialize(PartitionDTO value, JsonGenerator gen, SerializerProvider serializers)
@@ -1034,6 +1069,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for PartitionDTO objects. */
   public static class PartitionDTODeserializer extends JsonDeserializer<PartitionDTO> {
     @Override
     public PartitionDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -1118,6 +1154,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for Index objects. */
   public static class IndexSerializer extends JsonSerializer<Index> {
     @Override
     public void serialize(Index value, JsonGenerator gen, SerializerProvider serializers)
@@ -1133,6 +1170,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Index objects. */
   public static class IndexDeserializer extends JsonDeserializer<Index> {
     @Override
     public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
