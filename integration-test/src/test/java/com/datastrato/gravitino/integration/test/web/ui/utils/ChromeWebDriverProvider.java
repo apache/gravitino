@@ -140,7 +140,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
         last = e;
       } finally {
         LOG.info("Remove temp directory: " + downLoadTmpDir);
-        //FileUtils.deleteQuietly(new File(downLoadTmpDir));
+        // FileUtils.deleteQuietly(new File(downLoadTmpDir));
       }
     }
     throw new RuntimeException(last);
