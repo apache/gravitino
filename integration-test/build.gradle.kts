@@ -33,7 +33,7 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.guava)
   implementation(libs.httpclient5)
-  
+
   testImplementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -78,14 +78,14 @@ dependencies {
     exclude("*")
   }
   testImplementation(libs.hadoop2.hdfs) {
-      exclude("*")
+    exclude("*")
   }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
-      exclude("*")
+    exclude("*")
   }
   testImplementation(libs.hive2.common) {
-      exclude("org.eclipse.jetty.aggregate", "jetty-all")
-      exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
 
   testAnnotationProcessor(libs.lombok)
@@ -99,15 +99,15 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.httpclient5)
   testImplementation(libs.spark.sql) {
-      exclude("io.dropwizard.metrics")
-      exclude("org.apache.avro")
-      exclude("org.apache.hadoop")
-      exclude("org.apache.rocksdb")
-      exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.rocksdb")
+    exclude("org.apache.zookeeper")
   }
   testImplementation(libs.jline.terminal)
   testImplementation(libs.minikdc) {
-      exclude("org.apache.directory.api", "api-ldap-schema-data")
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
   testImplementation(libs.mysql.driver)
   testImplementation(libs.okhttp3.loginterceptor)
@@ -124,7 +124,7 @@ dependencies {
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.trino.cli)
   testImplementation(libs.trino.client) {
-      exclude("jakarta.annotation")
+    exclude("jakarta.annotation")
   }
   testImplementation(libs.trino.jdbc)
   testRuntimeOnly(libs.junit.jupiter.engine)

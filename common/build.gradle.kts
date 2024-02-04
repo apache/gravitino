@@ -9,7 +9,6 @@ plugins {
 }
 
 dependencies {
-  
   implementation(project(":api"))
 
   implementation(libs.bundles.log4j)
@@ -24,7 +23,6 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
-  
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 

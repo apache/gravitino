@@ -39,15 +39,14 @@ dependencies {
 
   testImplementation(libs.commons.io)
   testImplementation(libs.jersey.test.framework.core) {
-      exclude(group = "org.junit.jupiter")
+    exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.jersey.test.framework.provider.jetty) {
-      exclude(group = "org.junit.jupiter")
+    exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

@@ -11,32 +11,31 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
-  implementation(libs.bundles.log4j)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.httpclient5)
-  implementation(libs.jackson.annotations)
+  implementation(libs.protobuf.java.util) {
+    exclude("com.google.guava", "guava")
+      .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
+  }
   implementation(libs.jackson.databind)
+  implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.protobuf.java.util) {
-      exclude("com.google.guava", "guava")
-          .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
-  }
+  implementation(libs.guava)
+  implementation(libs.bundles.log4j)
+  implementation(libs.httpclient5)
+  implementation(libs.commons.lang3)
 
-  annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
-
-  testAnnotationProcessor(libs.lombok)
+  annotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
 
-  testImplementation(libs.bundles.jwt)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.bundles.jwt)
 }
 
 tasks.build {
