@@ -272,7 +272,7 @@ Partition addedPartition =
 
 ### Get a partition by name
 
-You can get a partition by its name by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
+You can get a partition by its name via sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of getting a partition by its name:
 
 <Tabs>
