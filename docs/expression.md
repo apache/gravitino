@@ -9,7 +9,7 @@ license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces the expression system of Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-metadata-using-gravitino.md#table-column-default-value) for columns and function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing), and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
+This page introduces the expression system of Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing), and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts: field reference, literal, and function. Function expressions can contain field references, literals, and other function expressions.
 
 ## Field reference
@@ -141,7 +141,7 @@ FunctionExpression[] functionExpressions =
 
 ## Unparsed expression
 
-An unparsed expression, a special type of expression, currently serves exclusively to represent the default value of a column when it's unsolvable.
+Unparsed expression is a special type of expression, currently serves exclusively for presenting the default value of a column when it's unsolvable.
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs>
@@ -158,6 +158,7 @@ The following shows the data structure of an unparsed expression in JSON and Jav
   <TabItem value="java" label="Java">
 
 ```java
+// The result of the following expression is a string "(curdate() + interval 1 year)"
 String unparsedValue = ((UnparsedExpression) expressino).unparsedExpression();
 ```
 

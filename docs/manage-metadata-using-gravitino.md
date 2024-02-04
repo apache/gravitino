@@ -792,20 +792,81 @@ The following types that Gravitino supports:
 The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
 #### Table column default value
-You can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value when defining a table column. This default value is applied to new rows inserted into the table by the underlying catalog.
 
-When defining a table column, you can specify a [literal](./expression.md#field-reference) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
+When defining a table column, you can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
+
+The following is a table of the column default value that Gravitino supports for different catalogs:
+
+| Catalog provider    | Supported default value |
+|---------------------|-------------------------|
+| `hive`              | NO                      |
+| `lakehouse-iceberg` | NO                      |
+| `jdbc-mysql`        | YES                     |
+| `jdbc-postgresql`   | YES                     |
+
+
+The following is an example of creating columns with default values:
+
+<Tabs>
+  <TabItem value="json" label="Json">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "integer",
+      "comment": "id column comment",
+      "nullable": false,
+      "defaultValue": {
+        "type": "literal",
+        "dataType": "integer",
+        "value": "-1"
+      }
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true,
+      "defaultValue": {
+        "type": "literal",
+        "dataType": "null",
+        "value": "null"
+      }
+    },
+    {
+      "name": "StartingDate",
+      "type": "timestamp",
+      "comment": "StartingDate column comment",
+      "nullable": false,
+      "defaultValue": {
+        "type": "function",
+        "funcName": "current_timestamp",
+        "funcArgs": []
+      }
+    }
+  ]
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+Column[] cols = new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, false, Literals.integerLiteral(-1)),
+    Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
+    Column.of("StartingDate", Types.TimestampType.withoutTimeZone(), "StartingDate column comment", false, false, Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
+    };
+```
+
+  </TabItem>
+</Tabs>
 
 :::note
-When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an [Unparsed Expression](./expression.md#unparsed-expression) to preserve the original default value, ensuring that the table can be loaded successfully.
+When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
-
-The following catalogs support setting the table column default value.
-
-| Catalog provider  | Default value mapping                                                                       |
-|-------------------|---------------------------------------------------------------------------------------------|
-| `jdbc-mysql`      | [MySQL default value mapping](./jdbc-mysql-catalog.md#table-column-default-value)           |
-| `jdbc-postgresql` | [PostgreSQL default value mapping](./jdbc-postgresql-catalog.md#table-column-default-value) |
 
 #### Table column auto-increment
 

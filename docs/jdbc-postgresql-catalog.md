@@ -28,7 +28,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports column default value and auto-increment. 
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value). and auto-increment. 
 
 ### Catalog properties
 
@@ -109,67 +109,6 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 :::
-
-#### Table column default value
-
-- Supports setting default value.
-
-<Tabs>
-  <TabItem value="json" label="Json">
-
-```json
-{
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "comment": "id column comment",
-      "nullable": false,
-      "defaultValue": {
-        "type": "literal",
-        "dataType": "integer",
-        "value": "-1"
-      }
-    },
-    {
-      "name": "name",
-      "type": "varchar(500)",
-      "comment": "name column comment",
-      "nullable": true,
-      "defaultValue": {
-        "type": "literal",
-        "dataType": "null",
-        "value": "null"
-      }
-    },
-    {
-      "name": "StartingDate",
-      "type": "timestamp",
-      "comment": "StartingDate column comment",
-      "nullable": false,
-      "defaultValue": {
-        "type": "function",
-        "funcName": "current_timestamp",
-        "funcArgs": []
-      }
-    }
-  ]
-}
-```
-
-  </TabItem>
-  <TabItem value="java" label="Java">
-
-```java
-Column[] cols = new Column[] {
-    Column.of("id", Types.IntegerType.get(), "id column comment", false, false, Literals.integerLiteral(-1)),
-    Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
-    Column.of("StartingDate", Types.TimestampType.withoutTimeZone(), "StartingDate column comment", false, false, Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP)
-    };
-```
-
-  </TabItem>
-</Tabs>
 
 #### Table column auto-increment
 
