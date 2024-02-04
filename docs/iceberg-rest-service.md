@@ -74,7 +74,7 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 ### Gravitino Iceberg catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory by default catalog backend. You can specify using a Hive or JDBC catalog backend in a production environment.
+The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify using a Hive or JDBC catalog backend in a production environment.
 :::
 
 #### Hive backend configuration
