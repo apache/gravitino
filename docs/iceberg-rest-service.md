@@ -77,7 +77,7 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 The Gravitino Iceberg REST catalog service uses the memory catalog by default. You can specify using a Hive or JDBC catalog in a production environment.
 :::
 
-#### Hive catalog backend configuration
+#### Hive backend configuration
 
 | Configuration item                                  | Description                                                                                                 | Default value | Required   | Since Version |
 |-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------|------------|---------------|
@@ -85,7 +85,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog by default. Y
 | `gravitino.auxService.iceberg-rest.uri`             | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                               | (none)        | Yes        | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                          | (none)        | Yes        | 0.2.0         |
 
-#### JDBC catalog backend configuration
+#### JDBC backend configuration
 
 | Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
