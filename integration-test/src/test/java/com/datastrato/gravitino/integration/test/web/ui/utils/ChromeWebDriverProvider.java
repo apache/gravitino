@@ -127,9 +127,10 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
         Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
         archiver.extract(chromeDriverZip, new File(downLoadTmpDir));
 
+        // fileName contains directory path, there's an assumption that the zip file is extracted to
+        // `ITUtils.splitPath(fileName)[0]`
         File unzipFile = new File(downLoadTmpDir, ITUtils.splitPath(fileName)[0]);
-        LOG.info(
-            "Move file from " + unzipFile.getAbsolutePath() + " to " + targetFile.getParentFile());
+        LOG.info("Move file from " + unzipFile.getAbsolutePath() + " to " + downLoadDir);
         FileUtils.moveToDirectory(unzipFile, new File(downLoadDir), true);
         LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
         return;
