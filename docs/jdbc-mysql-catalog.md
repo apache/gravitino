@@ -28,7 +28,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
-- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and auto-increment.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment).
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
@@ -79,7 +79,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 - Gravitino table corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Supports index.
-- Support column default value and auto-increment.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 #### Table column types
@@ -107,58 +107,9 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 
 #### Table column auto-increment
 
-- Supports setting auto-increment.
-
 :::notice
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
-
-<Tabs>
-<TabItem value="json" label="Json">
-
-```json
-{
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "comment": "id column comment",
-      "nullable": false,
-      "autoIncrement": true
-    },
-    {
-      "name": "name",
-      "type": "varchar(500)",
-      "comment": "name column comment",
-      "nullable": true,
-      "autoIncrement": false
-    }
-  ],
-  "indexes": [
-    {
-      "indexType": "primary_key",
-      "name": "PRIMARY",
-      "fieldNames": [["id"]]
-    }
-  ]
-}
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-Column[] cols = new Column[] {
-    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
-    Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
-};
-Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
-```
-
-</TabItem>
-</Tabs>
 
 ### Table properties
 
