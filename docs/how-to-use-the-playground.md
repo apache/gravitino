@@ -128,7 +128,19 @@ If you want to migrate your business from Hive to Iceberg. Some tables will use 
 Gravitino provides an Iceberg REST catalog service, too. You can will use Spark to access REST catalog to write the table data.
 Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
 
+spark-defaults.conf is as follows (is already configured):
+
+```text
+spark.sql.extensions org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+spark.sql.catalog.catalog_iceberg org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.catalog_iceberg.type rest
+spark.sql.catalog.catalog_iceberg.uri http://gravitino:9001/iceberg/
+spark.locality.wait.node 0
+```
+
 1. Login Spark container and execute the steps.
+
+
 
 ```shell
 docker exec -it playground-spark bash
@@ -143,6 +155,7 @@ use catalog_iceberg;
 create database sales;
 use sales;
 create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
+describe extended customers;    
 insert into customers (customer_id, customer_name, customer_email) values (11,'Rory Brown','rory@123.com');
 insert into customers (customer_id, customer_name, customer_email) values (12,'Jerry Washington','jerry@dt.com');
 ```
