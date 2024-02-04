@@ -14,7 +14,7 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 ### Capabilities
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports all namespace and table interfaces. `Token`, and `Config` interfaces aren't supported yet.
-- Works as a catalog proxy, supporting `HiveCatalog` and `JDBCCatalog`.
+- Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
@@ -26,7 +26,7 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 
 ## Gravitino Iceberg REST catalog service configuration
 
-Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three configuration properties for the Iceberg REST catalog service:
+Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are four configuration properties for the Iceberg REST catalog service:
 
 1. [**REST Catalog Server Configuration**](#rest-catalog-server-configuration): you can specify the HTTP server properties like host and port.
 
@@ -74,7 +74,7 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 ### Gravitino Iceberg catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory catalog by default. You can specify using a Hive or JDBC catalog in a production environment.
+The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify using a Hive or JDBC catalog backend in a production environment.
 :::
 
 #### Hive backend configuration
@@ -99,10 +99,6 @@ The Gravitino Iceberg REST catalog service uses the memory catalog by default. Y
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
-:::
-
-:::info
-`gravitino.auxService.iceberg-rest.jdbc-driver` isn't required unless Gravitino manages multi JDBC drivers.
 :::
 
 ### Other Apache Iceberg catalog properties
