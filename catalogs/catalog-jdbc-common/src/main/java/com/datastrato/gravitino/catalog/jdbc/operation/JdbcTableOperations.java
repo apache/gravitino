@@ -402,4 +402,12 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withNullable(nullable)
         .withDefaultValue(defaultValue);
   }
+
+  protected String escapeSQL(String s) {
+    if (s == null) {
+      return null;
+    }
+
+    return s.replace("_", "\\_").replace("%", "\\%");
+  }
 }

@@ -11,10 +11,12 @@ import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTable.Builder;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -32,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -209,28 +212,87 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
+    // MySQL in CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci is case-insensitive, when the name is
+    // hello, the result can be 'HELLO', 'Hello', 'hello' and so on.
     try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
-        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
-          throw new NoSuchTableException(
-              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        while (resultSet.next()) {
+          String name = resultSet.getString("NAME");
+          if (Objects.equals(name, tableName)) {
+            return Collections.unmodifiableMap(
+                new HashMap<String, String>() {
+                  {
+                    put(COMMENT, resultSet.getString(COMMENT));
+                    put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                    String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                    if (StringUtils.isNotEmpty(autoIncrement)) {
+                      put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                    }
+                  }
+                });
+          }
         }
-        return Collections.unmodifiableMap(
-            new HashMap<String, String>() {
-              {
-                // It is not possible to get all column assembly returns here, because in version
-                // 5.7, some columns exist in metadata but get will report an error that they do not
-                // exist, such as: TABLE_NAME
-                put(COMMENT, resultSet.getString(COMMENT));
-                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                if (StringUtils.isNotEmpty(autoIncrement)) {
-                  put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                }
-              }
-            });
+
+        throw new NoSuchTableException(
+            String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
       }
+    }
+  }
+
+  @Override
+  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    // We should handle case sensitivity and wild card issue in MySQL
+    // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
+    // like utf8mb4.
+    // 2. MySQL will view 'a_b' as a wild card, and it will match any table name that starts with
+    // 'a',then any character and then 'b'.
+    try (Connection connection = getConnection(databaseName)) {
+      // 1.Get table information
+      ResultSet table = getTable(connection, escapeSQL(databaseName), escapeSQL(tableName));
+      // The result of tables may be more than one due to the reason above, so we need to check the
+      // result
+      JdbcTable.Builder jdbcTableBuilder = new Builder();
+      boolean found = false;
+      while (table.next()) {
+        if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
+          jdbcTableBuilder.withName(tableName);
+          jdbcTableBuilder.withComment(table.getString("REMARKS"));
+          jdbcTableBuilder.withAuditInfo(AuditInfo.EMPTY);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new NoSuchTableException(
+            String.format("Table %s does not exist in %s.", tableName, databaseName));
+      }
+
+      // 2.Get column information
+      List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      ResultSet columns = getColumns(connection, escapeSQL(databaseName), escapeSQL(tableName));
+      while (columns.next()) {
+        JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+        boolean autoIncrement = getAutoIncrementInfo(columns);
+        columnBuilder.withAutoIncrement(autoIncrement);
+        jdbcColumns.add(columnBuilder.build());
+      }
+      jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
+
+      // 3.Get index information
+      List<Index> indexes = getIndexes(databaseName, tableName, connection.getMetaData());
+      jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
+
+      // 4.Get table properties
+      Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      jdbcTableBuilder.withProperties(tableProperties);
+
+      // 5.Leave the information to the bottom layer to append the table
+      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
+      return jdbcTableBuilder.build();
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
     }
   }
 
