@@ -80,7 +80,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         AuditInfo.builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(HIVE_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
