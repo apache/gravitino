@@ -388,7 +388,7 @@ public class TestCatalogOperations extends JerseyTest {
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {
     CatalogEntity entity =
-         CatalogEntity.builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(catalogName)
             .withComment("comment")
