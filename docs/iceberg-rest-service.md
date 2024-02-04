@@ -161,4 +161,4 @@ SELECT * FROM dml.test
 ```
 
 For the details, review the
-[playground example](./how-to-use-the-playground.md#lakehouse-practice).
+[playground example](./how-to-use-the-playground.md#using-iceberg-rest-service).
