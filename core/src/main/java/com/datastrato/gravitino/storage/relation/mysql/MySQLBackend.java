@@ -17,7 +17,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
 
-public class MysqlBackend implements RelationBackend {
+/**
+ * {@link MySQLBackend} is a MySQL implementation of RelationBackend interface. If we want to use
+ * another relation implementation, We can just implement {@link RelationBackend} interface and use
+ * it in the Gravitino.
+ */
+public class MySQLBackend implements RelationBackend {
+
+  /** Initialize the MySQL backend instance. */
   @Override
   public void initialize(Config config) throws IOException {
     throw new UnsupportedOperationException("Unsupported operation now.");
@@ -35,7 +42,7 @@ public class MysqlBackend implements RelationBackend {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
+  public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     throw new UnsupportedOperationException("Unsupported operation now.");
   }

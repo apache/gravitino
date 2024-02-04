@@ -26,7 +26,7 @@ public interface RelationBackend extends Closeable {
 
   boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException;
 
-  <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
+  <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
   <E extends Entity & HasIdentifier> E update(
