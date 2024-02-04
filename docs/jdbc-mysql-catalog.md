@@ -107,7 +107,7 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 
 #### Table column auto-increment
 
-:::notice
+:::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
@@ -173,7 +173,7 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
-:::notice
+:::note
 The index name of the PRIMARY_KEY must be PRIMARY
 [Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
 :::
