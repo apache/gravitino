@@ -43,6 +43,8 @@ For function partitioning, you should provide the function name and the function
 
 - In some cases, you require other information. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
 
+Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
+
 ## Table bucketing
 
 To create a bucketed table, you should use the following three components to construct a valid bucketed table.
