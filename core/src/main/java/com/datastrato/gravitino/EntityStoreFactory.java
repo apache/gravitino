@@ -22,9 +22,9 @@ public class EntityStoreFactory {
   // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of(
-          "kv",
+          Configs.DEFAULT_ENTITY_STORE,
           KvEntityStore.class.getCanonicalName(),
-          "rel",
+          Configs.RELATION_ENTITY_STORE,
           RelationEntityStore.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
