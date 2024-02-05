@@ -195,7 +195,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
+| `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -260,7 +260,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-Iceberg just supports updating primitive types.
 :::
 
 :::caution

@@ -50,7 +50,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
     dispatch(setAuthParams(params))
     localStorage.setItem('authParams', JSON.stringify(params))
 
-    const url = isProdEnv ? getState().auth.oauthUrl : devOauthUrl
+    const url = getState().auth.oauthUrl
 
     const [err, res] = await to(loginApi(url, params))
 
@@ -58,7 +58,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
       throw new Error(err)
     }
 
-    const { access_token, expires_in } = res
+    const { access_token, expires_in } = res.data
 
     localStorage.setItem('accessToken', access_token)
     localStorage.setItem('expiredIn', expires_in)

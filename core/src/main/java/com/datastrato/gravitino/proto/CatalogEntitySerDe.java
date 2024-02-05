@@ -50,7 +50,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
    */
   @Override
   public CatalogEntity deserialize(Catalog p) {
-    CatalogEntity.Builder builder = new CatalogEntity.Builder();
+    CatalogEntity.Builder builder = CatalogEntity.builder();
     builder
         .withId(p.getId())
         .withName(p.getName())
