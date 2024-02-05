@@ -19,7 +19,7 @@ public class TestSortOrderDTO {
   @Test
   void testJsonSerDe() throws JsonProcessingException {
     SortOrderDTO dto =
-         SortOrderDTO.builder()
+        SortOrderDTO.builder()
             .withDirection(SortDirection.ASCENDING)
             .withNullOrder(NullOrdering.NULLS_FIRST)
             .withSortTerm(FieldReferenceDTO.of("field1"))

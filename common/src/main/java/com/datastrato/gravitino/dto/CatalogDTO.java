@@ -153,7 +153,7 @@ public class CatalogDTO implements Catalog {
     protected AuditDTO audit;
 
     /** Default constructor for the builder. */
-    private Builder() {}
+    public Builder() {}
 
     /**
      * Sets the name of the catalog.

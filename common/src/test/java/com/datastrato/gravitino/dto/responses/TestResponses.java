@@ -74,7 +74,7 @@ public class TestResponses {
   @Test
   void testMetalakeResponse() throws IllegalArgumentException {
     AuditDTO audit =
-         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeResponse response = new MetalakeResponse(metalake);
     response.validate(); // No exception thrown
@@ -89,7 +89,7 @@ public class TestResponses {
   @Test
   void testMetalakeListResponse() throws IllegalArgumentException {
     AuditDTO audit =
-         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeListResponse response = new MetalakeListResponse(new MetalakeDTO[] {metalake});
     response.validate(); // No exception thrown
@@ -104,9 +104,9 @@ public class TestResponses {
   @Test
   void testCatalogResponse() throws IllegalArgumentException {
     AuditDTO audit =
-         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-         CatalogDTO.builder()
+        CatalogDTO.builder()
             .withName("CatalogA")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
@@ -126,9 +126,9 @@ public class TestResponses {
   @Test
   void testSchemaResponse() throws IllegalArgumentException {
     AuditDTO audit =
-         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     SchemaDTO schema =
-         SchemaDTO.builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
+        SchemaDTO.builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
     SchemaResponse schemaResponse = new SchemaResponse(schema);
     schemaResponse.validate(); // No exception thrown
   }
@@ -142,11 +142,11 @@ public class TestResponses {
   @Test
   void testTableResponse() throws IllegalArgumentException {
     AuditDTO audit =
-         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     ColumnDTO column =
-         ColumnDTO.builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
+        ColumnDTO.builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
     TableDTO table =
-         TableDTO.builder()
+        TableDTO.builder()
             .withName("TableA")
             .withComment("comment")
             .withColumns(new ColumnDTO[] {column})

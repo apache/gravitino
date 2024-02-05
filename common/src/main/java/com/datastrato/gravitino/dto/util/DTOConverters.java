@@ -94,7 +94,7 @@ public class DTOConverters {
    * @return The metalake DTO.
    */
   public static MetalakeDTO toDTO(Metalake metalake) {
-    return  MetalakeDTO.builder()
+    return MetalakeDTO.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -171,7 +171,7 @@ public class DTOConverters {
    * @return The schema DTO.
    */
   public static SchemaDTO toDTO(Schema schema) {
-    return  SchemaDTO.builder()
+    return SchemaDTO.builder()
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
@@ -186,7 +186,7 @@ public class DTOConverters {
    * @return The column DTO.
    */
   public static ColumnDTO toDTO(Column column) {
-    return  ColumnDTO.builder()
+    return ColumnDTO.builder()
         .withName(column.name())
         .withDataType(column.dataType())
         .withComment(column.comment())
@@ -260,7 +260,7 @@ public class DTOConverters {
     if (sortOrder instanceof SortOrderDTO) {
       return (SortOrderDTO) sortOrder;
     }
-    return  SortOrderDTO.builder()
+    return SortOrderDTO.builder()
         .withSortTerm(toFunctionArg(sortOrder.expression()))
         .withDirection(sortOrder.direction())
         .withNullOrder(sortOrder.nullOrdering())
@@ -686,5 +686,4 @@ public class DTOConverters {
         throw new IllegalArgumentException("Unsupported partitioning: " + partitioning.strategy());
     }
   }
-  
 }

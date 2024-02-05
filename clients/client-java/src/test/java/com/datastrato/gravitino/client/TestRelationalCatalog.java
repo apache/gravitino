@@ -20,7 +20,6 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.DistributionDTO.Builder;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
@@ -90,7 +89,7 @@ public class TestRelationalCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
-         CatalogDTO.builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
             .withProvider(provider)
@@ -1132,8 +1131,7 @@ public class TestRelationalCatalog extends TestBase {
         .withName(name)
         .withComment(comment)
         .withProperties(props)
-        .withAudit(
-            AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -1197,8 +1195,7 @@ public class TestRelationalCatalog extends TestBase {
         .withProperties(properties)
         .withDistribution(distributionDTO)
         .withSortOrders(sortOrderDTOs)
-        .withAudit(
-            AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .withPartitioning(partitioning)
         .withIndex(indexDTOS)
         .build();

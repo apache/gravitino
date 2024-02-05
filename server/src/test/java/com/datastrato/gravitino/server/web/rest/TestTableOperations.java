@@ -163,7 +163,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return  DistributionDTO.builder()
+    return DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(FieldReferenceDTO.of(columnName))
