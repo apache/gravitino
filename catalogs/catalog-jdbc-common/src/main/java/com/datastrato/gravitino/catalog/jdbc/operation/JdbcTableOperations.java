@@ -118,12 +118,12 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    // We should handle case sensitivity and wild card issue in some catalog tables, take a
-    // MySQL table for example.
+    // We should handle case sensitivity and wild card issue in some catalog tables, take a MySQL
+    // table for example.
     // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
     // like utf8mb4.
-    // 2. MySQL will view 'a_b' as a wild card, and it will match any table name that starts with
-    // 'a',then any character and then 'b'.
+    // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
+    // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1.Get table information
       ResultSet table = getTable(connection, escapeSQL(databaseName), escapeSQL(tableName));
@@ -131,13 +131,10 @@ public abstract class JdbcTableOperations implements TableOperation {
       // result
       JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
       boolean found = false;
-      while (table.next()) {
+      while (table.next() && !found) {
         if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
-          jdbcTableBuilder.withName(tableName);
-          jdbcTableBuilder.withComment(table.getString("REMARKS"));
-          jdbcTableBuilder.withAuditInfo(AuditInfo.EMPTY);
+          jdbcTableBuilder = getBasicJdbcTableInfo(table);
           found = true;
-          break;
         }
       }
 
