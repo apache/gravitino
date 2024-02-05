@@ -126,11 +126,12 @@ public abstract class JdbcTableOperations implements TableOperation {
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1.Get table information
-      ResultSet table = getTable(connection, escapeSQL(databaseName), escapeSQL(tableName));
+      ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check the
       // result
       JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
       boolean found = false;
+      // Handle case-sensitive issues.
       while (table.next() && !found) {
         if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
           jdbcTableBuilder = getBasicJdbcTableInfo(table);
@@ -145,12 +146,16 @@ public abstract class JdbcTableOperations implements TableOperation {
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
-      ResultSet columns = getColumns(connection, escapeSQL(databaseName), escapeSQL(tableName));
+      // Get columns are wildcard sensitive, so we need to check the result.
+      ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
-        JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
-        boolean autoIncrement = getAutoIncrementInfo(columns);
-        columnBuilder.withAutoIncrement(autoIncrement);
-        jdbcColumns.add(columnBuilder.build());
+        // TODO(yunqing): check schema and catalog also
+        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
+          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+          boolean autoIncrement = getAutoIncrementInfo(columns);
+          columnBuilder.withAutoIncrement(autoIncrement);
+          jdbcColumns.add(columnBuilder.build());
+        }
       }
       jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
 
@@ -418,15 +423,5 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
         .withNullable(nullable)
         .withDefaultValue(defaultValue);
-  }
-
-  // Different JDBC catalog may have different escape character, please overwrite this method if
-  // necessary
-  protected String escapeSQL(String s) {
-    if (s == null) {
-      return null;
-    }
-
-    return s.replace("_", "\\_").replace("%", "\\%");
   }
 }

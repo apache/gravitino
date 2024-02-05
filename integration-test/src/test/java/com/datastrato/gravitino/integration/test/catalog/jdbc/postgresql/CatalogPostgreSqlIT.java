@@ -980,4 +980,62 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "_1__"));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
   }
+
+  @Test
+  void testPGTableNameCaseSensitive() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes = new Index[0];
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "tablename");
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            "low case table name",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    assertionsTableInfo(
+        "tablename",
+        "low case table name",
+        Arrays.asList(newColumns),
+        properties,
+        indexes,
+        createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
+
+    // Test create table with same name but different case
+    NameIdentifier tableIdentifier2 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "TABLENAME");
+
+    Column[] upperTableColumns = new Column[] {col1, col4, col5};
+    Table tableAgain =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier2,
+                    upperTableColumns,
+                    "upper case table name",
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    indexes));
+    Assertions.assertEquals("TABLENAME", tableAgain.name());
+
+    table = tableCatalog.loadTable(tableIdentifier2);
+    Assertions.assertEquals("TABLENAME", table.name());
+  }
 }

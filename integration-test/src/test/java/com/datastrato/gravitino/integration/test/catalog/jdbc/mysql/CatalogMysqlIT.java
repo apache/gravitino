@@ -51,6 +51,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.math.RandomUtils;
@@ -1074,6 +1075,83 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testMySQLSpecialTableName() {
+    // Test create many indexes with name success.
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    String tableName = "t112";
+    Column col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    Column[] columns = {col1};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "t212";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "t_12";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "_1__";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table t1 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t112"));
+    Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
+
+    Table t2 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t212"));
+    Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
+
+    Table t3 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t_12"));
+    Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
+
+    Table t4 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "_1__"));
+    Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
+  }
+
+  @Test
   void testMySQLTableNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
@@ -1125,5 +1203,9 @@ public class CatalogMysqlIT extends AbstractIT {
                     new SortOrder[0],
                     indexes));
     Assertions.assertEquals("TABLENAME", tableAgain.name());
+
+    table = tableCatalog.loadTable(tableIdentifier2);
+    assertionsTableInfo(
+        "TABLENAME", table_comment, Arrays.asList(newColumns), properties, indexes, table);
   }
 }
