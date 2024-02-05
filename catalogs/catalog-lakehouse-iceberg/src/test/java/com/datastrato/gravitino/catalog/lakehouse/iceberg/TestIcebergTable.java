@@ -99,7 +99,7 @@ public class TestIcebergTable {
         AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(ICEBERG_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))

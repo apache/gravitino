@@ -762,6 +762,65 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(data.contains("bucketed_by = ARRAY['booleantype']"));
     Assertions.assertTrue(data.contains("partitioned_by = ARRAY['binarytype']"));
     Assertions.assertTrue(data.contains("sorted_by = ARRAY['longtype']"));
+
+    // Test table format issues.
+    tableName = GravitinoITUtils.genRandomName("table_format1").toLowerCase();
+    sql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC')",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(
+        data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+
+    // Test input_format can overwrite format setting
+    tableName = GravitinoITUtils.genRandomName("table_format2").toLowerCase();
+    sql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC', input_format = 'org.apache.hadoop.mapred.TextInputFormat')",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.mapred.TextInputFormat'"));
+    Assertions.assertTrue(
+        data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+
+    // Test output_format can overwrite format setting
+    tableName = GravitinoITUtils.genRandomName("table_format3").toLowerCase();
+    sql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC', output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat')",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(
+        data.contains(
+            "output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
   }
 
   @Test
@@ -1274,6 +1333,64 @@ public class TrinoConnectorIT extends AbstractIT {
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertTrue(data.contains("age integer NOT NULL"));
     Assertions.assertTrue(data.contains("address varchar(20) NOT NULL"));
+
+    // Test special characters in table name
+    String tableName1 = "t112";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t1name varchar)",
+            metalakeName, catalogName, schemaName, tableName1);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName2 = "t212";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t2name varchar)",
+            metalakeName, catalogName, schemaName, tableName2);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName3 = "t_12";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t3name varchar)",
+            metalakeName, catalogName, schemaName, tableName3);
+
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName4 = "_1__";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t4name varchar)",
+            metalakeName, catalogName, schemaName, tableName4);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    // Get table tableName1
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName1);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t1name varchar");
+
+    // Get table tableName2
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName2);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t2name varchar");
+
+    // Get table tableName3
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName3);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t3name varchar");
+
+    // Get table tableName4
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName4);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t4name varchar");
   }
 
   @Test

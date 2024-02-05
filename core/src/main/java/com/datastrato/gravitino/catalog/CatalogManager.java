@@ -268,7 +268,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     CatalogEntity e =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -371,7 +371,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
-                    new CatalogEntity.Builder()
+                    CatalogEntity.builder()
                         .withId(catalog.id())
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())

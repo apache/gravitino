@@ -16,7 +16,7 @@ paths:
     get:
       tags:
         - table
-      summary: List all tables in a schema
+      summary: List tables
       operationId: listTables
       responses:
         "200":
@@ -29,7 +29,7 @@ paths:
     post:
       tags:
         - table
-      summary: Create a new table in a schema
+      summary: Create table
       operationId: createTable
       requestBody:
         content:
@@ -69,7 +69,7 @@ paths:
     get:
       tags:
         - table
-      summary: Get the specified table in a schema
+      summary: Get table
       operationId: loadTable
       description: Returns the specified table object
       responses:
@@ -96,7 +96,7 @@ paths:
     put:
       tags:
         - table
-      summary: Update the specified table in a schema
+      summary: Update table
       operationId: alterTable
       description: Updates the specified table in a schema
       requestBody:
@@ -139,7 +139,7 @@ paths:
     delete:
       tags:
         - table
-      summary: Delete the specified table in a schema
+      summary: Drop table
       operationId: dropTable
       responses:
         "200":
@@ -320,6 +320,13 @@ components:
       items:
         type: string
 
+    ColumnDefaultValue:
+      $ref: "./expression.yaml#/components/schemas/FunctionArg"
+      description: The default value of the column
+      required: false
+      nullable: true
+      default: null
+
     Column:
       type: object
       required:
@@ -340,6 +347,8 @@ components:
           description: Whether the column is nullable
           nullable: true
           default: true
+        defaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
         autoIncrement:
           type: boolean
           description: Whether the column is auto increment
@@ -733,6 +742,43 @@ components:
             "name": "age",
             "type": "integer",
             "comment": "age column comment",
+            "nullable": true
+          },
+          {
+            "name": "info",
+            "type": {
+              "type": "struct",
+              "fields": [
+                {
+                  "name": "position",
+                  "type": "string",
+                  "nullable": true,
+                  "comment": "position field comment"
+                },
+                {
+                  "name": "contact",
+                  "type": {
+                    "type": "list",
+                    "elementType": "integer",
+                    "containsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "contact field comment"
+                },
+                {
+                  "name": "rating",
+                  "type": {
+                    "type": "map",
+                    "keyType": "string",
+                    "valueType": "integer",
+                    "valueContainsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "rating field comment"
+                }
+              ]
+            },
+            "comment": "info column comment",
             "nullable": true
           },
           {

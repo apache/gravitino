@@ -81,8 +81,6 @@ const CreateCatalogDialog = props => {
 
   const dispatch = useAppDispatch()
 
-  const typeText = type === 'create' ? 'Create' : 'Update'
-
   const [innerProps, setInnerProps] = useState(providers[0].defaultProps)
 
   const [cacheData, setCacheData] = useState()
@@ -358,7 +356,7 @@ const CreateCatalogDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              {typeText} Catalog
+              {type === 'create' ? 'Create' : 'Edit'} Catalog
             </Typography>
           </Box>
 
@@ -571,7 +569,7 @@ const CreateCatalogDialog = props => {
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit'>
-            {typeText}
+            {type === 'create' ? 'Create' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
             Cancel

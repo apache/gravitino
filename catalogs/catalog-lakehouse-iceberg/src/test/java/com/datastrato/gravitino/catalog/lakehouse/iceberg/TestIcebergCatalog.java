@@ -23,7 +23,7 @@ public class TestIcebergCatalog {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
@@ -51,7 +51,7 @@ public class TestIcebergCatalog {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))

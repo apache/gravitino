@@ -54,20 +54,11 @@ public class HivePropertyMeta implements HasPropertyMeta {
           stringProperty(HIVE_TABLE_LOCATION, "HDFS location for table storage", null, false),
           stringProperty(HIVE_TABLE_TYPE, "The type of Hive table", null, false),
           stringProperty(
-              HIVE_TABLE_INPUT_FORMAT,
-              "The input format class for the table",
-              "org.apache.hadoop.mapred.TextInputFormat",
-              false),
+              HIVE_TABLE_INPUT_FORMAT, "The input format class for the table", null, false),
           stringProperty(
-              HIVE_TABLE_OUTPUT_FORMAT,
-              "The output format class for the table",
-              "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-              false),
+              HIVE_TABLE_OUTPUT_FORMAT, "The output format class for the table", null, false),
           stringProperty(
-              HIVE_TABLE_SERDE_LIB,
-              "The serde library class for the table",
-              "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
-              false),
+              HIVE_TABLE_SERDE_LIB, "The serde library class for the table", null, false),
           stringProperty(
               HIVE_TABLE_SERDE_NAME, "Name of the serde, table name by default", null, false),
           new PropertyMetadata<>(

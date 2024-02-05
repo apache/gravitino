@@ -21,7 +21,7 @@ but they may have some differences, especially in catalog property, table proper
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
-Assuming Gravitino has just started, and the host and port is <http://localhost:8090>.
+Assuming Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
 
 ## Metalake operations
 
@@ -609,26 +609,44 @@ You can create a table by sending a `POST` request to the `/api/metalakes/{metal
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "my_table",
-  "comment": "This is my table",
+  "name": "exmaple_table",
+  "comment": "This is an exmaple table",
   "columns": [
     {
       "name": "id",
       "type": "integer",
       "comment": "id column comment",
-      "nullable": true
+      "nullable": false,
+      "autoIncrement": true,
+      "defaultValue": {
+        "type": "literal",
+        "dataType": "integer",
+        "value": "-1"
+      }
     },
     {
       "name": "name",
-      "type": "string",
+      "type": "varchar(500)"
       "comment": "name column comment",
-      "nullable": true
+      "nullable": true,
+      "autoIncrement": false,
+      "defaultValue": {
+        "type": "literal",
+        "dataType": "null",
+        "value": "null"
+      }
     },
     {
-      "name": "age",
-      "type": "integer",
-      "comment": "age column comment",
-      "nullable": true
+      "name": "StartingDate",
+      "type": "timestamp",
+      "comment": "StartingDate column comment",
+      "nullable": false,
+      "autoIncrement": false,
+      "defaultValue": {
+        "type": "function",
+        "funcName": "current_timestamp",
+        "funcArgs": []
+      }
     },
     {
       "name": "info",
@@ -700,6 +718,13 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "nullOrdering": "nulls_first"
     }
   ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    }
+  ],
   "properties": {
     "format": "ORC"
   }
@@ -731,11 +756,11 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "catalog", "schema", "table"),
+  NameIdentifier.of("metalake", "catalog", "schema", "exmaple_table"),
   new Column[] {
-    Column.of("id", Types.IntegerType.get(), "id column comment", true, false, null),
-    Column.of("name", Types.VarCharType.of(1000), "name column comment", true, false, null),
-    Column.of("age", Types.IntegerType.get(), "age column comment", true, false, null),
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
+    Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
+    Column.of("StartingDate", Types.TimestampType.withoutTimeZone(), "StartingDate column comment", false, false, Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
     Column.of("info", Types.StructType.of(
         Field.nullableField("position", Types.StringType.get(), "Position of the user"),
         Field.nullableField("contact", Types.ListType.of(Types.IntegerType.get(), false), "contact field comment"),
@@ -743,21 +768,28 @@ tableCatalog.createTable(
       ), "info column comment", true, false, null),
     Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
   },
-  "Create a new Table",
+  "This is an exmaple table",
   tablePropertiesMap,
   new Transform[] {Transforms.identity("id")},
   Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
-  new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))}
+  new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))},
+  new Index[] {Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})}
 );
 ```
 
 </TabItem>
 </Tabs>
 
+:::caution
+The provided example demonstrates table creation but isn't directly executable in Gravitino, since not all catalogs fully support these capabilities.
+:::
+
 In order to create a table, you need to provide the following information:
 
 - Table column name and type
-- Table property
+- Table column default value (optional)
+- Table column auto-increment (optional)
+- Table property (optional)
 
 #### Gravitino table column type
 
@@ -791,16 +823,30 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
+#### Table column default value
+
+When defining a table column, you can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
+
+The following is a table of the column default value that Gravitino supports for different catalogs:
+
+| Catalog provider    | Supported default value |
+|---------------------|-------------------------|
+| `hive`              | NO                      |
+| `lakehouse-iceberg` | NO                      |
+| `jdbc-mysql`        | YES                     |
+| `jdbc-postgresql`   | YES                     |
+
 #### Table column auto-increment
 
 Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
-The following catalogs support setting the table column auto-increment.
+The following table shows the column auto-increment that Gravitino supports for different catalogs:
 
-| Catalog provider    | Auto-increment mapping                                                                        |
-|---------------------|-----------------------------------------------------------------------------------------------|
-| `jdbc-mysql`        | [MySQL auto-increment mapping](./jdbc-mysql-catalog.md#table-column-auto-increment)           |
-| `jdbc-postgresql`   | [PostgreSQL auto-increment mapping](./jdbc-postgresql-catalog.md#table-column-auto-increment) |
-
+| Catalog provider    | Supported auto-increment                                                    |
+|---------------------|-----------------------------------------------------------------------------|
+| `hive`              | NO                                                                          |
+| `lakehouse-iceberg` | NO                                                                          |
+| `jdbc-mysql`        | YES with [limitations](./jdbc-mysql-catalog.md#table-column-auto-increment) |
+| `jdbc-postgresql`   | YES                                                                         |
 
 #### Table property and type mapping
 
@@ -813,7 +859,6 @@ The following is the table property that Gravitino supports:
 | `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 
-
 #### Table partitioning, bucketing, sort ordering and indexing
 
 In addition to the basic settings, Gravitino supports the following features:
@@ -824,7 +869,6 @@ In addition to the basic settings, Gravitino supports the following features:
 | Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.                 | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                             | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexing      | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations.   | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
-
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexing](table-partitioning-bucketing-sort-order-indexes.md).
 
@@ -860,6 +904,10 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 
 </TabItem>
 </Tabs>
+
+:::note
+When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
+:::
 
 ### Alter a table
 
@@ -911,7 +959,7 @@ Currently, Gravitino supports the following changes to a table:
 | Set a table property               | `{"@type":"setProperty","property":"key1","value":"value1"}`                                                          | `TableChange.setProperty("key1", "value1")` |
 | Remove a table property            | `{"@type":"removeProperty","property":"key1"}`                                                                        | `TableChange.removeProperty("key1")`        |
 | Add a column                       | `{"@type":"addColumn","fieldName":["position"],"type":"varchar(20)","comment":"Position of user","position":"FIRST"}` | `TableChange.addColumn(...)`                |
-| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExists": true}`                                                     | `TableChange.deleteColumn(...)`             |
+| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExists": true}`                                                    | `TableChange.deleteColumn(...)`             |
 | Rename a column                    | `{"@type":"renameColumn","oldFieldName":["name_old"], "newFieldName":"name_new"}`                                     | `TableChange.renameColumn(...)`             |
 | Update the column comment          | `{"@type":"updateColumnComment", "fieldName": ["name"], "newComment": "new comment"}`                                 | `TableChange.updateColumnCommment(...)`     |
 | Update the type of a column        | `{"@type":"updateColumnType","fieldName": ["name"], "newType":"varchar(100)"}`                                        | `TableChange.updateColumnType(...)`         |
