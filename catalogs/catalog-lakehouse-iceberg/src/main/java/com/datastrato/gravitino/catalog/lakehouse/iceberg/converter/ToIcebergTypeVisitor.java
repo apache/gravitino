@@ -18,10 +18,10 @@ import java.util.List;
 public class ToIcebergTypeVisitor<T> {
 
   /**
-   * Traverse the Gravitino data type and convert the fields into iceberg fields.
+   * Traverse the Gravitino data type and convert the fields into Iceberg fields.
    *
    * @param type Gravitino a data type in a gravitino.
-   * @param visitor Visitor of iceberg type
+   * @param visitor Visitor of Iceberg type
    * @param <T> Iceberg type
    * @return Iceberg type
    */
@@ -29,11 +29,9 @@ public class ToIcebergTypeVisitor<T> {
     if (type instanceof Types.MapType) {
       Types.MapType map = (Types.MapType) type;
       return visitor.map(map, visit(map.keyType(), visitor), visit(map.valueType(), visitor));
-
     } else if (type instanceof Types.ListType) {
       Types.ListType list = (Types.ListType) type;
       return visitor.array(list, visit(list.elementType(), visitor));
-
     } else if (type instanceof Types.StructType) {
       Types.StructType.Field[] fields = ((Types.StructType) type).fields();
       List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
@@ -42,7 +40,6 @@ public class ToIcebergTypeVisitor<T> {
       }
       return visitor.struct(
           (com.datastrato.gravitino.rel.types.Types.StructType) type, fieldResults);
-
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }

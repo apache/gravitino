@@ -17,7 +17,7 @@ public class ConvertUtil {
   /**
    * Convert the Iceberg Table to the corresponding schema information in the Iceberg.
    *
-   * @param icebergTable Iceberg table.
+   * @param icebergTable gravitinoTable.
    * @return Iceberg schema.
    */
   public static Schema toIcebergSchema(IcebergTable icebergTable) {
@@ -25,18 +25,6 @@ public class ConvertUtil {
         toGravitinoStructType(icebergTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
-    return new Schema(converted.asNestedType().asStructType().fields());
-  }
-
-  /**
-   * Convert the Gravitino StructType to the corresponding schema information in the Iceberg.
-   *
-   * @param gravitinoType Gravitino StructType
-   * @return Iceberg schema.
-   */
-  public static Schema toIcebergSchema(
-      com.datastrato.gravitino.rel.types.Types.StructType gravitinoType) {
-    Type converted = ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType(gravitinoType));
     return new Schema(converted.asNestedType().asStructType().fields());
   }
 
@@ -79,30 +67,12 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the Gravitino field to the Iceberg Gravitino column
-   *
-   * @param field Gravitino field.
-   * @param id Gravitino field id.
-   * @return Gravitino iceberg table column
-   */
-  public static IcebergColumn fromGravitinoField(
-      com.datastrato.gravitino.rel.types.Types.StructType.Field field, int id) {
-    return new IcebergColumn.Builder()
-        .withId(id)
-        .withName(field.name())
-        .withNullable(field.nullable())
-        .withComment(field.comment())
-        .withType(field.type())
-        .build();
-  }
-
-  /**
    * Convert the Gravitino iceberg table to the Gravitino StructType
    *
    * @param icebergTable Gravitino iceberg table
    * @return Gravitino StructType
    */
-  public static com.datastrato.gravitino.rel.types.Types.StructType toGravitinoStructType(
+  private static com.datastrato.gravitino.rel.types.Types.StructType toGravitinoStructType(
       IcebergTable icebergTable) {
     com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields =
         Arrays.stream(icebergTable.columns())
