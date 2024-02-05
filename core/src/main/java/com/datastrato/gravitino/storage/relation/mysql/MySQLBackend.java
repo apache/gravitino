@@ -22,6 +22,7 @@ import com.datastrato.gravitino.storage.relation.mysql.utils.POConverters;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -50,17 +51,18 @@ public class MySQLBackend implements RelationBackend {
           List<MetalakePO> metalakePOS =
               ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
                   .listMetalakePOs();
-          return (List<E>)
-              metalakePOS.stream()
+          return metalakePOS != null
+              ? metalakePOS.stream()
                   .map(
                       metalakePO -> {
                         try {
-                          return POConverters.fromMetalakePO(metalakePO);
+                          return (E) POConverters.fromMetalakePO(metalakePO);
                         } catch (JsonProcessingException e) {
                           throw new RuntimeException(e);
                         }
                       })
-                  .collect(Collectors.toList());
+                  .collect(Collectors.toList())
+              : new ArrayList<>();
         case CATALOG:
         case SCHEMA:
         case TABLE:
@@ -102,16 +104,24 @@ public class MySQLBackend implements RelationBackend {
     try (SqlSession session = SqlSessions.getSqlSession()) {
       try {
         if (e instanceof BaseMetalake) {
-          MetalakePO metalakePO = POConverters.toMetalakePO((BaseMetalake) e);
+          MetalakePO metalakePO =
+              ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
+                  .selectMetalakeMetaByName(e.nameIdentifier().name());
+          if (!overwritten && metalakePO != null) {
+            throw new EntityAlreadyExistsException(
+                String.format("Metalake entity: %s already exists", e.nameIdentifier().name()));
+          }
+
           if (overwritten) {
             ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .insertMetalakeMetaWithUpdate(metalakePO);
+                .insertMetalakeMetaWithUpdate(POConverters.toMetalakePO((BaseMetalake) e));
           } else {
             ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .insertMetalakeMeta(metalakePO);
+                .insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
           }
           SqlSessions.commitAndCloseSqlSession();
         } else {
+          SqlSessions.closeSqlSession();
           throw new IllegalArgumentException(
               String.format("Unsupported entity type: %s for put operation", e.getClass()));
         }
@@ -138,7 +148,7 @@ public class MySQLBackend implements RelationBackend {
             Preconditions.checkArgument(
                 Objects.equals(oldMetalakeEntity.id(), newMetalakeEntity.id()),
                 String.format(
-                    "The updated metalake entity id: %s is not same with the metalake entity id before: %s",
+                    "The updated metalake entity id: %s should same with the metalake entity id before: %s",
                     newMetalakeEntity.id(), oldMetalakeEntity.id()));
             ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
                 .updateMetalakeMeta(POConverters.toMetalakePO(newMetalakeEntity), oldMetalakePO);
@@ -169,6 +179,9 @@ public class MySQLBackend implements RelationBackend {
           MetalakePO metalakePO =
               ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
                   .selectMetalakeMetaByName(ident.name());
+          if (metalakePO == null) {
+            return null;
+          }
           return (E) POConverters.fromMetalakePO(metalakePO);
         case CATALOG:
         case SCHEMA:
@@ -197,7 +210,7 @@ public class MySQLBackend implements RelationBackend {
               ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
                   .deleteMetalakeMetaById(metalakeId);
               if (cascade) {
-                // TODO We will cascade delete the metadata of sub-resources under metalake
+                // TODO We will cascade delete the metadata of sub-resources under the metalake
               }
               SqlSessions.commitAndCloseSqlSession();
             }

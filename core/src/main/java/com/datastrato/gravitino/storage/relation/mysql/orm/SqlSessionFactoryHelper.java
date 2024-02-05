@@ -19,6 +19,11 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
+/**
+ * SqlSessionFactoryHelper maintains the MyBatis's {@link SqlSessionFactory} object, which is used
+ * to create the {@link org.apache.ibatis.session.SqlSession} object. It is a singleton class and
+ * should be initialized only once.
+ */
 public class SqlSessionFactoryHelper {
   private static volatile SqlSessionFactory sqlSessionFactory;
   private static final SqlSessionFactoryHelper INSTANCE = new SqlSessionFactoryHelper();
@@ -27,6 +32,13 @@ public class SqlSessionFactoryHelper {
     return INSTANCE;
   }
 
+  private SqlSessionFactoryHelper() {}
+
+  /**
+   * Initialize the SqlSessionFactory object.
+   *
+   * @param config Config object to get the MySQL connection details from the config.
+   */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
     BasicDataSource dataSource = new BasicDataSource();

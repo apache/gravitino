@@ -78,7 +78,7 @@ public interface MetalakeMetaMapper {
           + " audit_info = #{newMetalakeMeta.auditInfo},"
           + " schema_version = #{newMetalakeMeta.schemaVersion}"
           + " WHERE id = #{oldMetalakeMeta.id}"
-          + " and metalake_name = #{oldMetalakeMeta.metalakeComment}"
+          + " and metalake_name = #{oldMetalakeMeta.metalakeName}"
           + " and metalake_comment = #{oldMetalakeMeta.metalakeComment}"
           + " and properties = #{oldMetalakeMeta.properties}"
           + " and audit_info = #{oldMetalakeMeta.auditInfo}"
