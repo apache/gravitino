@@ -41,8 +41,5 @@ public class ITUtils {
     }
   }
 
-  // private constructor
-  private ITUtils(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private ITUtils() {}
 }

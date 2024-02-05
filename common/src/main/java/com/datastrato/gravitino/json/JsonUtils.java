@@ -1198,8 +1198,5 @@ public class JsonUtils {
     }
   }
 
-  // private constructor
-  private JsonUtils() {
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private JsonUtils() {}
 }

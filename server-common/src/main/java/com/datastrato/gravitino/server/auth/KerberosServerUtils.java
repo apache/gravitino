@@ -394,8 +394,5 @@ public class KerberosServerUtils {
     }
   }
 
-  // private constructor
-  private KerberosServerUtils(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private KerberosServerUtils() {}
 }

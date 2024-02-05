@@ -133,8 +133,5 @@ public class FromHiveType {
     }
   }
 
-  // private constructor
-  private FromHiveType(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private FromHiveType() {}
 }

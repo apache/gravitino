@@ -183,8 +183,5 @@ public class Distributions {
     }
   }
 
-  // private constructor
-  private Distributions(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private Distributions() {}
 }

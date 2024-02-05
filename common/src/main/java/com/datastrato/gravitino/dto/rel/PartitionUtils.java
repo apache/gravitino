@@ -37,8 +37,5 @@ public class PartitionUtils {
     // TODO: should validate nested fieldName after column type support namedStruct
   }
 
-  // private constructor
-  private PartitionUtils() {
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private PartitionUtils() {}
 }

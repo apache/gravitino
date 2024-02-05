@@ -235,8 +235,5 @@ public class Partitions {
     }
   }
 
-  // private constructor
-  private Partitions(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private Partitions() {}
 }

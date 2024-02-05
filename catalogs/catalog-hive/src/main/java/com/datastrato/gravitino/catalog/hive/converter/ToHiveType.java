@@ -96,8 +96,5 @@ public class ToHiveType {
     }
   }
 
-  // private constructor
-  private ToHiveType(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private ToHiveType() {}
 }

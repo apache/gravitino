@@ -218,8 +218,5 @@ public class Literals {
     }
   }
 
-  // private constructor
-  private Literals(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private Literals() {}
 }

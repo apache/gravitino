@@ -87,8 +87,5 @@ public class IcebergCatalogUtil {
     }
   }
 
-  // private constructor
-  private IcebergCatalogUtil(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private IcebergCatalogUtil() {}
 }

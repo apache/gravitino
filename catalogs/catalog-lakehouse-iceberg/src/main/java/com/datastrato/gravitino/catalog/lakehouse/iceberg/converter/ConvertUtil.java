@@ -62,8 +62,5 @@ public class ConvertUtil {
         .build();
   }
 
-  // private constructor
-  private ConvertUtil(){
-    throw new UnsupportedOperationException("This utility class cannot be instantiated");
-  }
+  private ConvertUtil() {}
 }
