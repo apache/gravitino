@@ -205,24 +205,24 @@ export const fetchCatalogs = createAsyncThunk(
 
     if (init) {
       if (update && update.catalog) {
-        const tree = getState().metalakes.metalakeTree.map(catalog => {
-          if (catalog.name !== update.newCatalog.name) {
-            return {
-              ...catalog,
-              id: `{{${metalake}}}{{${update.newCatalog.name}}}`,
-              key: `{{${metalake}}}{{${update.newCatalog.name}}}`,
-              path: `?${new URLSearchParams({ metalake, catalog: update.newCatalog.name }).toString()}`,
-              name: update.newCatalog.name,
-              title: update.newCatalog.name
+        if (update.catalog !== update.newCatalog.name) {
+          const tree = getState().metalakes.metalakeTree.map(catalog => {
+            if (catalog.name === update.catalog) {
+              return {
+                ...catalog,
+                id: `{{${metalake}}}{{${update.newCatalog.name}}}`,
+                key: `{{${metalake}}}{{${update.newCatalog.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog: update.newCatalog.name }).toString()}`,
+                name: update.newCatalog.name,
+                title: update.newCatalog.name
+              }
+            } else {
+              return { ...catalog }
             }
-          }
+          })
 
-          return {
-            ...catalog
-          }
-        })
-
-        dispatch(setMetalakeTree(tree))
+          dispatch(setMetalakeTree(tree))
+        }
       } else {
         const mergedTree = _.values(
           _.merge(_.keyBy(getState().metalakes.metalakeTree, 'key'), _.keyBy(catalogs, 'key'))
