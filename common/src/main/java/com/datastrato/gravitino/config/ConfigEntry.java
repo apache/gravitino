@@ -262,6 +262,7 @@ public class ConfigEntry<T> {
         throw new NoSuchElementException("No configuration found for key " + key);
       }
     }
+
     T convertedValue = valueConverter.apply(value);
     if (validator != null) {
       validator.accept(convertedValue);
