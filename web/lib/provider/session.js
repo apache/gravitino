@@ -38,7 +38,7 @@ const AuthProvider = ({ children }) => {
   const dispatch = useAppDispatch()
 
   const handleLogin = async params => {
-    await dispatch(loginAction({ params, router }))
+    dispatch(loginAction({ params, router }))
   }
 
   const handleLogout = () => {
