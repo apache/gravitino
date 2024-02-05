@@ -41,7 +41,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   private static Partition existingPartition;
 
   @BeforeAll
-  private static void setup() {
+  public static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveSchema = initHiveSchema(hiveCatalog);
     hiveTable = createPartitionedTable();
@@ -87,6 +87,14 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertTrue(
         partitionNames.length > 0
             && Arrays.asList(partitionNames).contains(existingPartition.name()));
+  }
+
+  @Test
+  public void testListPartitions() {
+    Partition[] partitions = hiveTable.supportPartitions().listPartitions();
+    // there maybe other partitions in the list, so we only check the added partition
+    Assertions.assertTrue(
+        partitions.length > 0 && Arrays.asList(partitions).contains(existingPartition));
   }
 
   @Test

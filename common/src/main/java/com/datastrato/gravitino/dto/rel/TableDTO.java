@@ -81,46 +81,55 @@ public class TableDTO implements Table {
     this.indexes = indexes;
   }
 
+  /** @return The name of the table. */
   @Override
   public String name() {
     return name;
   }
 
+  /** @return The columns of the table. */
   @Override
   public Column[] columns() {
     return columns;
   }
 
+  /** @return The comment associated with the table. */
   @Override
   public String comment() {
     return comment;
   }
 
+  /** @return The properties associated with the table. */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
+  /** @return The audit information for the table. */
   @Override
   public AuditDTO auditInfo() {
     return audit;
   }
 
+  /** @return The partitioning of the table. */
   @Override
   public Transform[] partitioning() {
     return partitioning;
   }
 
+  /** @return The sort orders of the table. */
   @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
+  /** @return The distribution of the table. */
   @Override
   public Distribution distribution() {
     return distribution;
   }
 
+  /** @return The indexes of the table. */
   @Override
   public Index[] index() {
     return indexes;
@@ -141,16 +150,26 @@ public class TableDTO implements Table {
    * @param <S> The type of the builder subclass.
    */
   public static class Builder<S extends Builder> {
+    /** The name of the table. */
     protected String name;
+    /** The comment associated with the table. */
     protected String comment;
+    /** The columns of the table. */
     protected ColumnDTO[] columns;
+    /** The properties associated with the table. */
     protected Map<String, String> properties;
+    /** The audit information for the table. */
     protected AuditDTO audit;
+    /** The distribution of the table. */
     protected SortOrderDTO[] sortOrderDTOs;
+    /** The distribution of the table. */
     protected DistributionDTO distributionDTO;
+    /** The partitioning of the table. */
     protected Partitioning[] Partitioning;
+    /** The indexes of the table. */
     protected IndexDTO[] indexes;
 
+    /** Default constructor. */
     public Builder() {}
 
     /**
@@ -208,21 +227,45 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
+    /**
+     * Sets the distribution of the table.
+     *
+     * @param distributionDTO The distribution of the table.
+     * @return The Builder instance.
+     */
     public S withDistribution(DistributionDTO distributionDTO) {
       this.distributionDTO = distributionDTO;
       return (S) this;
     }
 
+    /**
+     * Sets the sort orders of the table.
+     *
+     * @param sortOrderDTOs The sort orders of the table.
+     * @return The Builder instance.
+     */
     public S withSortOrders(SortOrderDTO[] sortOrderDTOs) {
       this.sortOrderDTOs = sortOrderDTOs;
       return (S) this;
     }
 
+    /**
+     * Sets the partitioning of the table.
+     *
+     * @param Partitioning The partitioning of the table.
+     * @return The Builder instance.
+     */
     public S withPartitioning(Partitioning[] Partitioning) {
       this.Partitioning = Partitioning;
       return (S) this;
     }
 
+    /**
+     * Sets the indexes of the table.
+     *
+     * @param indexes The indexes of the table.
+     * @return The Builder instance.
+     */
     public S withIndex(IndexDTO[] indexes) {
       this.indexes = indexes;
       return (S) this;

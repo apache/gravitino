@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.rel.expressions;
 
+import java.util.Arrays;
+
 /**
  * The interface of a function expression. A function expression is an expression that takes a
  * function name and a list of arguments.
@@ -60,6 +62,15 @@ public interface FunctionExpression extends Expression {
     @Override
     public Expression[] arguments() {
       return arguments;
+    }
+
+    /** @return The string representation of the function expression. */
+    @Override
+    public String toString() {
+      if (arguments.length == 0) {
+        return functionName + "()";
+      }
+      return functionName + "(" + String.join(", ", Arrays.toString(arguments)) + ")";
     }
   }
 }

@@ -7,10 +7,21 @@ package com.datastrato.gravitino.exceptions;
 /** Exception thrown when a file with specified name is not existed. */
 public class NoSuchFilesetException extends NotFoundException {
 
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   */
   public NoSuchFilesetException(String message) {
     super(message);
   }
 
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param message the detail message.
+   * @param cause the cause.
+   */
   public NoSuchFilesetException(String message, Throwable cause) {
     super(message, cause);
   }

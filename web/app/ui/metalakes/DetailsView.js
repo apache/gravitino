@@ -19,7 +19,7 @@ const DetailsView = props => {
   const properties = Object.keys(activatedItem?.properties || []).map(item => {
     return {
       key: item,
-      value: activatedItem?.properties[item]
+      value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
     }
   })
 
@@ -36,7 +36,7 @@ const DetailsView = props => {
   }
 
   return (
-    <Box sx={{ p: 4 }}>
+    <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Grid container spacing={6}>
         {page && page === 'catalogs' ? (
           <>

@@ -117,7 +117,7 @@ public class TestEntityProtoSerDe {
     String provider = "test";
 
     com.datastrato.gravitino.meta.CatalogEntity catalogEntity =
-        new com.datastrato.gravitino.meta.CatalogEntity.Builder()
+        com.datastrato.gravitino.meta.CatalogEntity.builder()
             .withId(catalogId)
             .withName(catalogName)
             .withComment(comment)

@@ -4,9 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Lists;
@@ -20,30 +18,12 @@ import java.util.List;
 public class ToIcebergTypeVisitor<T> {
 
   /**
-   * Traverse the gravitino table and convert the fields into iceberg fields.
+   * Traverse the Gravitino data type and convert the fields into Iceberg fields.
    *
-   * @param table iceberg table.
-   * @param visitor
-   * @param <T>
-   * @return
-   */
-  public static <T> T visit(IcebergTable table, ToIcebergTypeVisitor<T> visitor) {
-    Column[] columns = table.columns();
-    List<T> fieldResults = Lists.newArrayListWithExpectedSize(columns.length);
-
-    for (Column field : columns) {
-      fieldResults.add(visitor.field((IcebergColumn) field, visit(field.dataType(), visitor)));
-    }
-    return visitor.struct(table, fieldResults);
-  }
-
-  /**
-   * Convert the type mapping of gravitino to Iceberg.
-   *
-   * @param type TODO Abstract a data type in a gravitino.
-   * @param visitor
-   * @return
-   * @param <T>
+   * @param type Gravitino a data type in a gravitino.
+   * @param visitor Visitor of Iceberg type
+   * @param <T> Iceberg type
+   * @return Iceberg type
    */
   public static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor) {
     if (type instanceof Types.MapType) {
@@ -52,6 +32,14 @@ public class ToIcebergTypeVisitor<T> {
     } else if (type instanceof Types.ListType) {
       Types.ListType list = (Types.ListType) type;
       return visitor.array(list, visit(list.elementType(), visitor));
+    } else if (type instanceof Types.StructType) {
+      Types.StructType.Field[] fields = ((Types.StructType) type).fields();
+      List<T> fieldResults = Lists.newArrayListWithExpectedSize(fields.length);
+      for (Types.StructType.Field field : fields) {
+        fieldResults.add(visitor.field(field, visit(field.type(), visitor)));
+      }
+      return visitor.struct(
+          (com.datastrato.gravitino.rel.types.Types.StructType) type, fieldResults);
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }
@@ -61,7 +49,12 @@ public class ToIcebergTypeVisitor<T> {
     throw new UnsupportedOperationException();
   }
 
-  public T field(IcebergColumn field, T typeResult) {
+  public T struct(
+      com.datastrato.gravitino.rel.types.Types.StructType struct, List<T> fieldResults) {
+    throw new UnsupportedOperationException();
+  }
+
+  public T field(Types.StructType.Field field, T typeResult) {
     throw new UnsupportedOperationException();
   }
 

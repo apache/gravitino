@@ -17,10 +17,18 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from './CreateCatalogDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { setIntoTreeAction, updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
+import { updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
 
-import { extractPlaceholder, to } from '@/lib/utils'
+import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
+
+const EmptyText = () => {
+  return (
+    <Typography variant='caption' color={theme => theme.palette.text.disabled}>
+      N/A
+    </Typography>
+  )
+}
 
 const TableView = props => {
   const { page, routeParams } = props
@@ -46,35 +54,15 @@ const TableView = props => {
     if (!path) {
       return
     }
-    const [metalake, catalog, schema, table] = new URLSearchParams(path)
-
-    const id = `${metalake && metalake[1] ? '{{' + metalake[1] + '}}' : ''}${
-      catalog && catalog[1]
-        ? `{{${catalog[1]}}}${
-            schema && schema[1] ? `{{${schema[1]}}}${table && table[1] ? `{{${table[1]}}}` : ''}` : ''
-          }`
-        : ''
-    }`
-
-    if (extractPlaceholder(id).length <= 2) {
-      if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
-        dispatch(setIntoTreeAction({ nodeIds: [id] }))
-      }
-    } else if (table) {
-      const removedLastSegment = extractPlaceholder(id).slice(0, -1)
-      const removedLastSegmentId = removedLastSegment.map(i => `{{${i}}}`).join('')
-
-      dispatch(setIntoTreeAction({ nodeIds: [removedLastSegmentId] }))
-    } else {
-      dispatch(setIntoTreeAction({ nodeIds: [id] }))
-    }
   }
 
   const columns = [
     {
       flex: 0.1,
       minWidth: 60,
-      field: 'id',
+      disableColumnMenu: true,
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -109,7 +97,9 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
-      field: 'id',
+      disableColumnMenu: true,
+      type: 'string',
+      field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
@@ -142,6 +132,8 @@ const TableView = props => {
       flex: 0.1,
       minWidth: 90,
       sortable: false,
+      disableColumnMenu: true,
+      type: 'actions',
       field: 'actions',
       headerName: 'Actions',
       renderCell: ({ row }) => (
@@ -181,14 +173,17 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name } = row
 
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
             <Typography
+              title={name}
               noWrap
               sx={{
                 fontWeight: 400,
@@ -205,6 +200,8 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
       field: 'type',
       headerName: 'Type',
       renderCell: ({ row }) => {
@@ -220,6 +217,8 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      disableColumnMenu: true,
+      type: 'boolean',
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -236,9 +235,68 @@ const TableView = props => {
                 textDecoration: 'none'
               }}
             >
-              {`${nullable}`}
+              {typeof nullable !== 'undefined' && `${nullable}`}
             </Typography>
           </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'boolean',
+      field: 'autoIncrement',
+      headerName: 'AutoIncrement',
+      renderCell: ({ row }) => {
+        const { autoIncrement } = row
+
+        return typeof autoIncrement !== 'undefined' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {`${autoIncrement}`}
+            </Typography>
+          </Box>
+        ) : (
+          <EmptyText />
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
+      field: 'comment',
+      headerName: 'Comment',
+      renderCell: ({ row }) => {
+        const { comment } = row
+
+        return typeof comment !== 'undefined' ? (
+          <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              title={comment}
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {comment}
+            </Typography>
+          </Box>
+        ) : (
+          <EmptyText />
         )
       }
     }
@@ -312,7 +370,7 @@ const TableView = props => {
   }, [store.tableLoading])
 
   return (
-    <>
+    <Box className={`twc-h-full`}>
       <DataGrid
         sx={{
           '& .MuiDataGrid-columnHeaders': {
@@ -321,7 +379,6 @@ const TableView = props => {
             borderTop: 0
           }
         }}
-        autoHeight
         loading={store.tableLoading}
         rows={store.tableData}
         getRowId={row => row?.name}
@@ -348,7 +405,7 @@ const TableView = props => {
         type={dialogType}
         routeParams={routeParams}
       />
-    </>
+    </Box>
   )
 }
 

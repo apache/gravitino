@@ -182,7 +182,7 @@ public final class JettyServer {
     }
 
     if (!serverConfig.isEnableHttps()) {
-      LOG.warn("Users would better use HTTPS to void token data leak.");
+      LOG.warn("Users would better use HTTPS to avoid token data leak.");
     }
 
     LOG.info(

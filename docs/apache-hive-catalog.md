@@ -28,17 +28,21 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
-| Property Name                            | Description                                                                                                                                                                                                                                                                      | Default Value | Required | Since Version |
-|------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                                                                                      | (none)        | Yes      | 0.2.0         |
-| `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                                                                                          | 1             | No       | 0.2.0         |
-| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls                                                                | (none)        | No       | 0.2.0         |
-| `client.pool-cache.eviction-interval-ms` | The cache pool eviction interval.                                                                                                                                                                                                                                                | 300000        | No       | 0.4.0         |
-| `impersonation-enable`                   | Enable user impersonation for Hive catalog.                                                                                                                                                                                                                                      | false         | No       | 0.4.0         |
+| Property Name                            | Description                                                                                                                                                                                                       | Default Value | Required                     | Since Version |
+|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
+| `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                       | (none)        | Yes                          | 0.2.0         |
+| `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                           | 1             | No                           | 0.2.0         |
+| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls | (none)        | No                           | 0.2.0         |
+| `client.pool-cache.eviction-interval-ms` | The cache pool eviction interval.                                                                                                                                                                                 | 300000        | No                           | 0.4.0         |
+| `impersonation-enable`                   | Enable user impersonation for Hive catalog.                                                                                                                                                                       | false         | No                           | 0.4.0         |
+| `kerberos.principal`                     | The Kerberos principal for the catalog. You should configure `gravitino.bypass.hadoop.security.authentication` and `gravitino.bypass.hive.metastore.sasl.enabled`if you want to use Kerberos.                     | (none)        | required if you use kerberos | 0.4.0         |
+| `kerberos.keytab-uri`                    | The uri of key tab for the catalog. Now supported protocols are `https`, `http`, `ftp`, `file`.                                                                                                                   | (none)        | required if you use kerberos | 0.4.0         |
+| `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                  | 60            | No                           | 0.4.0         |
+| `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                      | 60            | No                           | 0.4.0         |
 
 ### Catalog operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -57,13 +61,14 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema operations
 
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations).
+see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
 ### Table capabilities
 
-The Hive catalog supports creating, updating, and deleting tables in the HMS.
+- The Hive catalog supports creating, updating, and deleting tables in the HMS.
+- Doesn't support column default value.
 
 #### Table partitions
 
@@ -136,9 +141,13 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 | `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
 | `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
 
+### Table indexes
+
+- Doesn't support table indexes.
+
 ### Table operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter operations
 

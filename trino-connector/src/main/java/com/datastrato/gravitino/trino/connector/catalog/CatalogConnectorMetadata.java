@@ -125,7 +125,7 @@ public class CatalogConnectorMetadata {
     try {
       tableCatalog.createTable(
           identifier,
-          table.getColumnDTOs(),
+          table.getRawColumns(),
           table.getComment(),
           table.getProperties(),
           table.getPartitioning(),

@@ -18,9 +18,12 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -57,7 +60,24 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public Partition[] listPartitions() {
-    throw new UnsupportedOperationException();
+    List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
+    try {
+      partitions =
+          table
+              .clientPool()
+              .run(c -> c.listPartitions(table.schemaName(), table.name(), (short) -1));
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    List<String> partCols =
+        table.buildPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
+
+    return partitions.stream()
+        .map(
+            partition ->
+                fromHivePartition(
+                    FileUtils.makePartName(partCols, partition.getValues()), partition))
+        .toArray(Partition[]::new);
   }
 
   @Override
@@ -172,7 +192,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     // todo: support custom serde and location if necessary
     StorageDescriptor sd;
     if (table.storageDescriptor() == null) {
-      // In theoretically, this should not happen because the Hive table will reload after creating
+      // In theory, this should not happen because the Hive table will reload after creating
       // in CatalogOperationDispatcher and the storage descriptor will be set. But in case of the
       // Hive table is created by other ways(such as UT), we need to handle this.
       sd = new StorageDescriptor();

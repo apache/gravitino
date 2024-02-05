@@ -34,6 +34,7 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
+import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { providers } from '@/lib/utils/initial'
 import { nameRegex, keyRegex } from '@/lib/utils/regex'
@@ -80,8 +81,6 @@ const CreateCatalogDialog = props => {
 
   const dispatch = useAppDispatch()
 
-  const typeText = type === 'create' ? 'Create' : 'Update'
-
   const [innerProps, setInnerProps] = useState(providers[0].defaultProps)
 
   const [cacheData, setCacheData] = useState()
@@ -106,18 +105,24 @@ const CreateCatalogDialog = props => {
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
-    setInnerProps(data)
-    setValue('propItems', data)
-
-    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
-
-    const duplicateKeys = nonEmptyKeys.some((item, i) => i !== index && item.key === event.target.value)
-    data[index].hasDuplicateKey = duplicateKeys
 
     if (event.target.name === 'key') {
       const invalidKey = !keyRegex.test(event.target.value)
       data[index].invalid = invalidKey
     }
+
+    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
+    const grouped = groupBy(nonEmptyKeys, 'key')
+    const duplicateKeys = Object.keys(grouped).some(key => grouped[key].length > 1)
+
+    if (duplicateKeys) {
+      data[index].hasDuplicateKey = duplicateKeys
+    } else {
+      data.forEach(it => (it.hasDuplicateKey = false))
+    }
+
+    setInnerProps(data)
+    setValue('propItems', data)
   }
 
   const addFields = () => {
@@ -351,7 +356,7 @@ const CreateCatalogDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              {typeText} Catalog
+              {type === 'create' ? 'Create' : 'Edit'} Catalog
             </Typography>
           </Box>
 
@@ -486,6 +491,7 @@ const CreateCatalogDialog = props => {
                                     value={item.value}
                                     size='small'
                                     sx={{ width: 195 }}
+                                    disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
                                   >
                                     {item.select.map(selectItem => (
@@ -563,7 +569,7 @@ const CreateCatalogDialog = props => {
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit'>
-            {typeText}
+            {type === 'create' ? 'Create' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
             Cancel

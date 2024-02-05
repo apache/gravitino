@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.mysql.operation;
 
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
@@ -20,10 +21,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,8 +32,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -69,17 +67,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
   }
 
-  private JdbcColumn getJdbcColumnFromTable(JdbcTable jdbcTable, String colName) {
-    return (JdbcColumn)
-        Arrays.stream(jdbcTable.columns())
-            .filter(column -> column.name().equals(colName))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NoSuchColumnException(
-                        "Column " + colName + " does not exist in table " + jdbcTable.name()));
-  }
-
   @Override
   protected String generateCreateTableSql(
       String tableName,
@@ -93,7 +80,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
+    sqlBuilder
+        .append("CREATE TABLE ")
+        .append(BACK_QUOTE)
+        .append(tableName)
+        .append(BACK_QUOTE)
+        .append(" (\n");
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
@@ -210,43 +202,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
   }
 
-  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
-      throws SQLException {
-    List<Index> indexes = new ArrayList<>();
-
-    // Get primary key information
-    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
-    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
-    while (primaryKeys.next()) {
-      String columnName = primaryKeys.getString("COLUMN_NAME");
-      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
-    }
-    for (String key : primaryKeyGroupByName.keySet()) {
-      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
-    }
-
-    // Get unique key information
-    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
-    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
-    while (indexInfo.next()) {
-      String indexName = indexInfo.getString("INDEX_NAME");
-      if (!indexInfo.getBoolean("NON_UNIQUE")
-          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
-        String columnName = indexInfo.getString("COLUMN_NAME");
-        indexGroupByName.put(indexName, columnName);
-      }
-    }
-    for (String key : indexGroupByName.keySet()) {
-      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
-    }
-
-    return indexes;
-  }
-
-  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
-    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
-  }
-
   @Override
   protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
     return "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT"));
@@ -255,27 +210,30 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
+    // MySQL in CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci is case-insensitive, when the name is
+    // hello, the result can be 'HELLO', 'Hello', 'hello' and so on.
     try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
-        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
-          throw new NoSuchTableException(
-              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        while (resultSet.next()) {
+          String name = resultSet.getString("NAME");
+          if (Objects.equals(name, tableName)) {
+            return Collections.unmodifiableMap(
+                new HashMap<String, String>() {
+                  {
+                    put(COMMENT, resultSet.getString(COMMENT));
+                    put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                    String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                    if (StringUtils.isNotEmpty(autoIncrement)) {
+                      put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                    }
+                  }
+                });
+          }
         }
-        return Collections.unmodifiableMap(
-            new HashMap<String, String>() {
-              {
-                // It is not possible to get all column assembly returns here, because in version
-                // 5.7, some columns exist in metadata but get will report an error that they do not
-                // exist, such as: TABLE_NAME
-                put(COMMENT, resultSet.getString(COMMENT));
-                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                if (StringUtils.isNotEmpty(autoIncrement)) {
-                  put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                }
-              }
-            });
+
+        throw new NoSuchTableException(
+            String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
       }
     }
   }
@@ -293,12 +251,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("RENAME TABLE %s TO %s", oldTableName, newTableName);
+    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    return "DROP TABLE " + BACK_QUOTE + tableName + BACK_QUOTE;
   }
 
   @Override
@@ -390,29 +348,30 @@ public class MysqlTableOperations extends JdbcTableOperations {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
+    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
   }
 
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
-    if (change.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
-    }
+    validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            // TODO #1531 will add default value.
-            .withDefaultValue(null)
+            .withDefaultValue(column.defaultValue())
             .withNullable(change.nullable())
             .withType(column.dataType())
             .withComment(column.comment())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "MODIFY COLUMN "
+        + BACK_QUOTE
+        + col
+        + BACK_QUOTE
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -423,7 +382,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .collect(Collectors.joining(",\n"));
   }
 
-  private JdbcTable getOrCreateTable(
+  protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
@@ -439,14 +398,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            // TODO #1531 will add default value.
-            .withDefaultValue(null)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withType(column.dataType())
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "MODIFY COLUMN "
+        + BACK_QUOTE
+        + col
+        + BACK_QUOTE
+        + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -457,7 +419,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
+    columnDefinition
+        .append("ADD COLUMN ")
+        .append(BACK_QUOTE)
+        .append(col)
+        .append(BACK_QUOTE)
+        .append(SPACE)
+        .append(dataType)
+        .append(SPACE);
 
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
@@ -472,7 +441,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+      columnDefinition
+          .append("AFTER ")
+          .append(BACK_QUOTE)
+          .append(afterPosition.getColumn())
+          .append(BACK_QUOTE);
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing, follow the default behavior of mysql
     } else {
@@ -491,14 +464,21 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String newColumnName = renameColumn.getNewName();
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
     StringBuilder sqlBuilder =
-        new StringBuilder("CHANGE COLUMN " + oldColumnName + SPACE + newColumnName);
+        new StringBuilder(
+            "CHANGE COLUMN "
+                + BACK_QUOTE
+                + oldColumnName
+                + BACK_QUOTE
+                + SPACE
+                + BACK_QUOTE
+                + newColumnName
+                + BACK_QUOTE);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(newColumnName)
             .withType(column.dataType())
             .withComment(column.comment())
-            // TODO #1531 will add default value.
-            .withDefaultValue(null)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
@@ -548,7 +528,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + col;
+    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
   }
 
   private String updateColumnTypeFieldDefinition(
@@ -564,7 +544,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(null)
+            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
@@ -584,7 +564,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
     } else {
       sqlBuilder.append("NOT NULL ");
     }
-    // TODO #1531 will add default value.
+
+    // Add DEFAULT value if specified
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
+    }
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {

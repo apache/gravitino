@@ -132,6 +132,11 @@ public abstract class Config {
     return MapUtils.getPrefixMap(configMap, prefix);
   }
 
+  /**
+   * Retrieves a map containing all configuration entries.
+   *
+   * @return An unmodifiable map containing all configuration entries.
+   */
   public Map<String, String> getAllConfig() {
     return MapUtils.unmodifiableMap(configMap);
   }

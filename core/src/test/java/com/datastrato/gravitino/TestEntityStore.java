@@ -155,7 +155,7 @@ public class TestEntityStore {
             .build();
 
     CatalogEntity catalog =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))

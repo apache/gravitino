@@ -123,7 +123,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     private final CatalogEntity catalog;
 
     /** Constructs a new {@link Builder}. */
-    public Builder() {
+    private Builder() {
       catalog = new CatalogEntity();
     }
 
@@ -259,5 +259,9 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public int hashCode() {
     return Objects.hashCode(id, name, type, provider, comment, properties, auditInfo);
+  }
+
+  public static Builder builder() {
+    return new Builder();
   }
 }

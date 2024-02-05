@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public abstract class OAuth2TokenProvider implements AuthDataProvider {
 
+  /** The HTTP client used to request the access token from the authorization server. */
   protected HTTPClient client;
 
   /**
@@ -55,6 +56,11 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     }
   }
 
+  /**
+   * Get the access token from the authorization server.
+   *
+   * @return The access token.
+   */
   protected abstract String getAccessToken();
 
   interface Builder<SELF extends Builder<SELF, T>, T extends OAuth2TokenProvider> {
@@ -74,6 +80,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
       implements Builder<SELF, T> {
 
     private String uri;
+    /** The HTTP client used to request the access token from the authorization server. */
     protected HTTPClient client;
 
     /**
@@ -105,6 +112,11 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
       return (SELF) this;
     }
 
+    /**
+     * Builds the instance of the OAuth2TokenProvider.
+     *
+     * @return The built OAuth2TokenProvider instance.
+     */
     protected abstract T internalBuild();
   }
 }
