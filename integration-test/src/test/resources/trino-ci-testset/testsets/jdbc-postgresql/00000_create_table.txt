@@ -2,6 +2,42 @@ CREATE SCHEMA
 
 CREATE TABLE
 
+"CREATE TABLE ""test.gt_postgresql"".gt_db1.tb01 (
+   name varchar(10485760),
+   salary integer
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".gt_db1.tb02 (
+   name varchar(100),
+   salary integer
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".gt_db1.tb03 (
+   name char(100),
+   salary integer
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".gt_db1.tb04 (
+   name char(1),
+   salary integer
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
 DROP TABLE
 
 DROP SCHEMA
