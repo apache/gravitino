@@ -1,0 +1,23 @@
+CALL
+
+"test.gt_mysql_xxx1"
+
+<QUERY_FAILED> Catalog test.gt_mysql_xxx1 already exists.
+
+CALL
+
+CALL
+
+<BLANK_LINE>
+
+<QUERY_FAILED> Drop catalog failed. Catalog test.gt_mysql_xxx1 not exists
+
+CALL
+
+CALL
+
+"test.gt_mysql_xxx1"
+
+CALL
+
+<BLANK_LINE>
