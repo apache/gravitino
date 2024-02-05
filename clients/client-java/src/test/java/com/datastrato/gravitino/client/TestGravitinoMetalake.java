@@ -109,13 +109,13 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp = new CatalogResponse(mockCatalog);
 
@@ -138,13 +138,13 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
@@ -171,13 +171,13 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -198,13 +198,13 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
@@ -263,13 +263,13 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock1")
             .withComment("comment1")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp = new CatalogResponse(mockCatalog);
 
@@ -336,11 +336,11 @@ public class TestGravitinoMetalake extends TestBase {
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)
       throws JsonProcessingException {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(metalakeName)
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeCreateRequest req =
         new MetalakeCreateRequest(metalakeName, "comment", Collections.emptyMap());

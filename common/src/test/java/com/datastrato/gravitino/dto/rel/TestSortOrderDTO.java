@@ -19,7 +19,7 @@ public class TestSortOrderDTO {
   @Test
   void testJsonSerDe() throws JsonProcessingException {
     SortOrderDTO dto =
-        new SortOrderDTO.Builder()
+         SortOrderDTO.builder()
             .withDirection(SortDirection.ASCENDING)
             .withNullOrder(NullOrdering.NULLS_FIRST)
             .withSortTerm(FieldReferenceDTO.of("field1"))
@@ -44,7 +44,7 @@ public class TestSortOrderDTO {
     SortOrderDTO dto2 = JsonUtils.objectMapper().readValue(value, SortOrderDTO.class);
     Assertions.assertEquals(dto, dto2);
 
-    dto = new SortOrderDTO.Builder().withSortTerm(FieldReferenceDTO.of("field1")).build();
+    dto = SortOrderDTO.builder().withSortTerm(FieldReferenceDTO.of("field1")).build();
 
     Assertions.assertEquals(
         dto,
@@ -52,7 +52,7 @@ public class TestSortOrderDTO {
             .readValue(JsonUtils.objectMapper().writeValueAsString(dto), SortOrderDTO.class));
 
     dto =
-        new SortOrderDTO.Builder()
+        SortOrderDTO.builder()
             .withSortTerm(
                 new FuncExpressionDTO.Builder()
                     .withFunctionName("date")

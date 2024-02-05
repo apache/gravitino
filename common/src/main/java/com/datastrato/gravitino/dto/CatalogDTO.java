@@ -153,7 +153,7 @@ public class CatalogDTO implements Catalog {
     protected AuditDTO audit;
 
     /** Default constructor for the builder. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Sets the name of the catalog.
@@ -236,5 +236,9 @@ public class CatalogDTO implements Catalog {
 
       return new CatalogDTO(name, type, provider, comment, properties, audit);
     }
+  }
+
+  public static Builder builder() {
+    return new Builder();
   }
 }

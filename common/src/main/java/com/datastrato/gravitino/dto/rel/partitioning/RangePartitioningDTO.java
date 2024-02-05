@@ -89,4 +89,8 @@ public final class RangePartitioningDTO implements Partitioning {
       return new RangePartitioningDTO(fieldName);
     }
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }
