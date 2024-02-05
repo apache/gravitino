@@ -17,7 +17,7 @@ paths:
     get:
       tags:
         - partition
-      summary: List all partitions/partition names in a table
+      summary: List partitions (names)
       operationId: listPartitions
       parameters:
         - $ref: "#/components/parameters/details"
@@ -43,7 +43,7 @@ paths:
     post:
       tags:
         - partition
-      summary: Add partitions to a table
+      summary: Add partitions
       operationId: addPartitions
       requestBody:
         content:
@@ -79,7 +79,7 @@ paths:
     get:
       tags:
         - partition
-      summary: Get a partition by name
+      summary: Get partition by name
       operationId: getPartition
       description: Returns the specified partition
       responses:
