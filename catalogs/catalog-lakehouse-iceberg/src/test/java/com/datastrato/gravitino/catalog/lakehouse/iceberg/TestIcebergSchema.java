@@ -27,7 +27,7 @@ public class TestIcebergSchema {
   private static final String COMMENT_VALUE = "comment";
 
   private static AuditInfo AUDIT_INFO =
-      new AuditInfo.Builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
+      AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
   @Test
   public void testCreateIcebergSchema() {
@@ -127,10 +127,10 @@ public class TestIcebergSchema {
   @Test
   void testSchemaProperty() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
@@ -158,7 +158,7 @@ public class TestIcebergSchema {
 
   private IcebergCatalog initIcebergCatalog(String name) {
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(name)
             .withNamespace(Namespace.of(META_LAKE_NAME))

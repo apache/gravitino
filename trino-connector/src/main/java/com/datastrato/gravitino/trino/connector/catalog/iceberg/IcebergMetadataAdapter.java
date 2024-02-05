@@ -106,7 +106,9 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
               column.getComment(),
-              column.isNullable()));
+              column.isNullable(),
+              false,
+              column.getProperties()));
     }
     GravitinoTable gravitinoTable =
         new GravitinoTable(schemaName, tableName, columns, comment, properties);

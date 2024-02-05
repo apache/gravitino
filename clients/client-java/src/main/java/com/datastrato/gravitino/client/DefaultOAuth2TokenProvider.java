@@ -25,9 +25,11 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
       if (expires == null) {
         return null;
       }
+
       if (expires > System.currentTimeMillis()) {
         return token;
       }
+
       token =
           OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path)
               .getAccessToken();
@@ -44,7 +46,7 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     return new Builder();
   }
 
-  /* Builder class for configuring and creating instances of DefaultOAuth2TokenProvider. */
+  /** Builder class for configuring and creating instances of DefaultOAuth2TokenProvider. */
   public static class Builder
       extends OAuth2TokenProviderBuilder<Builder, DefaultOAuth2TokenProvider> {
 
@@ -88,10 +90,14 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     @Override
     protected DefaultOAuth2TokenProvider internalBuild() {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(credential), "OAuthDataProvider must set credential");
+          StringUtils.isNotBlank(credential), "OAuth2TokenProvider must set credential");
+
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(scope), "OAuthDataProvider must set scope");
-      Preconditions.checkArgument(StringUtils.isNotBlank(path), "OAuthDataProvider must set path");
+          StringUtils.isNotBlank(scope), "OAuth2TokenProvider must set scope");
+
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(path), "OAuth2TokenProvider must set path");
+
       DefaultOAuth2TokenProvider provider = new DefaultOAuth2TokenProvider();
       provider.client = client;
       provider.credential = credential;

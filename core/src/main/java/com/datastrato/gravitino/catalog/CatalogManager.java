@@ -268,7 +268,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     CatalogEntity e =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -277,7 +277,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withComment(comment)
             .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -371,7 +371,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
-                    new CatalogEntity.Builder()
+                    CatalogEntity.builder()
                         .withId(catalog.id())
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
@@ -380,7 +380,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withComment(catalog.getComment());
 
                 AuditInfo newInfo =
-                    new AuditInfo.Builder()
+                    AuditInfo.builder()
                         .withCreator(catalog.auditInfo().creator())
                         .withCreateTime(catalog.auditInfo().createTime())
                         .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())

@@ -92,6 +92,18 @@ public class Namespace {
   }
 
   /**
+   * Create a namespace for fileset.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for fileset
+   */
+  public static Namespace ofFileset(String metalake, String catalog, String schema) {
+    return of(metalake, catalog, schema);
+  }
+
+  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
@@ -208,6 +220,13 @@ public class Namespace {
     return DOT.join(levels);
   }
 
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
+   *
+   * @param expression The expression to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
   public static void check(boolean expression, String message, Object... args) {
     if (!expression) {
       throw new IllegalNamespaceException(String.format(message, args));

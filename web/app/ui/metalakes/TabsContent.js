@@ -25,7 +25,7 @@ const CustomTab = props => {
       label={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Icon icon={icon} />
-          <Typography sx={{ ml: 1 }} color={'inherit'}>
+          <Typography className={`twc-font-bold twc-ml-1 twc-normal-case`} color={'inherit'}>
             {label}
           </Typography>
         </Box>
@@ -40,18 +40,14 @@ const CustomTabPanel = props => {
   const { value, children, ...others } = props
 
   return (
-    <TabPanel
-      value={value}
-      sx={{ boxShadow: 'none', height: 'calc(100% - 4rem)', overflowY: 'auto', p: 0 }}
-      {...others}
-    >
+    <TabPanel value={value} sx={{ boxShadow: 'none', p: 0, height: 'calc(100% - 4rem)' }} {...others}>
       {children}
     </TabPanel>
   )
 }
 
 const TabsContent = props => {
-  const { tableTitle, store, page } = props
+  const { tableTitle, store, page, routeParams } = props
   const [tab, setTab] = useState('table')
 
   const handleChangeTab = (event, newValue) => {
@@ -67,7 +63,7 @@ const TabsContent = props => {
         </TabList>
       </Box>
       <CustomTabPanel value='table'>
-        <TableView page={page} />
+        <TableView page={page} routeParams={routeParams} />
       </CustomTabPanel>
       <CustomTabPanel value='details'>
         <DetailsView store={store} page={page} />

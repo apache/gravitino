@@ -58,7 +58,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema 
 
@@ -72,11 +72,13 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table 
 
 ### Table capabilities
+
+- Doesn't support column default value.
 
 #### Table partitions
 
@@ -193,7 +195,6 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -212,7 +213,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 | `UUID`                      | `UUID`                      |
 
 :::info
-Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+Apache Iceberg doesn't support Gravitino `Struct` `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
 :::
 
 ### Table properties
@@ -232,9 +233,13 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `identifier-fields`             | The identifier fields for defining the table.           |
 | `write.distribution-mode`       | Defines distribution of write data                      |
 
+### Table indexes
+
+- Doesn't support table indexes.
+
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 

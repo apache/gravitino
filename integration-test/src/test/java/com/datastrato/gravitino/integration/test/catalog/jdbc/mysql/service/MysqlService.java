@@ -77,6 +77,14 @@ public class MysqlService {
     }
   }
 
+  public void executeQuery(String sql) {
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void close() {
     try {
       connection.close();

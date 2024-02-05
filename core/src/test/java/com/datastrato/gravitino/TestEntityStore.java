@@ -144,7 +144,7 @@ public class TestEntityStore {
   @Test
   public void testEntityStoreAndRetrieve() throws Exception {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     BaseMetalake metalake =
         new BaseMetalake.Builder()
@@ -155,7 +155,7 @@ public class TestEntityStore {
             .build();
 
     CatalogEntity catalog =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))

@@ -265,7 +265,7 @@ public final class PropertyEntry<T> {
   }
 
   public static PropertyEntry<Integer> integerOptionalPropertyEntry(
-      String name, String description, boolean immutable, int defaultValue, boolean hidden) {
+      String name, String description, boolean immutable, Integer defaultValue, boolean hidden) {
     return integerPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 

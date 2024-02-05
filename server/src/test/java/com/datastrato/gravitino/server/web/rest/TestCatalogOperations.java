@@ -388,7 +388,7 @@ public class TestCatalogOperations extends JerseyTest {
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(catalogName)
             .withComment("comment")
@@ -397,10 +397,7 @@ public class TestCatalogOperations extends JerseyTest {
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAuditInfo(
-                new AuditInfo.Builder()
-                    .withCreator("creator")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);

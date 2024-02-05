@@ -105,6 +105,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     try {
+      NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+      if (!store.exists(schemaIdent, Entity.EntityType.SCHEMA)) {
+        throw new NoSuchSchemaException("Schema " + schemaIdent + " does not exist");
+      }
+
       List<FilesetEntity> filesets =
           store.list(namespace, FilesetEntity.class, Entity.EntityType.FILESET);
       return filesets.stream()
@@ -218,7 +223,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withStorageLocation(filesetPath.toString())
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -365,7 +370,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withComment(comment)
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -534,7 +539,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withComment(schemaEntity.comment())
         .withProperties(props)
         .withAuditInfo(
-            new AuditInfo.Builder()
+            AuditInfo.builder()
                 .withCreator(schemaEntity.auditInfo().creator())
                 .withCreateTime(schemaEntity.auditInfo().createTime())
                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
@@ -575,7 +580,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withStorageLocation(filesetEntity.storageLocation())
         .withProperties(props)
         .withAuditInfo(
-            new AuditInfo.Builder()
+            AuditInfo.builder()
                 .withCreator(filesetEntity.auditInfo().creator())
                 .withCreateTime(filesetEntity.auditInfo().createTime())
                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())

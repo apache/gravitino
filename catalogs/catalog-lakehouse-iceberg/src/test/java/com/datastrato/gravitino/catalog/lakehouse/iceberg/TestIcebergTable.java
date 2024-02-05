@@ -96,13 +96,10 @@ public class TestIcebergTable {
 
   private static CatalogEntity createDefaultCatalogEntity() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder()
-            .withCreator("testIcebergUser")
-            .withCreateTime(Instant.now())
-            .build();
+        AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(ICEBERG_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
@@ -534,7 +531,6 @@ public class TestIcebergTable {
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");
-      map.put(IcebergTablePropertiesMetadata.LOCATION, "test");
       map.put(IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID, "test");
       map.put(IcebergTablePropertiesMetadata.CHERRY_PICK_SNAPSHOT_ID, "test");
       map.put(IcebergTablePropertiesMetadata.SORT_ORDER, "test");
@@ -596,7 +592,7 @@ public class TestIcebergTable {
         new IcebergTable.Builder()
             .withName("test_table")
             .withAuditInfo(
-                new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .withProperties(Maps.newHashMap())
             .withColumns(icebergColumns.toArray(new IcebergColumn[0]))
             .withComment("test_table")
@@ -627,7 +623,7 @@ public class TestIcebergTable {
         new IcebergTable.Builder()
             .withName("test_table2")
             .withAuditInfo(
-                new AuditInfo.Builder().withCreator("test2").withCreateTime(Instant.now()).build())
+                AuditInfo.builder().withCreator("test2").withCreateTime(Instant.now()).build())
             .withProperties(Maps.newHashMap())
             .withPartitioning(new Transform[] {day("col_1")})
             .withSortOrders(

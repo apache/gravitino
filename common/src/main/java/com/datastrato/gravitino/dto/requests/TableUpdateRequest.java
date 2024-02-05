@@ -22,6 +22,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to update a table. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
@@ -57,8 +58,14 @@ import org.apache.commons.lang3.StringUtils;
 })
 public interface TableUpdateRequest extends RESTRequest {
 
+  /**
+   * The table change that is requested.
+   *
+   * @return An instance of TableChange.
+   */
   TableChange tableChange();
 
+  /** Represents a request to rename a table. */
   @EqualsAndHashCode
   @ToString
   class RenameTableRequest implements TableUpdateRequest {
@@ -67,26 +74,43 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("newName")
     private final String newName;
 
+    /**
+     * Constructor for RenameTableRequest.
+     *
+     * @param newName the new name of the table
+     */
     public RenameTableRequest(String newName) {
       this.newName = newName;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public RenameTableRequest() {
       this(null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(newName), "\"newName\" field is required and cannot be empty");
     }
 
+    /**
+     * Returns the table change.
+     *
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.rename(newName);
     }
   }
 
+  /** Represents a request to update the comment of a table. */
   @EqualsAndHashCode
   @ToString
   class UpdateTableCommentRequest implements TableUpdateRequest {
@@ -95,14 +119,25 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("newComment")
     private final String newComment;
 
+    /**
+     * Constructor for UpdateTableCommentRequest.
+     *
+     * @param newComment the new comment of the table
+     */
     public UpdateTableCommentRequest(String newComment) {
       this.newComment = newComment;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public UpdateTableCommentRequest() {
       this(null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -110,12 +145,18 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newComment\" field is required and cannot be empty");
     }
 
+    /**
+     * Returns the table change.
+     *
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateComment(newComment);
     }
   }
 
+  /** Represents a request to set a property of a table. */
   @EqualsAndHashCode
   @ToString
   class SetTablePropertyRequest implements TableUpdateRequest {
@@ -128,15 +169,27 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("value")
     private final String value;
 
+    /**
+     * Constructor for SetTablePropertyRequest.
+     *
+     * @param property the property to set
+     * @param value the value to set
+     */
     public SetTablePropertyRequest(String property, String value) {
       this.property = property;
       this.value = value;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public SetTablePropertyRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -144,12 +197,18 @@ public interface TableUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(value != null, "\"value\" field is required and cannot be null");
     }
 
+    /**
+     * Returns the table change.
+     *
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.setProperty(property, value);
     }
   }
 
+  /** Represents a request to remove a property of a table. */
   @EqualsAndHashCode
   @ToString
   class RemoveTablePropertyRequest implements TableUpdateRequest {
@@ -158,26 +217,39 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("property")
     private final String property;
 
+    /**
+     * Constructor for RemoveTablePropertyRequest.
+     *
+     * @param property the property to remove
+     */
     public RemoveTablePropertyRequest(String property) {
       this.property = property;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public RemoveTablePropertyRequest() {
       this(null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.removeProperty(property);
     }
   }
 
+  /** Represents a request to add a column to a table. */
   @EqualsAndHashCode
   @ToString
   class AddTableColumnRequest implements TableUpdateRequest {
@@ -208,7 +280,7 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty(value = "nullable", defaultValue = "true")
     private final boolean nullable;
 
-    // For Jackson deserialization
+    /** Default constructor for Jackson deserialization. */
     public AddTableColumnRequest() {
       this(null, null, null, null, true);
     }
@@ -259,6 +331,11 @@ public interface TableUpdateRequest extends RESTRequest {
       this(fieldName, dataType, comment, TableChange.ColumnPosition.defaultPos());
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -270,12 +347,14 @@ public interface TableUpdateRequest extends RESTRequest {
           dataType != null, "\"type\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.addColumn(fieldName, dataType, comment, position, nullable);
     }
   }
 
+  /** Represents a request to rename a column of a table. */
   @EqualsAndHashCode
   @ToString
   class RenameTableColumnRequest implements TableUpdateRequest {
@@ -288,15 +367,27 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("newFieldName")
     private final String newFieldName;
 
+    /**
+     * Constructor for RenameTableColumnRequest.
+     *
+     * @param oldFieldName the old field name to rename
+     * @param newFieldName the new field name
+     */
     public RenameTableColumnRequest(String[] oldFieldName, String newFieldName) {
       this.oldFieldName = oldFieldName;
       this.newFieldName = newFieldName;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public RenameTableColumnRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -309,12 +400,14 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newFieldName\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.renameColumn(oldFieldName, newFieldName);
     }
   }
 
+  /** Represents a request to update the type of a column of a table. */
   @EqualsAndHashCode
   @ToString
   class UpdateTableColumnTypeRequest implements TableUpdateRequest {
@@ -329,15 +422,27 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
     private final Type newType;
 
+    /**
+     * Constructor for UpdateTableColumnTypeRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newType the new type of the field
+     */
     public UpdateTableColumnTypeRequest(String[] fieldName, Type newType) {
       this.fieldName = fieldName;
       this.newType = newType;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public UpdateTableColumnTypeRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -349,12 +454,14 @@ public interface TableUpdateRequest extends RESTRequest {
           newType != null, "\"newType\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnType(fieldName, newType);
     }
   }
 
+  /** Represents a request to update the comment of a column of a table. */
   @EqualsAndHashCode
   @ToString
   class UpdateTableColumnCommentRequest implements TableUpdateRequest {
@@ -367,15 +474,27 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("newComment")
     private final String newComment;
 
+    /**
+     * Constructor for UpdateTableColumnCommentRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newComment the new comment of the field
+     */
     public UpdateTableColumnCommentRequest(String[] fieldName, String newComment) {
       this.fieldName = fieldName;
       this.newComment = newComment;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public UpdateTableColumnCommentRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -388,12 +507,14 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newComment\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnComment(fieldName, newComment);
     }
   }
 
+  /** Represents a request to update the position of a column of a table. */
   @EqualsAndHashCode
   @ToString
   class UpdateTableColumnPositionRequest implements TableUpdateRequest {
@@ -408,16 +529,28 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonDeserialize(using = JsonUtils.ColumnPositionDeserializer.class)
     private final TableChange.ColumnPosition newPosition;
 
+    /**
+     * Constructor for UpdateTableColumnPositionRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newPosition the new position of the field
+     */
     public UpdateTableColumnPositionRequest(
         String[] fieldName, TableChange.ColumnPosition newPosition) {
       this.fieldName = fieldName;
       this.newPosition = newPosition;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public UpdateTableColumnPositionRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -429,12 +562,14 @@ public interface TableUpdateRequest extends RESTRequest {
           newPosition != null, "\"newPosition\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnPosition(fieldName, newPosition);
     }
   }
 
+  /** Represents a request to update the nullability of a column of a table. */
   @EqualsAndHashCode
   @ToString
   class UpdateTableColumnNullabilityRequest implements TableUpdateRequest {
@@ -447,21 +582,37 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("nullable")
     private final boolean nullable;
 
+    /**
+     * Constructor for UpdateTableColumnNullabilityRequest.
+     *
+     * @param fieldName the field name to update
+     * @param nullable the new nullability of the field
+     */
     public UpdateTableColumnNullabilityRequest(String[] fieldName, boolean nullable) {
       this.fieldName = fieldName;
       this.nullable = nullable;
     }
 
-    // For Jackson deserialization
+    /** Default constructor for Jackson deserialization. */
     public UpdateTableColumnNullabilityRequest() {
       this(null, true);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnNullability(fieldName, nullable);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -472,6 +623,7 @@ public interface TableUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Represents a request to delete a column from a table. */
   @EqualsAndHashCode
   @ToString
   class DeleteTableColumnRequest implements TableUpdateRequest {
@@ -484,15 +636,27 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("ifExists")
     private final boolean ifExists;
 
+    /**
+     * Constructor for DeleteTableColumnRequest.
+     *
+     * @param fieldName the field name to delete
+     * @param ifExists whether to delete the column if it exists
+     */
     public DeleteTableColumnRequest(String[] fieldName, boolean ifExists) {
       this.fieldName = fieldName;
       this.ifExists = ifExists;
     }
 
+    /** Default constructor for Jackson deserialization. */
     public DeleteTableColumnRequest() {
       this(null, false);
     }
 
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -502,6 +666,7 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"fieldName\" field is required and cannot be empty");
     }
 
+    /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
       return TableChange.deleteColumn(fieldName, ifExists);

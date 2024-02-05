@@ -23,6 +23,10 @@ public interface Index {
    */
   String[][] fieldNames();
 
+  /**
+   * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
+   * supported.
+   */
   enum IndexType {
     /**
      * PRIMARY KEY index in a relational database is a field or a combination of fields that

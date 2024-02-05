@@ -38,7 +38,7 @@ const AuthProvider = ({ children }) => {
   const dispatch = useAppDispatch()
 
   const handleLogin = async params => {
-    await dispatch(loginAction({ params, router }))
+    dispatch(loginAction({ params, router }))
   }
 
   const handleLogout = () => {
@@ -48,7 +48,7 @@ const AuthProvider = ({ children }) => {
 
     dispatch(setStoreVersion(''))
     dispatch(setAuthToken(''))
-    router.push('/login')
+    router.push('/ui/login')
   }
 
   useEffect(() => {
@@ -64,7 +64,7 @@ const AuthProvider = ({ children }) => {
           dispatch(setAuthToken(token))
           dispatch(initialVersion())
         } else {
-          router.replace('/login')
+          router.push('/ui/login')
         }
       }
     }

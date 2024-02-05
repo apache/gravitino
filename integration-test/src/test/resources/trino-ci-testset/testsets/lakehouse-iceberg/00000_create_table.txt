@@ -6,7 +6,7 @@ CREATE TABLE
    name varchar,
    salary integer
 )
-COMMENT ''
+COMMENT ''"
 
 CREATE TABLE
 
@@ -55,6 +55,19 @@ COMMENT ''
 WITH (
    partitioning = ARRAY['name']
 )"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb06 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_iceberg/gt_db2/tb06'
+)"
+
+DROP TABLE
 
 DROP TABLE
 

@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.rel;
 
+import com.datastrato.gravitino.catalog.OperationsProxy;
+import com.datastrato.gravitino.catalog.ProxyPlugin;
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -12,6 +15,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.ToString;
 
@@ -36,6 +40,41 @@ public abstract class BaseTable implements Table {
   @Nullable protected Distribution distribution;
 
   @Nullable protected Index[] indexes;
+
+  protected Optional<ProxyPlugin> proxyPlugin;
+
+  private volatile TableOperations ops;
+
+  /**
+   * @return The {@link TableOperations} instance associated with this table.
+   * @throws UnsupportedOperationException if the table does not support operations.
+   */
+  protected abstract TableOperations newOps() throws UnsupportedOperationException;
+
+  /**
+   * Retrieves the {@link TableOperations} instance associated with this table. If the instance is
+   * not initialized, it is initialized and returned.
+   *
+   * @return The {@link TableOperations} instance associated with this table.
+   */
+  public TableOperations ops() {
+    if (ops == null) {
+      synchronized (this) {
+        if (ops == null) {
+          TableOperations newOps = newOps();
+          ops =
+              proxyPlugin
+                  .map(
+                      plugin -> {
+                        return OperationsProxy.createProxy(newOps, plugin);
+                      })
+                  .orElse(newOps);
+        }
+      }
+    }
+
+    return ops;
+  }
 
   /** Returns the audit details of the table. */
   @Override
@@ -121,6 +160,8 @@ public abstract class BaseTable implements Table {
 
     SELF withIndexes(Index[] indexes);
 
+    SELF withProxyPlugin(ProxyPlugin plugin);
+
     T build();
   }
 
@@ -142,6 +183,7 @@ public abstract class BaseTable implements Table {
 
     protected Distribution distribution;
     protected Index[] indexes;
+    protected Optional<ProxyPlugin> proxyPlugin = Optional.empty();
 
     /**
      * Sets the name of the table.
@@ -227,6 +269,11 @@ public abstract class BaseTable implements Table {
 
     public SELF withIndexes(Index[] indexes) {
       this.indexes = indexes;
+      return (SELF) this;
+    }
+
+    public SELF withProxyPlugin(ProxyPlugin proxyPlugin) {
+      this.proxyPlugin = Optional.ofNullable(proxyPlugin);
       return (SELF) this;
     }
 

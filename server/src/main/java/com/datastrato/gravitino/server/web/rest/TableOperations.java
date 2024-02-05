@@ -100,7 +100,8 @@ public class TableOperations {
                     request.getProperties(),
                     fromDTOs(request.getPartitioning()),
                     fromDTO(request.getDistribution()),
-                    fromDTOs(request.getSortOrders()));
+                    fromDTOs(request.getSortOrders()),
+                    fromDTOs(request.getIndexes()));
             return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
           });
 
