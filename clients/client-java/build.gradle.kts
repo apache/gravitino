@@ -35,7 +35,7 @@ dependencies {
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
   testImplementation(libs.bundles.jwt)
-  
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

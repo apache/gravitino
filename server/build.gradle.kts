@@ -47,7 +47,7 @@ dependencies {
   testImplementation(libs.jersey.test.framework.provider.jetty) {
     exclude(group = "org.junit.jupiter")
   }
-  
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

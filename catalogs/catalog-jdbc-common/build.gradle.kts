@@ -28,7 +28,7 @@ dependencies {
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  
+
   testRuntimeOnly(libs.junit.jupiter.engine)
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

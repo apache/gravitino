@@ -34,6 +34,6 @@ dependencies {
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
-  
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
