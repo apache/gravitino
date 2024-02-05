@@ -745,6 +745,43 @@ components:
             "nullable": true
           },
           {
+            "name": "info",
+            "type": {
+              "type": "struct",
+              "fields": [
+                {
+                  "name": "position",
+                  "type": "string",
+                  "nullable": true,
+                  "comment": "position field comment"
+                },
+                {
+                  "name": "contact",
+                  "type": {
+                    "type": "list",
+                    "elementType": "integer",
+                    "containsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "contact field comment"
+                },
+                {
+                  "name": "rating",
+                  "type": {
+                    "type": "map",
+                    "keyType": "string",
+                    "valueType": "integer",
+                    "valueContainsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "rating field comment"
+                }
+              ]
+            },
+            "comment": "info column comment",
+            "nullable": true
+          },
+          {
             "name": "dt",
             "type": "date",
             "comment": "dt column comment",
