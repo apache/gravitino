@@ -143,7 +143,7 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(metalake, desermetalake);
 
     // Test with optional fields
-    MetalakeDTO metalake1 =  MetalakeDTO.builder().withName(name).withAudit(audit).build();
+    MetalakeDTO metalake1 = MetalakeDTO.builder().withName(name).withAudit(audit).build();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(metalake1);
     String expectedJson1 =
@@ -339,10 +339,7 @@ public class TestDTOJsonSerDe {
             .withValue("Asia/Shanghai")
             .build();
     FunctionArg toDateFunc =
-        FuncExpressionDTO.builder()
-            .withFunctionName("toDate")
-            .withFunctionArgs(arg1, arg2)
-            .build();
+        FuncExpressionDTO.builder().withFunctionName("toDate").withFunctionArgs(arg1, arg2).build();
     Partitioning expressionPart = FunctionPartitioningDTO.of("toYYYYMM", toDateFunc);
     Partitioning bucketPart = BucketPartitioningDTO.of(10, field1);
     Partitioning truncatePart = TruncatePartitioningDTO.of(20, field2);

@@ -93,7 +93,11 @@ public class DTOConverters {
    * @return The metalake DTO.
    */
   public static MetalakeDTO toDTO(Metalake metalake) {
+<<<<<<< HEAD
     return new MetalakeDTO.Builder()
+=======
+    return MetalakeDTO.builder()
+>>>>>>> 00fd2c9c (draft2)
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -170,7 +174,11 @@ public class DTOConverters {
    * @return The schema DTO.
    */
   public static SchemaDTO toDTO(Schema schema) {
+<<<<<<< HEAD
     return new SchemaDTO.Builder()
+=======
+    return SchemaDTO.builder()
+>>>>>>> 00fd2c9c (draft2)
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
@@ -185,7 +193,11 @@ public class DTOConverters {
    * @return The column DTO.
    */
   public static ColumnDTO toDTO(Column column) {
+<<<<<<< HEAD
     return new ColumnDTO.Builder()
+=======
+    return ColumnDTO.builder()
+>>>>>>> 00fd2c9c (draft2)
         .withName(column.name())
         .withDataType(column.dataType())
         .withComment(column.comment())
@@ -255,7 +267,11 @@ public class DTOConverters {
     if (sortOrder instanceof SortOrderDTO) {
       return (SortOrderDTO) sortOrder;
     }
+<<<<<<< HEAD
     return new SortOrderDTO.Builder()
+=======
+    return SortOrderDTO.builder()
+>>>>>>> 00fd2c9c (draft2)
         .withSortTerm(toFunctionArg(sortOrder.expression()))
         .withDirection(sortOrder.direction())
         .withNullOrder(sortOrder.nullOrdering())

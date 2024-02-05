@@ -93,7 +93,11 @@ public class TestRelationalCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
+<<<<<<< HEAD
         new CatalogDTO.Builder()
+=======
+        CatalogDTO.builder()
+>>>>>>> 00fd2c9c (draft2)
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
             .withProvider(provider)
@@ -1117,8 +1121,12 @@ public class TestRelationalCatalog extends TestBase {
         .withName(name)
         .withComment(comment)
         .withProperties(props)
+<<<<<<< HEAD
         .withAudit(
             new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+=======
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+>>>>>>> 00fd2c9c (draft2)
         .build();
   }
 
@@ -1182,8 +1190,12 @@ public class TestRelationalCatalog extends TestBase {
         .withProperties(properties)
         .withDistribution(distributionDTO)
         .withSortOrders(sortOrderDTOs)
+<<<<<<< HEAD
         .withAudit(
             new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+=======
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+>>>>>>> 00fd2c9c (draft2)
         .withPartitioning(partitioning)
         .withIndex(indexDTOS)
         .build();

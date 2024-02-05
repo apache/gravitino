@@ -40,14 +40,11 @@ public class TestGravitinoClient extends TestBase {
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeDTO mockMetalake1 =
-         MetalakeDTO.builder()
+        MetalakeDTO.builder()
             .withName("mock1")
             .withComment("comment1")
             .withAudit(
-                AuditDTO.builder()
-                    .withCreator("creator1")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditDTO.builder().withCreator("creator1").withCreateTime(Instant.now()).build())
             .build();
 
     MetalakeListResponse resp =
