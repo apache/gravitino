@@ -16,3 +16,17 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     PRIMARY KEY (`metalake_id`),
     UNIQUE KEY `uk_mn_del` (`metalake_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'metalake metadata';
+
+CREATE TABLE IF NOT EXISTS `catalog_meta`
+(
+    `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `catalog_name` VARCHAR(128) NOT NULL COMMENT 'catalog name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `type` VARCHAR(64) NOT NULL COMMENT 'catalog type',
+    `provider` VARCHAR(64) NOT NULL COMMENT 'catalog provider',
+    `catalog_comment` VARCHAR(256) DEFAULT '' COMMENT 'catalog comment',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'catalog properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'catalog audit info',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cn_mid` (`catalog_name`, `metalake_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'catalog metadata';

@@ -28,11 +28,6 @@ public interface Configs {
   String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
       "gravitino.entity.store.relational.jdbcPassword";
 
-  String MYSQL_ENTITY_STORE_URL_KEY = "gravitino.entity.store.mysql.url";
-  String MYSQL_ENTITY_STORE_DRIVER_NAME_KEY = "gravitino.entity.store.mysql.driverName";
-  String MYSQL_ENTITY_STORE_USERNAME_KEY = "gravitino.entity.store.mysql.username";
-  String MYSQL_ENTITY_STORE_PASSWORD_KEY = "gravitino.entity.store.mysql.password";
-
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
   Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days

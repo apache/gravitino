@@ -5,10 +5,14 @@
 
 package com.datastrato.gravitino.storage.relational.utils;
 
+import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
@@ -124,5 +128,69 @@ public class POConverters {
    */
   public static List<BaseMetalake> fromMetalakePOs(List<MetalakePO> metalakePOS) {
     return metalakePOS.stream().map(POConverters::fromMetalakePO).collect(Collectors.toList());
+  }
+
+  /**
+   * Convert {@link CatalogEntity} to {@link CatalogPO}
+   *
+   * @param catalogEntity CatalogEntity object to be converted
+   * @param metalakeId Metalake id to be associated with the catalog
+   * @return CatalogPO object from CatalogEntity object
+   */
+  public static CatalogPO toCatalogPO(CatalogEntity catalogEntity, Long metalakeId) {
+    try {
+      return new CatalogPO.Builder()
+          .withId(catalogEntity.id())
+          .withCatalogName(catalogEntity.name())
+          .withMetalakeId(metalakeId)
+          .withType(catalogEntity.type().name())
+          .withProvider(catalogEntity.getProvider())
+          .withCatalogComment(catalogEntity.getComment())
+          .withProperties(
+              JsonUtils.objectMapper().writeValueAsString(catalogEntity.getProperties()))
+          .withAuditInfo(JsonUtils.objectMapper().writeValueAsString(catalogEntity.auditInfo()))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link CatalogPO} to {@link CatalogEntity}
+   *
+   * @param catalogPO CatalogPO object to be converted
+   * @param namespace Namespace object to be associated with the catalog
+   * @return CatalogEntity object from CatalogPO object
+   */
+  public static CatalogEntity fromCatalogPO(CatalogPO catalogPO, Namespace namespace) {
+    try {
+      return CatalogEntity.builder()
+          .withId(catalogPO.getId())
+          .withName(catalogPO.getCatalogName())
+          .withNamespace(namespace)
+          .withType(Catalog.Type.valueOf(catalogPO.getType()))
+          .withProvider(catalogPO.getProvider())
+          .withComment(catalogPO.getCatalogComment())
+          .withProperties(JsonUtils.objectMapper().readValue(catalogPO.getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.objectMapper().readValue(catalogPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert list of {@link MetalakePO} to list of {@link BaseMetalake}
+   *
+   * @param catalogPOS list of MetalakePO objects
+   * @param namespace Namespace object to be associated with the metalake
+   * @return list of BaseMetalake objects from list of MetalakePO objects
+   */
+  public static List<CatalogEntity> fromCatalogPOs(
+      List<CatalogPO> catalogPOS, Namespace namespace) {
+    return catalogPOS.stream()
+        .map(catalogPO -> POConverters.fromCatalogPO(catalogPO, namespace))
+        .collect(Collectors.toList());
   }
 }

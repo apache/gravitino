@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.session;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
@@ -74,6 +75,7 @@ public class SqlSessionFactoryHelper {
     // Initialize the configuration
     Configuration configuration = new Configuration(environment);
     configuration.addMapper(MetalakeMetaMapper.class);
+    configuration.addMapper(CatalogMetaMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {
