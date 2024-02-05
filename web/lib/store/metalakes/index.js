@@ -208,13 +208,48 @@ export const fetchCatalogs = createAsyncThunk(
         if (update.catalog !== update.newCatalog.name) {
           const tree = getState().metalakes.metalakeTree.map(catalog => {
             if (catalog.name === update.catalog) {
+              const schemas = catalog.schemas
+                ? catalog.schemas.map(schema => {
+                    const tables = schema.tables
+                      ? schema.tables.map(table => {
+                          return {
+                            ...table,
+                            id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}{{${table.name}}}`,
+                            key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}{{${table.name}}}`,
+                            path: `?${new URLSearchParams({
+                              metalake,
+                              catalog: update.newCatalog.name,
+                              schema: schema.name,
+                              table: table.name
+                            }).toString()}`
+                          }
+                        })
+                      : []
+
+                    return {
+                      ...schema,
+                      id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}`,
+                      key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}`,
+                      path: `?${new URLSearchParams({
+                        metalake,
+                        catalog: update.newCatalog.name,
+                        schema: schema.name
+                      }).toString()}`,
+                      tables: tables,
+                      children: tables
+                    }
+                  })
+                : []
+
               return {
                 ...catalog,
                 id: `{{${metalake}}}{{${update.newCatalog.name}}}`,
                 key: `{{${metalake}}}{{${update.newCatalog.name}}}`,
                 path: `?${new URLSearchParams({ metalake, catalog: update.newCatalog.name }).toString()}`,
                 name: update.newCatalog.name,
-                title: update.newCatalog.name
+                title: update.newCatalog.name,
+                schemas: schemas,
+                children: schemas
               }
             } else {
               return { ...catalog }
@@ -222,6 +257,10 @@ export const fetchCatalogs = createAsyncThunk(
           })
 
           dispatch(setMetalakeTree(tree))
+
+          dispatch(resetExpandNode([]))
+
+          dispatch(setLoadedNodes([]))
         }
       } else {
         const mergedTree = _.values(
@@ -319,6 +358,7 @@ export const deleteCatalog = createAsyncThunk(
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
   async ({ init, page, metalake, catalog }, { getState, dispatch }) => {
+    console.log(init)
     if (init) {
       dispatch(setTableLoading(true))
     }
@@ -347,8 +387,8 @@ export const fetchSchemas = createAsyncThunk(
         path: `?${new URLSearchParams({ metalake, catalog, schema: schema.name }).toString()}`,
         name: schema.name,
         title: schema.name,
-        tables: schemaItem ? schemaItem.tables : [],
-        children: schemaItem ? schemaItem.tables : []
+        tables: schemaItem ? schemaItem.children : [],
+        children: schemaItem ? schemaItem.children : []
       }
     })
 
