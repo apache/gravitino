@@ -174,7 +174,7 @@ export const getMetalakeDetails = createAsyncThunk('appMetalakes/getMetalakeDeta
 
 export const fetchCatalogs = createAsyncThunk(
   'appMetalakes/fetchCatalogs',
-  async ({ init, page, metalake }, { getState, dispatch }) => {
+  async ({ init, update, page, metalake }, { getState, dispatch }) => {
     if (init) {
       dispatch(resetTableData())
       dispatch(setTableLoading(true))
@@ -204,8 +204,31 @@ export const fetchCatalogs = createAsyncThunk(
     })
 
     if (init) {
-      const mergedTree = _.values(_.merge(_.keyBy(getState().metalakes.metalakeTree, 'key'), _.keyBy(catalogs, 'key')))
-      dispatch(setMetalakeTree(mergedTree))
+      if (update && update.catalog) {
+        const tree = getState().metalakes.metalakeTree.map(catalog => {
+          if (catalog.name !== update.newCatalog.name) {
+            return {
+              ...catalog,
+              id: `{{${metalake}}}{{${update.newCatalog.name}}}`,
+              key: `{{${metalake}}}{{${update.newCatalog.name}}}`,
+              path: `?${new URLSearchParams({ metalake, catalog: update.newCatalog.name }).toString()}`,
+              name: update.newCatalog.name,
+              title: update.newCatalog.name
+            }
+          }
+
+          return {
+            ...catalog
+          }
+        })
+
+        dispatch(setMetalakeTree(tree))
+      } else {
+        const mergedTree = _.values(
+          _.merge(_.keyBy(getState().metalakes.metalakeTree, 'key'), _.keyBy(catalogs, 'key'))
+        )
+        dispatch(setMetalakeTree(mergedTree))
+      }
     }
 
     return {
@@ -253,7 +276,7 @@ export const createCatalog = createAsyncThunk(
       children: []
     }
 
-    dispatch(fetchCatalogs({ metalake, init: true }))
+    dispatch(dispatch(fetchCatalogs({ metalake, init: true })))
 
     dispatch(addCatalogToTree(catalogData))
 
@@ -268,9 +291,9 @@ export const updateCatalog = createAsyncThunk(
     if (err || !res) {
       throw new Error(err)
     }
-    dispatch(fetchCatalogs({ metalake, catalog, page: 'metalakes', init: true }))
+    dispatch(fetchCatalogs({ metalake, update: { catalog, newCatalog: res.catalog }, init: true }))
 
-    return res
+    return res.catalog
   }
 )
 
