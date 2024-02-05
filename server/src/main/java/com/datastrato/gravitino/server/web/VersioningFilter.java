@@ -76,7 +76,7 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Enumeration<String> acceptHeader = req.getHeaders("Accept");
+    Enumeration<String> acceptHeader = req.getHeaders(ACCEPT_VERSION_HEADER);
     while (acceptHeader.hasMoreElements()) {
       String value = acceptHeader.nextElement();
 
