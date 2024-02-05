@@ -39,15 +39,16 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.commons.io)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.jersey.test.framework.provider.jetty) {
     exclude(group = "org.junit.jupiter")
   }
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.commons.io)
+  
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 fun getGitCommitId(): String {

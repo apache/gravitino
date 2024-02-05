@@ -94,7 +94,6 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.httpclient5)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.iceberg.spark.runtime)
@@ -122,12 +121,14 @@ dependencies {
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  implementation(libs.commons.cli)
   testImplementation(libs.selenium)
   testImplementation(libs.rauschig)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
+  implementation(libs.commons.cli)
+  
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 /* Optimizing integration test execution conditions */

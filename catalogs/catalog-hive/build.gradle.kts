@@ -74,8 +74,9 @@ dependencies {
   implementation(libs.caffeine)
 
   testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
+  
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
