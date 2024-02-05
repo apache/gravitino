@@ -3,11 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relation.mysql.orm;
+package com.datastrato.gravitino.storage.relational.mysql.orm;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.storage.relation.mysql.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -19,6 +19,11 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
+/**
+ * SqlSessionFactoryHelper maintains the MyBatis's {@link SqlSessionFactory} object, which is used
+ * to create the {@link org.apache.ibatis.session.SqlSession} object. It is a singleton class and
+ * should be initialized only once.
+ */
 public class SqlSessionFactoryHelper {
   private static volatile SqlSessionFactory sqlSessionFactory;
   private static final SqlSessionFactoryHelper INSTANCE = new SqlSessionFactoryHelper();
@@ -27,6 +32,13 @@ public class SqlSessionFactoryHelper {
     return INSTANCE;
   }
 
+  private SqlSessionFactoryHelper() {}
+
+  /**
+   * Initialize the SqlSessionFactory object.
+   *
+   * @param config Config object to get the MySQL connection details from the config.
+   */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
     BasicDataSource dataSource = new BasicDataSource();

@@ -3,14 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relation.mysql.po;
+package com.datastrato.gravitino.storage.relational.mysql.po;
 
-import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.SchemaVersion;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Objects;
-import java.util.Map;
 
 public class MetalakePO {
   private Long id;
@@ -118,19 +114,18 @@ public class MetalakePO {
       return this;
     }
 
-    public MetalakePO.Builder withProperties(Map<String, String> properties)
-        throws JsonProcessingException {
-      metalakePO.properties = JsonUtils.objectMapper().writeValueAsString(properties);
+    public MetalakePO.Builder withProperties(String properties) throws JsonProcessingException {
+      metalakePO.properties = properties;
       return this;
     }
 
-    public MetalakePO.Builder withAuditInfo(AuditInfo auditInfo) throws JsonProcessingException {
-      metalakePO.auditInfo = JsonUtils.objectMapper().writeValueAsString(auditInfo);
+    public MetalakePO.Builder withAuditInfo(String auditInfo) throws JsonProcessingException {
+      metalakePO.auditInfo = auditInfo;
       return this;
     }
 
-    public MetalakePO.Builder withVersion(SchemaVersion version) throws JsonProcessingException {
-      metalakePO.schemaVersion = JsonUtils.objectMapper().writeValueAsString(version);
+    public MetalakePO.Builder withVersion(String version) throws JsonProcessingException {
+      metalakePO.schemaVersion = version;
       return this;
     }
 

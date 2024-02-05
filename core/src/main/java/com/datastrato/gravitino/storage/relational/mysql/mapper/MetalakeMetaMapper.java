@@ -3,9 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relation.mysql.mapper;
+package com.datastrato.gravitino.storage.relational.mysql.mapper;
 
-import com.datastrato.gravitino.storage.relation.mysql.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.mysql.po.MetalakePO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -78,7 +78,7 @@ public interface MetalakeMetaMapper {
           + " audit_info = #{newMetalakeMeta.auditInfo},"
           + " schema_version = #{newMetalakeMeta.schemaVersion}"
           + " WHERE id = #{oldMetalakeMeta.id}"
-          + " and metalake_name = #{oldMetalakeMeta.metalakeComment}"
+          + " and metalake_name = #{oldMetalakeMeta.metalakeName}"
           + " and metalake_comment = #{oldMetalakeMeta.metalakeComment}"
           + " and properties = #{oldMetalakeMeta.properties}"
           + " and audit_info = #{oldMetalakeMeta.auditInfo}"
