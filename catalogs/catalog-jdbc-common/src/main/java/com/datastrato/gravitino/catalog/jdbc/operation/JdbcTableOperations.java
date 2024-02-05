@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
@@ -117,23 +118,44 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    // We should handle case sensitivity and wild card issue in some catalog tables, take a MySQL
+    // table for example.
+    // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
+    // like utf8mb4.
+    // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
+    // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1.Get table information
       ResultSet table = getTable(connection, databaseName, tableName);
-      if (!table.next() || !tableName.equals(table.getString("TABLE_NAME"))) {
+      // The result of tables may be more than one due to the reason above, so we need to check the
+      // result
+      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      boolean found = false;
+      // Handle case-sensitive issues.
+      while (table.next() && !found) {
+        if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
+          jdbcTableBuilder = getBasicJdbcTableInfo(table);
+          found = true;
+        }
+      }
+
+      if (!found) {
         throw new NoSuchTableException(
             String.format("Table %s does not exist in %s.", tableName, databaseName));
       }
-      JdbcTable.Builder jdbcTableBuilder = getBasicJdbcTableInfo(table);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      // Get columns are wildcard sensitive, so we need to check the result.
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
-        JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
-        boolean autoIncrement = getAutoIncrementInfo(columns);
-        columnBuilder.withAutoIncrement(autoIncrement);
-        jdbcColumns.add(columnBuilder.build());
+        // TODO(yunqing): check schema and catalog also
+        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
+          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+          boolean autoIncrement = getAutoIncrementInfo(columns);
+          columnBuilder.withAutoIncrement(autoIncrement);
+          jdbcColumns.add(columnBuilder.build());
+        }
       }
       jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
 

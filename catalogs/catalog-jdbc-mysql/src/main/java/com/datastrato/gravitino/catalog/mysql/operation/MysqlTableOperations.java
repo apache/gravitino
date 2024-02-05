@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -209,27 +210,30 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
+    // MySQL in CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci is case-insensitive, when the name is
+    // hello, the result can be 'HELLO', 'Hello', 'hello' and so on.
     try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
-        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
-          throw new NoSuchTableException(
-              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        while (resultSet.next()) {
+          String name = resultSet.getString("NAME");
+          if (Objects.equals(name, tableName)) {
+            return Collections.unmodifiableMap(
+                new HashMap<String, String>() {
+                  {
+                    put(COMMENT, resultSet.getString(COMMENT));
+                    put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                    String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                    if (StringUtils.isNotEmpty(autoIncrement)) {
+                      put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                    }
+                  }
+                });
+          }
         }
-        return Collections.unmodifiableMap(
-            new HashMap<String, String>() {
-              {
-                // It is not possible to get all column assembly returns here, because in version
-                // 5.7, some columns exist in metadata but get will report an error that they do not
-                // exist, such as: TABLE_NAME
-                put(COMMENT, resultSet.getString(COMMENT));
-                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                if (StringUtils.isNotEmpty(autoIncrement)) {
-                  put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                }
-              }
-            });
+
+        throw new NoSuchTableException(
+            String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
       }
     }
   }

@@ -1333,6 +1333,64 @@ public class TrinoConnectorIT extends AbstractIT {
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertTrue(data.contains("age integer NOT NULL"));
     Assertions.assertTrue(data.contains("address varchar(20) NOT NULL"));
+
+    // Test special characters in table name
+    String tableName1 = "t112";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t1name varchar)",
+            metalakeName, catalogName, schemaName, tableName1);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName2 = "t212";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t2name varchar)",
+            metalakeName, catalogName, schemaName, tableName2);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName3 = "t_12";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t3name varchar)",
+            metalakeName, catalogName, schemaName, tableName3);
+
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    String tableName4 = "_1__";
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, t4name varchar)",
+            metalakeName, catalogName, schemaName, tableName4);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    // Get table tableName1
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName1);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t1name varchar");
+
+    // Get table tableName2
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName2);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t2name varchar");
+
+    // Get table tableName3
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName3);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t3name varchar");
+
+    // Get table tableName4
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName4);
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    data.contains("t4name varchar");
   }
 
   @Test

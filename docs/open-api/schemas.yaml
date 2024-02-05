@@ -15,7 +15,7 @@ paths:
     get:
       tags:
         - schema
-      summary: List all schemas in a catalog
+      summary: List schemas
       operationId: listSchemas
       responses:
         "200":
@@ -28,7 +28,7 @@ paths:
     post:
       tags:
         - schema
-      summary: Create a new schema in a catalog
+      summary: Create schema
       operationId: createSchema
       requestBody:
         content:
@@ -63,7 +63,7 @@ paths:
     get:
       tags:
         - schema
-      summary: Get the specified schema in the specified catalog and metalake
+      summary: Get schema
       operationId: loadSchema
       description: Returns the specified schema in the specified catalog and metalake
       responses:
@@ -88,7 +88,7 @@ paths:
     put:
       tags:
         - schema
-      summary: Update the specified schema in the specified catalog and metalake
+      summary: Update schema
       operationId: alterSchema
       description: Updates the specified schema in the specified catalog and metalake
       requestBody:
@@ -127,7 +127,7 @@ paths:
     delete:
       tags:
         - schema
-      summary: Drop the specified schema in the specified catalog and metalake
+      summary: Drop schema
       operationId: dropSchema
       responses:
         "200":
