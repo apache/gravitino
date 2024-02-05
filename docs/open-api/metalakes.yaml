@@ -12,7 +12,7 @@ paths:
     get:
       tags:
         - metalake
-      summary: List all metalakes
+      summary: List metalakes
       operationId: listMetalakes
       description: Returns a list of all metalakes.
       responses:
@@ -26,7 +26,7 @@ paths:
     post:
       tags:
         - metalake
-      summary: Create a new metalake
+      summary: Create metalake
       operationId: createMetalake
       description: Creates a new metalake
       requestBody:
@@ -64,7 +64,7 @@ paths:
     get:
       tags:
         - metalake
-      summary: Load a metalake from the Gravitino store
+      summary: Get metalake
       operationId: loadMetalake
       description: Returns a metalake information by given metalake name
       responses:
@@ -85,7 +85,7 @@ paths:
     put:
       tags:
         - metalake
-      summary: Alter a metalake by name
+      summary: Update metalake
       operationId: alterMetalake
       description: Alters a specified metalake
       requestBody:
@@ -126,7 +126,7 @@ paths:
     delete:
       tags:
         - metalake
-      summary: Drop a metalake by name
+      summary: Drop metalake
       operationId: dropMetalake
       description: Drops a specified metalake
       responses:
