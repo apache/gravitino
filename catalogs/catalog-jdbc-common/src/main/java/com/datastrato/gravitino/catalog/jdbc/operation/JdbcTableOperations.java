@@ -106,7 +106,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       final List<String> names = Lists.newArrayList();
       try (ResultSet tables = getTables(connection)) {
         while (tables.next()) {
-          names.add(tables.getString("TABLE_NAME"));
+          if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
+            names.add(tables.getString("TABLE_NAME"));
+          }
         }
       }
       LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
