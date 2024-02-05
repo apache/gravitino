@@ -17,12 +17,12 @@ public class ConvertUtil {
   /**
    * Convert the Iceberg Table to the corresponding schema information in the Iceberg.
    *
-   * @param icebergTable gravitinoTable.
+   * @param gravitinoTable Gravitino table of Iceberg.
    * @return Iceberg schema.
    */
-  public static Schema toIcebergSchema(IcebergTable icebergTable) {
+  public static Schema toIcebergSchema(IcebergTable gravitinoTable) {
     com.datastrato.gravitino.rel.types.Types.StructType gravitinoStructType =
-        toGravitinoStructType(icebergTable);
+        toGravitinoStructType(gravitinoTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
     return new Schema(converted.asNestedType().asStructType().fields());
