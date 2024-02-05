@@ -208,10 +208,10 @@ export const fetchCatalogs = createAsyncThunk(
         if (update.catalog !== update.newCatalog.name) {
           const tree = getState().metalakes.metalakeTree.map(catalog => {
             if (catalog.name === update.catalog) {
-              const schemas = catalog.schemas
-                ? catalog.schemas.map(schema => {
-                    const tables = schema.tables
-                      ? schema.tables.map(table => {
+              const schemas = catalog.children
+                ? catalog.children.map(schema => {
+                    const tables = schema.children
+                      ? schema.children.map(table => {
                           return {
                             ...table,
                             id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}{{${table.name}}}`,
@@ -258,9 +258,37 @@ export const fetchCatalogs = createAsyncThunk(
 
           dispatch(setMetalakeTree(tree))
 
-          dispatch(resetExpandNode([]))
+          const expandedNodes = getState().metalakes.expandedNodes.map(node => {
+            const [metalake, catalog, schema, table] = extractPlaceholder(node)
+            if (catalog === update.catalog) {
+              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}${schema ? `{{${schema}}}` : ''}${
+                table ? `{{${table}}}` : ''
+              }`
 
-          dispatch(setLoadedNodes([]))
+              return updatedNode
+            }
+
+            return node
+          })
+
+          const expanded = expandedNodes.filter(i => !i.startsWith(`{{${metalake}}}{{${update.catalog}}}`))
+          dispatch(setExpandedNodes(expanded))
+
+          const loadedNodes = getState().metalakes.loadedNodes.map(node => {
+            const [metalake, catalog, schema, table] = extractPlaceholder(node)
+            if (catalog === update.catalog) {
+              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}${schema ? `{{${schema}}}` : ''}${
+                table ? `{{${table}}}` : ''
+              }`
+
+              return updatedNode
+            }
+
+            return node
+          })
+
+          const loaded = loadedNodes.filter(i => !i.startsWith(`{{${metalake}}}{{${update.catalog}}}`))
+          dispatch(setLoadedNodes(loaded))
         }
       } else {
         const mergedTree = _.values(
@@ -358,7 +386,6 @@ export const deleteCatalog = createAsyncThunk(
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
   async ({ init, page, metalake, catalog }, { getState, dispatch }) => {
-    console.log(init)
     if (init) {
       dispatch(setTableLoading(true))
     }
