@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 public class TestConfigEntryList {
 
   private final ConcurrentMap<String, String> configMap = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, String> configMapEmpty = new ConcurrentHashMap<>();
 
   @BeforeEach
   public void initializeConfigMap() {
@@ -28,49 +29,46 @@ public class TestConfigEntryList {
   @AfterEach
   public void clearConfigMap() {
     configMap.clear();
+    configMapEmpty.clear();
   }
 
   @Test
   public void testConfWithDefaultValue() {
-    ConfigEntry<List<String>> testConf1 =
-        new ConfigBuilder("gravitino.test.list")
-            .doc("test")
-            .internal()
-            .stringConf()
-            .checkValue(value -> value == "test-string-1,test-string-2,test-string-3", "error")
-            .toSequence()
-            .createWithDefault(Lists.newArrayList("test-string-0"));
-
-    ConfigEntry<List<String>> testConf2 =
+    ConfigEntry<List<String>> testConf =
         new ConfigBuilder("gravitino.test.string.list")
             .doc("test")
             .internal()
             .stringConf()
+            .checkValue(value -> value == null, "error")
             .toSequence()
-            .create();
-    List<String> valueList2 = testConf2.readFrom(configMap);
-    Assertions.assertEquals("test-string-1", valueList2.get(0));
-    Assertions.assertEquals("test-string-2", valueList2.get(1));
-    Assertions.assertEquals("test-string-3", valueList2.get(2));
+            .checkValue(
+                valueList -> valueList.stream().allMatch(element -> element == "test-string"),
+                "error")
+            .createWithDefault(Lists.newArrayList("test-string", "test-string", "test-string"));
+    List<String> valueList = testConf.readFrom(configMapEmpty);
+    Assertions.assertEquals(null, configMapEmpty.get("gravitino.test.string.list"));
+    Assertions.assertEquals("test-string", valueList.get(0));
+    Assertions.assertEquals("test-string", valueList.get(1));
+    Assertions.assertEquals("test-string", valueList.get(2));
 
-    ConfigEntry<List<Integer>> testConf3 =
+    ConfigEntry<List<Integer>> testConf1 =
         new ConfigBuilder("gravitino.test.int.list")
             .doc("test")
             .version("1.0")
             .intConf()
             .toSequence()
             .createWithDefault(Lists.newArrayList(10));
-    List<Integer> valueList3 = testConf3.readFrom(configMap);
-    Assertions.assertEquals(10, valueList3.get(0));
+    List<Integer> valueList1 = testConf1.readFrom(configMap);
+    Assertions.assertEquals(10, valueList1.get(0));
 
-    ConfigEntry<List<Boolean>> testConf4 =
+    ConfigEntry<List<Boolean>> testConf2 =
         new ConfigBuilder("gravitino.test.boolean.list")
             .booleanConf()
             .toSequence()
             .createWithDefault(Lists.newArrayList(true, false));
-    List<Boolean> valueList4 = testConf4.readFrom(configMap);
-    Assertions.assertTrue(valueList4.get(0));
-    Assertions.assertFalse(valueList4.get(1));
+    List<Boolean> valueList2 = testConf2.readFrom(configMap);
+    Assertions.assertTrue(valueList2.get(0));
+    Assertions.assertFalse(valueList2.get(1));
   }
 
   @Test
@@ -80,7 +78,8 @@ public class TestConfigEntryList {
             .doc("test")
             .internal()
             .stringConf()
-            .toSequence();
+            .toSequence()
+            .create();
     List<String> valueList = testConf.readFrom(configMap);
     Assertions.assertEquals("test-string-1", valueList.get(0));
     Assertions.assertEquals("test-string-2", valueList.get(1));
@@ -132,5 +131,7 @@ public class TestConfigEntryList {
             .toSequence()
             .checkValue(Objects::nonNull, "error")
             .create();
+    Assertions.assertThrows(
+        NullPointerException.class, () -> testConfNoDefault.readFrom(configMap));
   }
 }
