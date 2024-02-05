@@ -32,18 +32,18 @@ public class TestGravitinoClient extends TestBase {
   @Test
   public void testListMetalakes() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeDTO mockMetalake1 =
-        new MetalakeDTO.Builder()
+         MetalakeDTO.builder()
             .withName("mock1")
             .withComment("comment1")
             .withAudit(
-                new AuditDTO.Builder()
+                AuditDTO.builder()
                     .withCreator("creator1")
                     .withCreateTime(Instant.now())
                     .build())
@@ -85,11 +85,11 @@ public class TestGravitinoClient extends TestBase {
   @Test
   public void testLoadMetalake() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
@@ -127,11 +127,11 @@ public class TestGravitinoClient extends TestBase {
   @Test
   public void testCreateMetalake() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     MetalakeCreateRequest req =
@@ -181,11 +181,11 @@ public class TestGravitinoClient extends TestBase {
                 .collect(Collectors.toList()));
 
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName("newName")
             .withComment("newComment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
 

@@ -163,7 +163,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return new DistributionDTO.Builder()
+    return  DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(FieldReferenceDTO.of(columnName))
@@ -172,7 +172,7 @@ public class TestTableOperations extends JerseyTest {
 
   private SortOrderDTO[] createMockSortOrderDTO(String columnName, SortDirection direction) {
     return new SortOrderDTO[] {
-      new SortOrderDTO.Builder()
+      SortOrderDTO.builder()
           .withDirection(direction)
           .withNullOrder(NullOrdering.NULLS_FIRST)
           .withSortTerm(FieldReferenceDTO.of(columnName))

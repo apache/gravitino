@@ -188,4 +188,8 @@ public class MetalakeDTO implements Metalake {
   public int hashCode() {
     return Objects.hashCode(name, comment, audit);
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }

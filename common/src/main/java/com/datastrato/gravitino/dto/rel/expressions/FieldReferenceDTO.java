@@ -74,4 +74,8 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
       return new FieldReferenceDTO(fieldName);
     }
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }

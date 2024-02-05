@@ -90,4 +90,8 @@ public final class ListPartitioningDTO implements Partitioning {
       return new ListPartitioningDTO(fieldNames);
     }
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }

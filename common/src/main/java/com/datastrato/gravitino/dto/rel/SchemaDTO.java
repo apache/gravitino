@@ -141,4 +141,8 @@ public class SchemaDTO implements Schema {
       return new SchemaDTO(name, comment, properties, audit);
     }
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }
