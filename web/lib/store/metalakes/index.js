@@ -272,7 +272,7 @@ export const fetchCatalogs = createAsyncThunk(
           })
 
           const expanded = expandedNodes.filter(i => !i.startsWith(`{{${metalake}}}{{${update.catalog}}}`))
-          dispatch(setExpandedNodes(expanded))
+          dispatch(setExpanded(expanded))
 
           const loadedNodes = getState().metalakes.loadedNodes.map(node => {
             const [metalake, catalog, schema, table] = extractPlaceholder(node)
@@ -575,6 +575,9 @@ export const appMetalakesSlice = createSlice({
     setSelectedNodes(state, action) {
       state.selectedNodes = action.payload
     },
+    setExpanded(state, action) {
+      state.expandedNodes = action.payload
+    },
     setExpandedNodes(state, action) {
       const expandedNodes = JSON.parse(JSON.stringify(state.expandedNodes))
       const nodes = Array.from(new Set([...expandedNodes, action.payload].flat()))
@@ -680,6 +683,7 @@ export const {
   setTreeLoading,
   setIntoTreeNodes,
   setLoadedNodes,
+  setExpanded,
   setExpandedNodes,
   addCatalogToTree,
   removeCatalogFromTree
