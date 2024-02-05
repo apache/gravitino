@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.storage.relation;
+package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
@@ -17,17 +17,17 @@ import java.util.List;
 import java.util.function.Function;
 
 /** Interface defining the operations for a Relation Backend. */
-public interface RelationBackend extends Closeable {
+public interface RelationalBackend extends Closeable {
 
   /**
-   * Initializes the Relation Backend environment with the provided configuration.
+   * Initializes the Relational Backend environment with the provided configuration.
    *
    * @param config The configuration for the backend.
    */
   void initialize(Config config);
 
   /**
-   * List the entities associated with the given parent namespace and entityType
+   * Lists the entities associated with the given parent namespace and entityType
    *
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
@@ -40,7 +40,7 @@ public interface RelationBackend extends Closeable {
       throws NoSuchEntityException;
 
   /**
-   * Check the entity associated with the given identifier and entityType whether exists.
+   * Checks the entity associated with the given identifier and entityType whether exists.
    *
    * @param ident The identifier of the entity.
    * @param entityType The type of the entity.
@@ -59,7 +59,7 @@ public interface RelationBackend extends Closeable {
       throws EntityAlreadyExistsException;
 
   /**
-   * Update the entity.
+   * Updates the entity.
    *
    * @param ident The identifier of the entity which need be stored.
    * @param entityType The type of the entity.

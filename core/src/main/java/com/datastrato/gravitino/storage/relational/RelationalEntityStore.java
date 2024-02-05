@@ -2,9 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.storage.relation;
+package com.datastrato.gravitino.storage.relational;
 
-import static com.datastrato.gravitino.Configs.ENTITY_RELATION_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -17,7 +17,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.storage.relation.mysql.MySQLBackend;
+import com.datastrato.gravitino.storage.relational.mysql.MySQLBackend;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -30,41 +30,43 @@ import org.slf4j.LoggerFactory;
 /**
  * Relation store to store entities. This means we can store entities in a relational store. I.e.,
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
- * RelationBackend} interface
+ * RelationalBackend} interface
  */
-public class RelationEntityStore implements EntityStore {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RelationEntityStore.class);
-  public static final ImmutableMap<String, String> RELATION_BACKENDS =
-      ImmutableMap.of(Configs.DEFAULT_ENTITY_RELATION_STORE, MySQLBackend.class.getCanonicalName());
-  private RelationBackend backend;
+public class RelationalEntityStore implements EntityStore {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
+  public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
+      ImmutableMap.of(
+          Configs.DEFAULT_ENTITY_RELATIONAL_STORE, MySQLBackend.class.getCanonicalName());
+  private RelationalBackend backend;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    this.backend = createRelationEntityBackend(config);
+    this.backend = createRelationalEntityBackend(config);
   }
 
-  private static RelationBackend createRelationEntityBackend(Config config) {
-    String backendName = config.get(ENTITY_RELATION_STORE);
-    String className = RELATION_BACKENDS.getOrDefault(backendName, backendName);
+  private static RelationalBackend createRelationalEntityBackend(Config config) {
+    String backendName = config.get(ENTITY_RELATIONAL_STORE);
+    String className = RELATIONAL_BACKENDS.getOrDefault(backendName, backendName);
     if (Objects.isNull(className)) {
       throw new RuntimeException("Unsupported backend type..." + backendName);
     }
 
     try {
-      RelationBackend relationBackend =
-          (RelationBackend) Class.forName(className).getDeclaredConstructor().newInstance();
-      relationBackend.initialize(config);
-      return relationBackend;
+      RelationalBackend relationalBackend =
+          (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
+      relationalBackend.initialize(config);
+      return relationalBackend;
     } catch (Exception e) {
-      LOGGER.error("Failed to create and initialize RelationBackend by name '{}'.", backendName, e);
+      LOGGER.error(
+          "Failed to create and initialize RelationalBackend by name '{}'.", backendName, e);
       throw new RuntimeException(
-          "Failed to create and initialize RelationBackend by name: " + backendName, e);
+          "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
   }
 
   @Override
   public void setSerDe(EntitySerDe entitySerDe) {
-    throw new UnsupportedOperationException("Unsupported operation in relation entity store.");
+    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
   }
 
   @Override
@@ -110,7 +112,7 @@ public class RelationEntityStore implements EntityStore {
 
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) {
-    throw new UnsupportedOperationException("Unsupported operation in relation entity store.");
+    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
   }
 
   @Override

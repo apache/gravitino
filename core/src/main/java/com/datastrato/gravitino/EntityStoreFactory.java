@@ -5,7 +5,7 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.storage.kv.KvEntityStore;
-import com.datastrato.gravitino.storage.relation.RelationEntityStore;
+import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +24,8 @@ public class EntityStoreFactory {
       ImmutableMap.of(
           Configs.DEFAULT_ENTITY_STORE,
           KvEntityStore.class.getCanonicalName(),
-          Configs.RELATION_ENTITY_STORE,
-          RelationEntityStore.class.getCanonicalName());
+          Configs.RELATIONAL_ENTITY_STORE,
+          RelationalEntityStore.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
   private EntityStoreFactory() {}

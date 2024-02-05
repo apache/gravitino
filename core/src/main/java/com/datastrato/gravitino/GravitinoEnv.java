@@ -12,7 +12,6 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
-import com.datastrato.gravitino.storage.relation.RelationEntityStore;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,15 +68,9 @@ public class GravitinoEnv {
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
-    // Initialize EntitySerDe
-    this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);
-
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    if (!(entityStore instanceof RelationEntityStore)) {
-      entityStore.setSerDe(entitySerDe);
-    }
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
@@ -107,10 +100,11 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the EntitySerDe associated with the Gravitino environment.
-   *
-   * @return The EntitySerDe instance.
+   * @deprecated Put the {@link EntitySerDe} initialization logic of the {@link EntityStore} into
+   *     the {@link EntityStore#initialize} method. If you need to get the {@link EntitySerDe} of
+   *     the {@link EntityStore}, you can add a method in {@link EntityStore}.
    */
+  @Deprecated
   public EntitySerDe entitySerDe() {
     return entitySerDe;
   }

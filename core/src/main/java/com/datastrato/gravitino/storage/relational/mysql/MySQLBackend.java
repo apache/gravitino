@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.storage.relation.mysql;
+package com.datastrato.gravitino.storage.relational.mysql;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
@@ -11,23 +11,21 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.storage.relation.RelationBackend;
+import com.datastrato.gravitino.storage.relational.RelationalBackend;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
 
 /**
- * {@link MySQLBackend} is a MySQL implementation of RelationBackend interface. If we want to use
- * another relation implementation, We can just implement {@link RelationBackend} interface and use
- * it in the Gravitino.
+ * {@link MySQLBackend} is a MySQL implementation of RelationalBackend interface. If we want to use
+ * another relational implementation, We can just implement {@link RelationalBackend} interface and
+ * use it in the Gravitino.
  */
-public class MySQLBackend implements RelationBackend {
+public class MySQLBackend implements RelationalBackend {
 
   /** Initialize the MySQL backend instance. */
   @Override
-  public void initialize(Config config) {
-    throw new UnsupportedOperationException("Unsupported operation now.");
-  }
+  public void initialize(Config config) {}
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
@@ -65,7 +63,5 @@ public class MySQLBackend implements RelationBackend {
   }
 
   @Override
-  public void close() throws IOException {
-    throw new UnsupportedOperationException("Unsupported operation now.");
-  }
+  public void close() throws IOException {}
 }
