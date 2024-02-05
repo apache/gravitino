@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import java.util.Arrays;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
@@ -17,10 +18,25 @@ public class ConvertUtil {
    * Convert the Iceberg Table to the corresponding schema information in the Iceberg.
    *
    * @param icebergTable Iceberg table.
-   * @return iceberg schema.
+   * @return Iceberg schema.
    */
   public static Schema toIcebergSchema(IcebergTable icebergTable) {
-    Type converted = ToIcebergTypeVisitor.visit(icebergTable, new ToIcebergType(icebergTable));
+    com.datastrato.gravitino.rel.types.Types.StructType gravitinoStructType =
+        toGravitinoStructType(icebergTable);
+    Type converted =
+        ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
+    return new Schema(converted.asNestedType().asStructType().fields());
+  }
+
+  /**
+   * Convert the Gravitino StructType to the corresponding schema information in the Iceberg.
+   *
+   * @param gravitinoType Gravitino StructType
+   * @return Iceberg schema.
+   */
+  public static Schema toIcebergSchema(
+      com.datastrato.gravitino.rel.types.Types.StructType gravitinoType) {
+    Type converted = ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType(gravitinoType));
     return new Schema(converted.asNestedType().asStructType().fields());
   }
 
@@ -50,7 +66,7 @@ public class ConvertUtil {
    * Convert the nested field of Iceberg to the Iceberg column.
    *
    * @param nestedField Iceberg nested field.
-   * @return
+   * @return Gravitino iceberg column
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
     return new IcebergColumn.Builder()
@@ -63,11 +79,11 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the Gravitino field to the Iceberg column.t
+   * Convert the Gravitino field to the Iceberg Gravitino column
    *
    * @param field Gravitino field.
    * @param id Gravitino field id.
-   * @return
+   * @return Gravitino iceberg table column
    */
   public static IcebergColumn fromGravitinoField(
       com.datastrato.gravitino.rel.types.Types.StructType.Field field, int id) {
@@ -78,5 +94,23 @@ public class ConvertUtil {
         .withComment(field.comment())
         .withType(field.type())
         .build();
+  }
+
+  /**
+   * Convert the Gravitino iceberg table to the Gravitino StructType
+   *
+   * @param icebergTable Gravitino iceberg table
+   * @return Gravitino StructType
+   */
+  public static com.datastrato.gravitino.rel.types.Types.StructType toGravitinoStructType(
+      IcebergTable icebergTable) {
+    com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields =
+        Arrays.stream(icebergTable.columns())
+            .map(
+                column ->
+                    com.datastrato.gravitino.rel.types.Types.StructType.Field.of(
+                        column.name(), column.dataType(), column.nullable(), column.comment()))
+            .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new);
+    return com.datastrato.gravitino.rel.types.Types.StructType.of(fields);
   }
 }
