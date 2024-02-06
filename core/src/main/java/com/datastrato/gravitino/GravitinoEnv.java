@@ -27,8 +27,6 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
-  private EntitySerDe entitySerDe;
-
   private CatalogManager catalogManager;
 
   private CatalogOperationDispatcher catalogOperationDispatcher;
@@ -97,16 +95,6 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
-  }
-
-  /**
-   * @deprecated Put the {@link EntitySerDe} initialization logic of the {@link EntityStore} into
-   *     the {@link EntityStore#initialize} method. If you need to get the {@link EntitySerDe} of
-   *     the {@link EntityStore}, you can add a method in {@link EntityStore}.
-   */
-  @Deprecated
-  public EntitySerDe entitySerDe() {
-    return entitySerDe;
   }
 
   /**
