@@ -56,6 +56,7 @@ class DTOConverters {
     }
   }
 
+  @SuppressWarnings("unchecked")
   static Catalog toCatalog(CatalogDTO catalog, RESTClient client) {
     switch (catalog.type()) {
       case RELATIONAL:
