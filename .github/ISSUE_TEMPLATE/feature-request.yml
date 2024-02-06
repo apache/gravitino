@@ -2,7 +2,6 @@ name: Feature Request
 title: "[FEATURE] "
 description: Suggest an idea for Gravitino
 labels: [ "feature" ]
-projects: [ "datastrato/1" ]
 body:
 
   - type: textarea

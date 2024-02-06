@@ -17,6 +17,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntitySerDe;
+import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
@@ -103,6 +104,7 @@ public class KvEntityStore implements EntityStore {
     kvGarbageCollector.start();
 
     this.storageLayoutVersion = initStorageVersionInfo();
+    this.serDe = EntitySerDeFactory.createEntitySerDe(config);
   }
 
   @Override

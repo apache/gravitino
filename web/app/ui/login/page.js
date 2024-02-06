@@ -5,6 +5,7 @@
 
 'use client'
 
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
@@ -12,7 +13,9 @@ import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormContro
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
-import { useAuth } from '@/lib/provider/session'
+
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { loginAction } from '@/lib/store/auth'
 
 const defaultValues = {
   grant_type: 'client_credentials',
@@ -29,20 +32,27 @@ const schema = yup.object().shape({
 })
 
 const LoginPage = () => {
-  const auth = useAuth()
+  const router = useRouter()
+  const dispatch = useAppDispatch()
 
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors }
   } = useForm({
-    defaultValues,
+    defaultValues: Object.assign({}, defaultValues),
     mode: 'onChange',
     resolver: yupResolver(schema)
   })
 
-  const onSubmit = data => {
-    auth.login(data)
+  const onSubmit = async data => {
+    dispatch(loginAction({ params: data, router }))
+    reset()
+  }
+
+  const onError = errors => {
+    console.error('fields error', errors)
   }
 
   return (
@@ -57,7 +67,7 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
-            <form autoComplete='off' onSubmit={handleSubmit(onSubmit)}>
+            <form autoComplete='off' onSubmit={handleSubmit(onSubmit, onError)}>
               <Grid item xs={12} sx={{ mt: 4 }}>
                 <FormControl fullWidth>
                   <Controller

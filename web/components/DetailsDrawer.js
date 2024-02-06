@@ -37,14 +37,14 @@ const DetailsDrawer = props => {
     setOpenDrawer(false)
   }
 
-  const renderFieldText = (value, linkBreak = false) => {
+  const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
       return <EmptyText />
     }
 
     return (
       <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
-        {isValidDate(value) ? formatToDateTime(value) : value}
+        {isDate && isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
   }
@@ -118,13 +118,13 @@ const DetailsDrawer = props => {
               <Typography variant='body2' sx={{ mb: 2 }}>
                 Type
               </Typography>
-              {renderFieldText(drawerData.type)}
+              {renderFieldText({ value: drawerData.type })}
             </Grid>
             <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
               <Typography variant='body2' sx={{ mb: 2 }}>
                 Provider
               </Typography>
-              {renderFieldText(drawerData.provider)}
+              {renderFieldText({ value: drawerData.provider })}
             </Grid>
           </>
         ) : null}
@@ -133,35 +133,35 @@ const DetailsDrawer = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          {renderFieldText(drawerData.comment, true)}
+          {renderFieldText({ value: drawerData.comment, linkBreak: true })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Created by
           </Typography>
-          {renderFieldText(audit.creator)}
+          {renderFieldText({ value: audit.creator })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Created at
           </Typography>
-          {renderFieldText(audit.createTime)}
+          {renderFieldText({ value: audit.createTime, isDate: true })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified by
           </Typography>
-          {renderFieldText(audit.lastModifier)}
+          {renderFieldText({ value: audit.lastModifier })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified at
           </Typography>
-          {renderFieldText(audit.lastModifiedTime)}
+          {renderFieldText({ value: audit.lastModifiedTime, isDate: true })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>

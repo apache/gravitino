@@ -95,4 +95,6 @@ public class ToHiveType {
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }
   }
+
+  private ToHiveType() {}
 }

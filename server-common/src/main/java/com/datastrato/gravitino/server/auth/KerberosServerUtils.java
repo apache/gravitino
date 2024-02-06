@@ -393,4 +393,6 @@ public class KerberosServerUtils {
       return "[tag=0x" + Integer.toHexString(tag) + " bb=" + bb + "]";
     }
   }
+
+  private KerberosServerUtils() {}
 }
