@@ -429,7 +429,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   static class Builder extends CatalogDTO.Builder<Builder> {
     private RESTClient restClient;
 
-    private Builder() {}
+    protected Builder() {}
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
@@ -447,5 +447,9 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
 
       return new RelationalCatalog(name, type, provider, comment, properties, audit, restClient);
     }
+  }
+
+  public static Builder builder() {
+    return new Builder();
   }
 }

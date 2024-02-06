@@ -214,4 +214,8 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
       return new GravitinoMetaLake(name, comment, properties, audit, restClient);
     }
   }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 }
