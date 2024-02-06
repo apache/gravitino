@@ -94,7 +94,7 @@ public class MetalakeDTO implements Metalake {
     protected AuditDTO audit;
 
     /** Default constructor. */
-    public Builder() {}
+    protected Builder() {}
 
     /**
      * Sets the name of the Metalake DTO.

@@ -21,7 +21,7 @@ class DTOConverters {
   private DTOConverters() {}
 
   static GravitinoMetaLake toMetaLake(MetalakeDTO metalake, RESTClient client) {
-    return new GravitinoMetaLake.Builder()
+    return GravitinoMetaLake.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -57,7 +57,7 @@ class DTOConverters {
   static Catalog toCatalog(CatalogDTO catalog, RESTClient client) {
     switch (catalog.type()) {
       case RELATIONAL:
-        return new RelationalCatalog.Builder()
+        return RelationalCatalog.builder()
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())

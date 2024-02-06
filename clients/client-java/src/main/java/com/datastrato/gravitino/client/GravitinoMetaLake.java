@@ -196,6 +196,10 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
   static class Builder extends MetalakeDTO.Builder<Builder> {
     private RESTClient restClient;
 
+    private Builder() {
+      super();
+    }
+
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
       return this;
