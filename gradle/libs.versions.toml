@@ -56,6 +56,7 @@ kerby = "2.0.3"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
 sun-activation-version = "1.2.0"
+error-prone = "3.1.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -167,3 +168,4 @@ node = { id = "com.github.node-gradle.node", version.ref = "node-plugin" }
 tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.5"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
+errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}

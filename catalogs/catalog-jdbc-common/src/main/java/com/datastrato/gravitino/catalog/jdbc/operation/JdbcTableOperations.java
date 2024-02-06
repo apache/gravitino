@@ -142,8 +142,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       }
 
       if (!found) {
-        throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, databaseName));
+        throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
       }
 
       // 2.Get column information
@@ -390,7 +389,7 @@ public abstract class JdbcTableOperations implements TableOperation {
             .orElseThrow(
                 () ->
                     new NoSuchColumnException(
-                        "Column " + colName + " does not exist in table " + jdbcTable.name()));
+                        "Column %s does not exist in table %s", colName, jdbcTable.name()));
   }
 
   protected Connection getConnection(String catalog) throws SQLException {

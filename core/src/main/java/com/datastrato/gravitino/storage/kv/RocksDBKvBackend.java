@@ -91,9 +91,8 @@ public class RocksDBKvBackend implements KvBackend {
     byte[] existKey = db.get(key);
     if (existKey != null) {
       throw new AlreadyExistsException(
-          String.format(
-              "Key %s already exists in the database, please use overwrite option to overwrite it",
-              ByteUtils.formatByteArray(key)));
+          "Key %s already exists in the database, please use overwrite option to overwrite it",
+          ByteUtils.formatByteArray(key));
     }
     db.put(key, value);
   }

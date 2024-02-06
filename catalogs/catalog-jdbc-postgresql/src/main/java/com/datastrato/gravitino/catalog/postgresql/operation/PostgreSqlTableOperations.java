@@ -366,7 +366,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                 .findFirst()
                 .orElse(null);
     if (null == column) {
-      throw new NoSuchColumnException("Column " + col + " does not exist.");
+      throw new NoSuchColumnException("Column %s does not exist.", col);
     }
     StringBuilder sqlBuilder = new StringBuilder("ALTER TABLE " + jdbcTable.name());
     sqlBuilder

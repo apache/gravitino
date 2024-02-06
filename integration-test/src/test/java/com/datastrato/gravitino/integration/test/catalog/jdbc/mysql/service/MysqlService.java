@@ -66,8 +66,7 @@ public class MysqlService {
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (!resultSet.next()) {
           throw new NoSuchSchemaException(
-              String.format(
-                  "Database %s could not be found in information_schema.SCHEMATA", databaseName));
+              "Database %s could not be found in information_schema.SCHEMATA", databaseName);
         }
         String schemaName = resultSet.getString("SCHEMA_NAME");
         return new JdbcSchema.Builder().withName(schemaName).withAuditInfo(AuditInfo.EMPTY).build();
