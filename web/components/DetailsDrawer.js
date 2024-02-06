@@ -37,13 +37,13 @@ const DetailsDrawer = props => {
     setOpenDrawer(false)
   }
 
-  const renderFieldText = ({ value, isDate = false }) => {
+  const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
       return <EmptyText />
     }
 
     return (
-      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
         {isDate && isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
@@ -133,7 +133,7 @@ const DetailsDrawer = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          {renderFieldText({ value: drawerData.comment })}
+          {renderFieldText({ value: drawerData.comment, linkBreak: true })}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
