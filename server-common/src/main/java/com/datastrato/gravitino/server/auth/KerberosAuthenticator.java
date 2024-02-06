@@ -135,7 +135,9 @@ public class KerberosAuthenticator implements Authenticator {
     GSSContext gssContext = null;
     GSSCredential gssCreds = null;
     try {
-      LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+      }
 
       gssCreds =
           this.gssManager.createCredential(

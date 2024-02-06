@@ -78,7 +78,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     downloadZipFile(chromeDriverDownloadURL, chromeDriverZipFile, chromeDriverBinName);
     downloadZipFile(chromeDownloadURL, chromeZipFile, chromeBinName);
 
-    LOG.info("Download the chromeDriver to " + downLoadDir + " successfully.");
+    LOG.info("Download the chromeDriver to {} successfully.", downLoadDir);
   }
 
   @Override
@@ -100,8 +100,8 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
   // Be careful, fileName contains directory path.
   private void downloadZipFile(String url, String zipFileName, String fileName) {
     File targetFile = new File(downLoadDir, fileName);
-    if (targetFile.exists()) {
-      LOG.info("The file " + targetFile.getAbsolutePath() + " already exists, skip download.");
+    if (targetFile.exists() && LOG.isInfoEnabled()) {
+      LOG.info("The file {} already exists, skip download.", targetFile.getAbsolutePath());
       return;
     }
 
@@ -115,7 +115,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
               System.getenv("IT_PROJECT_DIR"),
               String.format("chrome-%d", Instant.now().toEpochMilli()));
       try {
-        LOG.info("Download the zip file from " + url + " to " + downLoadTmpDir);
+        LOG.info("Download the zip file from {} to {}", url, downLoadTmpDir);
         File chromeDriverZip = new File(downLoadTmpDir, zipFileName);
         FileUtils.copyURLToFile(new URL(url), chromeDriverZip, 30000, 30000);
 
@@ -136,14 +136,14 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
         LOG.info(
             "Move file from " + unzipFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
         FileUtils.moveToDirectory(unzipFile, dstFile, true);
-        LOG.info("Download the zip file from " + url + " to " + downLoadDir + " successfully.");
+        LOG.info("Download the zip file from {} to {} successfully.", url, downLoadDir);
         return;
       } catch (IOException e) {
-        LOG.error("Download of: " + url + ", failed in path " + downLoadDir, e);
+        LOG.error("Download of: {}, failed in path {}", url, downLoadDir, e);
         retryNum += 1;
         last = e;
       } finally {
-        LOG.info("Remove temp directory: " + downLoadTmpDir);
+        LOG.info("Remove temp directory: {}", downLoadTmpDir);
         FileUtils.deleteQuietly(new File(downLoadTmpDir));
       }
     }

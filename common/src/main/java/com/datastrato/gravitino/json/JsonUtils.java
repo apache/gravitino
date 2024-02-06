@@ -66,13 +66,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Utility class for working with JSON data. */
 public class JsonUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
   private static final String NAMESPACE = "namespace";
   private static final String NAME = "name";
   private static final String POSITION_FIRST = "first";
