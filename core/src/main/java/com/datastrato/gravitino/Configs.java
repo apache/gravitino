@@ -22,10 +22,12 @@ public interface Configs {
   String DEFAULT_ENTITY_RELATIONAL_STORE = "MySQLBackend";
   String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
 
-  String MYSQL_ENTITY_STORE_URL_KEY = "gravitino.entity.store.mysql.url";
-  String MYSQL_ENTITY_STORE_DRIVER_NAME_KEY = "gravitino.entity.store.mysql.driverName";
-  String MYSQL_ENTITY_STORE_USERNAME_KEY = "gravitino.entity.store.mysql.username";
-  String MYSQL_ENTITY_STORE_PASSWORD_KEY = "gravitino.entity.store.mysql.password";
+  String ENTITY_RELATIONAL_MYSQL_BACKEND_URL_KEY = "gravitino.entity.store.relational.mysqlUrl";
+  String ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER_KEY =
+      "gravitino.entity.store.relational.mysqlDriver";
+  String ENTITY_RELATIONAL_MYSQL_BACKEND_USER_KEY = "gravitino.entity.store.relational.mysqlUser";
+  String ENTITY_RELATIONAL_MYSQL_BACKEND_PASSWORD_KEY =
+      "gravitino.entity.store.relational.mysqlPassword";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
@@ -64,35 +66,37 @@ public interface Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
 
-  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_URL =
-      new ConfigBuilder(MYSQL_ENTITY_STORE_URL_KEY)
+  ConfigEntry<String> ENTITY_RELATIONAL_MYSQL_BACKEND_URL =
+      new ConfigBuilder(ENTITY_RELATIONAL_MYSQL_BACKEND_URL_KEY)
           .doc("Connection URL of `MySQLBackend`")
           .version("0.5.0")
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME =
-      new ConfigBuilder(MYSQL_ENTITY_STORE_DRIVER_NAME_KEY)
+  ConfigEntry<String> ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER =
+      new ConfigBuilder(ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER_KEY)
           .doc("Driver Name of `MySQLBackend`")
           .version("0.5.0")
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME =
-      new ConfigBuilder(MYSQL_ENTITY_STORE_USERNAME_KEY)
+  ConfigEntry<String> ENTITY_RELATIONAL_MYSQL_BACKEND_USER =
+      new ConfigBuilder(ENTITY_RELATIONAL_MYSQL_BACKEND_USER_KEY)
           .doc("Username of `MySQLBackend`")
           .version("0.5.0")
           .stringConf()
-          .createWithDefault("");
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
-  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_PASSWORD =
-      new ConfigBuilder(MYSQL_ENTITY_STORE_PASSWORD_KEY)
+  ConfigEntry<String> ENTITY_RELATIONAL_MYSQL_BACKEND_PASSWORD =
+      new ConfigBuilder(ENTITY_RELATIONAL_MYSQL_BACKEND_PASSWORD_KEY)
           .doc("Password of `MySQLBackend`")
           .version("0.5.0")
           .stringConf()
-          .createWithDefault("");
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)

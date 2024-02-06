@@ -85,9 +85,9 @@ public class TestPOConverters {
         .withId(id)
         .withMetalakeName(name)
         .withMetalakeComment(comment)
-        .withProperties(JsonUtils.objectMapper().writeValueAsString(properties))
-        .withAuditInfo(JsonUtils.objectMapper().writeValueAsString(auditInfo))
-        .withVersion(JsonUtils.objectMapper().writeValueAsString(SchemaVersion.V_0_1))
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withVersion(JsonUtils.anyFieldMapper().writeValueAsString(SchemaVersion.V_0_1))
         .build();
   }
 }

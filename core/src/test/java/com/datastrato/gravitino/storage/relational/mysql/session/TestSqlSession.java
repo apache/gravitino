@@ -6,11 +6,11 @@
 package com.datastrato.gravitino.storage.relational.mysql.session;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_URL;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_USER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
-import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME;
-import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_URL;
-import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,11 +49,10 @@ public class TestSqlSession {
     config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_URL))
+    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_URL))
         .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME)).thenReturn("sa");
-    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME))
-        .thenReturn("org.h2.Driver");
+    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_USER)).thenReturn("sa");
+    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
   }
 
   @BeforeEach
@@ -94,7 +93,7 @@ public class TestSqlSession {
                 .getEnvironment()
                 .getDataSource();
     assertEquals("org.h2.Driver", dataSource.getDriverClassName());
-    assertEquals(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_URL), dataSource.getUrl());
+    assertEquals(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_URL), dataSource.getUrl());
   }
 
   @Test

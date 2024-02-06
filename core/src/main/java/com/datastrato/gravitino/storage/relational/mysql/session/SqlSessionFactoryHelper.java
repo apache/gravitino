@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.sql.SQLException;
 import java.time.Duration;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
@@ -47,12 +48,13 @@ public class SqlSessionFactoryHelper {
    */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
+    // Initialize the data source
     BasicDataSource dataSource = new BasicDataSource();
-    dataSource.setUrl(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_URL));
-    dataSource.setDriverClassName(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME));
-    dataSource.setUsername(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME));
-    dataSource.setPassword(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_PASSWORD));
-    // close the auto commit, so that need manual commit
+    dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_URL));
+    dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER));
+    dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_USER));
+    dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_PASSWORD));
+    // Close the auto commit, so that we can control the transaction manual commit
     dataSource.setDefaultAutoCommit(false);
     dataSource.setMaxWaitMillis(1000L);
     dataSource.setMaxTotal(20);
@@ -70,10 +72,16 @@ public class SqlSessionFactoryHelper {
     dataSource.setSoftMinEvictableIdleTimeMillis(
         BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
     dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
+
+    // Create the transaction factory and env
     TransactionFactory transactionFactory = new JdbcTransactionFactory();
     Environment environment = new Environment("development", transactionFactory, dataSource);
+
+    // Initialize the configuration
     Configuration configuration = new Configuration(environment);
     configuration.addMapper(MetalakeMetaMapper.class);
+
+    // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {
       synchronized (SqlSessionFactoryHelper.class) {
         if (sqlSessionFactory == null) {
@@ -86,5 +94,17 @@ public class SqlSessionFactoryHelper {
   public SqlSessionFactory getSqlSessionFactory() {
     Preconditions.checkState(sqlSessionFactory != null, "SqlSessionFactory is not initialized.");
     return sqlSessionFactory;
+  }
+
+  public void close() {
+    if (sqlSessionFactory != null) {
+      try {
+        BasicDataSource dataSource =
+            (BasicDataSource) sqlSessionFactory.getConfiguration().getEnvironment().getDataSource();
+        dataSource.close();
+      } catch (SQLException e) {
+        // silently ignore the error report
+      }
+    }
   }
 }

@@ -17,7 +17,6 @@ dependencies {
   implementation(libs.bundles.prometheus)
   implementation(libs.caffeine)
   implementation(libs.commons.io)
-  implementation(libs.commons.dbcp2)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.protobuf.java.util) {
@@ -25,6 +24,7 @@ dependencies {
       .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
   }
   implementation(libs.rocksdbjni)
+  implementation(libs.commons.dbcp2)
   implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)

@@ -17,17 +17,13 @@ import com.datastrato.gravitino.storage.relational.RelationalBackend;
 import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mysql.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessionFactoryHelper;
-import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessions;
 import com.datastrato.gravitino.storage.relational.mysql.utils.POConverters;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.datastrato.gravitino.storage.relational.mysql.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import org.apache.ibatis.session.SqlSession;
 
 /**
  * {@link MySQLBackend} is a MySQL implementation of RelationalBackend interface. If we want to use
@@ -45,134 +41,88 @@ public class MySQLBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Entity.EntityType entityType) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        switch (entityType) {
-          case METALAKE:
-            List<MetalakePO> metalakePOS =
-                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                    .listMetalakePOs();
-            return metalakePOS != null
-                ? metalakePOS.stream()
-                    .map(
-                        metalakePO -> {
-                          try {
-                            return (E) POConverters.fromMetalakePO(metalakePO);
-                          } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
-                          }
-                        })
-                    .collect(Collectors.toList())
-                : new ArrayList<>();
-          case CATALOG:
-          case SCHEMA:
-          case TABLE:
-          case FILESET:
-          default:
-            throw new IllegalArgumentException(
-                String.format("Unsupported entity type: %s for list operation", entityType));
-        }
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
-      } finally {
-        SqlSessions.closeSqlSession();
-      }
+    if (entityType == Entity.EntityType.METALAKE) {
+      List<MetalakePO> metalakePOS =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, MetalakeMetaMapper::listMetalakePOs);
+      return (List<E>) POConverters.fromMetalakePOs(metalakePOS);
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for list operation", entityType));
     }
   }
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        switch (entityType) {
-          case METALAKE:
-            MetalakePO metalakePO =
-                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                    .selectMetalakeMetaByName(ident.name());
-            return metalakePO != null;
-          case CATALOG:
-          case SCHEMA:
-          case TABLE:
-          case FILESET:
-          default:
-            throw new IllegalArgumentException(
-                String.format("Unsupported entity type: %s for exists operation", entityType));
-        }
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
-      } finally {
-        SqlSessions.closeSqlSession();
-      }
+    if (entityType == Entity.EntityType.METALAKE) {
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+      return metalakePO != null;
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for exists operation", entityType));
     }
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        if (e instanceof BaseMetalake) {
-          MetalakePO metalakePO =
-              ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                  .selectMetalakeMetaByName(e.nameIdentifier().name());
-          if (!overwritten && metalakePO != null) {
-            throw new EntityAlreadyExistsException(
-                String.format("Metalake entity: %s already exists", e.nameIdentifier().name()));
-          }
-
-          if (overwritten) {
-            ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .insertMetalakeMetaWithUpdate(POConverters.toMetalakePO((BaseMetalake) e));
-          } else {
-            ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
-          }
-          SqlSessions.commitAndCloseSqlSession();
-        } else {
-          throw new IllegalArgumentException(
-              String.format("Unsupported entity type: %s for insert operation", e.getClass()));
-        }
-      } catch (Throwable t) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
+    if (e instanceof BaseMetalake) {
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class,
+              mapper -> mapper.selectMetalakeMetaByName(e.nameIdentifier().name()));
+      if (!overwritten && metalakePO != null) {
+        throw new EntityAlreadyExistsException(
+            String.format("Metalake entity: %s already exists", e.nameIdentifier().name()));
       }
+      SessionUtils.doWithCommit(
+          MetalakeMetaMapper.class,
+          mapper -> {
+            if (overwritten) {
+              mapper.insertMetalakeMetaWithUpdate(POConverters.toMetalakePO((BaseMetalake) e));
+            } else {
+              mapper.insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
+            }
+          });
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for insert operation", e.getClass()));
     }
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException, AlreadyExistsException {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        switch (entityType) {
-          case METALAKE:
-            MetalakePO oldMetalakePO =
-                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                    .selectMetalakeMetaByName(ident.name());
-            BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
-            BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
-            Preconditions.checkArgument(
-                Objects.equals(oldMetalakeEntity.id(), newMetalakeEntity.id()),
-                String.format(
-                    "The updated metalake entity id: %s should same with the metalake entity id before: %s",
-                    newMetalakeEntity.id(), oldMetalakeEntity.id()));
-            ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                .updateMetalakeMeta(POConverters.toMetalakePO(newMetalakeEntity), oldMetalakePO);
-            SqlSessions.commitAndCloseSqlSession();
-            return (E) newMetalakeEntity;
-          case CATALOG:
-          case SCHEMA:
-          case TABLE:
-          case FILESET:
-          default:
-            throw new IllegalArgumentException(
-                String.format("Unsupported entity type: %s for update operation", entityType));
-        }
-      } catch (Throwable t) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
+      throws IOException, NoSuchEntityException, AlreadyExistsException {
+    if (entityType == Entity.EntityType.METALAKE) {
+      MetalakePO oldMetalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+
+      BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
+      BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
+      Preconditions.checkArgument(
+          Objects.equals(oldMetalakeEntity.id(), newMetalakeEntity.id()),
+          String.format(
+              "The updated metalake entity id: %s should same with the metalake entity id before: %s",
+              newMetalakeEntity.id(), oldMetalakeEntity.id()));
+
+      Integer updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              MetalakeMetaMapper.class,
+              mapper ->
+                  mapper.updateMetalakeMeta(
+                      POConverters.toMetalakePO(newMetalakeEntity), oldMetalakePO));
+      if (updateResult > 0) {
+        return (E) newMetalakeEntity;
+      } else {
+        throw new IOException("Failed to update the entity:" + ident);
       }
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for update operation", entityType));
     }
   }
 
@@ -180,67 +130,50 @@ public class MySQLBackend implements RelationalBackend {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        switch (entityType) {
-          case METALAKE:
-            MetalakePO metalakePO =
-                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                    .selectMetalakeMetaByName(ident.name());
-            if (metalakePO == null) {
-              return null;
-            }
-            return (E) POConverters.fromMetalakePO(metalakePO);
-          case CATALOG:
-          case SCHEMA:
-          case TABLE:
-          case FILESET:
-          default:
-            throw new IllegalArgumentException(
-                String.format("Unsupported entity type: %s for get operation", entityType));
-        }
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
-      } finally {
-        SqlSessions.closeSqlSession();
+    if (entityType == Entity.EntityType.METALAKE) {
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException("No such entity:%s", ident.toString());
       }
+      return (E) POConverters.fromMetalakePO(metalakePO);
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for get operation", entityType));
     }
   }
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        switch (entityType) {
-          case METALAKE:
-            Long metalakeId =
-                ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                    .selectMetalakeIdMetaByName(ident.name());
-            if (metalakeId != null) {
-              // delete metalake
-              ((MetalakeMetaMapper) SqlSessions.getMapper(MetalakeMetaMapper.class))
-                  .deleteMetalakeMetaById(metalakeId);
-              if (cascade) {
+    if (entityType == Entity.EntityType.METALAKE) {
+      Long metalakeId =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));
+      if (metalakeId != null) {
+        if (cascade) {
+          SessionUtils.doMultipleWithCommit(
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.deleteMetalakeMetaById(metalakeId)),
+              () -> {
                 // TODO We will cascade delete the metadata of sub-resources under the metalake
-              }
-              SqlSessions.commitAndCloseSqlSession();
-            }
-            return true;
-          case CATALOG:
-          case SCHEMA:
-          case TABLE:
-          case FILESET:
-          default:
-            throw new IllegalArgumentException(
-                String.format("Unsupported entity type: %s for delete operation", entityType));
+              });
+        } else {
+          SessionUtils.doWithCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.deleteMetalakeMetaById(metalakeId));
         }
-      } catch (Throwable t) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
       }
+      return true;
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Unsupported entity type: %s for delete operation", entityType));
     }
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    SqlSessionFactoryHelper.getInstance().close();
+  }
 }

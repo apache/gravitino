@@ -13,6 +13,14 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+/**
+ * A MyBatis Mapper for metalake meta operation SQLs.
+ *
+ * <p>This interface class is a specification defined by MyBatis. It requires this interface class
+ * to identify the corresponding SQLs for execution. We can write SQL in an additional XML file, or
+ * write SQLs with annotations in this interface Mapper. See: <a
+ * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
+ */
 public interface MetalakeMetaMapper {
   String TABLE_NAME = "metalake_meta";
 
@@ -83,7 +91,7 @@ public interface MetalakeMetaMapper {
           + " and properties = #{oldMetalakeMeta.properties}"
           + " and audit_info = #{oldMetalakeMeta.auditInfo}"
           + " and schema_version = #{oldMetalakeMeta.schemaVersion}")
-  void updateMetalakeMeta(
+  Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
