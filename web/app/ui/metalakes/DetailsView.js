@@ -23,13 +23,13 @@ const DetailsView = props => {
     }
   })
 
-  const renderFieldText = ({ value, isDate = false }) => {
+  const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
       return <EmptyText />
     }
 
     return (
-      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+      <Typography sx={{ fontWeight: 500, wordBreak: 'break-all', whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
         {isDate && isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
@@ -58,7 +58,7 @@ const DetailsView = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          {renderFieldText({ value: activatedItem?.comment })}
+          {renderFieldText({ value: activatedItem?.comment, linkBreak: true })}
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
