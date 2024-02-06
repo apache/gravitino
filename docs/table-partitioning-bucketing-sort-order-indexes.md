@@ -1,5 +1,5 @@
 ---
-title: "Table partitioning, bucketing and sort ordering"
+title: "Table partitioning, bucketing and sort ordering and indexes"
 slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
@@ -236,7 +236,7 @@ tableCatalog.createTable(
 </TabItem>
 </Tabs>
 
-## Indexing
+## Indexes
 
 To define an indexed table, you should utilize the following three components to construct a valid indexed table.
 

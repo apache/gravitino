@@ -35,7 +35,7 @@ Gravitino connector supports the following alter table operations:
 ## Select
 
 The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as indexing and pushdowns.
+Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Table and Schema properties
 
