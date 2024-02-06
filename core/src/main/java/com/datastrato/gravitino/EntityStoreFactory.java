@@ -5,6 +5,7 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.storage.kv.KvEntityStore;
+import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,11 @@ public class EntityStoreFactory {
   // Register EntityStore's short name to its full qualified class name in the map. So that user
   // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
-      ImmutableMap.of("kv", KvEntityStore.class.getCanonicalName());
+      ImmutableMap.of(
+          Configs.DEFAULT_ENTITY_STORE,
+          KvEntityStore.class.getCanonicalName(),
+          Configs.RELATIONAL_ENTITY_STORE,
+          RelationalEntityStore.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
   private EntityStoreFactory() {}
