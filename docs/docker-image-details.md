@@ -17,7 +17,7 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 datastrato/gravitino
+docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 ```
 
 Changelog
