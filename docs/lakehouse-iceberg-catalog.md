@@ -195,6 +195,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
+| `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -213,7 +214,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 | `UUID`                      | `UUID`                      |
 
 :::info
-Apache Iceberg doesn't support Gravitino `Struct` `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
 :::
 
 ### Table properties
@@ -259,7 +260,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-Iceberg just supports updating primitive types.
 :::
 
 :::caution
