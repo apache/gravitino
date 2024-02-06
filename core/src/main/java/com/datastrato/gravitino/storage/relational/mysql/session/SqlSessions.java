@@ -3,8 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.orm;
+package com.datastrato.gravitino.storage.relational.mysql.session;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 
@@ -17,6 +18,11 @@ public final class SqlSessions {
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
 
   private SqlSessions() {}
+
+  @VisibleForTesting
+  static ThreadLocal<SqlSession> getSessions() {
+    return sessions;
+  }
 
   /**
    * Get the SqlSession object. If the SqlSession object is not present in the thread local, then

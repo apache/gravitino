@@ -3,11 +3,12 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.orm;
+package com.datastrato.gravitino.storage.relational.mysql.session;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -33,6 +34,11 @@ public class SqlSessionFactoryHelper {
   }
 
   private SqlSessionFactoryHelper() {}
+
+  @VisibleForTesting
+  static void setSqlSessionFactory(SqlSessionFactory sessionFactory) {
+    sqlSessionFactory = sessionFactory;
+  }
 
   /**
    * Initialize the SqlSessionFactory object.

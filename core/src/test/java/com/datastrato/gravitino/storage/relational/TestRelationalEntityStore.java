@@ -26,7 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
-import com.datastrato.gravitino.storage.relational.mysql.orm.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessionFactoryHelper;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
