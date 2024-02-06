@@ -152,10 +152,6 @@ RUN chown -R datastrato:hadoop /home/datastrato
 RUN rm -rf /tmp/packages
 
 ################################################################################
-# removed install cache
-RUN rm -rf /var/cache/apt/*
-
-################################################################################
 # expose port
 EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010
 
