@@ -36,4 +36,6 @@ public class PartitionUtils {
 
     // TODO: should validate nested fieldName after column type support namedStruct
   }
+
+  private PartitionUtils() {}
 }

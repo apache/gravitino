@@ -234,4 +234,6 @@ public class Partitions {
       return result;
     }
   }
+
+  private Partitions() {}
 }

@@ -132,4 +132,6 @@ public class FromHiveType {
             "Unknown category of Hive type: " + hiveTypeInfo.getCategory());
     }
   }
+
+  private FromHiveType() {}
 }
