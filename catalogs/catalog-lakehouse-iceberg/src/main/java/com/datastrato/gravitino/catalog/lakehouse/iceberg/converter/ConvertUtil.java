@@ -84,5 +84,5 @@ public class ConvertUtil {
     return com.datastrato.gravitino.rel.types.Types.StructType.of(fields);
   }
 
-    private ConvertUtil() {}
+  private ConvertUtil() {}
 }
