@@ -99,7 +99,7 @@ After configuring the Gravitino server, start the Gravitino server by running:
 ./bin/gravitino.sh start
 ```
 
-You can access the Gravitino Web UI by typing <http://localhost:8090> in your browser. or you
+You can access the Gravitino Web UI by typing [http://localhost:8090](http://localhost:8090) in your browser. or you
 can run
 
 ```shell

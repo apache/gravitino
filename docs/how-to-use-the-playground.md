@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 
 The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, and a `Gravitino` server.
 
-Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open <http://localhost:8090> in a browser to access the Gravitino Web UI.
+Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
 ## Prerequisites
 
