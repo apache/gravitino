@@ -15,6 +15,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
@@ -56,6 +58,71 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
+  }
+
+  @Override
+  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    // We should handle case sensitivity and wild card issue in some catalog tables, take a
+    // MySQL
+    // table for example.
+    // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
+    // like utf8mb4.
+    // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a',
+    // followed
+    // by any character, and ending with 'b'.
+    try (Connection connection = getConnection(databaseName)) {
+      // 1.Get table information
+      ResultSet table = getTable(connection, databaseName, tableName);
+      // The result of tables may be more than one due to the reason above, so we need to check
+      // the
+      // result
+      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      boolean found = false;
+      // Handle case-sensitive issues.
+      while (table.next() && !found) {
+        String tableNameInResult = table.getString("TABLE_NAME");
+        String tableSchemaInResultLowerCase = table.getString("TABLE_SCHEM");
+        if (Objects.equals(tableNameInResult, tableName)
+            && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
+          jdbcTableBuilder = getBasicJdbcTableInfo(table);
+          found = true;
+        }
+      }
+
+      if (!found) {
+        throw new NoSuchTableException(
+            String.format("Table %s does not exist in %s.", tableName, databaseName));
+      }
+
+      // 2.Get column information
+      List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      // Get columns are wildcard sensitive, so we need to check the result.
+      ResultSet columns = getColumns(connection, databaseName, tableName);
+      while (columns.next()) {
+        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)
+            && Objects.equals(columns.getString("TABLE_SCHEM"), databaseName)) {
+          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+          boolean autoIncrement = getAutoIncrementInfo(columns);
+          columnBuilder.withAutoIncrement(autoIncrement);
+          jdbcColumns.add(columnBuilder.build());
+        }
+      }
+      jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
+
+      // 3.Get index information
+      List<Index> indexes = getIndexes(databaseName, tableName, connection.getMetaData());
+      jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
+
+      // 4.Get table properties
+      Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      jdbcTableBuilder.withProperties(tableProperties);
+
+      // 5.Leave the information to the bottom layer to append the table
+      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
+      return jdbcTableBuilder.build();
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   @Override
