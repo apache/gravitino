@@ -62,7 +62,7 @@ dependencies {
   implementation(libs.hadoop2.hdfs)
   implementation(libs.hadoop2.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
- 
+
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
