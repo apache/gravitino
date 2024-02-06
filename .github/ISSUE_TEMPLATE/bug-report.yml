@@ -2,8 +2,6 @@ name: Bug Report
 title: "[Bug report] "
 description: A bug report issue
 labels: [ "bug" ]
-projects: [ "datastrato/1" ]
-
 body:
 
   - type: dropdown
