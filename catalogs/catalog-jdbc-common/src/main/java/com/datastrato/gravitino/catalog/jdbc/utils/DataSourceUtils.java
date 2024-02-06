@@ -72,4 +72,6 @@ public class DataSourceUtils {
       }
     }
   }
+
+  private DataSourceUtils() {}
 }

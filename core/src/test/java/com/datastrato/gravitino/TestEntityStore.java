@@ -45,7 +45,9 @@ public class TestEntityStore {
     }
 
     @Override
-    public void initialize(Config config) throws RuntimeException {}
+    public void initialize(Config config) throws RuntimeException {
+      this.serde = Mockito.mock(EntitySerDe.class);
+    }
 
     @Override
     public void setSerDe(EntitySerDe entitySerDe) {
@@ -155,7 +157,7 @@ public class TestEntityStore {
             .build();
 
     CatalogEntity catalog =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))

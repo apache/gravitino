@@ -30,9 +30,10 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.commons.io)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
-  testImplementation(libs.mockito.core)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

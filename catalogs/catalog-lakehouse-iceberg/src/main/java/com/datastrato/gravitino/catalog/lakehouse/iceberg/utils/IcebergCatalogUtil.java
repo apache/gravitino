@@ -86,4 +86,6 @@ public class IcebergCatalogUtil {
                 + catalogType);
     }
   }
+
+  private IcebergCatalogUtil() {}
 }

@@ -1,5 +1,5 @@
 ---
-title: "Table partitioning, bucketing and sort ordering"
+title: "Table partitioning, bucketing and sort ordering and indexes"
 slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
@@ -42,6 +42,8 @@ For function partitioning, you should provide the function name and the function
 - Field names: It defines which fields Gravitino uses to partition the table.
 
 - In some cases, you require other information. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
+
+Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
 
 ## Table bucketing
 
@@ -234,7 +236,7 @@ tableCatalog.createTable(
 </TabItem>
 </Tabs>
 
-## Indexing
+## Indexes
 
 To define an indexed table, you should utilize the following three components to construct a valid indexed table.
 

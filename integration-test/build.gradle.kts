@@ -126,7 +126,6 @@ dependencies {
   testImplementation(libs.trino.client) {
     exclude("jakarta.annotation")
   }
-  testImplementation(libs.trino.jdbc)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

@@ -72,4 +72,6 @@ public class ToIcebergPartitionSpec {
     }
     return builder.build();
   }
+
+  private ToIcebergPartitionSpec() {}
 }

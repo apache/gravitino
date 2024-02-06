@@ -6,11 +6,16 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.google.common.collect.Lists;
+import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 
 public class SqliteTableOperations extends JdbcTableOperations {
@@ -91,5 +96,22 @@ public class SqliteTableOperations extends JdbcTableOperations {
   @Override
   protected boolean getAutoIncrementInfo(ResultSet columns) {
     return false;
+  }
+
+  @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      final List<String> names = Lists.newArrayList();
+      try (ResultSet tables = getTables(connection)) {
+        // tables.getString("TABLE_SCHEM") is always null.
+        while (tables.next()) {
+          names.add(tables.getString("TABLE_NAME"));
+        }
+      }
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      return names;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
   }
 }

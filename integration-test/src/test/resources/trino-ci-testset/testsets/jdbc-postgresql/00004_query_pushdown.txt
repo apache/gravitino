@@ -40,8 +40,7 @@ INSERT: 15000 rows
 
 "Trino version: %
 %
-    TableScan[table = test.gt_postgresql:Query[SELECT l.""orderkey"" AS ""orderkey_0"", l.""custkey"" AS ""custkey_1"", r.""custkey"" AS ""custkey_2"" FROM (SELECT ""orderkey"", ""custkey"" FROM ""gt_db1"".""orders"") l INNER JOIN (SELECT ""custkey"" FROM ""gt_db1"".""customer"") r ON l.""custkey"" = r.""custkey""] sortOrder=[orderkey_0:bigint:int8 ASC NULLS LAST] limit=10 columns=[orderkey_0:bigint:int8, custkey_2:bigint:int8]]
-        Layout: [orderkey:bigint, custkey:bigint]
+    TableScan[table = test.gt_postgresql:Query[SELECT % INNER JOIN %] limit=10 columns=%]
 %
 "
 

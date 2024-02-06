@@ -5,16 +5,22 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.io.File;
+import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
 
   String DEFAULT_ENTITY_STORE = "kv";
+  String RELATIONAL_ENTITY_STORE = "relational";
   String ENTITY_STORE_KEY = "gravitino.entity.store";
 
   String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
+
+  String DEFAULT_ENTITY_RELATIONAL_STORE = "MySQLBackend";
+  String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
@@ -44,6 +50,14 @@ public interface Configs {
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_KV_STORE);
+
+  ConfigEntry<String> ENTITY_RELATIONAL_STORE =
+      new ConfigBuilder(ENTITY_RELATIONAL_STORE_KEY)
+          .doc("Detailed implementation of relational storage")
+          .version("0.5.0")
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)

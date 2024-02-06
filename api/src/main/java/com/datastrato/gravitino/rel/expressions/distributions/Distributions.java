@@ -182,4 +182,6 @@ public class Distributions {
       }
     }
   }
+
+  private Distributions() {}
 }
