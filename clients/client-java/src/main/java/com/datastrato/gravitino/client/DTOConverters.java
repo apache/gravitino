@@ -23,7 +23,7 @@ class DTOConverters {
   private DTOConverters() {}
 
   static GravitinoMetalake toMetaLake(MetalakeDTO metalake, RESTClient client) {
-    return new GravitinoMetalake.Builder()
+    return GravitinoMetalake.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
