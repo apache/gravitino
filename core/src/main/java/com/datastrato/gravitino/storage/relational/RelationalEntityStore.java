@@ -22,7 +22,6 @@ import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +45,8 @@ public class RelationalEntityStore implements EntityStore {
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
-    String className = RELATIONAL_BACKENDS.getOrDefault(backendName, backendName);
-    if (Objects.isNull(className)) {
-      throw new RuntimeException("Unsupported backend type..." + backendName);
-    }
+    String className =
+        RELATIONAL_BACKENDS.getOrDefault(backendName, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
 
     try {
       RelationalBackend relationalBackend =
