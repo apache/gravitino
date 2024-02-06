@@ -73,8 +73,9 @@ public class MySQLBackend implements RelationalBackend {
                 String.format("Unsupported entity type: %s for list operation", entityType));
         }
       } catch (Throwable t) {
-        SqlSessions.closeSqlSession();
         throw new RuntimeException(t);
+      } finally {
+        SqlSessions.closeSqlSession();
       }
     }
   }
@@ -98,8 +99,9 @@ public class MySQLBackend implements RelationalBackend {
                 String.format("Unsupported entity type: %s for exists operation", entityType));
         }
       } catch (Throwable t) {
-        SqlSessions.closeSqlSession();
         throw new RuntimeException(t);
+      } finally {
+        SqlSessions.closeSqlSession();
       }
     }
   }
@@ -198,8 +200,9 @@ public class MySQLBackend implements RelationalBackend {
                 String.format("Unsupported entity type: %s for get operation", entityType));
         }
       } catch (Throwable t) {
-        SqlSessions.closeSqlSession();
         throw new RuntimeException(t);
+      } finally {
+        SqlSessions.closeSqlSession();
       }
     }
   }

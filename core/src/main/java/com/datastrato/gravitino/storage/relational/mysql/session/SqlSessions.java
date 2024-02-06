@@ -85,7 +85,7 @@ public final class SqlSessions {
    * @return the Mapper object.
    * @param <T> the type of the Mapper object.
    */
-  public static <T> T getMapper(Class className) {
+  public static <T> T getMapper(Class<?> className) {
     return (T) getSqlSession().getMapper(className);
   }
 }

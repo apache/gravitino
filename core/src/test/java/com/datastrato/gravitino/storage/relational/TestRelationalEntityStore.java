@@ -8,9 +8,9 @@ package com.datastrato.gravitino.storage.relational;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
-import static com.datastrato.gravitino.Configs.MYSQL_ENTITY_STORE_DRIVER_NAME_KEY;
-import static com.datastrato.gravitino.Configs.MYSQL_ENTITY_STORE_URL_KEY;
-import static com.datastrato.gravitino.Configs.MYSQL_ENTITY_STORE_USERNAME_KEY;
+import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME;
+import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_URL;
+import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -69,10 +69,10 @@ public class TestRelationalEntityStore {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-    Mockito.when(config.getRawString(MYSQL_ENTITY_STORE_URL_KEY))
+    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_URL))
         .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-    Mockito.when(config.getRawString(MYSQL_ENTITY_STORE_USERNAME_KEY)).thenReturn("sa");
-    Mockito.when(config.getRawString(MYSQL_ENTITY_STORE_DRIVER_NAME_KEY))
+    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME)).thenReturn("sa");
+    Mockito.when(config.get(ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME))
         .thenReturn("org.h2.Driver");
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);

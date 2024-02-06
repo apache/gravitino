@@ -64,6 +64,36 @@ public interface Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
 
+  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_URL =
+      new ConfigBuilder(MYSQL_ENTITY_STORE_URL_KEY)
+          .doc("Connection URL of `MySQLBackend`")
+          .version("0.5.0")
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME =
+      new ConfigBuilder(MYSQL_ENTITY_STORE_DRIVER_NAME_KEY)
+          .doc("Driver Name of `MySQLBackend`")
+          .version("0.5.0")
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME =
+      new ConfigBuilder(MYSQL_ENTITY_STORE_USERNAME_KEY)
+          .doc("Username of `MySQLBackend`")
+          .version("0.5.0")
+          .stringConf()
+          .createWithDefault("");
+
+  ConfigEntry<String> ENTRY_RELATIONAL_MYSQL_BACKEND_PASSWORD =
+      new ConfigBuilder(MYSQL_ENTITY_STORE_PASSWORD_KEY)
+          .doc("Password of `MySQLBackend`")
+          .version("0.5.0")
+          .stringConf()
+          .createWithDefault("");
+
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
           .doc(

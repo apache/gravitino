@@ -48,10 +48,10 @@ public class SqlSessionFactoryHelper {
   @SuppressWarnings("deprecation")
   public void init(Config config) {
     BasicDataSource dataSource = new BasicDataSource();
-    dataSource.setUrl(config.getRawString(Configs.MYSQL_ENTITY_STORE_URL_KEY));
-    dataSource.setDriverClassName(config.getRawString(Configs.MYSQL_ENTITY_STORE_DRIVER_NAME_KEY));
-    dataSource.setUsername(config.getRawString(Configs.MYSQL_ENTITY_STORE_USERNAME_KEY, ""));
-    dataSource.setPassword(config.getRawString(Configs.MYSQL_ENTITY_STORE_PASSWORD_KEY, ""));
+    dataSource.setUrl(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_URL));
+    dataSource.setDriverClassName(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_DRIVER_NAME));
+    dataSource.setUsername(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_USERNAME));
+    dataSource.setPassword(config.get(Configs.ENTRY_RELATIONAL_MYSQL_BACKEND_PASSWORD));
     // close the auto commit, so that need manual commit
     dataSource.setDefaultAutoCommit(false);
     dataSource.setMaxWaitMillis(1000L);

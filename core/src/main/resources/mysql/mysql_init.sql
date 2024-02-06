@@ -1,3 +1,8 @@
+--
+-- Copyright 2024 Datastrato Pvt Ltd.
+-- This software is licensed under the Apache License version 2.
+--
+
 CREATE TABLE IF NOT EXISTS `metalake_meta`
 (
     `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
