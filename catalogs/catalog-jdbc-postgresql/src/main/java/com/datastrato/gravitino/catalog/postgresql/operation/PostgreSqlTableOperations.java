@@ -62,20 +62,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    // We should handle case sensitivity and wild card issue in some catalog tables, take a
-    // MySQL
-    // table for example.
-    // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
-    // like utf8mb4.
-    // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a',
-    // followed
-    // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1.Get table information
       ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check
-      // the
-      // result
+      // the result
       JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
       boolean found = false;
       // Handle case-sensitive issues.
