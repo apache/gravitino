@@ -1197,4 +1197,6 @@ public class JsonUtils {
       return builder.build();
     }
   }
+
+  private JsonUtils() {}
 }

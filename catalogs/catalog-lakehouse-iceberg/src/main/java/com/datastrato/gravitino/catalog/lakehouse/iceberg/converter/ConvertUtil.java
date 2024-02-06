@@ -83,4 +83,6 @@ public class ConvertUtil {
             .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new);
     return com.datastrato.gravitino.rel.types.Types.StructType.of(fields);
   }
+
+  private ConvertUtil() {}
 }
