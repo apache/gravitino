@@ -25,12 +25,12 @@ public class StorageLayoutException extends GravitinoRuntimeException {
   /**
    * Constructs a new StorageLayoutException.
    *
-   * @param message The detail message.
    * @param cause The cause of the exception.
+   * @param message The detail message.
    * @param args The argument of the formatted message.
    */
   @FormatMethod
-  public StorageLayoutException(@FormatString String message, Throwable cause, Object... args) {
+  public StorageLayoutException(Throwable cause, @FormatString String message, Object... args) {
     super(cause, message, args);
   }
 }
