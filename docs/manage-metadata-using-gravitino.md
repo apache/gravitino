@@ -841,12 +841,12 @@ The following is a table of the column default value that Gravitino supports for
 Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
 The following table shows the column auto-increment that Gravitino supports for different catalogs:
 
-| Catalog provider    | Supported auto-increment                                                       |
-|---------------------|--------------------------------------------------------------------------------|
-| `hive`              | &#10008;                                                                       |
-| `lakehouse-iceberg` | &#10008;                                                                       |
-| `jdbc-mysql`        | &#10004;  ([limitations](./jdbc-mysql-catalog.md#table-column-auto-increment)) |
-| `jdbc-postgresql`   | &#10004;                                                                       |
+| Catalog provider    | Supported auto-increment                                                     |
+|---------------------|------------------------------------------------------------------------------|
+| `hive`              | &#10008;                                                                     |
+| `lakehouse-iceberg` | &#10008;                                                                     |
+| `jdbc-mysql`        | &#10004;([limitations](./jdbc-mysql-catalog.md#table-column-auto-increment)) |
+| `jdbc-postgresql`   | &#10004;                                                                     |
 
 #### Table property and type mapping
 
