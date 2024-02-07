@@ -79,7 +79,7 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
     AbstractIT.registerCustomConfigs(icebergConfigs);
-    LOG.info("Iceberg REST service config registered," + StringUtils.join(icebergConfigs));
+    LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
   private static IcebergConfig buildIcebergConfig(Config config) {

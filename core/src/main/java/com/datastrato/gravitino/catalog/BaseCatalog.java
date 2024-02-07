@@ -12,8 +12,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -29,8 +27,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
-
-  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   private CatalogEntity entity;
 

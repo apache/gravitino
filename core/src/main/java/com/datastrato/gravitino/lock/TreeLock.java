@@ -87,11 +87,13 @@ public class TreeLock {
       heldLocks.push(treeLockNode);
     }
 
-    LOG.trace(
-        "Locked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
-        identifier,
-        lockNodes,
-        lockType);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Locked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+          identifier,
+          lockNodes,
+          lockType);
+    }
   }
 
   /** Unlock the tree lock. */
@@ -116,10 +118,12 @@ public class TreeLock {
       current.unlock(type);
     }
 
-    LOG.trace(
-        "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
-        identifier,
-        lockNodes,
-        lockType);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+          identifier,
+          lockNodes,
+          lockType);
+    }
   }
 }
