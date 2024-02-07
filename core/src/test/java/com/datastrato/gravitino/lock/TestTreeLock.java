@@ -24,34 +24,39 @@ class TestTreeLock {
 
   @Test
   void testLockAndUnlockWithReadLock() {
-    assertDoesNotThrow(() -> {
-      lock.lock(LockType.READ);
-      lock.unlock();
-    });
+    assertDoesNotThrow(
+        () -> {
+          lock.lock(LockType.READ);
+          lock.unlock();
+        });
   }
 
   @Test
   void testLockAndUnlockWithWriteLock() {
-    assertDoesNotThrow(() -> {
-      lock.lock(LockType.WRITE);
-      lock.unlock();
-    });
+    assertDoesNotThrow(
+        () -> {
+          lock.lock(LockType.WRITE);
+          lock.unlock();
+        });
   }
 
   @Test
   void testUnlockWithoutLock() {
-    assertThrows(IllegalStateException.class, () -> {
-      lock.unlock();
-    });
+    assertThrows(
+        IllegalStateException.class,
+        () -> {
+          lock.unlock();
+        });
   }
 
   @Test
   void testMultipleLockAndUnlock() {
-    assertDoesNotThrow(() -> {
-      for (int i = 0; i < 1000; i++) {
-        lock.lock(i % 2 == 0 ? LockType.READ : LockType.WRITE);
-        lock.unlock();
-      }
-    });
+    assertDoesNotThrow(
+        () -> {
+          for (int i = 0; i < 1000; i++) {
+            lock.lock(i % 2 == 0 ? LockType.READ : LockType.WRITE);
+            lock.unlock();
+          }
+        });
   }
 }

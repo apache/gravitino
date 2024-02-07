@@ -6,11 +6,9 @@
 package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
-
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,9 +74,9 @@ public class TreeLock {
   }
 
   /**
-   * Lock the tree lock with the given lock type.
-   * This method locks all nodes in the list, from the root to the leaf, and pushes them onto the deque.
-   * If an exception occurs during the locking process, it will unlock all nodes that have been locked so far.
+   * Lock the tree lock with the given lock type. This method locks all nodes in the list, from the
+   * root to the leaf, and pushes them onto the deque. If an exception occurs during the locking
+   * process, it will unlock all nodes that have been locked so far.
    *
    * @param lockType The lock type to lock the tree lock.
    */
@@ -94,8 +92,12 @@ public class TreeLock {
         heldLocks.push(Pair.of(treeLockNode, type));
         LOG.trace("Locked node: {}, lock type: {}", treeLockNode, type);
       } catch (Exception e) {
-        LOG.error("Failed to lock the treeNode, identifier: {}, node {} of lockNodes: [{}]",
-            identifier, treeLockNode, lockNodes, e);
+        LOG.error(
+            "Failed to lock the treeNode, identifier: {}, node {} of lockNodes: [{}]",
+            identifier,
+            treeLockNode,
+            lockNodes,
+            e);
         unlock();
         throw e;
       }
