@@ -89,11 +89,13 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
-    LOG.info(
-        "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
-        namespace,
-        table,
-        SerializeUpdateTableRequest(updateTableRequest));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(
+          "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
+          namespace,
+          table,
+          SerializeUpdateTableRequest(updateTableRequest));
+    }
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     return IcebergRestUtils.ok(icebergTableOps.updateTable(tableIdentifier, updateTableRequest));

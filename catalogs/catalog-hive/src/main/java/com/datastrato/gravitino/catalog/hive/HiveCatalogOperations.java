@@ -395,10 +395,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // load the database parameters
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
       Map<String, String> properties = HiveSchema.buildSchemaProperties(database);
-      LOG.debug(
-          "Loaded properties for Hive schema (database) {} found {}",
-          ident.name(),
-          properties.keySet());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Loaded properties for Hive schema (database) {} found {}",
+            ident.name(),
+            properties.keySet());
+      }
 
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetProperty) {

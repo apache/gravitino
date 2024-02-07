@@ -180,8 +180,10 @@ public class ProcessData {
       InputStream inErrors = this.checkedProcess.getErrorStream();
       BufferedReader inReader = new BufferedReader(new InputStreamReader(in));
       BufferedReader inReaderErrors = new BufferedReader(new InputStreamReader(inErrors));
-      LOG.trace("Started retrieving data from streams of attached process: " + this.checkedProcess);
-
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "Started retrieving data from streams of attached process: {}", this.checkedProcess);
+      }
       // Store start time to be able to finish method if command hangs
       long lastStreamDataTime = System.currentTimeMillis();
 

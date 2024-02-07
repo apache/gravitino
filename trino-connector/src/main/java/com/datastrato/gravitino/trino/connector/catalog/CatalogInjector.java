@@ -315,10 +315,12 @@ public class CatalogInjector {
     try {
       ObjectMapper objectMapper = new ObjectMapper();
       connectorProperties = objectMapper.writeValueAsString(properties);
-      LOG.debug(
-          "Create internal catalog connector {}. The config:{} .",
-          connectorName,
-          connectorProperties);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Create internal catalog connector {}. The config:{} .",
+            connectorName,
+            connectorProperties);
+      }
 
       Object catalogConnector = createHandle.invoke(connectorName, connectorProperties);
 

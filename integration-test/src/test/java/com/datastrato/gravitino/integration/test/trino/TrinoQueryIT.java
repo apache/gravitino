@@ -363,10 +363,12 @@ public class TrinoQueryIT extends TrinoQueryITBase {
               () -> {
                 try {
                   runOneTestSetWithCatalog(testSetDirName, testCatalogs[finalI], testerFilter);
-                  LOG.debug(
-                      "Test set {}'s catalog {} run completed",
-                      simpleTesterName(testSetDirName),
-                      testCatalogs[finalI]);
+                  if (LOG.isDebugEnabled()) {
+                    LOG.debug(
+                        "Test set {}'s catalog {} run completed",
+                        simpleTesterName(testSetDirName),
+                        testCatalogs[finalI]);
+                  }
                   return finalI;
                 } catch (Exception e) {
                   String msg =

@@ -85,13 +85,15 @@ public class TreeLockNode {
     }
 
     holdingThreadTimestamp.put(Thread.currentThread(), System.currentTimeMillis());
-    LOG.trace(
-        "Node {} has been lock with '{}' lock, hold by {} at {}, current holding threads: {}",
-        this,
-        lockType,
-        Thread.currentThread(),
-        System.currentTimeMillis(),
-        holdingThreadTimestamp);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Node {} has been lock with '{}' lock, hold by {} at {}, current holding threads: {}",
+          this,
+          lockType,
+          Thread.currentThread(),
+          System.currentTimeMillis(),
+          holdingThreadTimestamp);
+    }
   }
 
   /**
@@ -111,13 +113,15 @@ public class TreeLockNode {
     this.referenceCount.decrementAndGet();
 
     long holdStartTime = holdingThreadTimestamp.remove(Thread.currentThread());
-    LOG.trace(
-        "Node {} has been unlock with '{}' lock, hold by {} for {} ms, current holding threads: {}",
-        this,
-        lockType,
-        Thread.currentThread(),
-        System.currentTimeMillis() - holdStartTime,
-        holdingThreadTimestamp);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Node {} has been unlock with '{}' lock, hold by {} for {} ms, current holding threads: {}",
+          this,
+          lockType,
+          Thread.currentThread(),
+          System.currentTimeMillis() - holdStartTime,
+          holdingThreadTimestamp);
+    }
   }
 
   /**
@@ -136,7 +140,9 @@ public class TreeLockNode {
             name,
             k -> {
               TreeLockNode newNode = new TreeLockNode(name);
-              LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
+              if (LOG.isTraceEnabled()) {
+                LOG.trace("Create tree lock node '{}' as a child of '{}'", name, this.name);
+              }
               newCreated[0] = true;
               return newNode;
             });
