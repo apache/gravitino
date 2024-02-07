@@ -60,7 +60,7 @@ public class TrinoQueryITBase {
       gravitinoClient = AbstractIT.getGravitinoClient();
       gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
-      trinoITContainers = ContainerSuite.getInstance().getTrinoITContainers();
+      trinoITContainers = ContainerSuite.getTrinoITContainers();
       trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
 
       trinoUri = trinoITContainers.getTrinoUri();
