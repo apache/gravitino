@@ -25,18 +25,20 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
-
+  private static final String VERSION_0_2_0 = "0.2.0";
+  private static final String VERSION_0_3_0 = "0.3.0";
+  private static final String VERSION_0_4_0 = "0.4.0";
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(CATALOG_BACKEND_NAME)
           .doc("Catalog backend of Gravitino Iceberg catalog")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .stringConf()
           .createWithDefault("memory");
 
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(WAREHOUSE)
           .doc("Warehouse directory of catalog")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -44,7 +46,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> CATALOG_URI =
       new ConfigBuilder(URI)
           .doc("The uri config of the Iceberg catalog")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -52,7 +54,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> JDBC_USER =
       new ConfigBuilder(ICEBERG_JDBC_USER)
           .doc("The username of the Jdbc connection")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -60,7 +62,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> JDBC_PASSWORD =
       new ConfigBuilder(ICEBERG_JDBC_PASSWORD)
           .doc("The password of the Jdbc connection")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -68,7 +70,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder(GRAVITINO_JDBC_DRIVER)
           .doc("The driver of the Jdbc connection")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -76,14 +78,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
       new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
           .doc("Whether to initialize meta tables when create Jdbc catalog")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .booleanConf()
           .createWithDefault(true);
 
   public static final ConfigEntry<String> ICEBERG_METRICS_STORE =
       new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_STORE)
           .doc("The store to save Iceberg metrics")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .create();
 
@@ -91,14 +93,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_STORE_RETAIN_DAYS)
           .doc(
               "The retain days of Iceberg metrics, the value not greater than 0 means retain forever")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .intConf()
           .createWithDefault(-1);
 
   public static final ConfigEntry<Integer> ICEBERG_METRICS_QUEUE_CAPACITY =
       new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_QUEUE_CAPACITY)
           .doc("The capacity for Iceberg metrics queues, should greater than 0")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(1000);

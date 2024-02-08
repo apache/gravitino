@@ -26,6 +26,10 @@ import org.slf4j.LoggerFactory;
 public final class JettyServerConfig {
   private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
   private static final String SPLITTER = ",";
+  private static final String VERSION_0_1_0 = "0.1.0";
+  private static final String VERSION_0_2_0 = "0.2.0";
+  private static final String VERSION_0_3_0 = "0.3.0";
+  private static final String VERSION_0_4_0 = "0.4.0";
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
   public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT = 8090;
@@ -34,14 +38,14 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
           .doc("The host name of the Jetty web server")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .stringConf()
           .createWithDefault("0.0.0.0");
 
   public static final ConfigEntry<Integer> WEBSERVER_HTTP_PORT =
       new ConfigBuilder("httpPort")
           .doc("The http port number of the Jetty web server")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT);
@@ -49,7 +53,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
       new ConfigBuilder("minThreads")
           .doc("The minimum number of threads in the thread pool used by Jetty webserver")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(
@@ -58,7 +62,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_MAX_THREADS =
       new ConfigBuilder("maxThreads")
           .doc("The maximum number of threads in the thread pool used by Jetty webserver")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
@@ -66,7 +70,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Long> WEBSERVER_STOP_TIMEOUT =
       new ConfigBuilder("stopTimeout")
           .doc("Time in milliseconds to gracefully shutdown the Jetty webserver")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000L);
@@ -74,7 +78,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_IDLE_TIMEOUT =
       new ConfigBuilder("idleTimeout")
           .doc("The timeout in milliseconds of idle connections")
-          .version("0.2.0")
+          .version(VERSION_0_2_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000);
@@ -82,7 +86,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_REQUEST_HEADER_SIZE =
       new ConfigBuilder("requestHeaderSize")
           .doc("Maximum size of HTTP requests")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
@@ -90,7 +94,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_RESPONSE_HEADER_SIZE =
       new ConfigBuilder("responseHeaderSize")
           .doc("Maximum size of HTTP responses")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
@@ -98,7 +102,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE =
       new ConfigBuilder("threadPoolWorkQueueSize")
           .doc("The size of the queue in the thread pool used by Jetty webserver")
-          .version("0.1.0")
+          .version(VERSION_0_1_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100);
@@ -106,14 +110,14 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Boolean> ENABLE_HTTPS =
       new ConfigBuilder("enableHttps")
           .doc("Enable https")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .booleanConf()
           .createWithDefault(false);
 
   public static final ConfigEntry<Integer> WEBSERVER_HTTPS_PORT =
       new ConfigBuilder("httpsPort")
           .doc("The https port number of the Jetty web server")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_GRAVITINO_WEBSERVER_HTTPS_PORT);
@@ -121,7 +125,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_KEYSTORE_PATH =
       new ConfigBuilder("keyStorePath")
           .doc("Path to the key store file")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -129,7 +133,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_KEYSTORE_PASSWORD =
       new ConfigBuilder("keyStorePassword")
           .doc("Password to the key store")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -137,7 +141,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_MANAGER_PASSWORD =
       new ConfigBuilder("managerPassword")
           .doc("Manager password to the key store")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -145,35 +149,35 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_KEYSTORE_TYPE =
       new ConfigBuilder("keyStoreType")
           .doc("The type to the key store")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .createWithDefault("JKS");
 
   public static final ConfigEntry<Optional<String>> SSL_PROTOCOL =
       new ConfigBuilder("tlsProtocol")
           .doc("TLS protocol to use. The protocol must be supported by JVM")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .createWithOptional();
 
   public static final ConfigEntry<String> ENABLE_CIPHER_ALGORITHMS =
       new ConfigBuilder("enableCipherAlgorithms")
           .doc("The collection of the cipher algorithms are enabled ")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .createWithDefault("");
 
   public static final ConfigEntry<Boolean> ENABLE_CLIENT_AUTH =
       new ConfigBuilder("enableClientAuth")
           .doc("Enable the authentication of the client")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .booleanConf()
           .createWithDefault(false);
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_PATH =
       new ConfigBuilder("trustStorePath")
           .doc("Path to the trust store file")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -181,7 +185,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_TRUST_STORE_PASSWORD =
       new ConfigBuilder("trustStorePassword")
           .doc("Password to the trust store")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -189,20 +193,20 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> SSL_TRUST_STORE_TYPE =
       new ConfigBuilder("trustStoreType")
           .doc("The type to the trust store")
-          .version("0.3.0")
+          .version(VERSION_0_3_0)
           .stringConf()
           .createWithDefault("JKS");
 
   public static final ConfigEntry<Optional<String>> CUSTOM_FILTERS =
       new ConfigBuilder("customFilters")
           .doc("Comma separated list of filter class names to apply to the APIs")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithOptional();
   public static final ConfigEntry<Boolean> ENABLE_CORS_FILTER =
       new ConfigBuilder("enableCorsFilter")
           .doc("Enable cross origin resource share filter")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .booleanConf()
           .createWithDefault(false);
 
@@ -211,7 +215,7 @@ public final class JettyServerConfig {
           .doc(
               "A comma separated list of origins that are allowed to access the resources."
                   + " Default value is *, means all origins")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithDefault("*");
 
@@ -220,7 +224,7 @@ public final class JettyServerConfig {
           .doc(
               "A comma separated list of origins that are allowed to time the resource."
                   + " Default value is the empty string, means no origins.")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithDefault("");
 
@@ -229,7 +233,7 @@ public final class JettyServerConfig {
           .doc(
               "A comma separated list of HTTP methods that are allowed to be used when accessing the resources."
                   + " Default value is GET,POST,HEAD,DELETE")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithDefault("GET,POST,HEAD,DELETE,PUT");
 
@@ -239,7 +243,7 @@ public final class JettyServerConfig {
               "A comma separated list of HTTP headers that are allowed to be specified when accessing the resources."
                   + " Default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *,"
                   + " this means that any headers will be accepted.")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithDefault("X-Requested-With,Content-Type,Accept,Origin");
 
@@ -248,7 +252,7 @@ public final class JettyServerConfig {
           .doc(
               "The number of seconds that preflight requests can be cached by the client."
                   + " Default value is 1800 seconds, or 30 minutes")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(1800);
@@ -257,7 +261,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("allowCredentials")
           .doc(
               "A boolean indicating if the resource allows requests with credentials. Default value is true")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .booleanConf()
           .createWithDefault(true);
 
@@ -266,7 +270,7 @@ public final class JettyServerConfig {
           .doc(
               "A comma separated list of HTTP headers that are allowed to be exposed on the client."
                   + " Default value is the empty list")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .stringConf()
           .createWithDefault("");
 
@@ -275,7 +279,7 @@ public final class JettyServerConfig {
           .doc(
               "If true preflight requests are chained to their target resource for normal handling "
                   + "(as an OPTION request). Otherwise the filter will response to the preflight. Default is true.")
-          .version("0.4.0")
+          .version(VERSION_0_4_0)
           .booleanConf()
           .createWithDefault(true);
 
@@ -368,27 +372,23 @@ public final class JettyServerConfig {
 
     this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
-    String keyStorePath = null;
-    String keyStorePassword = null;
-    String managerPassword = null;
-    String trustStorePath = null;
-    String trustStorePassword = null;
 
     if (this.enableHttps) {
-      keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
-      keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
-      managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
-      if (this.enableClientAuth) {
-        trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
-        trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
-      }
+      this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
+      this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
+      this.managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
+    } else {
+      this.keyStorePath = null;
+      this.keyStorePassword = null;
+      this.managerPassword = null;
     }
-
-    this.keyStorePath = keyStorePath;
-    this.keyStorePassword = keyStorePassword;
-    this.managerPassword = managerPassword;
-    this.trustStorePassword = trustStorePassword;
-    this.trustStorePath = trustStorePath;
+    if (this.enableHttps && this.enableClientAuth) {
+      this.trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
+      this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
+    } else {
+      this.trustStorePath = null;
+      this.trustStorePassword = null;
+    }
 
     this.enableCorsFilter = internalConfig.get(ENABLE_CORS_FILTER);
     this.allowedOrigins = internalConfig.get(ALLOWED_ORIGINS);
