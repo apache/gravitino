@@ -126,7 +126,7 @@ public class TestIcebergTableUpdate {
     Assertions.assertFalse(
         loadTableResponse.tableMetadata().properties().containsKey(testPropertyKey));
 
-    icebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange setProperty1 = TableChange.setProperty(property, "test_v");
@@ -134,7 +134,7 @@ public class TestIcebergTableUpdate {
                   IllegalArgumentException.class, () -> updateTable(identifier, setProperty1));
             });
 
-    icebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange removeProperty1 = TableChange.removeProperty(property);
