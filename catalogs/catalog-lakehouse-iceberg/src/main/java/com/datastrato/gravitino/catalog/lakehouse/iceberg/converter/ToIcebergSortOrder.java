@@ -22,10 +22,7 @@ import org.apache.iceberg.expressions.UnboundTerm;
 /** Implement gravitino sort order converter to iceberg sort order. */
 public class ToIcebergSortOrder {
 
-  // Private constructor to prevent instantiation
-  private ToIcebergSortOrder() {
-    // This constructor is intentionally empty. Nothing to initialize.
-  }
+  private ToIcebergSortOrder() {}
 
   private static final String DOT = ".";
 
