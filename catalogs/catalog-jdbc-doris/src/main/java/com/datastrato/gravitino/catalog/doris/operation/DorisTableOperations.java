@@ -1,23 +1,24 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.mysql.operation;
+package com.datastrato.gravitino.catalog.doris.operation;
 
-import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
-import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
@@ -25,6 +26,7 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,25 +34,19 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
-/** Table operations for MySQL. */
-public class MysqlTableOperations extends JdbcTableOperations {
-
+/** Table operations for Doris. */
+public class DorisTableOperations extends JdbcTableOperations {
   public static final String BACK_QUOTE = "`";
-  public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
-  private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
-      "Mysql does not support nested column names.";
+  public static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
+
+  public static final String NEW_LINE = "\n";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -80,135 +76,149 @@ public class MysqlTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      Index[] indexes) {
-    if (ArrayUtils.isNotEmpty(partitioning)) {
-      throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
-    }
-    validateIncrementCol(columns, indexes);
+      com.datastrato.gravitino.rel.indexes.Index[] indexes) {
+
+    validateIncrementCol(columns);
+    validateDistribution(distribution, columns);
+
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("CREATE TABLE ")
-        .append(BACK_QUOTE)
-        .append(tableName)
-        .append(BACK_QUOTE)
-        .append(" (\n");
+
+    sqlBuilder.append(String.format("CREATE TABLE `%s` (", tableName)).append(NEW_LINE);
 
     // Add columns
-    for (int i = 0; i < columns.length; i++) {
-      JdbcColumn column = columns[i];
-      sqlBuilder
-          .append(SPACE)
-          .append(SPACE)
-          .append(BACK_QUOTE)
-          .append(column.name())
-          .append(BACK_QUOTE);
-
-      appendColumnDefinition(column, sqlBuilder);
-      // Add a comma for the next column, unless it's the last one
-      if (i < columns.length - 1) {
-        sqlBuilder.append(",\n");
-      }
-    }
+    sqlBuilder.append(
+        Arrays.stream(columns)
+            .map(
+                column -> {
+                  StringBuilder columnsSql = new StringBuilder();
+                  columnsSql
+                      .append(SPACE)
+                      .append(BACK_QUOTE)
+                      .append(column.name())
+                      .append(BACK_QUOTE);
+                  appendColumnDefinition(column, columnsSql);
+                  return columnsSql.toString();
+                })
+            .collect(Collectors.joining(",\n")));
 
     appendIndexesSql(indexes, sqlBuilder);
 
-    sqlBuilder.append("\n)");
+    sqlBuilder.append(NEW_LINE).append(")");
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+      sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
     }
 
-    // Add table properties if any
-    if (MapUtils.isNotEmpty(properties)) {
+    // Add distribution info
+    if (distribution.strategy() == Strategy.HASH) {
+      sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
       sqlBuilder.append(
-          properties.entrySet().stream()
-              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
-              .collect(Collectors.joining(",\n", "\n", "")));
+          Arrays.stream(distribution.expressions())
+              .map(column -> BACK_QUOTE + column.toString() + BACK_QUOTE)
+              .collect(Collectors.joining(", ")));
+      sqlBuilder.append(")");
+    } else if (distribution.strategy() == Strategy.EVEN) {
+      sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY ").append("RANDOM");
+    }
+
+    if (distribution.number() != 0) {
+      sqlBuilder.append(" BUCKETS ").append(distribution.number());
+    }
+
+    // Add table properties
+    sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
+
+    // Add Partition Info
+    if (partitioning != null && partitioning.length > 0) {
+      // TODO: Add partitioning support
     }
 
     // Return the generated SQL statement
-    String result = sqlBuilder.append(";").toString();
+    String result = sqlBuilder.toString();
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
   }
 
-  /**
-   * The auto-increment column will be verified. There can only be one auto-increment column and it
-   * must be the primary key or unique index.
-   *
-   * @param columns jdbc column
-   * @param indexes table indexes
-   */
-  private static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
+  private static void validateIncrementCol(JdbcColumn[] columns) {
     // Check auto increment column
     List<JdbcColumn> autoIncrementCols =
         Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
     String autoIncrementColsStr =
         autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
+
     Preconditions.checkArgument(
         autoIncrementCols.size() <= 1,
         "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
             + autoIncrementColsStr);
-    if (!autoIncrementCols.isEmpty()) {
-      Optional<Index> existAutoIncrementColIndexOptional =
-          Arrays.stream(indexes)
-              .filter(
-                  index ->
-                      Arrays.stream(index.fieldNames())
-                          .flatMap(Arrays::stream)
-                          .anyMatch(
-                              s ->
-                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
-              .filter(
-                  index ->
-                      index.type() == Index.IndexType.PRIMARY_KEY
-                          || index.type() == Index.IndexType.UNIQUE_KEY)
-              .findAny();
-      Preconditions.checkArgument(
-          existAutoIncrementColIndexOptional.isPresent(),
-          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
+
+    // Check Auto increment column type
+    autoIncrementCols.forEach(
+        column -> {
+          Preconditions.checkArgument(
+              column.dataType().equals(Types.LongType.get()),
+              "Auto-increment column must be of type BIGINT. The column "
+                  + column.name()
+                  + " is of type "
+                  + column.dataType());
+        });
+
+    // Check auto increment column is nullable
+    autoIncrementCols.forEach(
+        column -> {
+          Preconditions.checkArgument(
+              !column.nullable(),
+              "Auto-increment column must be not nullable. The column "
+                  + column.name()
+                  + " is nullable");
+        });
+  }
+
+  private static void validateDistribution(Distribution distribution, JdbcColumn[] columns) {
+    Preconditions.checkArgument(null != distribution, "Doris must set distribution");
+
+    Preconditions.checkArgument(
+        Strategy.HASH == distribution.strategy() || Strategy.EVEN == distribution.strategy(),
+        "Doris only supports HASH or EVEN distribution strategy");
+
+    if (distribution.strategy() == Strategy.HASH) {
+      // Check if the distribution column exists
+      Arrays.stream(distribution.expressions())
+          .forEach(
+              expression -> {
+                Preconditions.checkArgument(
+                    Arrays.stream(columns)
+                        .anyMatch(column -> column.name().equalsIgnoreCase(expression.toString())),
+                    "Distribution column " + expression + " does not exist in the table columns");
+              });
     }
   }
 
-  public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
-    for (Index index : indexes) {
-      String fieldStr = getIndexFieldStr(index.fieldNames());
-      sqlBuilder.append(",\n");
-      switch (index.type()) {
-        case PRIMARY_KEY:
-          if (null != index.name()
-              && !StringUtils.equalsIgnoreCase(
-                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-            throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-          }
-          sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
-          break;
-        case UNIQUE_KEY:
-          sqlBuilder.append("CONSTRAINT ");
-          if (null != index.name()) {
-            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
-          }
-          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
-          break;
-        default:
-          throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
-      }
-    }
-  }
+  @VisibleForTesting
+  static void appendIndexesSql(
+      com.datastrato.gravitino.rel.indexes.Index[] indexes, StringBuilder sqlBuilder) {
 
-  private static String getIndexFieldStr(String[][] fieldNames) {
-    return Arrays.stream(fieldNames)
+    if (indexes.length == 0) {
+      return;
+    }
+
+    // validate indexes
+    Arrays.stream(indexes)
         .map(
-            colNames -> {
-              if (colNames.length > 1) {
-                throw new IllegalArgumentException(
-                    "Index does not support complex fields in MySQL");
+            index -> {
+              if (index.fieldNames().length > 1) {
+                throw new IllegalArgumentException("Index does not support multi fields in Doris");
               }
-              return BACK_QUOTE + colNames[0] + BACK_QUOTE;
-            })
-        .collect(Collectors.joining(", "));
+              return index;
+            });
+
+    String indexSql =
+        Arrays.stream(indexes)
+            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
+            .collect(Collectors.joining(",\n"));
+
+    sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
   }
 
   @Override
@@ -219,31 +229,56 @@ public class MysqlTableOperations extends JdbcTableOperations {
   @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
-    // MySQL in CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci is case-insensitive, when the name is
-    // hello, the result can be 'HELLO', 'Hello', 'hello' and so on.
-    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
-      statement.setString(1, tableName);
+
+    String showCreateTableSQL = String.format("SHOW CREATE TABLE `%s`", tableName);
+
+    StringBuilder createTableSqlSb = new StringBuilder();
+    try (PreparedStatement statement = connection.prepareStatement(showCreateTableSQL)) {
       try (ResultSet resultSet = statement.executeQuery()) {
         while (resultSet.next()) {
-          String name = resultSet.getString("NAME");
-          if (Objects.equals(name, tableName)) {
-            return Collections.unmodifiableMap(
-                new HashMap<String, String>() {
-                  {
-                    put(COMMENT, resultSet.getString(COMMENT));
-                    put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
-                    String autoIncrement = resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-                    if (StringUtils.isNotEmpty(autoIncrement)) {
-                      put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
-                    }
-                  }
-                });
-          }
+          createTableSqlSb.append(resultSet.getString("Create Table"));
         }
-
-        throw new NoSuchTableException(
-            "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
+    }
+
+    String createTableSql = createTableSqlSb.toString();
+
+    if (StringUtils.isEmpty(createTableSql)) {
+      throw new NoSuchTableException(
+          "Table %s does not exist in %s.", tableName, connection.getCatalog());
+    }
+
+    return Collections.unmodifiableMap(DorisUtils.extractPropertiesFromSql(createTableSql));
+  }
+
+  @Override
+  protected JdbcTable.Builder getBasicJdbcTableInfo(ResultSet table) throws SQLException {
+    return new JdbcTable.Builder()
+        .withName(table.getString("TABLE_NAME"))
+        .withComment(table.getString("REMARKS"))
+        .withAuditInfo(AuditInfo.EMPTY);
+  }
+
+  @Override
+  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    // get Indexes from SQL
+    try {
+      Connection connection = metaData.getConnection();
+
+      String sql = "SHOW INDEX FROM " + tableName + " FROM " + databaseName;
+      PreparedStatement preparedStatement = connection.prepareStatement(sql);
+      ResultSet resultSet = preparedStatement.executeQuery();
+      List<Index> indexes = new ArrayList<>();
+      while (resultSet.next()) {
+        String indexName = resultSet.getString("Key_name");
+        String columnName = resultSet.getString("Column_name");
+        indexes.add(
+            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+      }
+      return indexes;
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
     }
   }
 
@@ -251,28 +286,42 @@ public class MysqlTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
+
     if (StringUtils.isEmpty(tableBuilder.comment())) {
-      // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
-      LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
-      tableBuilder.withComment(
-          tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
+      // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
+      try {
+        String sql =
+            "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+        String comment = "";
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, databaseName);
+        preparedStatement.setString(2, tableName);
+
+        ResultSet resultSet = preparedStatement.executeQuery();
+        while (resultSet.next()) {
+          comment += resultSet.getString("TABLE_COMMENT");
+        }
+
+        tableBuilder.withComment(comment);
+      } catch (SQLException e) {
+        throw exceptionMapper.toGravitinoException(e);
+      }
     }
   }
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
+    return String.format("ALTER TABLE `%s` RENAME `%s`", oldTableName, newTableName);
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + BACK_QUOTE + tableName + BACK_QUOTE;
+    return String.format("DROP TABLE `%s`", tableName);
   }
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    throw new UnsupportedOperationException(
-        "MySQL does not support purge table in Gravitino, please use drop table");
+    return String.format("TRUNCATE TABLE `%s`", tableName);
   }
 
   @Override
@@ -291,25 +340,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
         // The set attribute needs to be added at the end.
         setProperties.add(((TableChange.SetProperty) change));
       } else if (change instanceof TableChange.RemoveProperty) {
-        // mysql does not support deleting table attributes, it can be replaced by Set Property
+        // Doris only support set properties, remove property is not supported yet
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn));
       } else if (change instanceof TableChange.RenameColumn) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
-        alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
+        throw new IllegalArgumentException("Rename column is not supported yet");
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnComment) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnComment updateColumnComment =
             (TableChange.UpdateColumnComment) change;
-        alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment, lazyLoadTable));
+        alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnPosition updateColumnPosition =
@@ -332,11 +378,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
-      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(
-            updateColumnAutoIncrementDefinition(
-                lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -357,7 +398,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add("MODIFY COMMENT \"" + newComment + "\"");
     }
 
     if (!setProperties.isEmpty()) {
@@ -371,46 +412,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
-  }
-
-  private String updateColumnAutoIncrementDefinition(
-      JdbcTable table, TableChange.UpdateColumnAutoIncrement change) {
-    if (change.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Nested column names are not supported");
-    }
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (change.isAutoIncrement()) {
-      Preconditions.checkArgument(
-          Types.allowAutoIncrement(column.dataType()),
-          "Auto increment is not allowed, type: " + column.dataType());
-    }
-    JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(change.isAutoIncrement())
-            .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
-  }
-
-  @VisibleForTesting
-  static String deleteIndexDefinition(
-      JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (deleteIndex.isIfExists()) {
-      if (Arrays.stream(lazyLoadTable.index())
-          .anyMatch(index -> index.name().equals(deleteIndex.getName()))) {
-        throw new IllegalArgumentException("Index does not exist");
-      }
-    }
-    return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
   }
 
   private String updateColumnNullabilityDefinition(
@@ -427,45 +428,18 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return MODIFY_COLUMN
+    return "MODIFY COLUMN "
         + BACK_QUOTE
         + col
         + BACK_QUOTE
         + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
-  @VisibleForTesting
-  static String addIndexDefinition(TableChange.AddIndex addIndex) {
-    StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("ADD ");
-    switch (addIndex.getType()) {
-      case PRIMARY_KEY:
-        if (null != addIndex.getName()
-            && !StringUtils.equalsIgnoreCase(
-                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-          throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-        }
-        sqlBuilder.append("PRIMARY KEY ");
-        break;
-      case UNIQUE_KEY:
-        sqlBuilder
-            .append("UNIQUE INDEX ")
-            .append(BACK_QUOTE)
-            .append(addIndex.getName())
-            .append(BACK_QUOTE);
-        break;
-      default:
-        break;
-    }
-    sqlBuilder.append(" (").append(getIndexFieldStr(addIndex.getFieldNames())).append(")");
-    return sqlBuilder.toString();
-  }
-
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
     return setProperties.stream()
         .map(
             setProperty ->
-                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+                String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
   }
 
@@ -475,33 +449,20 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnCommentFieldDefinition(
-      TableChange.UpdateColumnComment updateColumnComment, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnComment updateColumnComment) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = updateColumnComment.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withType(column.dataType())
-            .withComment(newComment)
-            .withAutoIncrement(column.autoIncrement())
-            .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+
+    return String.format("MODIFY COLUMN `%s` COMMENT '%s'", col, newComment);
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = addColumn.fieldName()[0];
 
@@ -514,13 +475,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .append(SPACE)
         .append(dataType)
         .append(SPACE);
-
-    if (addColumn.isAutoIncrement()) {
-      Preconditions.checkArgument(
-          Types.allowAutoIncrement(addColumn.getDataType()),
-          "Auto increment is not allowed, type: " + addColumn.getDataType());
-      columnDefinition.append(MYSQL_AUTO_INCREMENT).append(SPACE);
-    }
 
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
@@ -536,69 +490,38 @@ public class MysqlTableOperations extends JdbcTableOperations {
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
       columnDefinition
-          .append(AFTER)
+          .append("AFTER ")
           .append(BACK_QUOTE)
           .append(afterPosition.getColumn())
           .append(BACK_QUOTE);
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
-      // do nothing, follow the default behavior of mysql
+      // do nothing, follow the default behavior of doris
     } else {
       throw new IllegalArgumentException("Invalid column position.");
     }
     return columnDefinition.toString();
   }
 
-  private String renameColumnFieldDefinition(
-      TableChange.RenameColumn renameColumn, JdbcTable jdbcTable) {
-    if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
-    }
-
-    String oldColumnName = renameColumn.fieldName()[0];
-    String newColumnName = renameColumn.getNewName();
-    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
-    StringBuilder sqlBuilder =
-        new StringBuilder(
-            "CHANGE COLUMN "
-                + BACK_QUOTE
-                + oldColumnName
-                + BACK_QUOTE
-                + SPACE
-                + BACK_QUOTE
-                + newColumnName
-                + BACK_QUOTE);
-    JdbcColumn newColumn =
-        new JdbcColumn.Builder()
-            .withName(newColumnName)
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
-    return appendColumnDefinition(newColumn, sqlBuilder).toString();
-  }
-
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, JdbcTable jdbcTable) {
     if (updateColumnPosition.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append(MODIFY_COLUMN).append(col);
+    columnDefinition.append("MODIFY COLUMN ").append(col);
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
     }
     return columnDefinition.toString();
   }
@@ -606,7 +529,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable jdbcTable) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists = true;
@@ -628,11 +551,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+      throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(col)
@@ -669,7 +592,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {
-      sqlBuilder.append(MYSQL_AUTO_INCREMENT).append(" ");
+      sqlBuilder.append(DORIS_AUTO_INCREMENT).append(" ");
     }
 
     // Add column comment if specified
@@ -677,5 +600,20 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
     }
     return sqlBuilder;
+  }
+
+  static String addIndexDefinition(TableChange.AddIndex addIndex) {
+    return String.format("ADD INDEX %s (%s)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+  }
+
+  static String deleteIndexDefinition(
+      JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
+    if (deleteIndex.isIfExists()) {
+      Preconditions.checkArgument(
+          Arrays.stream(lazyLoadTable.index())
+              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
+          "Index does not exist");
+    }
+    return "DROP INDEX " + deleteIndex.getName();
   }
 }

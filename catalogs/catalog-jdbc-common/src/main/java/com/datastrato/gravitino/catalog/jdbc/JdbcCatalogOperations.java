@@ -35,7 +35,6 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -371,9 +370,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(
-        null == distribution || distribution == Distributions.NONE,
-        "jdbc-catalog does not support distribution");
-    Preconditions.checkArgument(
         null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
 
     StringIdentifier identifier =
@@ -406,6 +402,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         StringIdentifier.addToComment(identifier, comment),
         resultProperties,
         partitioning,
+        distribution,
         indexes);
 
     return new JdbcTable.Builder()

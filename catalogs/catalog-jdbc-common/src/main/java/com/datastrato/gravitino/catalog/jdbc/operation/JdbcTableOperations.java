@@ -18,6 +18,7 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -79,13 +80,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
-          generateCreateTableSql(tableName, columns, comment, properties, partitioning, indexes));
+          generateCreateTableSql(
+              tableName, columns, comment, properties, partitioning, distribution, indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -172,7 +175,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       jdbcTableBuilder.withProperties(tableProperties);
 
       // 5.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
+      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
       return jdbcTableBuilder.build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
@@ -272,7 +275,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @throws SQLException
    */
   protected void correctJdbcTableFields(
-      Connection connection, String tableName, JdbcTable.Builder jdbcTableBuilder)
+      Connection connection,
+      String databaseName,
+      String tableName,
+      JdbcTable.Builder jdbcTableBuilder)
       throws SQLException {
     // nothing to do
   }
@@ -357,6 +363,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
