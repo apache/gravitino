@@ -98,6 +98,7 @@ public class TreeLock {
             treeLockNode,
             lockNodes,
             e);
+        // unlock all nodes that have been locked when an exception occurs.
         unlock();
         throw e;
       }
