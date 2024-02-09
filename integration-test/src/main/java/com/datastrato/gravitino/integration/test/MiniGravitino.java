@@ -134,12 +134,7 @@ public class MiniGravitino {
       if (started || future.isDone()) {
         break;
       }
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw e;
-      }
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     }
     if (!started) {
       try {
@@ -157,23 +152,13 @@ public class MiniGravitino {
     LOG.debug("MiniGravitino shutDown...");
 
     executor.shutdown();
-    try {
-      Thread.sleep(500);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw e;
-    }
+    sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     executor.shutdownNow();
 
     long beginTime = System.currentTimeMillis();
     boolean started = true;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw e;
-      }
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
       started = checkIfServerIsRunning();
       if (!started) {
         break;
