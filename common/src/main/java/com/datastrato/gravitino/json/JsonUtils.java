@@ -212,7 +212,7 @@ public class JsonUtils {
     }
   }
 
-  private static volatile ObjectMapper mapper = null;
+  private static ObjectMapper mapper = null;
 
   /**
    * Get the shared ObjectMapper instance for JSON serialization/deserialization.

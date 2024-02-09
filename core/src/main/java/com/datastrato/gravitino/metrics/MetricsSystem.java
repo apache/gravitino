@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class MetricsSystem implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
   private final String name;
-  private final MetricRegistry metricRegistry;
+  @Getter private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
   private List<Reporter> metricsReporters = new LinkedList<>();
   private CollectorRegistry prometheusRegistry;
@@ -106,11 +107,6 @@ public class MetricsSystem implements Closeable {
   public void start() {
     registerMetricsToPrometheusRegistry();
     initAndStartMetricsReporter();
-  }
-
-  @VisibleForTesting
-  public MetricRegistry getMetricRegistry() {
-    return metricRegistry;
   }
 
   @Override
