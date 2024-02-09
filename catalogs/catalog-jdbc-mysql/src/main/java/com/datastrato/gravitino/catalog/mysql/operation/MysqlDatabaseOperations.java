@@ -26,16 +26,16 @@ import org.apache.commons.lang3.StringUtils;
 /** Database operations for MySQL. */
 public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
-  public static final Set<String> SYS_MYSQL_DATABASE_NAMES =
-      Collections.unmodifiableSet(
-          new HashSet<String>() {
-            {
-              add("information_schema");
-              add("mysql");
-              add("performance_schema");
-              add("sys");
-            }
-          });
+  public static final Set<String> SYS_MYSQL_DATABASE_NAMES = createSysMysqlDatabaseNames();
+
+  private static Set<String> createSysMysqlDatabaseNames() {
+    Set<String> set = new HashSet<>();
+    set.add("information_schema");
+    set.add("mysql");
+    set.add("performance_schema");
+    set.add("sys");
+    return Collections.unmodifiableSet(set);
+  }
 
   @Override
   public String generateCreateDatabaseSql(
@@ -108,17 +108,17 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
           // Mysql currently only supports these two attributes
           String characterSetName = resultSet.getString("DEFAULT_CHARACTER_SET_NAME");
           String collationName = resultSet.getString("DEFAULT_COLLATION_NAME");
-          return new JdbcSchema.Builder()
-              .withName(schemaName)
-              .withProperties(
-                  new HashMap<String, String>() {
-                    {
-                      put("CHARACTER SET", characterSetName);
-                      put("COLLATE", collationName);
-                    }
-                  })
-              .withAuditInfo(AuditInfo.EMPTY)
-              .build();
+          Map<String, String> properties = new HashMap<>();
+          properties.put("CHARACTER SET", characterSetName);
+          properties.put("COLLATE", collationName);
+
+          JdbcSchema.Builder builder =
+              new JdbcSchema.Builder()
+                  .withName(schemaName)
+                  .withProperties(properties)
+                  .withAuditInfo(AuditInfo.EMPTY);
+
+          return builder.build();
         }
       }
     } catch (final SQLException se) {
