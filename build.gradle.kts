@@ -53,6 +53,11 @@ if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   )
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+if (scalaVersion !in listOf("2.12", "2.13")) {
+  throw GradleException("Found unsupported Scala version: $scalaVersion")
+}
+
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
 } else {

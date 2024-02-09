@@ -13,6 +13,11 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark.get()
+val icebergVersion: String = libs.versions.iceberg.get()
+val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-hive"))
@@ -93,17 +98,21 @@ dependencies {
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
+  testImplementation(libs.httpclient5)
   testImplementation(libs.iceberg.spark.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.httpclient5)
-  testImplementation(libs.spark.sql) {
-    exclude("io.dropwizard.metrics")
+  testImplementation(libs.bundles.log4j)
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
     exclude("org.apache.hadoop")
-    exclude("org.apache.rocksdb")
     exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
   }
   testImplementation(libs.jline.terminal)
   testImplementation(libs.minikdc) {

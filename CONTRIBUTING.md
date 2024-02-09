@@ -104,6 +104,8 @@ All files must have a license header and the build fails if any files are missin
 
 For any bugs or new code please add unit tests to provide coverage of the code. The project may not accept code without unit tests.
 
+All text files should use macOS/unix style line endings (LF) not windows style line endings (CRLF).
+
 ## Community and communication
 
 Join the [community discourse group](https://gravitino.discourse.group) to discuss ideas and seek help. You are also encouraged to use GitHub discussions and follow Datastrato on social media to stay updated on project news.

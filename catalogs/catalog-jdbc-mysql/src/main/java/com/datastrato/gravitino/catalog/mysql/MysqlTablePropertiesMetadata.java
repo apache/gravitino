@@ -21,46 +21,43 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String MYSQL_ENGINE_KEY = "ENGINE";
   public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY = "auto-increment-offset";
   public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY = "AUTO_INCREMENT";
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
+      createPropertiesMetadata();
 
   public static final BidiMap<String, String> GRAVITINO_CONFIG_TO_MYSQL =
-      new TreeBidiMap<String, String>() {
-        {
-          put(GRAVITINO_ENGINE_KEY, MYSQL_ENGINE_KEY);
-          put(GRAVITINO_AUTO_INCREMENT_OFFSET_KEY, MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-        }
-      };
+      createGravitinoConfigToMysql();
 
-  static {
-    PROPERTIES_METADATA =
-        Collections.unmodifiableMap(
-            new HashMap<String, PropertyEntry<?>>() {
-              {
-                put(
-                    COMMENT_KEY,
-                    stringReservedPropertyEntry(COMMENT_KEY, "The table comment", true));
-                put(
-                    GRAVITINO_ENGINE_KEY,
-                    enumImmutablePropertyEntry(
-                        GRAVITINO_ENGINE_KEY,
-                        "The table engine",
-                        false,
-                        ENGINE.class,
-                        ENGINE.INNODB,
-                        false,
-                        false));
-                // auto_increment properties can only be specified when creating and cannot be
-                // modified.
-                put(
-                    GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
-                    integerOptionalPropertyEntry(
-                        GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
-                        "The table auto increment offset",
-                        true,
-                        null,
-                        false));
-              }
-            });
+  private static BidiMap<String, String> createGravitinoConfigToMysql() {
+    BidiMap<String, String> map = new TreeBidiMap<>();
+    map.put(GRAVITINO_ENGINE_KEY, MYSQL_ENGINE_KEY);
+    map.put(GRAVITINO_AUTO_INCREMENT_OFFSET_KEY, MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+    return map;
+  }
+
+  private static Map<String, PropertyEntry<?>> createPropertiesMetadata() {
+    Map<String, PropertyEntry<?>> map = new HashMap<>();
+    map.put(COMMENT_KEY, stringReservedPropertyEntry(COMMENT_KEY, "The table comment", true));
+    map.put(
+        GRAVITINO_ENGINE_KEY,
+        enumImmutablePropertyEntry(
+            GRAVITINO_ENGINE_KEY,
+            "The table engine",
+            false,
+            ENGINE.class,
+            ENGINE.INNODB,
+            false,
+            false));
+    // auto_increment properties can only be specified when creating and cannot be
+    // modified.
+    map.put(
+        GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
+        integerOptionalPropertyEntry(
+            GRAVITINO_AUTO_INCREMENT_OFFSET_KEY,
+            "The table auto increment offset",
+            true,
+            null,
+            false));
+    return Collections.unmodifiableMap(map);
   }
 
   public enum ENGINE {
