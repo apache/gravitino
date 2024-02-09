@@ -19,14 +19,14 @@ public interface ConfigConstants {
    */
   String NON_NEGATIVE_NUMBER_ERROR_MSG = "The value must be a non-negative number";
 
-  // Version 0.1.0
+  /** The version number for the 0.1.0 release. */
   String VERSION_0_1_0 = "0.1.0";
-  // Version 0.2.0
+  /** The version number for the 0.2.0 release. */
   String VERSION_0_2_0 = "0.2.0";
-  // Version 0.3.0
+  /** The version number for the 0.3.0 release. */
   String VERSION_0_3_0 = "0.3.0";
-  // Version 0.4.0
+  /** The version number for the 0.4.0 release. */
   String VERSION_0_4_0 = "0.4.0";
-  // Version 0.5.0
+  /** The version number for the 0.5.0 release. */
   String VERSION_0_5_0 = "0.5.0";
 }
