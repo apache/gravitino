@@ -90,7 +90,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
           Thread.sleep(100);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          throw new RuntimeException("Thread was interrupted", e);
+          throw new RuntimeException("Thread was interrupted, exception: ", e);
         }
         current = System.currentTimeMillis();
       }
