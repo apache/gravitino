@@ -38,7 +38,7 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   private volatile int currentSize;
   private boolean closed;
 
-  public ClientPoolImpl(int poolSize, Class<? extends E> reconnectExc, boolean retryByDefault) {
+  protected ClientPoolImpl(int poolSize, Class<? extends E> reconnectExc, boolean retryByDefault) {
     this.poolSize = poolSize;
     this.reconnectExc = reconnectExc;
     this.clients = new ArrayDeque<>(poolSize);

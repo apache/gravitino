@@ -72,7 +72,7 @@ To configure Gravitino connector correctly, you need to put the following config
 
 ```text
 connector.name=gravitino
-gravitino.url=http://gravitino-server-host:8090
+gravitino.uri=http://gravitino-server-host:8090
 gravitino.metalake=test
 ```
 
