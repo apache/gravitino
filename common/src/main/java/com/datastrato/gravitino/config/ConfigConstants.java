@@ -20,6 +20,7 @@ public interface ConfigConstants {
   String NON_NEGATIVE_NUMBER_ERROR_MSG = "The value must be a non-negative number";
 
   String VERSION_0_1_0 = "0.1.0";
+  String VERSION_0_2_0 = "0.2.0";
   String VERSION_0_3_0 = "0.3.0";
   String VERSION_0_4_0 = "0.4.0";
   String VERSION_0_5_0 = "0.5.0";
