@@ -103,7 +103,6 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.bundles.log4j)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -135,6 +134,7 @@ dependencies {
   testImplementation(libs.trino.client) {
     exclude("jakarta.annotation")
   }
+  testImplementation(libs.trino.jdbc)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
