@@ -30,7 +30,6 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put(
         "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
     config.put("connectorName", "memory");
