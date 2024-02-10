@@ -216,8 +216,8 @@ public class JsonUtils {
    * ObjectMapperHolder is a static inner class that holds the instance of ObjectMapper. This class
    * utilizes the Initialization-on-demand holder idiom, which is a lazy-loaded singleton. This
    * idiom takes advantage of the fact that inner classes are not loaded until they are referenced.
-   * It's a thread-safe and efficient way to implement a singleton as the instance is created the
-   * first time it's needed.
+   * It's a thread-safe and efficient way to implement a singleton as the instance is created when
+   * it's needed at the first time.
    */
   private static class ObjectMapperHolder {
     private static final ObjectMapper INSTANCE =
