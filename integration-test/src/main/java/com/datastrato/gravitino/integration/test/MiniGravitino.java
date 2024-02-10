@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -134,7 +135,7 @@ public class MiniGravitino {
       if (started || future.isDone()) {
         break;
       }
-      Thread.sleep(500);
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     }
     if (!started) {
       try {
@@ -152,13 +153,13 @@ public class MiniGravitino {
     LOG.debug("MiniGravitino shutDown...");
 
     executor.shutdown();
-    Thread.sleep(500);
+    sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     executor.shutdownNow();
 
     long beginTime = System.currentTimeMillis();
     boolean started = true;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      Thread.sleep(500);
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
       started = checkIfServerIsRunning();
       if (!started) {
         break;
