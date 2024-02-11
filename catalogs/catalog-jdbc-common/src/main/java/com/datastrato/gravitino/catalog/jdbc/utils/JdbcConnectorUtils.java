@@ -23,13 +23,12 @@ public final class JdbcConnectorUtils {
    * @throws SQLException on error during execution of the update to the underlying SQL data store
    */
   public static int executeUpdate(final Connection connection, final String sql)
-      throws SQLException {
+          throws SQLException {
     try (final Statement statement = connection.createStatement()) {
       return statement.executeUpdate(sql);
     }
   }
 
-  /** Returns a copy of the Table Types as a String Array  */
   public static String[] getTableTypes() {
     return TABLE_TYPES.toArray(new String[0]);
   }
