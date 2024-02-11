@@ -5,14 +5,12 @@
 package com.datastrato.gravitino.catalog.jdbc.utils;
 
 import com.google.common.collect.ImmutableList;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 public final class JdbcConnectorUtils {
   public static final ImmutableList<String> TABLE_TYPES = ImmutableList.of("TABLE");
-
 
   private JdbcConnectorUtils() {}
 
@@ -31,9 +29,7 @@ public final class JdbcConnectorUtils {
     }
   }
 
-  /**
-   * Returns a copy of the Table Types
-   * */
+  /** Returns a copy of the Table Types as a String Array  */
   public static String[] getTableTypes() {
     return TABLE_TYPES.toArray(new String[0]);
   }
