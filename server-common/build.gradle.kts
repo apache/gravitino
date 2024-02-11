@@ -11,22 +11,23 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common")) {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
   }
-  implementation(project(":api"))
   implementation(project(":core"))
 
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
-  implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jwt)
-  implementation(libs.bundles.metrics)
   implementation(libs.bundles.kerby)
+  implementation(libs.bundles.log4j)
+  implementation(libs.bundles.metrics)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.prometheus.servlet)
 
+  testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
@@ -34,6 +35,5 @@ dependencies {
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
-
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

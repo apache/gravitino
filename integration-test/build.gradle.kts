@@ -19,43 +19,44 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":server"))
-  implementation(project(":common"))
-  implementation(project(":server-common"))
-  implementation(project(":clients:client-java"))
   implementation(project(":api"))
-  implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
-  implementation(libs.guava)
-  implementation(libs.bundles.log4j)
-  implementation(libs.bundles.jersey)
+  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":common"))
+  implementation(project(":core"))
+  implementation(project(":server"))
+  implementation(project(":server-common"))
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)
-  implementation(libs.httpclient5)
+  implementation(libs.bundles.log4j)
+  implementation(libs.commons.cli)
   implementation(libs.commons.io)
+  implementation(libs.guava)
+  implementation(libs.httpclient5)
 
   testImplementation(libs.hive2.metastore) {
+    exclude("co.cask.tephra")
+    exclude("com.github.joshelser")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.code.findbugs", "sr305")
+    exclude("com.tdunning", "json")
+    exclude("com.zaxxer", "HikariCP")
+    exclude("io.dropwizard.metricss")
+    exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.avro")
+    exclude("org.apache.curator")
     exclude("org.apache.hbase")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("co.cask.tephra")
-    exclude("org.apache.avro")
-    exclude("org.apache.zookeeper")
     exclude("org.apache.logging.log4j")
-    exclude("com.google.code.findbugs", "sr305")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.zookeeper")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("com.tdunning", "json")
-    exclude("javax.transaction", "transaction-api")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("org.apache.curator")
-    exclude("com.github.joshelser")
-    exclude("io.dropwizard.metricss")
     exclude("org.slf4j")
   }
 
@@ -78,9 +79,8 @@ dependencies {
     exclude("org.slf4j")
   }
 
-  testImplementation(libs.hive2.common) {
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+  testImplementation(libs.hadoop2.common) {
+    exclude("*")
   }
   testImplementation(libs.hadoop2.hdfs) {
     exclude("*")
@@ -88,52 +88,50 @@ dependencies {
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.common) {
-    exclude("*")
+  testImplementation(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
 
-  testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
-  testImplementation(libs.guava)
+  testCompileOnly(libs.lombok)
+  testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.lang3)
+  testImplementation(libs.guava)
+  testImplementation(libs.httpclient5)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.httpclient5)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.bundles.log4j)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop")
-    exclude("org.rocksdb")
     exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
     exclude("org.apache.zookeeper")
     exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
   }
+  testImplementation(libs.jline.terminal)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.okhttp3.loginterceptor)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.rauschig)
+  testImplementation(libs.selenium)
   testImplementation(libs.slf4j.jdk14)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
-  testImplementation(libs.trino.jdbc)
   testImplementation(libs.trino.cli)
   testImplementation(libs.trino.client) {
     exclude("jakarta.annotation")
   }
-  testImplementation(libs.jline.terminal)
-  testImplementation(libs.okhttp3.loginterceptor)
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
-  testImplementation(libs.selenium)
-  testImplementation(libs.rauschig)
-  testImplementation(libs.minikdc) {
-    exclude("org.apache.directory.api", "api-ldap-schema-data")
-  }
-
-  implementation(libs.commons.cli)
-
+  testImplementation(libs.trino.jdbc)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
