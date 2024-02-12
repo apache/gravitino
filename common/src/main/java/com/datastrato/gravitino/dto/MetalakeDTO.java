@@ -189,6 +189,7 @@ public class MetalakeDTO implements Metalake {
     return Objects.hashCode(name, comment, audit);
   }
 
+  /** @return the builder for creating a new instance of MetalakeDTO. */
   public static Builder builder() {
     return new Builder();
   }

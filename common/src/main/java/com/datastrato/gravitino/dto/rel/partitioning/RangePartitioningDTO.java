@@ -90,6 +90,7 @@ public final class RangePartitioningDTO implements Partitioning {
     }
   }
 
+  /** @return the builder for creating a new instance of RangePartitioningDTO. */
   public static Builder builder() {
     return new Builder();
   }

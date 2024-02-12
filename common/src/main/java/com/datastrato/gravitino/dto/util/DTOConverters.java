@@ -246,6 +246,7 @@ public class DTOConverters {
         .build();
   }
 
+  /** @return the builder for creating a new instance of DTOConverters. */
   public static Builder builder() {
     return new Builder();
   }

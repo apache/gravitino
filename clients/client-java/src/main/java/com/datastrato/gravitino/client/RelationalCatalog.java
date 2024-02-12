@@ -449,6 +449,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     }
   }
 
+  /** @return the builder for creating a new instance of RelationalCatalog. */
   public static Builder builder() {
     return new Builder();
   }

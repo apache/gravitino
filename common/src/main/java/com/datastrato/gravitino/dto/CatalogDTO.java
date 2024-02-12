@@ -238,6 +238,7 @@ public class CatalogDTO implements Catalog {
     }
   }
 
+  /** @return the builder for creating a new instance of CatalogDTO. */
   public static Builder builder() {
     return new Builder();
   }
