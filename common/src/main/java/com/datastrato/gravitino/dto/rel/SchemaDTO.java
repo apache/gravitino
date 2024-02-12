@@ -142,6 +142,7 @@ public class SchemaDTO implements Schema {
     }
   }
 
+  /** @return the builder for creating a new instance of SchemaDTO. */
   public static Builder builder() {
     return new Builder();
   }

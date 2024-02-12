@@ -79,6 +79,7 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     }
   }
 
+  /** @return the builder for creating a new instance of FuncExpressionDTO. */
   public static Builder builder() {
     return new Builder();
   }

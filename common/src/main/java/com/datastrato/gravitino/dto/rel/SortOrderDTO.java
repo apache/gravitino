@@ -129,6 +129,7 @@ public class SortOrderDTO implements SortOrder {
     }
   }
 
+  /** @return the builder for creating a new instance of SortOrderDTO. */
   public static Builder builder() {
     return new Builder();
   }

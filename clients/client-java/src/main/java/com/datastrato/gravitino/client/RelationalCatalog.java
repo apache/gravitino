@@ -292,6 +292,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     }
   }
 
+  /** @return the builder for creating a new instance of RelationalCatalog. */
   public static Builder builder() {
     return new Builder();
   }

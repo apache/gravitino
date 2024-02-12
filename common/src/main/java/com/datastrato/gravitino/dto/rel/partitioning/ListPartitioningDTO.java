@@ -91,6 +91,7 @@ public final class ListPartitioningDTO implements Partitioning {
     }
   }
 
+  /** @return the builder for creating a new instance of ListPartitioningDTO. */
   public static Builder builder() {
     return new Builder();
   }
