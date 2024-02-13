@@ -32,7 +32,7 @@ public class TestPostgreSqlTypeConverter {
       new PostgreSqlTypeConverter();
 
   @Test
-  public void testToGravitinoType() {
+  void testToGravitinoType() {
     checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null);
     checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null);
     checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT_4, null, null);
@@ -50,7 +50,7 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
-  public void testFromGravitinoType() {
+  void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());
     checkGravitinoTypeToJdbcType(INT_4, Types.IntegerType.get());

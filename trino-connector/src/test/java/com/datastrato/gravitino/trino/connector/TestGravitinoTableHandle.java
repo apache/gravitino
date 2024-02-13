@@ -17,7 +17,7 @@ public class TestGravitinoTableHandle {
       JsonCodec.jsonCodec(GravitinoTableHandle.class);
 
   @Test
-  public void testCreateFromJson() {
+  void testCreateFromJson() {
     GravitinoTableHandle expected =
         new GravitinoTableHandle("db1", "t1", new MockConnectorTableHandle("mock"));
 

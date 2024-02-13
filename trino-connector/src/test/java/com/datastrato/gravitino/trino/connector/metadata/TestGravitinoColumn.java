@@ -13,7 +13,7 @@ import org.testng.annotations.Test;
 public class TestGravitinoColumn {
 
   @Test
-  public void testGravitinoColumn() {
+  void testGravitinoColumn() {
     Column column = Column.of("f1", Types.StringType.get(), "test column");
     GravitinoColumn gravitinoColumn = new GravitinoColumn(column, 0);
 

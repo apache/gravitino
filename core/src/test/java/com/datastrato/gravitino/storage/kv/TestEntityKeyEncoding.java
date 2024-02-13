@@ -77,8 +77,7 @@ public class TestEntityKeyEncoding {
   }
 
   @Test
-  public void testIdentifierEncoding()
-      throws IOException, IllegalAccessException, NoSuchFieldException {
+  void testIdentifierEncoding() throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
       BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
@@ -202,8 +201,7 @@ public class TestEntityKeyEncoding {
   }
 
   @Test
-  public void testNamespaceEncoding()
-      throws IOException, IllegalAccessException, NoSuchFieldException {
+  void testNamespaceEncoding() throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
       BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;

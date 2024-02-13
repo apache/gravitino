@@ -18,7 +18,7 @@ import org.testng.annotations.Test;
 public class TestGravitinoCatalog {
 
   @Test
-  public void testGravitinoCatalog() {
+  void testGravitinoCatalog() {
     String catalogName = "mock";
     String provider = "hive";
     Catalog mockCatalog =

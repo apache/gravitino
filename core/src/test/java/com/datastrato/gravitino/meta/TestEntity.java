@@ -44,7 +44,7 @@ public class TestEntity {
   private final String fileName = "testFile";
 
   @Test
-  public void testMetalake() {
+  void testMetalake() {
     BaseMetalake metalake =
         new BaseMetalake.Builder()
             .withId(metalakeId)
@@ -64,7 +64,7 @@ public class TestEntity {
   }
 
   @Test
-  public void testCatalog() {
+  void testCatalog() {
     String catalogComment = "testComment";
     CatalogEntity testCatalog =
         CatalogEntity.builder()
@@ -87,7 +87,7 @@ public class TestEntity {
   }
 
   @Test
-  public void testSchema() {
+  void testSchema() {
     SchemaEntity testSchema =
         new SchemaEntity.Builder()
             .withId(schemaId)
@@ -114,7 +114,7 @@ public class TestEntity {
   }
 
   @Test
-  public void testTable() {
+  void testTable() {
     TableEntity testTable =
         new TableEntity.Builder()
             .withId(tableId)
@@ -129,7 +129,7 @@ public class TestEntity {
   }
 
   @Test
-  public void testFile() {
+  void testFile() {
     FilesetEntity testFile =
         new FilesetEntity.Builder()
             .withId(fileId)

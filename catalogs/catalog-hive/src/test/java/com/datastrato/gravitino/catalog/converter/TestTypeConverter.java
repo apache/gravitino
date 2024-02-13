@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestTypeConverter {
   @Test
-  public void testTypeConverter() {
+  void testTypeConverter() {
     testConverter(BOOLEAN_TYPE_NAME);
     testConverter(TINYINT_TYPE_NAME);
     testConverter(SMALLINT_TYPE_NAME);

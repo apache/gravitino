@@ -59,7 +59,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreateHiveSchema() {
+  void testCreateHiveSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
@@ -95,7 +95,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAlterSchema() {
+  void testAlterSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
@@ -147,7 +147,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testDropSchema() {
+  void testDropSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());

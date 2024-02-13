@@ -47,7 +47,7 @@ public class TestConfig {
   }
 
   @Test
-  public void testLoadProperties() {
+  void testLoadProperties() {
     ConfigEntry<String> stringConf =
         new ConfigBuilder("test").stringConf().createWithDefault("test-default");
     ConfigEntry<Optional<Integer>> intConf =
@@ -71,7 +71,7 @@ public class TestConfig {
   }
 
   @Test
-  public void testLoadFormFile() throws Exception {
+  void testLoadFormFile() throws Exception {
     FileOutputStream fos = null;
     try {
       File propsFile = Files.createTempFile("tmp_test", ".properties").toFile();
@@ -108,7 +108,7 @@ public class TestConfig {
   }
 
   @Test
-  public void testGetAndSet() {
+  void testGetAndSet() {
     ConfigEntry<Optional<Integer>> intConf =
         new ConfigBuilder("gravitino.test.test-int").intConf().createWithOptional();
     ConfigEntry<Boolean> booleanConf =

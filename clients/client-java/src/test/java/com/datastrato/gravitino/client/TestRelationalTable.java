@@ -123,7 +123,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
   }
 
   @Test
-  public void testListPartitionNames() throws JsonProcessingException {
+  void testListPartitionNames() throws JsonProcessingException {
     String[] names = {"p1", "p2"};
     String partitionPath =
         withSlash(((RelationalTable) partitionedTable).getPartitionRequestPath());
@@ -149,7 +149,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
   }
 
   @Test
-  public void testListPartitions() throws JsonProcessingException {
+  void testListPartitions() throws JsonProcessingException {
     String partitionName = "p1";
     RangePartitionDTO partition =
         RangePartitionDTO.builder()
@@ -189,7 +189,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
   }
 
   @Test
-  public void testGetPartition() throws JsonProcessingException {
+  void testGetPartition() throws JsonProcessingException {
     String partitionName = "p1";
     RangePartitionDTO partition =
         RangePartitionDTO.builder()
@@ -231,7 +231,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
   }
 
   @Test
-  public void testAddPartition() throws JsonProcessingException {
+  void testAddPartition() throws JsonProcessingException {
     String partitionName = "p1";
     Literal<?>[] listValue1 = {Literals.integerLiteral(1)};
     Literal<?>[] listValue2 = {Literals.integerLiteral(3)};

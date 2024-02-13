@@ -174,7 +174,7 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
-  public void testListPartitionNames() {
+  void testListPartitionNames() {
     Table mockedTable = mockPartitionedTable();
 
     Response resp =
@@ -212,7 +212,7 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
-  public void testListPartitions() {
+  void testListPartitions() {
     Table mockedTable = mockPartitionedTable();
 
     Response resp =
@@ -252,7 +252,7 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetPartition() {
+  void testGetPartition() {
     mockPartitionedTable();
 
     Response resp =
@@ -285,7 +285,7 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddPartition() {
+  void testAddPartition() {
     mockPartitionedTable();
 
     Partition newPartition =

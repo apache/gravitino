@@ -566,7 +566,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
-  public void testBackQuoteTable() {
+  void testBackQuoteTable() {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.IntegerType.get(), "number", false, false, null);
     Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);

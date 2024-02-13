@@ -93,7 +93,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testHadoopCatalogConfiguration() {
+  void testHadoopCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
     HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store);
     ops.initialize(emptyProps);
@@ -117,7 +117,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testCreateSchemaWithNoLocation() throws IOException {
+  void testCreateSchemaWithNoLocation() throws IOException {
     String name = "schema11";
     String comment = "comment11";
     Schema schema = createSchema(name, comment, null, null);
@@ -136,7 +136,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testCreateSchemaWithCatalogLocation() throws IOException {
+  void testCreateSchemaWithCatalogLocation() throws IOException {
     String name = "schema12";
     String comment = "comment12";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog12";
@@ -151,7 +151,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testCreateSchemaWithSchemaLocation() throws IOException {
+  void testCreateSchemaWithSchemaLocation() throws IOException {
     String name = "schema13";
     String comment = "comment13";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog13";
@@ -167,7 +167,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testCreateSchemaWithCatalogAndSchemaLocation() throws IOException {
+  void testCreateSchemaWithCatalogAndSchemaLocation() throws IOException {
     String name = "schema14";
     String comment = "comment14";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog14";
@@ -186,7 +186,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testLoadSchema() throws IOException {
+  void testLoadSchema() throws IOException {
     String name = "schema15";
     String comment = "comment15";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog15";
@@ -215,7 +215,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testListSchema() throws IOException {
+  void testListSchema() throws IOException {
     String name = "schema17";
     String comment = "comment17";
     String name1 = "schema18";
@@ -234,7 +234,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testAlterSchema() throws IOException {
+  void testAlterSchema() throws IOException {
     String name = "schema19";
     String comment = "comment19";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog19";
@@ -283,7 +283,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testDropSchema() throws IOException {
+  void testDropSchema() throws IOException {
     String name = "schema20";
     String comment = "comment20";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
@@ -380,7 +380,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testCreateFilesetWithExceptions() throws IOException {
+  void testCreateFilesetWithExceptions() throws IOException {
     String schemaName = "schema22";
     String comment = "comment22";
     createSchema(schemaName, comment, null, null);
@@ -424,7 +424,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testListFilesets() throws IOException {
+  void testListFilesets() throws IOException {
     String schemaName = "schema23";
     String comment = "comment23";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -499,7 +499,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testAlterFilesetProperties() throws IOException {
+  void testAlterFilesetProperties() throws IOException {
     String schemaName = "schema25";
     String comment = "comment25";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;

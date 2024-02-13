@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 public class TestFromIcebergPartitionSpec extends TestBaseConvert {
 
   @Test
-  public void testFormTransform() {
+  void testFormTransform() {
     Types.NestedField[] nestedFields = createNestedField("col_1", "col_2", "col_3");
     nestedFields =
         ArrayUtils.add(nestedFields, createNestedField(4, "col_4", Types.DateType.get()));

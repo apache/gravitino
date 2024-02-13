@@ -39,7 +39,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
   }
 
   @Test
-  public void testAuthenticatorInitialization() throws Exception {
+  void testAuthenticatorInitialization() throws Exception {
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
 
     // case 1: lack different parameters
@@ -85,7 +85,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
   }
 
   @Test
-  public void testAuthenticationWithException() throws Exception {
+  void testAuthenticationWithException() throws Exception {
     // case 1: Empty token authorization header
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
     Config config = new Config(false) {};
@@ -127,7 +127,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
   }
 
   @Test
-  public void testAuthenticationNormally() throws Exception {
+  void testAuthenticationNormally() throws Exception {
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
     Config config = new Config(false) {};
     config.set(PRINCIPAL, KerberosTestUtils.getServerPrincipal());

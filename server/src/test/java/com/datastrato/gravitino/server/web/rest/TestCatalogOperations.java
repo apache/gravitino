@@ -82,7 +82,7 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   @Test
-  public void testListCatalogs() {
+  void testListCatalogs() {
     NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1");
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
@@ -121,7 +121,7 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateCatalog() {
+  void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
             "catalog1",
@@ -204,7 +204,7 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadCatalog() {
+  void testLoadCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
     when(manager.loadCatalog(any())).thenReturn(catalog);
@@ -271,7 +271,7 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   @Test
-  public void testAlterCatalog() {
+  void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
     when(manager.alterCatalog(any(), any())).thenReturn(catalog);
@@ -342,7 +342,7 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropCatalog() {
+  void testDropCatalog() {
     when(manager.dropCatalog(any())).thenReturn(true);
 
     Response resp =

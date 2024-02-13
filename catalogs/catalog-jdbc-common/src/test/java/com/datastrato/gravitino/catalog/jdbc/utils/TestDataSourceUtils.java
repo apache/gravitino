@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 public class TestDataSourceUtils {
 
   @Test
-  public void testCreateDataSource() throws SQLException {
+  void testCreateDataSource() throws SQLException {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
     properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");

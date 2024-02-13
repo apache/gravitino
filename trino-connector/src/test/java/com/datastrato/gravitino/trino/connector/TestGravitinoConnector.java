@@ -89,7 +89,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testCreateSchema() {
+  void testCreateSchema() {
     String catalogName = "test.memory";
     String schemaName = "db_01";
     String fullSchemaName = String.format("\"%s\".%s", catalogName, schemaName);
@@ -115,7 +115,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testCreateTable() {
+  void testCreateTable() {
     String fullSchemaName = "\"test.memory\".db_01";
     String tableName = "tb_01";
     String fullTableName = fullSchemaName + "." + tableName;
@@ -140,7 +140,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testInsert() throws Exception {
+  void testInsert() throws Exception {
     String fullTableName = "\"test.memory\".db_01.tb_01";
     createTestTable(fullTableName);
     // insert some data.
@@ -159,7 +159,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testInsertIntoSelect() throws Exception {
+  void testInsertIntoSelect() throws Exception {
     String fullTableName1 = "\"test.memory\".db_01.tb_01";
     String fullTableName2 = "\"test.memory\".db_01.tb_02";
     createTestTable(fullTableName1);
@@ -178,7 +178,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testAlterTable() throws Exception {
+  void testAlterTable() throws Exception {
     String fullTableName1 = "\"test.memory\".db_01.tb_01";
     String fullTableName2 = "\"test.memory\".db_01.tb_02";
     createTestTable(fullTableName1);
@@ -228,7 +228,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   }
 
   @Test
-  public void testCreateCatalog() throws Exception {
+  void testCreateCatalog() throws Exception {
     // testing the catalogs
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1");

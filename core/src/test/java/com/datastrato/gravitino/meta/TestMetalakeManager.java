@@ -51,7 +51,7 @@ public class TestMetalakeManager {
   }
 
   @Test
-  public void testCreateMetalake() {
+  void testCreateMetalake() {
     NameIdentifier ident = NameIdentifier.of("test1");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -67,7 +67,7 @@ public class TestMetalakeManager {
   }
 
   @Test
-  public void testListMetalakes() {
+  void testListMetalakes() {
     NameIdentifier ident1 = NameIdentifier.of("test11");
     NameIdentifier ident2 = NameIdentifier.of("test12");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
@@ -81,7 +81,7 @@ public class TestMetalakeManager {
   }
 
   @Test
-  public void testLoadMetalake() {
+  void testLoadMetalake() {
     NameIdentifier ident = NameIdentifier.of("test21");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -104,7 +104,7 @@ public class TestMetalakeManager {
   }
 
   @Test
-  public void testAlterMetalake() {
+  void testAlterMetalake() {
     NameIdentifier ident = NameIdentifier.of("test31");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -149,7 +149,7 @@ public class TestMetalakeManager {
   }
 
   @Test
-  public void testDropMetalake() {
+  void testDropMetalake() {
     NameIdentifier ident = NameIdentifier.of("test41");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 

@@ -877,7 +877,7 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
-  public void testAutoIncrement() {
+  void testAutoIncrement() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, true, null);
     Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
@@ -1035,7 +1035,7 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
-  public void testBackQuoteTable() {
+  void testBackQuoteTable() {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.ByteType.get(), "yes", false, false, null);
     Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);

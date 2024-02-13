@@ -33,7 +33,7 @@ public class TestConfigEntryList {
   }
 
   @Test
-  public void testConfWithDefaultValue() {
+  void testConfWithDefaultValue() {
     ConfigEntry<List<String>> testConf =
         new ConfigBuilder("gravitino.test.string.list")
             .doc("test")
@@ -72,7 +72,7 @@ public class TestConfigEntryList {
   }
 
   @Test
-  public void testConfWithoutDefaultValue() {
+  void testConfWithoutDefaultValue() {
     ConfigEntry<List<String>> testConf =
         new ConfigBuilder("gravitino.test.string.list")
             .doc("test")
@@ -94,7 +94,7 @@ public class TestConfigEntryList {
   }
 
   @Test
-  public void testSetConf() {
+  void testSetConf() {
     ConfigEntry<List<Integer>> testConf =
         new ConfigBuilder("gravitino.test.int.list")
             .intConf()
@@ -115,7 +115,7 @@ public class TestConfigEntryList {
   }
 
   @Test
-  public void testCheckValue() {
+  void testCheckValue() {
     ConfigEntry<List<Integer>> testConfDefault =
         new ConfigBuilder("gravitino.test.default")
             .intConf()

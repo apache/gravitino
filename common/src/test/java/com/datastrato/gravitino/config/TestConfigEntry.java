@@ -32,7 +32,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testConfWithDefaultValue() {
+  void testConfWithDefaultValue() {
     ConfigEntry<String> testConf =
         new ConfigBuilder("gravitino.test.string")
             .doc("test")
@@ -58,7 +58,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testConfWithoutDefaultValue() {
+  void testConfWithoutDefaultValue() {
     ConfigEntry<String> testConf =
         new ConfigBuilder("gravitino.test.string").doc("test").internal().stringConf();
     String value = testConf.readFrom(configMap);
@@ -72,7 +72,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testConfWithOptionalValue() {
+  void testConfWithOptionalValue() {
     ConfigEntry<Optional<String>> testConf =
         new ConfigBuilder("gravitino.test.no-exist-string").stringConf().createWithOptional();
 
@@ -87,7 +87,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testConfWithAlternatives() {
+  void testConfWithAlternatives() {
     ConfigEntry<String> testConf =
         new ConfigBuilder("gravitino.test.string")
             .alternatives(
@@ -110,7 +110,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testSetConf() {
+  void testSetConf() {
     ConfigEntry<Integer> testConf =
         new ConfigBuilder("gravitino.test.int").intConf().createWithDefault(1);
 
@@ -128,7 +128,7 @@ public class TestConfigEntry {
   }
 
   @Test
-  public void testCheckValue() {
+  void testCheckValue() {
     ConfigEntry<Integer> testConfDefault =
         new ConfigBuilder("gravitino.test.default")
             .intConf()

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 public class TestGravitinoClient extends TestBase {
 
   @Test
-  public void testListMetalakes() throws JsonProcessingException {
+  void testListMetalakes() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
         new MetalakeDTO.Builder()
             .withName("mock")
@@ -83,7 +83,7 @@ public class TestGravitinoClient extends TestBase {
   }
 
   @Test
-  public void testLoadMetalake() throws JsonProcessingException {
+  void testLoadMetalake() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
         new MetalakeDTO.Builder()
             .withName("mock")
@@ -125,7 +125,7 @@ public class TestGravitinoClient extends TestBase {
   }
 
   @Test
-  public void testCreateMetalake() throws JsonProcessingException {
+  void testCreateMetalake() throws JsonProcessingException {
     MetalakeDTO mockMetalake =
         new MetalakeDTO.Builder()
             .withName("mock")
@@ -169,7 +169,7 @@ public class TestGravitinoClient extends TestBase {
   }
 
   @Test
-  public void testAlterMetalake() throws JsonProcessingException {
+  void testAlterMetalake() throws JsonProcessingException {
     MetalakeChange[] changes =
         new MetalakeChange[] {
           MetalakeChange.rename("newName"), MetalakeChange.updateComment("newComment")
@@ -215,7 +215,7 @@ public class TestGravitinoClient extends TestBase {
   }
 
   @Test
-  public void testDropMetalake() throws JsonProcessingException {
+  void testDropMetalake() throws JsonProcessingException {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
     Assertions.assertTrue(client.dropMetalake(NameIdentifier.of("mock")));

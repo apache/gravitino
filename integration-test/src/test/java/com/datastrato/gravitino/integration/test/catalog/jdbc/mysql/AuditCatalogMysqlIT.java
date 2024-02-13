@@ -84,7 +84,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   @Test
-  public void testAuditCatalog() throws Exception {
+  void testAuditCatalog() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_catalog");
     Catalog catalog = createCatalog(catalogName);
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
@@ -98,7 +98,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   @Test
-  public void testAuditSchema() throws Exception {
+  void testAuditSchema() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_schema_catalog");
     String schemaName = GravitinoITUtils.genRandomName("audit_mysql_schema");
     Catalog catalog = createCatalog(catalogName);
@@ -110,7 +110,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   @Test
-  public void testAuditTable() throws Exception {
+  void testAuditTable() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_table_catalog");
     String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schma");
     String tableName = GravitinoITUtils.genRandomName("audit_mysql_table");

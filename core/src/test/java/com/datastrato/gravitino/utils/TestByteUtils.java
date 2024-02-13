@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 public class TestByteUtils {
 
   @Test
-  public void testIntToByte() {
+  void testIntToByte() {
     int v = 258;
     byte[] b = ByteUtils.intToByte(v);
     Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x01, 0x02}, b);
@@ -20,7 +20,7 @@ public class TestByteUtils {
   }
 
   @Test
-  public void testLongToByte() {
+  void testLongToByte() {
     long v = 259;
     byte[] b = ByteUtils.longToByte(v);
     Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03}, b);
@@ -29,7 +29,7 @@ public class TestByteUtils {
   }
 
   @Test
-  public void testFormatByteArray() {
+  void testFormatByteArray() {
     byte[] b = new byte[] {0x00, 0x01, 0x02, 0x03};
     String s = ByteUtils.formatByteArray(b);
     Assertions.assertEquals("0x00010203", s);

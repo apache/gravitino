@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestTableUpdatesRequest {
   @Test
-  public void testTableUpdatesRequest() throws JsonProcessingException {
+  void testTableUpdatesRequest() throws JsonProcessingException {
     List<TableUpdateRequest> updates =
         ImmutableList.of(
             new TableUpdateRequest.RenameTableRequest("newTable"),
@@ -113,7 +113,7 @@ public class TestTableUpdatesRequest {
   }
 
   @Test
-  public void testAddTableColumnRequest() throws JsonProcessingException {
+  void testAddTableColumnRequest() throws JsonProcessingException {
     TableUpdateRequest addTableColumnRequest =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"column"},

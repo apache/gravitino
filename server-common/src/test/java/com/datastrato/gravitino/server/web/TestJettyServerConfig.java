@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 public class TestJettyServerConfig {
 
   @Test
-  public void testCipherAlgorithms() {
+  void testCipherAlgorithms() {
     Config noIntersectConfig = new Config() {};
     noIntersectConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, "test1,test2");
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(noIntersectConfig, "");
@@ -47,7 +47,7 @@ public class TestJettyServerConfig {
   }
 
   @Test
-  public void testCustomFilters() {
+  void testCustomFilters() {
     Config emptyconfig = new Config() {};
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(emptyconfig, "");
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());

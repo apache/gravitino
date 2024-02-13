@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 public class TestAuxiliaryServiceManager {
 
   @Test
-  public void testGravitinoAuxServiceManagerEmptyServiceName() throws Exception {
+  void testGravitinoAuxServiceManagerEmptyServiceName() throws Exception {
     AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
     auxServiceManager.serviceInit(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
     auxServiceManager.serviceStart();
@@ -30,7 +30,7 @@ public class TestAuxiliaryServiceManager {
   }
 
   @Test
-  public void testGravitinoAuxServiceNotSetClassPath() {
+  void testGravitinoAuxServiceNotSetClassPath() {
     AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
@@ -40,7 +40,7 @@ public class TestAuxiliaryServiceManager {
   }
 
   @Test
-  public void testGravitinoAuxServiceManager() throws Exception {
+  void testGravitinoAuxServiceManager() throws Exception {
     GravitinoAuxiliaryService auxService = mock(GravitinoAuxiliaryService.class);
     GravitinoAuxiliaryService auxService2 = mock(GravitinoAuxiliaryService.class);
 

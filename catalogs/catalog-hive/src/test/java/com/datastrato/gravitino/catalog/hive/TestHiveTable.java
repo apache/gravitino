@@ -120,7 +120,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreateHiveTable() {
+  void testCreateHiveTable() {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
@@ -263,7 +263,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreatePartitionedHiveTable() {
+  void testCreatePartitionedHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -361,7 +361,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testDropHiveTable() {
+  void testDropHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -399,7 +399,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testListTableException() {
+  void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", hiveCatalog.name(), "not_exist_db");
     Throwable exception =
         Assertions.assertThrows(
@@ -408,7 +408,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAlterHiveTable() {
+  void testAlterHiveTable() {
     // create a table with random name
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
@@ -635,7 +635,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testPurgeHiveTable() {
+  void testPurgeHiveTable() {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
@@ -676,7 +676,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testPurgeExternalHiveTable() {
+  void testPurgeExternalHiveTable() {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);

@@ -118,7 +118,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testCreateIcebergTable() {
+  void testCreateIcebergTable() {
     String icebergTableName = "test_iceberg_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
@@ -244,7 +244,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testCreatePartitionedIcebergTable() {
+  void testCreatePartitionedIcebergTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), genRandomName());
@@ -346,7 +346,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testDropIcebergTable() {
+  void testDropIcebergTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), genRandomName());
@@ -385,7 +385,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testListTableException() {
+  void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", icebergCatalog.name(), "not_exist_db");
     Throwable exception =
         Assertions.assertThrows(
@@ -394,7 +394,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testAlterIcebergTable() {
+  void testAlterIcebergTable() {
     // create a table with random name
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
@@ -524,7 +524,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testTableProperty() {
+  void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
       ops.initialize(Maps.newHashMap());
@@ -568,7 +568,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testTableDistribution() {
+  void testTableDistribution() {
     IcebergColumn col_1 =
         new IcebergColumn.Builder()
             .withName("col_1")

@@ -74,7 +74,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
   }
 
   @Test
-  public void testCreateMultipleJdbc() throws URISyntaxException {
+  void testCreateMultipleJdbc() throws URISyntaxException {
     String metalakeName = GravitinoITUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = GravitinoITUtils.genRandomName("it_postgresql");
     GravitinoMetaLake metalake =
@@ -176,7 +176,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
   }
 
   @Test
-  public void testCreateMultipleJdbcInIceberg() throws URISyntaxException {
+  void testCreateMultipleJdbcInIceberg() throws URISyntaxException {
     String metalakeName = GravitinoITUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = GravitinoITUtils.genRandomName("it_iceberg_postgresql");
     GravitinoMetaLake metalake =

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestSimpleAuthenticator {
 
   @Test
-  public void testAuthentication() {
+  void testAuthentication() {
     SimpleAuthenticator simpleAuthenticator = new SimpleAuthenticator();
     Config config = new Config(false) {};
     simpleAuthenticator.initialize(config);

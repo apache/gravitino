@@ -109,7 +109,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testListTables() {
+  void testListTables() {
     NameIdentifier table1 = NameIdentifier.of(metalake, catalog, schema, "table1");
     NameIdentifier table2 = NameIdentifier.of(metalake, catalog, schema, "table2");
 
@@ -181,7 +181,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateTable() {
+  void testCreateTable() {
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
@@ -311,7 +311,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreatePartitionedTable() {
+  void testCreatePartitionedTable() {
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),
@@ -398,7 +398,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadTable() {
+  void testLoadTable() {
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
@@ -468,7 +468,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testRenameTable() {
+  void testRenameTable() {
     TableUpdateRequest.RenameTableRequest req = new TableUpdateRequest.RenameTableRequest("table2");
     Column[] columns =
         new Column[] {
@@ -480,7 +480,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateTableComment() {
+  void testUpdateTableComment() {
     TableUpdateRequest.UpdateTableCommentRequest req =
         new TableUpdateRequest.UpdateTableCommentRequest("new comment");
     Column[] columns =
@@ -493,7 +493,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testSetTableProperty() {
+  void testSetTableProperty() {
     TableUpdateRequest.SetTablePropertyRequest req =
         new TableUpdateRequest.SetTablePropertyRequest("k2", "v2");
     Column[] columns =
@@ -511,7 +511,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveTableProperty() {
+  void testRemoveTableProperty() {
     TableUpdateRequest.RemoveTablePropertyRequest req =
         new TableUpdateRequest.RemoveTablePropertyRequest("k1");
     Column[] columns =
@@ -523,7 +523,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddTableColumnFirst() {
+  void testAddTableColumnFirst() {
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col3"},
@@ -543,7 +543,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddTableColumnAfter() {
+  void testAddTableColumnAfter() {
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col1"},
@@ -563,7 +563,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testRenameTableColumn() {
+  void testRenameTableColumn() {
     TableUpdateRequest.RenameTableColumnRequest req =
         new TableUpdateRequest.RenameTableColumnRequest(new String[] {"col1"}, "col3");
     Column[] columns =
@@ -576,7 +576,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateTableColumnType() {
+  void testUpdateTableColumnType() {
     TableUpdateRequest.UpdateTableColumnTypeRequest req =
         new TableUpdateRequest.UpdateTableColumnTypeRequest(
             new String[] {"col1"}, Types.ByteType.get());
@@ -590,7 +590,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateTableColumnComment() {
+  void testUpdateTableColumnComment() {
     TableUpdateRequest.UpdateTableColumnCommentRequest req =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(
             new String[] {"col1"}, "new comment");
@@ -604,7 +604,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateTableColumnPosition() {
+  void testUpdateTableColumnPosition() {
     TableUpdateRequest.UpdateTableColumnPositionRequest req =
         new TableUpdateRequest.UpdateTableColumnPositionRequest(
             new String[] {"col1"}, TableChange.ColumnPosition.after("col2"));
@@ -618,7 +618,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropTable() {
+  void testDropTable() {
     when(dispatcher.dropTable(any())).thenReturn(true);
 
     Response resp =
@@ -666,7 +666,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
-  public void testPurgeTable() {
+  void testPurgeTable() {
     when(dispatcher.purgeTable(any())).thenReturn(true);
 
     Response resp =

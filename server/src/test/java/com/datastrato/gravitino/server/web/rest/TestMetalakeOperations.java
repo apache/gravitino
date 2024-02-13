@@ -79,7 +79,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   @Test
-  public void testListMetalakes() {
+  void testListMetalakes() {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -113,7 +113,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateMetalake() {
+  void testCreateMetalake() {
     MetalakeCreateRequest req =
         new MetalakeCreateRequest("metalake", "comment", ImmutableMap.of("k1", "v1"));
     Instant now = Instant.now();
@@ -162,7 +162,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadMetalake() {
+  void testLoadMetalake() {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -237,7 +237,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   @Test
-  public void testAlterMetalake() {
+  void testAlterMetalake() {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -314,7 +314,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropMetalake() {
+  void testDropMetalake() {
     when(metalakeManager.dropMetalake(any())).thenReturn(true);
     Response resp =
         target("/metalakes/test")

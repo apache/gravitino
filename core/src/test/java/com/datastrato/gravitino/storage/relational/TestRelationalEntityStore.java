@@ -44,18 +44,18 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  public void testSetSerDe() {
+  void testSetSerDe() {
     Assertions.assertThrows(UnsupportedOperationException.class, () -> store.setSerDe(null));
   }
 
   @Test
-  public void testExecuteInTransaction() {
+  void testExecuteInTransaction() {
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> store.executeInTransaction(null));
   }
 
   @Test
-  public void testExists() throws IOException {
+  void testExists() throws IOException {
     NameIdentifier nameIdentifier = Mockito.mock(NameIdentifier.class);
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -63,13 +63,13 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  public void testPut() throws IOException {
+  void testPut() throws IOException {
     BaseMetalake metalake = Mockito.mock(BaseMetalake.class);
     Assertions.assertThrows(UnsupportedOperationException.class, () -> store.put(metalake, false));
   }
 
   @Test
-  public void testGet() {
+  void testGet() {
     NameIdentifier nameIdentifier = Mockito.mock(NameIdentifier.class);
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -77,7 +77,7 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  public void testUpdate() {
+  void testUpdate() {
     NameIdentifier nameIdentifier = Mockito.mock(NameIdentifier.class);
     Function function = Mockito.mock(Function.class);
     Assertions.assertThrows(
@@ -87,7 +87,7 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  public void testList() {
+  void testList() {
     Namespace namespace = Mockito.mock(Namespace.class);
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -95,7 +95,7 @@ public class TestRelationalEntityStore {
   }
 
   @Test
-  public void testDelete() {
+  void testDelete() {
     NameIdentifier nameIdentifier = Mockito.mock(NameIdentifier.class);
     Assertions.assertThrows(
         UnsupportedOperationException.class,

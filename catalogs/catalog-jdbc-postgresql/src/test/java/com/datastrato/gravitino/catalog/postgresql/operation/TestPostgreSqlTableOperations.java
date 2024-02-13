@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlTableOperations {
 
   @Test
-  public void testAppendIndexesSql() {
+  void testAppendIndexesSql() {
     // Test append index sql success.
     Index[] indexes =
         new Index[] {

@@ -20,7 +20,7 @@ import org.testng.collections.Maps;
 public class TestIcebergCatalogPropertyConverter {
 
   @Test
-  public void testHiveBackendProperty() {
+  void testHiveBackendProperty() {
     PropertyConverter propertyConverter = new IcebergCatalogPropertyConverter();
     Map<String, String> gravitinoIcebergConfig =
         ImmutableMap.<String, String>builder()
@@ -42,7 +42,7 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
-  public void testJDBCBackendProperty() {
+  void testJDBCBackendProperty() {
     PropertyConverter propertyConverter = new IcebergCatalogPropertyConverter();
     Map<String, String> gravitinoIcebergConfig =
         ImmutableMap.<String, String>builder()
@@ -77,7 +77,7 @@ public class TestIcebergCatalogPropertyConverter {
 
   // To test whether we load jar `bundled-catalog` successfully.
   @Test
-  public void testPropertyMetadata() {
+  void testPropertyMetadata() {
     Set<String> gravitinoHiveKeys =
         Sets.newHashSet(IcebergTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
     Set<String> actualGravitinoKeys =

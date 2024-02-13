@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 public class TestAuthenticationFilter {
 
   @Test
-  public void testDoFilterNormal() throws ServletException, IOException {
+  void testDoFilterNormal() throws ServletException, IOException {
 
     Authenticator authenticator = mock(Authenticator.class);
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
@@ -44,7 +44,7 @@ public class TestAuthenticationFilter {
   }
 
   @Test
-  public void testDoFilterWithException() throws ServletException, IOException {
+  void testDoFilterWithException() throws ServletException, IOException {
     Authenticator authenticator = mock(Authenticator.class);
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);

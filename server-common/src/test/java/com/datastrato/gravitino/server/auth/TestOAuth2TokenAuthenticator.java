@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 public class TestOAuth2TokenAuthenticator {
 
   @Test
-  public void testAuthentication() {
+  void testAuthentication() {
     OAuth2TokenAuthenticator auth2TokenAuthenticator = new OAuth2TokenAuthenticator();
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
     String publicKey = new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));

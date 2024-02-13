@@ -17,7 +17,7 @@ public class TestJdbcColumnDefaultValueConverter {
   private final JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
 
   @Test
-  public void testFromGravitino() {
+  void testFromGravitino() {
     Expression expression = DEFAULT_VALUE_NOT_SET;
     String result = converter.fromGravitino(expression);
     Assertions.assertNull(result);

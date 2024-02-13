@@ -59,7 +59,7 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  public void testGetIdByName() throws Exception {
+  void testGetIdByName() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       NameMappingService nameMappingService = kvEntityStore.nameMappingService;
       Assertions.assertNull(nameMappingService.getIdByName("name1"));
@@ -80,7 +80,7 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  public void testUpdateName() throws Exception {
+  void testUpdateName() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       NameMappingService nameMappingService = kvEntityStore.nameMappingService;
       IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
@@ -130,7 +130,7 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  public void testBindAndUnBind() throws Exception {
+  void testBindAndUnBind() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       KvNameMappingService nameMappingService =
           (KvNameMappingService) kvEntityStore.nameMappingService;

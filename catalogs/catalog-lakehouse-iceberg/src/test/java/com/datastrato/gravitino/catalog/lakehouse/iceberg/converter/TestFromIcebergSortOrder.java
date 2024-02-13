@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 public class TestFromIcebergSortOrder extends TestBaseConvert {
 
   @Test
-  public void testFromSortOrder() {
+  void testFromSortOrder() {
     Types.NestedField[] nestedFields = createNestedField("col_1", "col_2", "col_3");
     nestedFields =
         ArrayUtils.add(nestedFields, createNestedField(4, "col_4", Types.DateType.get()));

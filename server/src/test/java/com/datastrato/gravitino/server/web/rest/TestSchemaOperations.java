@@ -85,7 +85,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   @Test
-  public void testListSchemas() {
+  void testListSchemas() {
     NameIdentifier ident1 = NameIdentifier.of(metalake, catalog, "schema1");
     NameIdentifier ident2 = NameIdentifier.of(metalake, catalog, "schema2");
 
@@ -141,7 +141,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateSchema() {
+  void testCreateSchema() {
     SchemaCreateRequest req =
         new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
@@ -220,7 +220,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadSchema() {
+  void testLoadSchema() {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
     when(dispatcher.loadSchema(any())).thenReturn(mockSchema);
 
@@ -274,7 +274,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   @Test
-  public void testAlterSchema() {
+  void testAlterSchema() {
     SchemaUpdateRequest setReq = new SchemaUpdateRequest.SetSchemaPropertyRequest("key2", "value2");
     Schema updatedSchema =
         mockSchema("schema1", "comment", ImmutableMap.of("key", "value", "key2", "value2"));
@@ -356,7 +356,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropSchema() {
+  void testDropSchema() {
     when(dispatcher.dropSchema(any(), eq(false))).thenReturn(true);
 
     Response resp =

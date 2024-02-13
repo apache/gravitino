@@ -31,13 +31,13 @@ public class TestClientPool {
   }
 
   @Test
-  public void testRun() throws Exception {
+  void testRun() throws Exception {
     String result = clientPool.run(client -> client.performAction("test"));
     assertEquals("test", result);
   }
 
   @Test
-  public void testRunWithException() {
+  void testRunWithException() {
     assertThrows(
         Exception.class,
         () ->
@@ -48,13 +48,13 @@ public class TestClientPool {
   }
 
   @Test
-  public void testClose() {
+  void testClose() {
     clientPool.close();
     assertTrue(clientPool.isClosed());
   }
 
   @Test
-  public void testPoolSize() {
+  void testPoolSize() {
     assertEquals(2, clientPool.poolSize());
   }
 

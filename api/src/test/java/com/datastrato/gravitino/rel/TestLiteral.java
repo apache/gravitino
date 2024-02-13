@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 public class TestLiteral {
 
   @Test
-  public void testLiterals() {
+  void testLiterals() {
     Literal<?> literal = booleanLiteral(Boolean.valueOf("true"));
     Assertions.assertEquals(literal.value(), true);
     Assertions.assertEquals(literal.dataType(), Types.BooleanType.get());

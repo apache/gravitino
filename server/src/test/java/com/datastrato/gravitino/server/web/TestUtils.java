@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 public class TestUtils {
 
   @Test
-  public void testRemoteUser() {
+  void testRemoteUser() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     when(mockRequest.getRemoteUser()).thenReturn("user");
     String remoteUser = Utils.remoteUser(mockRequest);
@@ -30,7 +30,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testRemoteUserDefault() {
+  void testRemoteUserDefault() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     when(mockRequest.getRemoteUser()).thenReturn(null);
     String remoteUser = Utils.remoteUser(mockRequest);
@@ -38,7 +38,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testOkWithData() {
+  void testOkWithData() {
     Response response = Utils.ok("data");
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -47,7 +47,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testOkWithoutData() {
+  void testOkWithoutData() {
     Response response = Utils.ok();
     assertNotNull(response);
     assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
@@ -55,7 +55,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testIllegalArguments() {
+  void testIllegalArguments() {
     Response response = Utils.illegalArguments("Invalid argument");
     assertNotNull(response);
     assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
@@ -65,7 +65,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testInternalError() {
+  void testInternalError() {
     Response response = Utils.internalError("Internal error");
     assertNotNull(response);
     assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
@@ -75,7 +75,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testNotFoundWithType() {
+  void testNotFoundWithType() {
     Response response = Utils.notFound("Resource", "Not found");
     assertNotNull(response);
     assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -86,7 +86,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testNotFoundWithThrowable() {
+  void testNotFoundWithThrowable() {
     Throwable throwable = new RuntimeException("Some error");
     Response response = Utils.notFound("Resource", throwable);
     assertNotNull(response);
@@ -98,7 +98,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testAlreadyExistsWithType() {
+  void testAlreadyExistsWithType() {
     Response response = Utils.alreadyExists("Resource", "Already exists");
     assertNotNull(response);
     assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
@@ -109,7 +109,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testAlreadyExistsWithThrowable() {
+  void testAlreadyExistsWithThrowable() {
     Throwable throwable = new RuntimeException("Already exists");
     Response response = Utils.alreadyExists("New message", throwable);
     assertNotNull(response);
@@ -121,7 +121,7 @@ public class TestUtils {
   }
 
   @Test
-  public void testUnsupportedOperation() {
+  void testUnsupportedOperation() {
     Response response = Utils.unsupportedOperation("Unsupported operation");
     assertNotNull(response);
     assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());

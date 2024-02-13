@@ -29,7 +29,7 @@ public class TestIcebergExceptionMapper {
   }
 
   @Test
-  public void testIcebergExceptionMapper() {
+  void testIcebergExceptionMapper() {
     checkExceptionStatus(new IllegalArgumentException(""), 400);
     checkExceptionStatus(new ValidationException(""), 400);
     checkExceptionStatus(new NamespaceNotEmptyException(""), 400);

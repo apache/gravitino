@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 /** Test class for {@link ConvertUtil}. */
 public class TestConvertUtil extends TestBaseConvert {
   @Test
-  public void testToIcebergSchema() {
+  void testToIcebergSchema() {
     Column[] columns = createColumns("col_1", "col_2", "col_3", "col_4");
     String col5Name = "col_5";
     IcebergColumn col5 =
@@ -80,7 +80,7 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
-  public void testToPrimitiveType() {
+  void testToPrimitiveType() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -179,7 +179,7 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
-  public void testFormIcebergType() {
+  void testFormIcebergType() {
     Assertions.assertTrue(
         ConvertUtil.formIcebergType(Types.StringType.get())
             instanceof com.datastrato.gravitino.rel.types.Types.StringType);
@@ -347,7 +347,7 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
-  public void testFromNestedField() {
+  void testFromNestedField() {
     String colName = RandomStringUtils.randomAlphabetic(10);
     String doc = RandomStringUtils.randomAlphabetic(20);
     Types.NestedField colField =

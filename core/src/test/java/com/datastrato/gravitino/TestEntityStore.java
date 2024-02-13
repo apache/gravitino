@@ -144,7 +144,7 @@ public class TestEntityStore {
   }
 
   @Test
-  public void testEntityStoreAndRetrieve() throws Exception {
+  void testEntityStoreAndRetrieve() throws Exception {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 

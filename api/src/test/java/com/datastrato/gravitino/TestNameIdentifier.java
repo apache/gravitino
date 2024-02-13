@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 public class TestNameIdentifier {
 
   @Test
-  public void testCreateNameIdentifier() {
+  void testCreateNameIdentifier() {
     NameIdentifier id = NameIdentifier.of("a", "b", "c");
     assertEquals(Namespace.of("a", "b"), id.namespace());
     assertEquals("c", id.name());
@@ -36,7 +36,7 @@ public class TestNameIdentifier {
   }
 
   @Test
-  public void testCreateWithInvalidArgs() {
+  void testCreateWithInvalidArgs() {
     assertThrows(IllegalArgumentException.class, NameIdentifier::of);
     assertThrows(IllegalArgumentException.class, () -> NameIdentifier.of("a", null));
     assertThrows(IllegalArgumentException.class, () -> NameIdentifier.of("a", ""));
@@ -57,7 +57,7 @@ public class TestNameIdentifier {
   }
 
   @Test
-  public void testEqualsAndHashNameIdentifier() {
+  void testEqualsAndHashNameIdentifier() {
     NameIdentifier id1 = NameIdentifier.parse("a.b.c");
     NameIdentifier id2 = NameIdentifier.parse("a.b.c");
 
@@ -67,7 +67,7 @@ public class TestNameIdentifier {
   }
 
   @Test
-  public void testNotEqualsAndHashNameIdentifier() {
+  void testNotEqualsAndHashNameIdentifier() {
     NameIdentifier id1 = NameIdentifier.parse("a.b.c");
     NameIdentifier id2 = NameIdentifier.parse("a.b.z");
 
@@ -78,13 +78,13 @@ public class TestNameIdentifier {
   }
 
   @Test
-  public void testHasNamespace() {
+  void testHasNamespace() {
     NameIdentifier id = NameIdentifier.parse("a.b.c");
     assertTrue(id.hasNamespace());
   }
 
   @Test
-  public void testToString() {
+  void testToString() {
     NameIdentifier id1 = NameIdentifier.parse("a");
     NameIdentifier id2 = NameIdentifier.parse("a.b.c");
 
@@ -93,7 +93,7 @@ public class TestNameIdentifier {
   }
 
   @Test
-  public void testCheckNameIdentifier() {
+  void testCheckNameIdentifier() {
     // Test metalake
     assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkMetalake(null));
     Throwable excep =

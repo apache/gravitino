@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 public class TestToIcebergSortOrder extends TestBaseConvert {
 
   @Test
-  public void testToSortOrder() {
+  void testToSortOrder() {
     SortOrder[] sortOrders = createSortOrder("col_1", "col_2", "col_3", "col_4", "col_5");
     sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("day", "col_6"));
     sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("hour", "col_7"));

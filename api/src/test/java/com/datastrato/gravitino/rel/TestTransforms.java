@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestTransforms {
   @Test
-  public void testSingleFieldTransform() {
+  void testSingleFieldTransform() {
     Column column = Column.of("col_1", Types.ByteType.get());
     String[] fieldName = new String[] {column.name()};
 
@@ -53,7 +53,7 @@ public class TestTransforms {
   }
 
   @Test
-  public void testApplyTransform() {
+  void testApplyTransform() {
     Column column = Column.of("col_1", Types.ByteType.get());
     // partition by foo(col_1, 'bar')
     NamedReference.FieldReference arg1 = field(column.name());

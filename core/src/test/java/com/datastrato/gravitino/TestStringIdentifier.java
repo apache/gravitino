@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 public class TestStringIdentifier {
 
   @Test
-  public void testCreateStringIdentifierFromId() {
+  void testCreateStringIdentifierFromId() {
     long uid = 1L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
@@ -25,7 +25,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testCreateStringIdentifierFromString() {
+  void testCreateStringIdentifierFromString() {
     long uid = 123123L;
     String idString = "gravitino.v1.uid" + uid;
 
@@ -69,7 +69,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testAddStringIdToProperties() {
+  void testAddStringIdToProperties() {
     long uid = 123123L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
@@ -95,7 +95,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testGetStringIdFromProperties() {
+  void testGetStringIdFromProperties() {
     long uid = 123123L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
@@ -115,7 +115,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testAddStringIdToComment() {
+  void testAddStringIdToComment() {
     long uid = 123123L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
@@ -132,7 +132,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testGetStringIdFromComment() {
+  void testGetStringIdFromComment() {
     long uid = 123123L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
@@ -152,7 +152,7 @@ public class TestStringIdentifier {
   }
 
   @Test
-  public void testRemoveIdFromComment() {
+  void testRemoveIdFromComment() {
     String blankComment = "";
     StringIdentifier identifier = StringIdentifier.fromId(123123L);
     String commentWithoutId = StringIdentifier.removeIdFromComment(blankComment);

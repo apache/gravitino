@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestObjectMapperProvider {
 
   @Test
-  public void testGetContext() {
+  void testGetContext() {
     ObjectMapperProvider provider = new ObjectMapperProvider();
     Class<Object> someClass = Object.class;
 

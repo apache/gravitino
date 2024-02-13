@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestIcebergCatalog {
   @Test
-  public void testListDatabases() {
+  void testListDatabases() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
