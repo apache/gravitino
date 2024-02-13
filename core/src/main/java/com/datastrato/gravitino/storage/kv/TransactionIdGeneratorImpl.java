@@ -116,13 +116,13 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   }
 
   /**
-   * We use the timestamp as the high 48 bits and the incrementId as the low 16 bits. The timestamp
+   * We use the timestamp as the high 46 bits and the incrementId as the low 18 bits. The timestamp
    * is always incremental.
    */
   @Override
   public synchronized long nextId() {
     incrementId++;
-    if (incrementId >= (1 << 18 - 1)) {
+    if (incrementId >= ((1 << 18) - 1)) {
       incrementId = 0;
     }
 
