@@ -36,6 +36,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile Map<String, String> properties;
 
+  private static String ENTITY_IS_NOT_SET = "entity is not set";
+
   // Any Gravitino configuration that starts with this prefix will be trim and passed to the
   // specific
   // catalog implementation. For example, if the configuration is
@@ -132,25 +134,25 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public String name() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.name();
   }
 
   @Override
   public Type type() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getType();
   }
 
   @Override
   public String provider() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getProvider();
   }
 
   @Override
   public String comment() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getComment();
   }
 
@@ -159,7 +161,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (properties == null) {
       synchronized (this) {
         if (properties == null) {
-          Preconditions.checkArgument(entity != null, "entity is not set");
+          Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
           properties = Maps.newHashMap(entity.getProperties());
           properties
               .entrySet()
@@ -173,7 +175,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public Audit auditInfo() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.auditInfo();
   }
 
