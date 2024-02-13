@@ -368,23 +368,27 @@ public final class JettyServerConfig {
 
     this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+    String keyStorePath = null;
+    String keyStorePassword = null;
+    String managerPassword = null;
+    String trustStorePath = null;
+    String trustStorePassword = null;
 
     if (this.enableHttps) {
-      this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
-      this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
-      this.managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
-    } else {
-      this.keyStorePath = null;
-      this.keyStorePassword = null;
-      this.managerPassword = null;
+      keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
+      keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
+      managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
+      if (this.enableClientAuth) {
+        trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
+        trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
+      }
     }
-    if (this.enableHttps && this.enableClientAuth) {
-      this.trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
-      this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
-    } else {
-      this.trustStorePath = null;
-      this.trustStorePassword = null;
-    }
+
+    this.keyStorePath = keyStorePath;
+    this.keyStorePassword = keyStorePassword;
+    this.managerPassword = managerPassword;
+    this.trustStorePassword = trustStorePassword;
+    this.trustStorePath = trustStorePath;
 
     this.enableCorsFilter = internalConfig.get(ENABLE_CORS_FILTER);
     this.allowedOrigins = internalConfig.get(ALLOWED_ORIGINS);
