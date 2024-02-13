@@ -107,11 +107,11 @@ public class MetricsSystem implements Closeable {
     registerMetricsToPrometheusRegistry();
     initAndStartMetricsReporter();
   }
-  
+
   public MetricRegistry getMetricRegistry() {
     return metricRegistry;
   }
-  
+
   @Override
   public void close() {
     this.metricsReporters.forEach(
