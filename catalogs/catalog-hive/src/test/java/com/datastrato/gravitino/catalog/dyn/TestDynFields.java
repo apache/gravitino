@@ -72,6 +72,7 @@ public class TestDynFields {
     assertEquals("John", nameField.get());
   }
 
+  @Test
   public void testBuild() {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
