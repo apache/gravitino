@@ -26,7 +26,7 @@ import java.util.Optional;
  * @param <T> The type of the concrete subclass of BaseCatalog.
  */
 public abstract class BaseCatalog<T extends BaseCatalog>
-    implements Catalog, CatalogProvider, HasPropertyMetadata {
+        implements Catalog, CatalogProvider, HasPropertyMetadata {
 
   private CatalogEntity entity;
 
@@ -85,15 +85,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       synchronized (this) {
         if (ops == null) {
           Preconditions.checkArgument(
-              entity != null && conf != null, "entity and conf must be set before calling ops()");
+                  entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = newOps(conf);
           ops =
-              newProxyPlugin(conf)
-                  .map(
-                      proxyPlugin -> {
-                        return asProxyOps(newOps, proxyPlugin);
-                      })
-                  .orElse(newOps);
+                  newProxyPlugin(conf)
+                          .map(
+                                  proxyPlugin -> {
+                                    return asProxyOps(newOps, proxyPlugin);
+                                  })
+                          .orElse(newOps);
         }
       }
     }
@@ -164,9 +164,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
           properties = Maps.newHashMap(entity.getProperties());
           properties
-              .entrySet()
-              .removeIf(
-                  entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+                  .entrySet()
+                  .removeIf(
+                          entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
         }
       }
     }

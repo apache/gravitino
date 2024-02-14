@@ -278,7 +278,7 @@ public class HiveTable extends BaseTable {
       }
     }
 
-    if (!Distributions.NONE.equals(distribution)) {
+    if (!Distributions.NONE.isNull(distribution)) {
       sd.setBucketCols(
           Arrays.stream(distribution.expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
