@@ -108,7 +108,6 @@ public class MetricsSystem implements Closeable {
     initAndStartMetricsReporter();
   }
 
-  @VisibleForTesting
   public MetricRegistry getMetricRegistry() {
     return metricRegistry;
   }
