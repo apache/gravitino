@@ -45,6 +45,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -202,10 +203,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-        String[] principalComponents = catalogPrincipal.split("@");
+        @SuppressWarnings("null")
+        List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
         Preconditions.checkArgument(
-            principalComponents.length == 2, "The principal has the wrong format");
-        this.kerberosRealm = principalComponents[1];
+            principalComponents.size() == 2, "The principal has the wrong format");
+        this.kerberosRealm = principalComponents.get(1);
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
