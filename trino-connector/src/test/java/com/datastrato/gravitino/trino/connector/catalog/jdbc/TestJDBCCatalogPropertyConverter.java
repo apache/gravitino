@@ -18,7 +18,7 @@ import org.testng.annotations.Test;
 public class TestJDBCCatalogPropertyConverter {
 
   @Test
-  void testTrinoPropertyKeyToGravitino() {
+  public void testTrinoPropertyKeyToGravitino() {
     PropertyConverter propertyConverter = new JDBCCatalogPropertyConverter();
     Map<String, String> gravitinoProperties =
         ImmutableMap.of(

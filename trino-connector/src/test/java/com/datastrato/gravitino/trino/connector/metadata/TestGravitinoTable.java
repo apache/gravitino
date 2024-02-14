@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
 public class TestGravitinoTable {
 
   @Test
-  void testGravitinoTable() {
+  public void testGravitinoTable() {
     Column[] columns = {
       Column.of("f1", Types.StringType.get(), "f1 column"), Column.of("f2", Types.IntegerType.get())
     };
@@ -67,7 +67,7 @@ public class TestGravitinoTable {
   }
 
   @Test
-  void testGravitinoTableWithOutComment() {
+  public void testGravitinoTableWithOutComment() {
     Column[] columns = {
       Column.of("f1", Types.StringType.get(), "f1 column"), Column.of("f2", Types.IntegerType.get())
     };

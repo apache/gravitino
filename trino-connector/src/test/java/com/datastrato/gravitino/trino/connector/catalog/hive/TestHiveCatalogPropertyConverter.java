@@ -16,7 +16,7 @@ import org.testng.annotations.Test;
 public class TestHiveCatalogPropertyConverter {
 
   @Test
-  void testConverter() {
+  public void testConverter() {
     // You can refer to testHiveCatalogCreatedByGravitino
     HiveCatalogPropertyConverter hiveCatalogPropertyConverter = new HiveCatalogPropertyConverter();
     Map<String, String> map =
@@ -34,7 +34,7 @@ public class TestHiveCatalogPropertyConverter {
 
   // To test whether we load jar `bundled-catalog` successfully.
   @Test
-  void testPropertyMetadata() {
+  public void testPropertyMetadata() {
     Set<String> gravitinoHiveKeys =
         Sets.newHashSet(HiveTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
     Set<String> actualGravitinoKeys =

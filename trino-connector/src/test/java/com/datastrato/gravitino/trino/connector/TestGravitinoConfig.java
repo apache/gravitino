@@ -22,7 +22,7 @@ public class TestGravitinoConfig {
   public static void shutdown() throws Exception {}
 
   @Test
-  void testGravitinoConfig() {
+  public void testGravitinoConfig() {
     String gravitinoUrl = "http://127.0.0.1:8000";
     String metalake = "user_001";
     ImmutableMap<String, String> configMap =
@@ -35,7 +35,7 @@ public class TestGravitinoConfig {
   }
 
   @Test
-  void testMissingConfig() {
+  public void testMissingConfig() {
     String gravitinoUrl = "http://127.0.0.1:8000";
     ImmutableMap<String, String> configMap = ImmutableMap.of("gravitino.uri", gravitinoUrl);
     try {

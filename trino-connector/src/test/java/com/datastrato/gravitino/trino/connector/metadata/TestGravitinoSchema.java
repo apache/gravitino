@@ -18,7 +18,7 @@ import org.testng.annotations.Test;
 public class TestGravitinoSchema {
 
   @Test
-  void testGravitinoSchema() {
+  public void testGravitinoSchema() {
     Map<String, String> properties = new HashMap<>();
     properties.put("prop1", "test prop1");
 

@@ -39,7 +39,7 @@ public class TestDataTypeTransformer {
   GeneralDataTypeTransformer dataTypeTransformer = new GeneralDataTypeTransformer();
 
   @Test
-  void testGetGravitinoType() {
+  public void testGetGravitinoType() {
     assertEquals(
         dataTypeTransformer.getGravitinoType(BooleanType.BOOLEAN), Types.BooleanType.get());
 
@@ -102,7 +102,7 @@ public class TestDataTypeTransformer {
   }
 
   @Test
-  void testGetTrinoType() {
+  public void testGetTrinoType() {
     assertEquals(dataTypeTransformer.getTrinoType(Types.BooleanType.get()), BooleanType.BOOLEAN);
 
     assertEquals(dataTypeTransformer.getTrinoType(Types.ByteType.get()), TinyintType.TINYINT);
