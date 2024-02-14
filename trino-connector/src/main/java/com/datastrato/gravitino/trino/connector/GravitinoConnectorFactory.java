@@ -34,7 +34,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   /**
    * This function call by trino creates a connector. It creates DummyGravitinoConnector at first.
-   * Another time's it get GravitinoConnector by CatalogConnectorManger
+   * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
    * @param catalogName the connector name of catalog
    * @param requiredConfig the config of connector
