@@ -228,7 +228,7 @@ public class DTOConverters {
    * @return The distribution DTO.
    */
   public static DistributionDTO toDTO(Distribution distribution) {
-    if (Distributions.NONE.equals(distribution) || null == distribution) {
+    if (Distributions.NONE.isNull(distribution) || null == distribution) {
       return DistributionDTO.NONE;
     }
 
@@ -468,7 +468,7 @@ public class DTOConverters {
    * @return The distribution.
    */
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
-    if (DistributionDTO.NONE.equals(distributionDTO) || null == distributionDTO) {
+    if (DistributionDTO.NONE.isNull(distributionDTO) || null == distributionDTO) {
       return Distributions.NONE;
     }
 

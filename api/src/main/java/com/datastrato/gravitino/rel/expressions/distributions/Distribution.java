@@ -32,7 +32,7 @@ public interface Distribution extends Expression {
    * @param distribution The reference distribution object with which to compare.
    * @return returns true if this object is the same as the obj argument; false otherwise.
    */
-  default boolean equals(Distribution distribution) {
+  default boolean isNull(Distribution distribution) {
     if (distribution == null) {
       return false;
     }

@@ -97,7 +97,7 @@ public class TrinoITContainers implements AutoCloseable {
     for (String serviceName : servicesName) {
       if (!servicesUri.containsKey(serviceName)) {
         throw new ContainerLaunchException(
-            "The container for the {} service is not started: " + serviceName);
+                String.format("The container for the %s service is not started: ", serviceName));
       }
     }
   }
