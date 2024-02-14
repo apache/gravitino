@@ -205,7 +205,7 @@ const transform: AxiosTransform = {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
       if (err?.includes('Network Error')) {
-        errMessage = 'Please check if your network connection is normal! The network is abnormal'
+        errMessage = 'Unable to connect to Gravitino. Please check if Gravitino is running.';
       }
 
       if (errMessage) {
