@@ -202,7 +202,7 @@ public class Namespace {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null || !(other instanceof Namespace)) {
+    if (!(other instanceof Namespace)) {
       return false;
     }
 
