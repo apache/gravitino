@@ -15,8 +15,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.Map;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -44,12 +44,21 @@ public class ConfigServlet extends HttpServlet {
     }
   }
 
+  @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse res)
-      throws ServletException, IOException {
+      throws UnsupportedEncodingException, IllegalStateException, IOException {
     try (PrintWriter writer = res.getWriter()) {
       ObjectMapper objectMapper = JsonUtils.objectMapper();
       res.setContentType("application/json;charset=utf-8");
       writer.write(objectMapper.writeValueAsString(configs));
+    } catch (UnsupportedEncodingException exception) {
+      throw new RuntimeException("Failed to use returned character encoding", exception);
+    } catch (IllegalStateException exception) {
+      throw new RuntimeException("Wrong usage of getWriter()", exception);
+    } catch (IOException exception) {
+      throw new RuntimeException("Failed to perform IO", exception);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 }
