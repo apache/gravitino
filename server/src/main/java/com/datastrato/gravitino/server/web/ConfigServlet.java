@@ -44,6 +44,7 @@ public class ConfigServlet extends HttpServlet {
     }
   }
 
+  @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse res)
       throws ServletException, IOException {
     try (PrintWriter writer = res.getWriter()) {
