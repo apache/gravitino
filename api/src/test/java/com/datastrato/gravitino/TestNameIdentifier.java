@@ -88,8 +88,8 @@ public class TestNameIdentifier {
     NameIdentifier id1 = NameIdentifier.parse("a");
     NameIdentifier id2 = NameIdentifier.parse("a.b.c");
 
-    assertEquals(id1.toString(), "a");
-    assertEquals(id2.toString(), "a.b.c");
+    assertEquals("a", id1.toString());
+    assertEquals("a.b.c", id2.toString());
   }
 
   @Test
