@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.rel.partitions;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -29,9 +28,6 @@ public class Partitions {
 
   /**
    * Creates a list partition.
-   *
-   * <p>Each list in the lists must have the same length. The values in each list must correspond to
-   * the field definitions in the {@link Transforms.ListTransform#fieldNames()}.
    *
    * @param name The name of the partition.
    * @param lists The values of the list partition.

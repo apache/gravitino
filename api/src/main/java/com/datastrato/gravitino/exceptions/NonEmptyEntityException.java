@@ -5,25 +5,31 @@
 
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** An exception thrown when a resource is not empty. */
 public class NonEmptyEntityException extends GravitinoRuntimeException {
-
   /**
    * Constructs a new exception with the specified detail message.
    *
    * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public NonEmptyEntityException(String message) {
-    super(message);
+  @FormatMethod
+  public NonEmptyEntityException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
   /**
    * Constructs a new exception with the specified detail message and cause.
    *
-   * @param message the detail message.
    * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public NonEmptyEntityException(String message, Throwable cause) {
-    super(message, cause);
+  @FormatMethod
+  public NonEmptyEntityException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

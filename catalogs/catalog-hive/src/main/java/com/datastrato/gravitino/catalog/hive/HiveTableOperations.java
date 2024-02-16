@@ -91,11 +91,11 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
     } catch (UnknownTableException e) {
       throw new NoSuchTableException(
-          "Hive table " + table.name() + " does not exist in Hive Metastore", e);
+          e, "Hive table %s does not exist in Hive Metastore", table.name());
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchPartitionException(
-          "Hive partition " + partitionName + " does not exist in Hive Metastore", e);
+          e, "Hive partition %s does not exist in Hive Metastore", partitionName);
 
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(

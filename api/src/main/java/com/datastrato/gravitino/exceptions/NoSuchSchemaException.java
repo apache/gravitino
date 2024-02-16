@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** An exception thrown when a schema is not found. */
 public class NoSuchSchemaException extends NotFoundException {
 
@@ -11,18 +14,22 @@ public class NoSuchSchemaException extends NotFoundException {
    * Constructs a new exception with the specified detail message.
    *
    * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public NoSuchSchemaException(String message) {
-    super(message);
+  @FormatMethod
+  public NoSuchSchemaException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
   /**
    * Constructs a new exception with the specified detail message and cause.
    *
-   * @param message the detail message.
    * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public NoSuchSchemaException(String message, Throwable cause) {
-    super(message, cause);
+  @FormatMethod
+  public NoSuchSchemaException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }
