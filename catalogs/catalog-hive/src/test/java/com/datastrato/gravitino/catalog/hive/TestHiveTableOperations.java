@@ -16,6 +16,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -99,14 +100,15 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
 
   @Test
   public void testGetPartition() {
-    Partition partition = hiveTable.supportPartitions().getPartition(existingPartition.name());
+    SupportsPartitions partitions = hiveTable.supportPartitions();
+    Partition partition = partitions.getPartition(existingPartition.name());
     Assertions.assertEquals(existingPartition, partition);
 
     NoSuchPartitionException exception =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
             () -> {
-              hiveTable.supportPartitions().getPartition("does_not_exist_partition");
+              partitions.getPartition("does_not_exist_partition");
             });
     Assertions.assertEquals(
         "Hive partition does_not_exist_partition does not exist in Hive Metastore",
@@ -124,8 +126,9 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         Partitions.identity(
             new String[][] {fieldCity, fieldDt}, new Literal<?>[] {valueCity, valueDt});
 
-    Partition addedPartition = hiveTable.supportPartitions().addPartition(partition);
-    Partition gotPartition = hiveTable.supportPartitions().getPartition(addedPartition.name());
+    SupportsPartitions partitions = hiveTable.supportPartitions();
+    Partition addedPartition = partitions.addPartition(partition);
+    Partition gotPartition = partitions.getPartition(addedPartition.name());
     Assertions.assertEquals(addedPartition, gotPartition);
 
     // test exception
@@ -134,8 +137,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Partition partition1 = Partitions.identity(new String[][] {field1}, new Literal<?>[] {value1});
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> hiveTable.supportPartitions().addPartition(partition1));
+            IllegalArgumentException.class, () -> partitions.addPartition(partition1));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -149,8 +151,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {value1, value2});
     exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> hiveTable.supportPartitions().addPartition(partition2));
+            IllegalArgumentException.class, () -> partitions.addPartition(partition2));
     Assertions.assertTrue(
         exception
             .getMessage()

@@ -35,6 +35,7 @@ import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -181,10 +182,10 @@ public class TestRelationalTable extends TestRelationalCatalog {
         ErrorResponse.unsupportedOperation("table does not support partition operations");
     buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_IMPLEMENTED);
 
+    SupportsPartitions supportPartitions = partitionedTable.supportPartitions();
     UnsupportedOperationException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> partitionedTable.supportPartitions().listPartitions());
+            UnsupportedOperationException.class, () -> supportPartitions.listPartitions());
     Assertions.assertEquals("table does not support partition operations", exception.getMessage());
   }
 

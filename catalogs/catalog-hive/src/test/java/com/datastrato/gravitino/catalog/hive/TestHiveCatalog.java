@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.hive;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -63,21 +64,24 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
             .build();
 
     Map<String, String> conf = Maps.newHashMap();
+    Map<String, String> properties = Maps.newHashMap();
+
     metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations(entity)) {
       ops.initialize(conf);
+      PropertiesMetadata metadata = ops.catalogPropertiesMetadata();
+
       Assertions.assertDoesNotThrow(
           () -> {
             Map<String, String> map = Maps.newHashMap();
             map.put(METASTORE_URIS, "/tmp");
-            ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
+            metadata.validatePropertyForCreate(map);
           });
 
       Throwable throwable =
           Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () -> ops.catalogPropertiesMetadata().validatePropertyForCreate(Maps.newHashMap()));
+              IllegalArgumentException.class, () -> metadata.validatePropertyForCreate(properties));
 
       Assertions.assertTrue(
           throwable
