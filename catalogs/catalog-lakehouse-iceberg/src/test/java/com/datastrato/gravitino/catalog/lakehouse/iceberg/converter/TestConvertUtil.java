@@ -150,13 +150,13 @@ public class TestConvertUtil extends TestBaseConvert {
         ConvertUtil.toIcebergType(
             true, com.datastrato.gravitino.rel.types.Types.DecimalType.of(9, 2));
     Assertions.assertTrue(decimalType instanceof Types.DecimalType);
-    Assertions.assertEquals(((Types.DecimalType) decimalType).precision(), 9);
-    Assertions.assertEquals(((Types.DecimalType) decimalType).scale(), 2);
+    Assertions.assertEquals(9, ((Types.DecimalType) decimalType).precision());
+    Assertions.assertEquals(2, ((Types.DecimalType) decimalType).scale());
 
     Type fixedCharType =
         ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.FixedType.of(9));
     Assertions.assertTrue(fixedCharType instanceof Types.FixedType);
-    Assertions.assertEquals(((Types.FixedType) fixedCharType).length(), 9);
+    Assertions.assertEquals(9, ((Types.FixedType) fixedCharType).length());
 
     com.datastrato.gravitino.rel.types.Type mapType =
         com.datastrato.gravitino.rel.types.Types.MapType.of(
@@ -219,15 +219,15 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         decimalType instanceof com.datastrato.gravitino.rel.types.Types.DecimalType);
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).precision(), 9);
+        9, ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).precision());
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).scale(), 2);
+        2, ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).scale());
 
     com.datastrato.gravitino.rel.types.Type fixedType =
         ConvertUtil.formIcebergType(Types.FixedType.ofLength(2));
     Assertions.assertTrue(fixedType instanceof com.datastrato.gravitino.rel.types.Types.FixedType);
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.FixedType) fixedType).length(), 2);
+        2, ((com.datastrato.gravitino.rel.types.Types.FixedType) fixedType).length());
 
     Types.MapType mapType =
         Types.MapType.ofOptional(1, 2, Types.StringType.get(), Types.IntegerType.get());
