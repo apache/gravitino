@@ -17,7 +17,7 @@ import org.apache.ibatis.annotations.Update;
  * A MyBatis Mapper for metalake meta operation SQLs.
  *
  * <p>This interface class is a specification defined by MyBatis. It requires this interface class
- * to identify the corresponding SQLs for execution. We can write SQL in an additional XML file, or
+ * to identify the corresponding SQLs for execution. We can write SQLs in an additional XML file, or
  * write SQLs with annotations in this interface Mapper. See: <a
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */

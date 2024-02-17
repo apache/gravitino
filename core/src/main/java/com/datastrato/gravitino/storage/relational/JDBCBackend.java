@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;

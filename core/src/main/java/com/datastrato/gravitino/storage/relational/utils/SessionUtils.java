@@ -35,9 +35,8 @@ public class SessionUtils {
         SqlSessions.commitAndCloseSqlSession();
         return result;
       } catch (Throwable t) {
+        SqlSessions.rollbackAndCloseSqlSession();
         throw new RuntimeException(t);
-      } finally {
-        SqlSessions.closeSqlSession();
       }
     }
   }

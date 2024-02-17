@@ -70,7 +70,7 @@ public interface Configs {
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_TYPE =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_TYPE_KEY)
           .doc("Database type of `JDBCBackend`")
-          .version("0.5.0")
+          .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
@@ -78,7 +78,7 @@ public interface Configs {
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_URL =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY)
           .doc("Connection URL of `JDBCBackend`")
-          .version("0.5.0")
+          .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -86,7 +86,7 @@ public interface Configs {
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
           .doc("Driver Name of `JDBCBackend`")
-          .version("0.5.0")
+          .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -94,7 +94,7 @@ public interface Configs {
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_USER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY)
           .doc("Username of `JDBCBackend`")
-          .version("0.5.0")
+          .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -102,7 +102,7 @@ public interface Configs {
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY)
           .doc("Password of `JDBCBackend`")
-          .version("0.5.0")
+          .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
