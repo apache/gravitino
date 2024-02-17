@@ -3,11 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.session;
+package com.datastrato.gravitino.storage.relational.session;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
@@ -44,16 +44,19 @@ public class SqlSessionFactoryHelper {
   /**
    * Initialize the SqlSessionFactory object.
    *
-   * @param config Config object to get the MySQL connection details from the config.
+   * @param config Config object to get the jdbc connection details from the config.
    */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
     // Initialize the data source
     BasicDataSource dataSource = new BasicDataSource();
-    dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_URL));
-    dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER));
-    dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_USER));
-    dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_PASSWORD));
+    dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL));
+    dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
+    String dbType = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
+    if (dbType.equals(Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE)) {
+      dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
+      dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
+    }
     // Close the auto commit, so that we can control the transaction manual commit
     dataSource.setDefaultAutoCommit(false);
     dataSource.setMaxWaitMillis(1000L);
@@ -98,12 +101,18 @@ public class SqlSessionFactoryHelper {
 
   public void close() {
     if (sqlSessionFactory != null) {
-      try {
-        BasicDataSource dataSource =
-            (BasicDataSource) sqlSessionFactory.getConfiguration().getEnvironment().getDataSource();
-        dataSource.close();
-      } catch (SQLException e) {
-        // silently ignore the error report
+      synchronized (SqlSessionFactoryHelper.class) {
+        if (sqlSessionFactory != null) {
+          try {
+            BasicDataSource dataSource =
+                (BasicDataSource)
+                    sqlSessionFactory.getConfiguration().getEnvironment().getDataSource();
+            dataSource.close();
+          } catch (SQLException e) {
+            // silently ignore the error report
+          }
+          sqlSessionFactory = null;
+        }
       }
     }
   }

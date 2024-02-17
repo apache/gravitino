@@ -3,9 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.utils;
+package com.datastrato.gravitino.storage.relational.utils;
 
-import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessions;
+import com.datastrato.gravitino.storage.relational.session.SqlSessions;
 import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;

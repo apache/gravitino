@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.po;
+package com.datastrato.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 

@@ -3,12 +3,15 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.session;
+package com.datastrato.gravitino.storage.relational.session;
 
+import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_URL;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_USER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_TYPE;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
@@ -49,10 +52,13 @@ public class TestSqlSession {
     config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_URL))
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_TYPE))
+        .thenReturn(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
         .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_USER)).thenReturn("sa");
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
   }
 
   @BeforeEach
@@ -62,7 +68,7 @@ public class TestSqlSession {
 
   @AfterEach
   public void cleanUp() {
-    SqlSessionFactoryHelper.setSqlSessionFactory(null);
+    SqlSessionFactoryHelper.getInstance().close();
   }
 
   @AfterAll
@@ -93,7 +99,7 @@ public class TestSqlSession {
                 .getEnvironment()
                 .getDataSource();
     assertEquals("org.h2.Driver", dataSource.getDriverClassName());
-    assertEquals(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_URL), dataSource.getUrl());
+    assertEquals(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL), dataSource.getUrl());
   }
 
   @Test

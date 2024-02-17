@@ -3,13 +3,13 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.utils;
+package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
-import com.datastrato.gravitino.storage.relational.mysql.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;

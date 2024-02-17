@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.session;
+package com.datastrato.gravitino.storage.relational.session;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ibatis.session.SqlSession;

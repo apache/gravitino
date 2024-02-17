@@ -2,9 +2,10 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.storage.relational.mysql;
+package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
@@ -13,12 +14,11 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.storage.relational.RelationalBackend;
-import com.datastrato.gravitino.storage.relational.mysql.mapper.MetalakeMetaMapper;
-import com.datastrato.gravitino.storage.relational.mysql.po.MetalakePO;
-import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessionFactoryHelper;
-import com.datastrato.gravitino.storage.relational.mysql.utils.POConverters;
-import com.datastrato.gravitino.storage.relational.mysql.utils.SessionUtils;
+import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.storage.relational.utils.POConverters;
+import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -26,13 +26,13 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * {@link MySQLBackend} is a MySQL implementation of RelationalBackend interface. If we want to use
+ * {@link JDBCBackend} is a jdbc implementation of RelationalBackend interface. If we want to use
  * another relational implementation, We can just implement {@link RelationalBackend} interface and
  * use it in the Gravitino.
  */
-public class MySQLBackend implements RelationalBackend {
+public class JDBCBackend implements RelationalBackend {
 
-  /** Initialize the MySQL backend instance. */
+  /** Initialize the jdbc backend instance. */
   @Override
   public void initialize(Config config) {
     SqlSessionFactoryHelper.getInstance().init(config);

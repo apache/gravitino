@@ -5,10 +5,13 @@
 
 package com.datastrato.gravitino.storage.relational;
 
+import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_URL;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_MYSQL_BACKEND_USER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_TYPE;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
@@ -26,7 +29,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
-import com.datastrato.gravitino.storage.relational.mysql.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -69,10 +72,13 @@ public class TestRelationalEntityStore {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_URL))
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_TYPE))
+        .thenReturn(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
         .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_USER)).thenReturn("sa");
-    Mockito.when(config.get(ENTITY_RELATIONAL_MYSQL_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
 

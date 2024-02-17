@@ -3,9 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.storage.relational.mysql.mapper;
+package com.datastrato.gravitino.storage.relational.mapper;
 
-import com.datastrato.gravitino.storage.relational.mysql.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
