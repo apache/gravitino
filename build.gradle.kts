@@ -495,6 +495,9 @@ tasks {
   val cleanDistribution by registering(Delete::class) {
     group = "gravitino distribution"
     delete(outputDir)
+    subprojects.forEach {
+      delete(it.file("bin"))
+    }
   }
 
   register("copySubprojectDependencies", Copy::class) {
