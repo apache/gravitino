@@ -62,7 +62,7 @@ public class TestResponses {
     entityList.validate(); // No exception thrown
     NameIdentifier[] identsB = entityList.identifiers();
     assertEquals(1, identsB.length);
-    assertEquals(identsB[0].name(), "TableA");
+    assertEquals("TableA", identsB[0].name());
   }
 
   @Test

@@ -73,18 +73,18 @@ class OAuth2TokenAuthenticator implements Authenticator {
       if (audienceObject instanceof String) {
         if (!serviceAudience.equals(audienceObject)) {
           throw new UnauthorizedException(
-              "Audience in the token [" + audienceObject + "] doesn't contain " + serviceAudience);
+              "Audience in the token [%s] doesn't contain %s", audienceObject, serviceAudience);
         }
       } else if (audienceObject instanceof List) {
         List<Object> audiences = (List<Object>) audienceObject;
         if (audiences.stream()
             .noneMatch(audienceInToken -> audienceInToken.equals(serviceAudience))) {
           throw new UnauthorizedException(
-              "Audiences in the token " + audienceObject + " don't contain " + serviceAudience);
+              "Audiences in the token %s don't contain %s", audienceObject, serviceAudience);
         }
       } else {
         throw new UnauthorizedException(
-            "Audiences in token is not in expected format: " + audienceObject);
+            "Audiences in token is not in expected format: %s", audienceObject);
       }
       return new UserPrincipal(jwt.getBody().getSubject());
     } catch (ExpiredJwtException
@@ -92,7 +92,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
         | MalformedJwtException
         | SignatureException
         | IllegalArgumentException e) {
-      throw new UnauthorizedException("JWT parse error", e);
+      throw new UnauthorizedException(e, "JWT parse error");
     }
   }
 

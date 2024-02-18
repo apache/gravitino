@@ -201,10 +201,12 @@ public class LockManager {
         if (treeNode.getReference() == 0) {
           parent.removeChild(treeNode.getName());
           long leftNodeCount = totalNodeCount.decrementAndGet();
-          LOG.trace(
-              "Evict stale tree lock node '{}', current left nodes '{}'",
-              treeNode.getName(),
-              leftNodeCount);
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(
+                "Evict stale tree lock node '{}', current left nodes '{}'",
+                treeNode.getName(),
+                leftNodeCount);
+          }
         }
       }
     }

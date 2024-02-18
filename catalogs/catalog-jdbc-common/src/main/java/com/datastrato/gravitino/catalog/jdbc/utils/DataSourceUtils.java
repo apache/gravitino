@@ -32,7 +32,7 @@ public class DataSourceUtils {
     try {
       return createDBCPDataSource(jdbcConfig);
     } catch (Exception exception) {
-      throw new GravitinoRuntimeException("Error creating datasource", exception);
+      throw new GravitinoRuntimeException(exception, "Error creating datasource");
     }
   }
 

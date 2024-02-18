@@ -17,7 +17,7 @@ public interface KerberosConfig extends Configs {
   ConfigEntry<String> PRINCIPAL =
       new ConfigBuilder(KERBEROS_CONFIG_PREFIX + "principal")
           .doc("Indicates the Kerberos principal to be used for HTTP endpoint")
-          .version("0.4.0")
+          .version(ConfigConstants.VERSION_0_4_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -25,7 +25,7 @@ public interface KerberosConfig extends Configs {
   ConfigEntry<String> KEYTAB =
       new ConfigBuilder(KERBEROS_CONFIG_PREFIX + "keytab")
           .doc("Location of the keytab file with the credentials for the principal")
-          .version("0.4.0")
+          .version(ConfigConstants.VERSION_0_4_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();

@@ -62,7 +62,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   @Override
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       DatabaseMetaData metaData = connection.getMetaData();
       ResultSet resultSet = metaData.getCatalogs();
       while (resultSet.next()) {

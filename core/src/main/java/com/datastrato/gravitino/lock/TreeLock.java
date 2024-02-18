@@ -6,8 +6,9 @@
 package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
-import java.util.Stack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,7 @@ public class TreeLock {
   private final List<TreeLockNode> lockNodes;
 
   // TreeLockNode that has been locked.
-  private final Stack<TreeLockNode> heldLocks = new Stack<>();
+  private final Deque<TreeLockNode> heldLocks = new ArrayDeque<>();
   private LockType lockType;
 
   TreeLock(List<TreeLockNode> lockNodes, NameIdentifier identifier) {
@@ -87,11 +88,13 @@ public class TreeLock {
       heldLocks.push(treeLockNode);
     }
 
-    LOG.trace(
-        "Locked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
-        identifier,
-        lockNodes,
-        lockType);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Locked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+          identifier,
+          lockNodes,
+          lockType);
+    }
   }
 
   /** Unlock the tree lock. */
@@ -101,25 +104,24 @@ public class TreeLock {
     }
 
     boolean lastNode = false;
-    TreeLockNode current;
     while (!heldLocks.isEmpty()) {
-      LockType type;
+      LockType type = LockType.READ;
       if (!lastNode) {
         lastNode = true;
         type = lockType;
-      } else {
-        type = LockType.READ;
       }
 
-      current = heldLocks.pop();
+      TreeLockNode current = heldLocks.pop();
       // Unlock the node and decrease the reference count.
       current.unlock(type);
     }
 
-    LOG.trace(
-        "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
-        identifier,
-        lockNodes,
-        lockType);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+          identifier,
+          lockNodes,
+          lockType);
+    }
   }
 }

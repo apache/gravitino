@@ -14,6 +14,7 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.FormatMethod;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory;
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
 
+@SuppressWarnings("FormatStringAnnotation")
 public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
   private SparkSession sparkSession;
@@ -79,7 +81,7 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
     AbstractIT.registerCustomConfigs(icebergConfigs);
-    LOG.info("Iceberg REST service config registered," + StringUtils.join(icebergConfigs));
+    LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
   private static IcebergConfig buildIcebergConfig(Config config) {
@@ -115,6 +117,7 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
     }
   }
 
+  @FormatMethod
   protected List<Object[]> sql(String query, Object... args) {
     List<Row> rows = sparkSession.sql(String.format(query, args)).collectAsList();
     if (rows.isEmpty()) {

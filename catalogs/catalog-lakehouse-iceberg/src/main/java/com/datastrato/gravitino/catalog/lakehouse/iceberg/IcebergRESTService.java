@@ -32,6 +32,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
   private JettyServer server;
 
   public static final String SERVICE_NAME = "iceberg-rest";
+  public static final String ICEBERG_SPEC = "/iceberg/*";
 
   private IcebergTableOps icebergTableOps;
   private IcebergMetricsManager icebergMetricsManager;
@@ -63,9 +64,9 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
         });
 
     Servlet servlet = new ServletContainer(config);
-    server.addServlet(servlet, "/iceberg/*");
-    server.addCustomFilters("/iceberg/*");
-    server.addSystemFilters("/iceberg/*");
+    server.addServlet(servlet, ICEBERG_SPEC);
+    server.addCustomFilters(ICEBERG_SPEC);
+    server.addSystemFilters(ICEBERG_SPEC);
   }
 
   @Override

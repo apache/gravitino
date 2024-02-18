@@ -162,17 +162,23 @@ public class IsolatedClassLoader implements Closeable {
           private Class<?> doLoadClass(String name, boolean resolve) throws Exception {
             if (isBarrierClass(name)) {
               // For barrier classes, copy the class bytecode and reconstruct the class.
-              LOG.debug("barrier class: {}", name);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("barrier class: {}", name);
+              }
               byte[] bytes = loadClassBytes(name);
               return defineClass(name, bytes, 0, bytes.length);
 
             } else if (!isSharedClass(name)) {
-              LOG.debug("isolated class: {} - {}", name, getResources(classToPath(name)));
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("isolated class: {} - {}", name, getResources(classToPath(name)));
+              }
               return super.loadClass(name, resolve);
 
             } else {
               // For shared classes, delegate to base classloader.
-              LOG.debug("shared class: {}", name);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("shared class: {}", name);
+              }
               try {
                 return baseClassLoader.loadClass(name);
               } catch (ClassNotFoundException e) {

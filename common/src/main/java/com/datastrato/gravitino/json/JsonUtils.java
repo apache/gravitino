@@ -66,13 +66,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Utility class for working with JSON data. */
 public class JsonUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
   private static final String NAMESPACE = "namespace";
   private static final String NAME = "name";
   private static final String POSITION_FIRST = "first";
@@ -215,7 +212,22 @@ public class JsonUtils {
     }
   }
 
-  private static volatile ObjectMapper mapper = null;
+  /**
+   * ObjectMapperHolder is a static inner class that holds the instance of ObjectMapper. This class
+   * utilizes the Initialization-on-demand holder idiom, which is a lazy-loaded singleton. This
+   * idiom takes advantage of the fact that inner classes are not loaded until they are referenced.
+   * It's a thread-safe and efficient way to implement a singleton as the instance is created when
+   * it's needed at the first time.
+   */
+  private static class ObjectMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .registerModule(new JavaTimeModule());
+  }
 
   /**
    * Get the shared ObjectMapper instance for JSON serialization/deserialization.
@@ -223,21 +235,7 @@ public class JsonUtils {
    * @return The ObjectMapper instance.
    */
   public static ObjectMapper objectMapper() {
-    if (mapper == null) {
-      synchronized (JsonUtils.class) {
-        if (mapper == null) {
-          mapper =
-              JsonMapper.builder()
-                  .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-                  .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
-                  .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                  .build()
-                  .registerModule(new JavaTimeModule());
-        }
-      }
-    }
-
-    return mapper;
+    return ObjectMapperHolder.INSTANCE;
   }
 
   /**
