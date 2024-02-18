@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.UnsupportedEntityTypeException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
@@ -21,6 +22,7 @@ import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -48,8 +50,8 @@ public class JDBCBackend implements RelationalBackend {
               MetalakeMetaMapper.class, MetalakeMetaMapper::listMetalakePOs);
       return (List<E>) POConverters.fromMetalakePOs(metalakePOS);
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for list operation", entityType));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for list operation", entityType);
     }
   }
 
@@ -61,8 +63,8 @@ public class JDBCBackend implements RelationalBackend {
               MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
       return metalakePO != null;
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for exists operation", entityType));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for exists operation", entityType);
     }
   }
 
@@ -70,26 +72,33 @@ public class JDBCBackend implements RelationalBackend {
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException {
     if (e instanceof BaseMetalake) {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.selectMetalakeMetaByName(e.nameIdentifier().name()));
-      if (!overwritten && metalakePO != null) {
-        throw new EntityAlreadyExistsException(
-            String.format("Metalake entity: %s already exists", e.nameIdentifier().name()));
+      try {
+        SessionUtils.doWithCommit(
+            MetalakeMetaMapper.class,
+            mapper -> {
+              if (overwritten) {
+                mapper.insertMetalakeMetaOnDuplicateKeyUpdate(
+                    POConverters.toMetalakePO((BaseMetalake) e));
+              } else {
+                mapper.insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
+              }
+            });
+      } catch (RuntimeException re) {
+        if (re.getCause() != null
+            && re.getCause().getCause() != null
+            && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+          // TODO We should make more fine-grained exception judgments
+          // Usually throwing `SQLIntegrityConstraintViolationException` means that
+          // SQL violates the constraints of `primary key` and `unique key`.
+          // We simply think that the entity already exists at this time.
+          throw new EntityAlreadyExistsException(
+              String.format("Metalake entity: %s already exists", e.nameIdentifier().name()));
+        }
+        throw re;
       }
-      SessionUtils.doWithCommit(
-          MetalakeMetaMapper.class,
-          mapper -> {
-            if (overwritten) {
-              mapper.insertMetalakeMetaWithUpdate(POConverters.toMetalakePO((BaseMetalake) e));
-            } else {
-              mapper.insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
-            }
-          });
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for insert operation", e.getClass()));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", e.getClass());
     }
   }
 
@@ -106,9 +115,9 @@ public class JDBCBackend implements RelationalBackend {
       BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
       Preconditions.checkArgument(
           Objects.equals(oldMetalakeEntity.id(), newMetalakeEntity.id()),
-          String.format(
-              "The updated metalake entity id: %s should same with the metalake entity id before: %s",
-              newMetalakeEntity.id(), oldMetalakeEntity.id()));
+          "The updated metalake entity id: %s should same with the metalake entity id before: %s",
+          newMetalakeEntity.id(),
+          oldMetalakeEntity.id());
 
       Integer updateResult =
           SessionUtils.doWithCommitAndFetchResult(
@@ -122,8 +131,8 @@ public class JDBCBackend implements RelationalBackend {
         throw new IOException("Failed to update the entity:" + ident);
       }
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for update operation", entityType));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for update operation", entityType);
     }
   }
 
@@ -140,8 +149,8 @@ public class JDBCBackend implements RelationalBackend {
       }
       return (E) POConverters.fromMetalakePO(metalakePO);
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for get operation", entityType));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for get operation", entityType);
     }
   }
 
@@ -162,14 +171,16 @@ public class JDBCBackend implements RelationalBackend {
                 // TODO We will cascade delete the metadata of sub-resources under the metalake
               });
         } else {
+          // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
+          //  deletion is not allowed.
           SessionUtils.doWithCommit(
               MetalakeMetaMapper.class, mapper -> mapper.deleteMetalakeMetaById(metalakeId));
         }
       }
       return true;
     } else {
-      throw new IllegalArgumentException(
-          String.format("Unsupported entity type: %s for delete operation", entityType));
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for delete operation", entityType);
     }
   }
 

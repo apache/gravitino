@@ -75,7 +75,7 @@ public interface MetalakeMetaMapper {
           + " properties = #{metalakeMeta.properties},"
           + " audit_info = #{metalakeMeta.auditInfo},"
           + " schema_version = #{metalakeMeta.schemaVersion}")
-  void insertMetalakeMetaWithUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
+  void insertMetalakeMetaOnDuplicateKeyUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
 
   @Update(
       "UPDATE "

@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.Namespace;
@@ -53,8 +54,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestRelationalEntityStore {
+  private static final Logger Logger = LoggerFactory.getLogger(TestRelationalEntityStore.class);
   private static final String MYSQL_STORE_PATH =
       "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = MYSQL_STORE_PATH + "/testdb";
@@ -114,9 +118,14 @@ public class TestRelationalEntityStore {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() {
     dropAllTables();
-    entityStore.close();
+    try {
+      entityStore.close();
+    } catch (IOException e) {
+      Logger.error("Close the entity store failed:", e);
+    }
+
     File dir = new File(DB_DIR);
     if (dir.exists()) {
       dir.delete();
@@ -134,7 +143,8 @@ public class TestRelationalEntityStore {
 
     // overwrite false
     BaseMetalake duplicateMetalake = createMetalake(1L, "test_metalake", "this is test");
-    assertThrows(RuntimeException.class, () -> entityStore.put(duplicateMetalake, false));
+    assertThrows(
+        EntityAlreadyExistsException.class, () -> entityStore.put(duplicateMetalake, false));
 
     // overwrite true
     BaseMetalake overittenMetalake = createMetalake(1L, "test_metalake2", "this is test2");
