@@ -23,14 +23,13 @@ public interface Configs {
   String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
 
   String ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY =
-      "gravitino.entity.store.relational.jdbc.dbType";
+      "gravitino.entity.store.relational.jdbcDBType";
   String DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE = "mysql";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbc.url";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY =
-      "gravitino.entity.store.relational.jdbc.driver";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbc.user";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbcUrl";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY = "gravitino.entity.store.relational.jdbcDriver";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbcUser";
   String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
-      "gravitino.entity.store.relational.jdbc.password";
+      "gravitino.entity.store.relational.jdbcPassword";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
