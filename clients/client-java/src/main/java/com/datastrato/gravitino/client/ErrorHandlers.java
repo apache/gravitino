@@ -369,6 +369,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Fileset operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class FilesetErrorHandler extends RestErrorHandler {
 
     private static final FilesetErrorHandler INSTANCE = new FilesetErrorHandler();

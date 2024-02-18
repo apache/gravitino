@@ -166,9 +166,8 @@ public class Namespace {
   public static void checkFileset(Namespace namespace) {
     check(
         namespace != null && namespace.length() == 3,
-        String.format(
-            "Fileset namespace must be non-null and have 3 levels, the input namespace is %s",
-            namespace));
+        "Fileset namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
   }
 
   private Namespace(String[] levels) {
