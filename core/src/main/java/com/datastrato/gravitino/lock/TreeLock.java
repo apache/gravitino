@@ -90,7 +90,9 @@ public class TreeLock {
       try {
         treeLockNode.lock(type);
         heldLocks.push(Pair.of(treeLockNode, type));
-        LOG.trace("Locked node: {}, lock type: {}", treeLockNode, type);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Locked node: {}, lock type: {}", treeLockNode, type);
+        }
       } catch (Exception e) {
         LOG.error(
             "Failed to lock the treeNode, identifier: {}, node {} of lockNodes: [{}]",
