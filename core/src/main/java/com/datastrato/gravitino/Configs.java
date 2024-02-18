@@ -22,13 +22,15 @@ public interface Configs {
   String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
 
-  String ENTITY_RELATIONAL_JDBC_BACKEND_TYPE_KEY = "gravitino.entity.store.relational.jdbcType";
-  String DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE = "mysql";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbcUrl";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY = "gravitino.entity.store.relational.jdbcDriver";
-  String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbcUser";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY =
+      "gravitino.entity.store.relational.jdbc.dbType";
+  String DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE = "mysql";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbc.url";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY =
+      "gravitino.entity.store.relational.jdbc.driver";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbc.user";
   String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
-      "gravitino.entity.store.relational.jdbcPassword";
+      "gravitino.entity.store.relational.jdbc.password";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
@@ -67,13 +69,13 @@ public interface Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
 
-  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_TYPE =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_TYPE_KEY)
+  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY)
           .doc("Database type of `JDBCBackend`")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
+          .createWithDefault(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE);
 
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_URL =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY)

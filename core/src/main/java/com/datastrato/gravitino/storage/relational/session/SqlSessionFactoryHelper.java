@@ -52,8 +52,8 @@ public class SqlSessionFactoryHelper {
     BasicDataSource dataSource = new BasicDataSource();
     dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL));
     dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
-    String dbType = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_TYPE);
-    if (dbType.equals(Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_TYPE)) {
+    String dbType = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE);
+    if (dbType.equals(Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE)) {
       dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
       dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
     }

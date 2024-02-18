@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
@@ -25,9 +26,10 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * {@link JDBCBackend} is a jdbc implementation of RelationalBackend interface. If we want to use
- * another relational implementation, We can just implement {@link RelationalBackend} interface and
- * use it in the Gravitino.
+ * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
+ * a database that supports the JDBC protocol as storage. If the specified database has special SQL
+ * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
+ * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
 
