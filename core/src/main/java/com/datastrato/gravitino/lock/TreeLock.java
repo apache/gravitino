@@ -126,7 +126,9 @@ public class TreeLock {
       TreeLockNode current = pair.getLeft();
       LockType type = pair.getRight();
       current.unlock(type);
-      LOG.trace("Unlocked node: {}, lock type: {}", current, type);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Unlocked node: {}, lock type: {}", current, type);
+      }
     }
 
     if (LOG.isTraceEnabled()) {
