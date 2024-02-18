@@ -11,14 +11,14 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":common"))
-  implementation(project(":core"))
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-jdbc-common"))
-  implementation(libs.guava)
+  implementation(project(":common"))
+  implementation(project(":core"))
   implementation(libs.bundles.log4j)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.collections4)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.jsqlparser)
 
   testImplementation(project(":catalogs:catalog-jdbc-common"))

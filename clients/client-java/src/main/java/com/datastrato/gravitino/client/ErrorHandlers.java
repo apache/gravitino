@@ -135,6 +135,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Partition operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class PartitionErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new PartitionErrorHandler();
 
@@ -177,6 +178,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Table operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class TableErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new TableErrorHandler();
 
@@ -211,6 +213,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Schema operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class SchemaErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new SchemaErrorHandler();
 
@@ -246,6 +249,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Catalog operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class CatalogErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new CatalogErrorHandler();
 
@@ -278,6 +282,7 @@ public class ErrorHandlers {
   }
 
   /** Error handler specific to Metalake operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class MetalakeErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new MetalakeErrorHandler();
 
@@ -338,17 +343,14 @@ public class ErrorHandlers {
         switch (errorResponse.getType()) {
           case OAuth2ClientUtil.INVALID_CLIENT_ERROR:
             throw new UnauthorizedException(
-                String.format(
-                    "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage()));
+                "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage());
           case OAuth2ClientUtil.INVALID_REQUEST_ERROR:
           case OAuth2ClientUtil.INVALID_GRANT_ERROR:
           case OAuth2ClientUtil.UNAUTHORIZED_CLIENT_ERROR:
           case OAuth2ClientUtil.UNSUPPORTED_GRANT_TYPE_ERROR:
           case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
             throw new BadRequestException(
-                String.format(
-                    "Malformed request: %s: %s",
-                    errorResponse.getType(), errorResponse.getMessage()));
+                "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
         }
       }
       super.accept(errorResponse);

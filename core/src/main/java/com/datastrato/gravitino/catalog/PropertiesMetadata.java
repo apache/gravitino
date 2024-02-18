@@ -39,9 +39,9 @@ public interface PropertiesMetadata {
     return propertyEntries().containsKey(propertyName);
   }
 
-  static <T> void checkValueFormat(String key, String value, Function<String, T> decoder) {
+  static <T> T checkValueFormat(String key, String value, Function<String, T> decoder) {
     try {
-      decoder.apply(value);
+      return decoder.apply(value);
     } catch (Exception e) {
       throw new IllegalArgumentException(
           String.format("Invalid value: '%s' for property: '%s'", value, key), e);

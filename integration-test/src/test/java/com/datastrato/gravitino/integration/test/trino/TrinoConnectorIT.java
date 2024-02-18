@@ -194,7 +194,7 @@ public class TrinoConnectorIT extends AbstractIT {
     testShowTable();
   }
 
-  void testShowTable() {
+  private void testShowTable() {
     String sql =
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",

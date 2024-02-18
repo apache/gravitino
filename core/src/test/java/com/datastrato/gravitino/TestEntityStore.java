@@ -94,7 +94,7 @@ public class TestEntityStore {
           () -> {
             E e = (E) entityMap.get(ident);
             if (e == null) {
-              throw new NoSuchEntityException("Entity " + ident + " does not exist");
+              throw new NoSuchEntityException("Entity %s does not exist", ident);
             }
 
             E newE = updater.apply(e);
@@ -113,7 +113,7 @@ public class TestEntityStore {
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
+        throw new NoSuchEntityException("Entity %s does not exist", ident);
       }
 
       return e;

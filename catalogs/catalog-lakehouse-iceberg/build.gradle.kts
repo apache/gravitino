@@ -11,68 +11,67 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":api"))
   implementation(project(":server-common"))
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
-  implementation(libs.bundles.log4j)
+  implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
-  implementation(libs.bundles.iceberg)
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.io)
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
+  implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.iceberg.hive.metastore)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
   implementation(libs.sqlite.jdbc)
 
   implementation(libs.hive2.metastore) {
-    exclude("org.apache.avro", "avro")
-    exclude("org.slf4j", "slf4j-log4j12")
-    exclude("org.pentaho") // missing dependency
-    exclude("org.apache.hbase")
-    exclude("org.apache.logging.log4j")
     exclude("co.cask.tephra")
+    exclude("com.github.spotbugs")
     exclude("com.google.code.findbugs", "jsr305")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
     exclude("com.tdunning", "json")
     exclude("javax.transaction", "transaction-api")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("org.apache.zookeeper")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-common")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-applicationhistoryservice")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
+    exclude("org.apache.avro", "avro")
+    exclude("org.apache.hbase")
     exclude("org.apache.hadoop", "hadoop-yarn-api")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-applicationhistoryservice")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-common")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("com.github.spotbugs")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.zookeeper")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.pentaho") // missing dependency
+    exclude("org.slf4j", "slf4j-log4j12")
+    exclude("com.zaxxer", "HikariCP")
   }
 
-  implementation(libs.hadoop2.hdfs)
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
   }
+  implementation(libs.hadoop2.hdfs)
   implementation(libs.hadoop2.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
 
-  compileOnly(libs.lombok)
-  annotationProcessor(libs.lombok)
-
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.jersey.test.framework.provider.jetty) {
     exclude(group = "org.junit.jupiter")
   }
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

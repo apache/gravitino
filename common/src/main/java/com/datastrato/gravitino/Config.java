@@ -36,7 +36,7 @@ public abstract class Config {
    *
    * @param loadDefaults Set to true if default configurations should be loaded.
    */
-  public Config(boolean loadDefaults) {
+  protected Config(boolean loadDefaults) {
     configMap = new ConcurrentHashMap<>();
     if (loadDefaults) {
       loadFromProperties(System.getProperties());

@@ -16,12 +16,15 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConfigServlet extends HttpServlet {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ConfigServlet.class);
 
   private static final ImmutableSet<ConfigEntry<?>> oauthConfigEntries =
       ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
@@ -44,12 +47,19 @@ public class ConfigServlet extends HttpServlet {
     }
   }
 
+  @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse res)
-      throws ServletException, IOException {
+      throws IllegalStateException, IOException {
     try (PrintWriter writer = res.getWriter()) {
       ObjectMapper objectMapper = JsonUtils.objectMapper();
       res.setContentType("application/json;charset=utf-8");
       writer.write(objectMapper.writeValueAsString(configs));
+    } catch (IllegalStateException exception) {
+      LOG.error("Illegal state occurred when calling getWriter()");
+    } catch (IOException exception) {
+      LOG.error("Failed to perform IO");
+    } catch (Exception e) {
+      LOG.error(e.getMessage());
     }
   }
 }
