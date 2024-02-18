@@ -170,7 +170,7 @@ public class JsonUtils {
     /**
      * Judge whether it has more elements in the JSON array.
      *
-     * @return
+     * @return true if the iteration has more elements.
      */
     @Override
     public boolean hasNext() {
@@ -180,7 +180,7 @@ public class JsonUtils {
     /**
      * Get a next element from the JSON array.
      *
-     * @return
+     * @return the next element in the iteration.
      */
     @Override
     public T next() {

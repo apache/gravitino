@@ -44,7 +44,7 @@ public class ConvertUtil {
    * Convert the nested type of Iceberg to the type of gravitino.
    *
    * @param type Iceberg type of field.
-   * @return
+   * @return Gravitino type.
    */
   public static com.datastrato.gravitino.rel.types.Type formIcebergType(Type type) {
     return TypeUtil.visit(type, new FromIcebergType());
