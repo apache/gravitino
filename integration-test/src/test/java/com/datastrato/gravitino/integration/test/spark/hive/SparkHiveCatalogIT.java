@@ -5,7 +5,15 @@
 package com.datastrato.gravitino.integration.test.spark.hive;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-it")
@@ -20,5 +28,34 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   @Override
   protected String getProvider() {
     return "hive";
+  }
+
+  @Override
+  protected boolean supportsSparkSQLClusteredBy() {
+    return true;
+  }
+
+  @Test
+  public void testCreateHiveFormatPartitionTable() {
+    String tableName = "hive_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    sql(createTableSQL);
+
+    List<SparkColumnInfo> columns = new ArrayList<>(getSimpleTableColumn());
+    columns.add(SparkColumnInfo.of("age_p1", DataTypes.IntegerType));
+    columns.add(SparkColumnInfo.of("age_p2", DataTypes.StringType));
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(columns)
+            .withIdentifyPartition(Arrays.asList("age_p1", "age_p2"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
   }
 }

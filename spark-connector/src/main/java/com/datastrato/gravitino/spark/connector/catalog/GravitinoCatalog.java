@@ -17,6 +17,8 @@ import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter.GravitinoTransformBundles;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -127,11 +129,21 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
     String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
+    GravitinoTransformBundles gravitinoTransformContext =
+        SparkTransformConverter.toGravitinoTransform(partitions);
+
     try {
       com.datastrato.gravitino.rel.Table table =
           gravitinoCatalogClient
               .asTableCatalog()
-              .createTable(gravitinoIdentifier, gravitinoColumns, comment, gravitinoProperties);
+              .createTable(
+                  gravitinoIdentifier,
+                  gravitinoColumns,
+                  comment,
+                  gravitinoProperties,
+                  gravitinoTransformContext.getPartitions(),
+                  gravitinoTransformContext.getDistribution(),
+                  gravitinoTransformContext.getSortOrders());
       return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());
