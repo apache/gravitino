@@ -15,16 +15,16 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
-  implementation(project(":server-common"))
   implementation(project(":core"))
-  implementation(libs.jackson.databind)
+  implementation(project(":server-common"))
+  implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jersey)
+  implementation(libs.bundles.log4j)
+  implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.guava)
-  implementation(libs.bundles.log4j)
-  implementation(libs.bundles.jetty)
-  implementation(libs.bundles.jersey)
+  implementation(libs.jackson.databind)
   implementation(libs.metrics.jersey2)
 
   // As of Java 9 or newer, the javax.activation package (needed by the jetty server) is no longer part of the JDK. It was removed because it was part of the
@@ -32,14 +32,11 @@ dependencies {
   // please see: https://stackoverflow.com/questions/46493613/what-is-the-replacement-for-javax-activation-package-in-java-9
   implementation(libs.sun.activation)
 
-  compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
+  compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
   testImplementation(libs.commons.io)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
@@ -47,6 +44,10 @@ dependencies {
   testImplementation(libs.jersey.test.framework.provider.jetty) {
     exclude(group = "org.junit.jupiter")
   }
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

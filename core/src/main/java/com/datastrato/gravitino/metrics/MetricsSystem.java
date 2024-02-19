@@ -19,9 +19,9 @@ import io.prometheus.client.dropwizard.samplebuilder.MapperConfig;
 import io.prometheus.client.exporter.MetricsServlet;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,7 @@ public class MetricsSystem implements Closeable {
   private final String name;
   private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
-  private List<Reporter> metricsReporters = new LinkedList<>();
+  private List<Reporter> metricsReporters = new ArrayList<>();
   private CollectorRegistry prometheusRegistry;
 
   public MetricsSystem() {
@@ -108,7 +108,6 @@ public class MetricsSystem implements Closeable {
     initAndStartMetricsReporter();
   }
 
-  @VisibleForTesting
   public MetricRegistry getMetricRegistry() {
     return metricRegistry;
   }

@@ -1121,10 +1121,6 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(updatedSchema.properties(), alteredSchema.properties());
   }
 
-  protected static String withSlash(String path) {
-    return "/" + path;
-  }
-
   protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
     return new SchemaDTO.Builder()

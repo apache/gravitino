@@ -194,7 +194,7 @@ public class TrinoConnectorIT extends AbstractIT {
     testShowTable();
   }
 
-  void testShowTable() {
+  private void testShowTable() {
     String sql =
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",
@@ -966,7 +966,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
-    LOG.info("create iceberg hive table sql is: " + data);
+    LOG.info("create iceberg hive table sql is: {}", data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
     Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));

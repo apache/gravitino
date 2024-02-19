@@ -28,8 +28,6 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
-  private EntitySerDe entitySerDe;
-
   private CatalogManager catalogManager;
 
   private CatalogOperationDispatcher catalogOperationDispatcher;
@@ -71,13 +69,9 @@ public class GravitinoEnv {
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
-    // Initialize EntitySerDe
-    this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);
-
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    entityStore.setSerDe(entitySerDe);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
@@ -106,15 +100,6 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
-  }
-
-  /**
-   * Get the EntitySerDe associated with the Gravitino environment.
-   *
-   * @return The EntitySerDe instance.
-   */
-  public EntitySerDe entitySerDe() {
-    return entitySerDe;
   }
 
   /**

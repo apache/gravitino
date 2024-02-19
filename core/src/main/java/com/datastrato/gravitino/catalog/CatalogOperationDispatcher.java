@@ -891,9 +891,8 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         ident.name() != null, "The name variable in the NameIdentifier must have value.");
     Namespace.check(
         ident.namespace() != null && ident.namespace().length() > 0,
-        String.format(
-            "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
-            ident.namespace()));
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        ident.namespace());
 
     List<String> allElems =
         Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))

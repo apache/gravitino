@@ -126,7 +126,7 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.FILE)
+            .withType(Catalog.Type.STREAM)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
@@ -191,14 +191,14 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.FILE)
+            .withType(Catalog.Type.STREAM)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
-            catalogName, Catalog.Type.FILE, provider, "comment", Collections.emptyMap());
+            catalogName, Catalog.Type.STREAM, provider, "comment", Collections.emptyMap());
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.POST, path, req1, resp1, HttpStatus.SC_OK);
     Assertions.assertThrows(
@@ -206,7 +206,7 @@ public class TestGravitinoMetalake extends TestBase {
         () ->
             metalake.createCatalog(
                 NameIdentifier.of(metalakeName, catalogName),
-                Catalog.Type.FILE,
+                Catalog.Type.STREAM,
                 provider,
                 "comment",
                 Collections.emptyMap()));

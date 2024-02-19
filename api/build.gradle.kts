@@ -9,13 +9,12 @@ plugins {
 }
 
 dependencies {
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.slf4j.api)
-  implementation(libs.commons.lang3)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

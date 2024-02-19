@@ -481,7 +481,7 @@ public class TestIcebergTable {
 
     Assertions.assertEquals(ICEBERG_COMMENT + "_new", alteredTable.comment());
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
-    Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
+    Assertions.assertEquals("val2_new", alteredTable.properties().get("key2"));
 
     Assertions.assertEquals(sortOrders.length, alteredTable.sortOrder().length);
 

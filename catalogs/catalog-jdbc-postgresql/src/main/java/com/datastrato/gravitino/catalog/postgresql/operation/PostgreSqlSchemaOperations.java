@@ -61,7 +61,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
         statement.setString(2, database);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (!resultSet.next()) {
-            throw new NoSuchSchemaException("No such schema: " + schema);
+            throw new NoSuchSchemaException("No such schema: %s", schema);
           }
           String schemaName = resultSet.getString(1);
           String comment = getSchemaComment(schema, connection);

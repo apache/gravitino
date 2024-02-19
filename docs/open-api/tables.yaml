@@ -827,20 +827,25 @@ components:
         "columns": [
           {
             "name": "id",
-            "type": "int",
+            "type": "integer",
             "comment": "id column comment",
             "nullable": false,
             "autoIncrement": true
           },
           {
             "name": "name",
-            "type": "string",
+            "type": "varchar(255)",
             "comment": "name column comment",
-            "nullable": true
+            "nullable": true,
+            "defaultValue": {
+              "type": "literal",
+              "dataType": "varchar(255)",
+              "value": "default_name"
+            }
           },
           {
             "name": "age",
-            "type": "int",
+            "type": "integer",
             "comment": "age column comment",
             "nullable": true
           },
@@ -881,7 +886,7 @@ components:
         "columns": [
           {
             "name": "id",
-            "type": "int",
+            "type": "integer",
             "comment": "id column comment",
             "nullable": false,
             "autoIncrement": true
@@ -894,7 +899,7 @@ components:
           },
           {
             "name": "age",
-            "type": "int",
+            "type": "integer",
             "comment": "age column comment",
             "nullable": true
           },

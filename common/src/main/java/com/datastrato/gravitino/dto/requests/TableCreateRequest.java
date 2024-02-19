@@ -127,7 +127,11 @@ public class TableCreateRequest implements RESTRequest {
 
     List<ColumnDTO> autoIncrementCols =
         Arrays.stream(columns)
-            .peek(ColumnDTO::validate)
+            .map(
+                column -> {
+                  column.validate();
+                  return column;
+                })
             .filter(ColumnDTO::autoIncrement)
             .collect(Collectors.toList());
     String autoIncrementColsStr =

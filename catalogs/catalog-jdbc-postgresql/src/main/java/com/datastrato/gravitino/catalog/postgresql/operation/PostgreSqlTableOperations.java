@@ -40,6 +40,12 @@ import org.apache.commons.lang3.StringUtils;
 public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   public static final String PG_QUOTE = "\"";
+  public static final String NEW_LINE = "\n";
+  public static final String ALTER_TABLE = "ALTER TABLE ";
+  public static final String ALTER_COLUMN = "ALTER COLUMN ";
+  public static final String IS = " IS '";
+  public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
+  public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
   private String database;
 
@@ -76,21 +82,22 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .append(PG_QUOTE)
         .append(tableName)
         .append(PG_QUOTE)
-        .append(" (\n");
+        .append(" (")
+        .append(NEW_LINE);
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    \"").append(column.name()).append(PG_QUOTE);
+      sqlBuilder.append("    ").append(PG_QUOTE).append(column.name()).append(PG_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
-        sqlBuilder.append(",\n");
+        sqlBuilder.append(",").append(NEW_LINE);
       }
     }
     appendIndexesSql(indexes, sqlBuilder);
-    sqlBuilder.append("\n)");
+    sqlBuilder.append(NEW_LINE).append(")");
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 will add properties
@@ -102,9 +109,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder
-          .append("\nCOMMENT ON TABLE ")
+          .append(NEW_LINE)
+          .append(TABLE_COMMENT)
           .append(tableName)
-          .append(" IS '")
+          .append(IS)
           .append(comment)
           .append("';");
     }
@@ -113,11 +121,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .forEach(
             jdbcColumn ->
                 sqlBuilder
-                    .append("\nCOMMENT ON COLUMN ")
+                    .append(NEW_LINE)
+                    .append(COLUMN_COMMENT)
                     .append(tableName)
                     .append(".")
                     .append(jdbcColumn.name())
-                    .append(" IS '")
+                    .append(IS)
                     .append(jdbcColumn.comment())
                     .append("';"));
 
@@ -142,7 +151,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                     return PG_QUOTE + colNames[0] + PG_QUOTE;
                   })
               .collect(Collectors.joining(", "));
-      sqlBuilder.append(",\n");
+      sqlBuilder.append(",").append(NEW_LINE);
       switch (index.type()) {
         case PRIMARY_KEY:
           if (StringUtils.isNotEmpty(index.name())) {
@@ -162,7 +171,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
     sqlBuilder
         .append(SPACE)
@@ -193,13 +202,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
           .append(SPACE);
     }
-
-    return sqlBuilder;
   }
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "ALTER TABLE " + PG_QUOTE + oldTableName + PG_QUOTE + " RENAME TO " + newTableName;
+    return ALTER_TABLE + PG_QUOTE + oldTableName + PG_QUOTE + " RENAME TO " + newTableName;
   }
 
   @Override
@@ -284,21 +291,23 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnNullability.fieldName()[0];
     if (updateColumnNullability.nullable()) {
-      return "ALTER TABLE "
+      return ALTER_TABLE
           + PG_QUOTE
           + tableName
           + PG_QUOTE
-          + " ALTER COLUMN "
+          + " "
+          + ALTER_COLUMN
           + PG_QUOTE
           + col
           + PG_QUOTE
           + " DROP NOT NULL;";
     } else {
-      return "ALTER TABLE "
+      return ALTER_TABLE
           + PG_QUOTE
           + tableName
           + PG_QUOTE
-          + " ALTER COLUMN "
+          + " "
+          + ALTER_COLUMN
           + PG_QUOTE
           + col
           + PG_QUOTE
@@ -318,13 +327,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         }
       }
     }
-    return "COMMENT ON TABLE "
-        + PG_QUOTE
-        + jdbcTable.name()
-        + PG_QUOTE
-        + " IS '"
-        + newComment
-        + "';";
+    return TABLE_COMMENT + PG_QUOTE + jdbcTable.name() + PG_QUOTE + IS + newComment + "';";
   }
 
   private String deleteColumnFieldDefinition(
@@ -342,7 +345,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "ALTER TABLE "
+    return ALTER_TABLE
         + PG_QUOTE
         + table.name()
         + PG_QUOTE
@@ -366,12 +369,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                 .findFirst()
                 .orElse(null);
     if (null == column) {
-      throw new NoSuchColumnException("Column " + col + " does not exist.");
+      throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder = new StringBuilder("ALTER TABLE " + jdbcTable.name());
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
     sqlBuilder
         .append("\n")
-        .append("ALTER COLUMN ")
+        .append(ALTER_COLUMN)
         .append(PG_QUOTE)
         .append(col)
         .append(PG_QUOTE)
@@ -380,7 +383,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     if (!column.nullable()) {
       sqlBuilder
           .append(",\n")
-          .append("ALTER COLUMN ")
+          .append(ALTER_COLUMN)
           .append(PG_QUOTE)
           .append(col)
           .append(PG_QUOTE)
@@ -394,7 +397,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     if (renameColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
     }
-    return "ALTER TABLE "
+    return ALTER_TABLE
         + tableName
         + " RENAME COLUMN "
         + PG_QUOTE
@@ -427,7 +430,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
-        .append("ALTER TABLE ")
+        .append(ALTER_TABLE)
         .append(lazyLoadTable.name())
         .append(SPACE)
         .append("ADD COLUMN ")
@@ -453,7 +456,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       result.add(
-          "COMMENT ON COLUMN "
+          COLUMN_COMMENT
               + PG_QUOTE
               + lazyLoadTable.name()
               + PG_QUOTE
@@ -461,7 +464,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
               + PG_QUOTE
               + col
               + PG_QUOTE
-              + " IS '"
+              + IS
               + addColumn.getComment()
               + "';");
     }
@@ -475,7 +478,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
     }
     String col = updateColumnComment.fieldName()[0];
-    return "COMMENT ON COLUMN "
+    return COLUMN_COMMENT
         + PG_QUOTE
         + tableName
         + PG_QUOTE
@@ -483,7 +486,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + PG_QUOTE
         + col
         + PG_QUOTE
-        + " IS '"
+        + IS
         + newComment
         + "';";
   }

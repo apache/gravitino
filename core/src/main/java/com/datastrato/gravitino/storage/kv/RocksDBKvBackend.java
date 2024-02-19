@@ -39,12 +39,12 @@ public class RocksDBKvBackend implements KvBackend {
    */
   private RocksDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
-    final Options options = new Options();
-    options.setCreateIfMissing(true);
 
     String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
     File dbDir = new File(dbPath, "instance");
-    try {
+    try (final Options options = new Options()) {
+      options.setCreateIfMissing(true);
+
       if (!dbDir.exists() && !dbDir.mkdirs()) {
         throw new RocksDBException(
             String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
@@ -91,9 +91,8 @@ public class RocksDBKvBackend implements KvBackend {
     byte[] existKey = db.get(key);
     if (existKey != null) {
       throw new AlreadyExistsException(
-          String.format(
-              "Key %s already exists in the database, please use overwrite option to overwrite it",
-              ByteUtils.formatByteArray(key)));
+          "Key %s already exists in the database, please use overwrite option to overwrite it",
+          ByteUtils.formatByteArray(key));
     }
     db.put(key, value);
   }
@@ -110,43 +109,45 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException {
     RocksIterator rocksIterator = db.newIterator();
-    rocksIterator.seek(scanRange.getStart());
+    try {
+      rocksIterator.seek(scanRange.getStart());
 
-    List<Pair<byte[], byte[]>> result = Lists.newArrayList();
-    int count = 0;
-    while (count < scanRange.getLimit() && rocksIterator.isValid()) {
-      byte[] key = rocksIterator.key();
+      List<Pair<byte[], byte[]>> result = Lists.newArrayList();
+      int count = 0;
+      while (count < scanRange.getLimit() && rocksIterator.isValid()) {
+        byte[] key = rocksIterator.key();
 
-      // Break if the key is out of the scan range
-      if (Bytes.wrap(key).compareTo(scanRange.getEnd()) > 0) {
-        break;
-      }
+        // Break if the key is out of the scan range
+        if (Bytes.wrap(key).compareTo(scanRange.getEnd()) > 0) {
+          break;
+        }
 
-      if (!scanRange.getPredicate().test(key, rocksIterator.value())) {
-        rocksIterator.next();
-        continue;
-      }
+        if (!scanRange.getPredicate().test(key, rocksIterator.value())) {
+          rocksIterator.next();
+          continue;
+        }
 
-      if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
-        if (scanRange.isStartInclusive()) {
+        if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
+          if (scanRange.isStartInclusive()) {
+            result.add(Pair.of(key, rocksIterator.value()));
+            count++;
+          }
+        } else if (Bytes.wrap(key).compareTo(scanRange.getEnd()) == 0) {
+          if (scanRange.isEndInclusive()) {
+            result.add(Pair.of(key, rocksIterator.value()));
+          }
+          break;
+        } else {
           result.add(Pair.of(key, rocksIterator.value()));
           count++;
         }
-      } else if (Bytes.wrap(key).compareTo(scanRange.getEnd()) == 0) {
-        if (scanRange.isEndInclusive()) {
-          result.add(Pair.of(key, rocksIterator.value()));
-        }
-        break;
-      } else {
-        result.add(Pair.of(key, rocksIterator.value()));
-        count++;
+
+        rocksIterator.next();
       }
-
-      rocksIterator.next();
+      return result;
+    } finally {
+      rocksIterator.close();
     }
-
-    rocksIterator.close();
-    return result;
   }
 
   @Override
@@ -162,33 +163,36 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public boolean deleteRange(KvRange deleteRange) throws IOException {
     RocksIterator rocksIterator = db.newIterator();
-    rocksIterator.seek(deleteRange.getStart());
 
-    while (rocksIterator.isValid()) {
-      byte[] key = rocksIterator.key();
-      // Break if the key is out of the scan range
-      if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) > 0) {
-        break;
-      }
+    try {
+      rocksIterator.seek(deleteRange.getStart());
 
-      if (Bytes.wrap(key).compareTo(deleteRange.getStart()) == 0) {
-        if (deleteRange.isStartInclusive()) {
+      while (rocksIterator.isValid()) {
+        byte[] key = rocksIterator.key();
+        // Break if the key is out of the scan range
+        if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) > 0) {
+          break;
+        }
+
+        if (Bytes.wrap(key).compareTo(deleteRange.getStart()) == 0) {
+          if (deleteRange.isStartInclusive()) {
+            delete(key);
+          }
+        } else if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) == 0) {
+          if (deleteRange.isEndInclusive()) {
+            delete(key);
+          }
+          break;
+        } else {
           delete(key);
         }
-      } else if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) == 0) {
-        if (deleteRange.isEndInclusive()) {
-          delete(key);
-        }
-        break;
-      } else {
-        delete(key);
-      }
 
-      rocksIterator.next();
+        rocksIterator.next();
+      }
+      return true;
+    } finally {
+      rocksIterator.close();
     }
-
-    rocksIterator.close();
-    return true;
   }
 
   @Override

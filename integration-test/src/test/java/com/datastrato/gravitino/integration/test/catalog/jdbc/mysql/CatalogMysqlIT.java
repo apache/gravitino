@@ -1015,7 +1015,8 @@ public class CatalogMysqlIT extends AbstractIT {
             "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_6]"));
   }
 
-  void testSchemaComment() {
+  @Test
+  public void testSchemaComment() {
     String testSchemaName = "test";
     NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     RuntimeException exception =

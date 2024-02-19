@@ -116,7 +116,7 @@ public class CatalogConnectorManager {
           continue;
         }
 
-        LOG.info("Load metalake: " + usedMetalake);
+        LOG.info("Load metalake: {}", usedMetalake);
         loadCatalogs(metalake);
       }
     } finally {
@@ -135,10 +135,12 @@ public class CatalogConnectorManager {
       return;
     }
 
-    LOG.info(
-        "Load metalake {}'s catalogs. catalogs: {}.",
-        metalake.name(),
-        Arrays.toString(catalogNames));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(
+          "Load metalake {}'s catalogs. catalogs: {}.",
+          metalake.name(),
+          Arrays.toString(catalogNames));
+    }
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
