@@ -17,6 +17,8 @@ import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.partitions.Partition;
@@ -60,14 +62,19 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            Table loadTable = dispatcher.loadTable(tableIdent);
-            if (verbose) {
-              Partition[] partitions = loadTable.supportPartitions().listPartitions();
-              return Utils.ok(new PartitionListResponse(toDTOs(partitions)));
-            } else {
-              String[] partitionNames = loadTable.supportPartitions().listPartitionNames();
-              return Utils.ok(new PartitionNameListResponse((partitionNames)));
-            }
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
+                LockType.READ,
+                () -> {
+                  Table loadTable = dispatcher.loadTable(tableIdent);
+                  if (verbose) {
+                    Partition[] partitions = loadTable.supportPartitions().listPartitions();
+                    return Utils.ok(new PartitionListResponse(toDTOs(partitions)));
+                  } else {
+                    String[] partitionNames = loadTable.supportPartitions().listPartitionNames();
+                    return Utils.ok(new PartitionNameListResponse((partitionNames)));
+                  }
+                });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.LIST, "", table, e);
@@ -90,9 +97,13 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            Table loadTable = dispatcher.loadTable(tableIdent);
-            Partition p = loadTable.supportPartitions().getPartition(partition);
-            return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
+            return TreeLockUtils.doWithRootTreeLock(
+                LockType.READ,
+                () -> {
+                  Table loadTable = dispatcher.loadTable(tableIdent);
+                  Partition p = loadTable.supportPartitions().getPartition(partition);
+                  return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
+                });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.GET, "", table, e);
@@ -117,10 +128,17 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            Table loadTable = dispatcher.loadTable(tableIdent);
-            Partition p =
-                loadTable.supportPartitions().addPartition(fromDTO(request.getPartitions()[0]));
-            return Utils.ok(new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
+            return TreeLockUtils.doWithRootTreeLock(
+                LockType.WRITE,
+                () -> {
+                  Table loadTable = dispatcher.loadTable(tableIdent);
+                  Partition p =
+                      loadTable
+                          .supportPartitions()
+                          .addPartition(fromDTO(request.getPartitions()[0]));
+                  return Utils.ok(
+                      new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
+                });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.CREATE, "", table, e);
