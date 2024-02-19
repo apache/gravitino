@@ -19,7 +19,6 @@ import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
-import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -89,9 +88,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetResponse resp =
         restClient.get(
-            formatFilesetRequestPath(ident.namespace())
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
+            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
             FilesetResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
@@ -129,7 +126,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
-            .name(RESTUtils.encodeString(ident.name()))
+            .name(ident.name())
             .comment(comment)
             .type(type)
             .storageLocation(storageLocation)
@@ -170,9 +167,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetResponse resp =
         restClient.put(
-            formatFilesetRequestPath(ident.namespace())
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
+            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
             req,
             FilesetResponse.class,
             Collections.emptyMap(),
@@ -197,9 +192,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     DropResponse resp =
         restClient.delete(
-            formatFilesetRequestPath(ident.namespace())
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
+            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
