@@ -86,9 +86,9 @@ public class MetalakeIT extends AbstractIT {
           client.loadMetalake(noexist);
         });
 
-    // metalake empty name
-    NameIdentifier empty = NameIdentifier.of("");
-    assertThrows(IllegalNameIdentifierException.class, () -> client.loadMetalake(empty));
+    // metalake empty name - note it's NameIdentifier.of("") that fails not the load
+    assertThrows(
+        IllegalNameIdentifierException.class, () -> client.loadMetalake(NameIdentifier.of("")));
 
     // metalake bad name
     NameIdentifier abc = NameIdentifier.of("A", "B", "C");

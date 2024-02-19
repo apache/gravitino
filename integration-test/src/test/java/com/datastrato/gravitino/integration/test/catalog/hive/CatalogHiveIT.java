@@ -1196,17 +1196,17 @@ public class CatalogHiveIT extends AbstractIT {
     // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
     NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
-    NameIdentifier id2 = NameIdentifier.of(metalakeName, newCatalogName);
+    NameIdentifier oldId = NameIdentifier.of(metalakeName, catalogName);
     for (int i = 0; i < 2; i++) {
       Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
       metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id2));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId));
 
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
-      catalog = metalake.loadCatalog(id2);
+      catalog = metalake.loadCatalog(oldId);
       Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
     }
 
