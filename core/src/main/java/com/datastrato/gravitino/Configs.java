@@ -22,9 +22,6 @@ public interface Configs {
   String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
 
-  String ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY =
-      "gravitino.entity.store.relational.jdbcDBType";
-  String DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE = "mysql";
   String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbcUrl";
   String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY = "gravitino.entity.store.relational.jdbcDriver";
   String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbcUser";
@@ -67,14 +64,6 @@ public interface Configs {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
-
-  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY)
-          .doc("Database type of `JDBCBackend`")
-          .version(ConfigConstants.VERSION_0_5_0)
-          .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault(DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE);
 
   ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_URL =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY)

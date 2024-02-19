@@ -8,7 +8,6 @@ package com.datastrato.gravitino.storage.relational.session;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -36,11 +35,6 @@ public class SqlSessionFactoryHelper {
 
   private SqlSessionFactoryHelper() {}
 
-  @VisibleForTesting
-  static void setSqlSessionFactory(SqlSessionFactory sessionFactory) {
-    sqlSessionFactory = sessionFactory;
-  }
-
   /**
    * Initialize the SqlSessionFactory object.
    *
@@ -52,11 +46,8 @@ public class SqlSessionFactoryHelper {
     BasicDataSource dataSource = new BasicDataSource();
     dataSource.setUrl(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL));
     dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
-    String dbType = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE);
-    if (dbType.equals(Configs.DEFAULT_ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE)) {
-      dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
-      dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
-    }
+    dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
+    dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
     // Close the auto commit, so that we can control the transaction manual commit
     dataSource.setDefaultAutoCommit(false);
     dataSource.setMaxWaitMillis(1000L);

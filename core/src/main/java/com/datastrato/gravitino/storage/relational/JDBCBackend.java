@@ -31,7 +31,7 @@ import java.util.function.Function;
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
  * a database that supports the JDBC protocol as storage. If the specified database has special SQL
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
- * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_DB_TYPE_KEY} parameter.
+ * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
 
