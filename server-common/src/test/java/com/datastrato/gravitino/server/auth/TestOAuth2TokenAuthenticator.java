@@ -116,7 +116,7 @@ public class TestOAuth2TokenAuthenticator {
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
-    String header4 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token3;
+    String header4 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token4;
     byte[] bytes6 = header4.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(

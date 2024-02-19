@@ -202,9 +202,10 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal argument
+    NameIdentifier id2 = NameIdentifier.parse("mock.mock");
     Throwable excep1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> client.alterMetalake(id, changes));
+            IllegalArgumentException.class, () -> client.alterMetalake(id2, changes));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }
