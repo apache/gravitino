@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-public abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
 
   /** The REST client to send the requests. */
