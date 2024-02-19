@@ -15,6 +15,7 @@ public class TreeLockUtils {
   private TreeLockUtils() {
     // Prevent instantiation.
   }
+
   /**
    * Execute the given executable with the given tree lock.
    *
