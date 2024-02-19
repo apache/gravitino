@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
@@ -17,7 +18,6 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
@@ -131,17 +131,17 @@ public class AbstractIT {
     if (AuthenticatorType.OAUTH
         .name()
         .toLowerCase()
-        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       client = GravitinoClient.builder(uri).withOAuth(mockDataProvider).build();
     } else if (AuthenticatorType.SIMPLE
         .name()
         .toLowerCase()
-        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       client = GravitinoClient.builder(uri).withSimpleAuth().build();
     } else if (AuthenticatorType.KERBEROS
         .name()
         .toLowerCase()
-        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       uri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client =
           GravitinoClient.builder(uri)
