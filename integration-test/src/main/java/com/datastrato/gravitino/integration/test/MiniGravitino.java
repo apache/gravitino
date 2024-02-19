@@ -23,7 +23,6 @@ import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -96,7 +95,7 @@ public class MiniGravitino {
     if (AuthenticatorType.OAUTH
         .name()
         .toLowerCase()
-        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
@@ -105,7 +104,7 @@ public class MiniGravitino {
     } else if (AuthenticatorType.KERBEROS
         .name()
         .toLowerCase()
-        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
