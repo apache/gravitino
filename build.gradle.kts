@@ -98,40 +98,38 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
-  if ((project.name != "catalogs") && project.name != "clients") {
-    apply(plugin = "com.diffplug.spotless")
-    repositories {
-      mavenCentral()
-      mavenLocal()
-    }
+  apply(plugin = "com.diffplug.spotless")
+  repositories {
+    mavenCentral()
+    mavenLocal()
+  }
 
-    plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
-      configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-        java {
-          // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-          // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-          // JDK17.
-          googleJavaFormat("1.7")
-          removeUnusedImports()
-          trimTrailingWhitespace()
-          replaceRegex(
-            "Remove wildcard imports",
-            "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-            "$1"
-          )
-          replaceRegex(
-            "Remove static wildcard imports",
-            "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-            "$1"
-          )
+  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+      java {
+        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+        // JDK17.
+        googleJavaFormat("1.7")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        replaceRegex(
+          "Remove wildcard imports",
+          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
+        replaceRegex(
+          "Remove static wildcard imports",
+          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
 
-          targetExclude("**/build/**")
-        }
+        targetExclude("**/build/**")
+      }
 
-        kotlinGradle {
-          target("*.gradle.kts")
-          ktlint().editorConfigOverride(mapOf("indent_size" to 2))
-        }
+      kotlinGradle {
+        target("*.gradle.kts")
+        ktlint().editorConfigOverride(mapOf("indent_size" to 2))
       }
     }
   }
@@ -188,12 +186,6 @@ subprojects {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       }
-    }
-  }
-
-  if ((project.name == "catalogs") || project.name == "clients") {
-    tasks.withType<Jar> {
-      enabled = false
     }
   }
 
