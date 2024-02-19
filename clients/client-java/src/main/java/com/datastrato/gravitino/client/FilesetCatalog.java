@@ -244,8 +244,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(provider), "provider must not be null or empty");
+      Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
       return new FilesetCatalog(name, type, provider, comment, properties, audit, restClient);
