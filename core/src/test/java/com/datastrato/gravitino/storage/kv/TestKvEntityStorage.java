@@ -612,9 +612,10 @@ public class TestKvEntityStorage {
           NonEmptyEntityException.class,
           () -> store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
       store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+      NameIdentifier id = catalog.nameIdentifier();
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
-          () -> store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
+          () -> store.get(id, EntityType.CATALOG, CatalogEntity.class));
 
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
@@ -657,9 +658,10 @@ public class TestKvEntityStorage {
           createCatalog(Namespace.of("metalake"), "catalogCopyAgain", auditInfo);
 
       // First, we try to test transactional is OK
+      final NameIdentifier id1 = metalake.nameIdentifier();
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+          () -> store.get(id1, EntityType.METALAKE, BaseMetalake.class));
 
       store.put(metalake);
       store.put(catalog);
@@ -692,14 +694,15 @@ public class TestKvEntityStorage {
       store.delete(catalog.nameIdentifier(), EntityType.CATALOG);
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
+          () -> store.get(id1, EntityType.CATALOG, CatalogEntity.class));
 
       Assertions.assertThrows(
           EntityAlreadyExistsException.class, () -> store.put(catalogCopy, false));
       store.delete(catalogCopy.nameIdentifier(), EntityType.CATALOG);
+      final NameIdentifier id2 = catalogCopy.nameIdentifier();
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(catalogCopy.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
+          () -> store.get(id2, EntityType.CATALOG, CatalogEntity.class));
 
       Assertions.assertThrowsExactly(
           NonEmptyEntityException.class,
@@ -708,7 +711,7 @@ public class TestKvEntityStorage {
       Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+          () -> store.get(id1, EntityType.METALAKE, BaseMetalake.class));
 
       // Test update
       BaseMetalake updatedMetalake = createBaseMakeLake("updatedMetalake", auditInfo);
@@ -720,7 +723,7 @@ public class TestKvEntityStorage {
           store.get(updatedMetalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+          () -> store.get(id1, EntityType.METALAKE, BaseMetalake.class));
 
       // Add new updateMetaLake.
       // 'updatedMetalake2' is a new name, which will trigger id allocation
@@ -940,9 +943,10 @@ public class TestKvEntityStorage {
           () -> store.get(NameIdentifier.of("metalake2"), EntityType.METALAKE, BaseMetalake.class));
       Assertions.assertDoesNotThrow(
           () -> store.get(NameIdentifier.of("metalake1"), EntityType.METALAKE, BaseMetalake.class));
+      NameIdentifier id = NameIdentifier.of("metalake3");
       Assertions.assertThrows(
           NoSuchEntityException.class,
-          () -> store.get(NameIdentifier.of("metalake3"), EntityType.METALAKE, BaseMetalake.class));
+          () -> store.get(id, EntityType.METALAKE, BaseMetalake.class));
 
       // Test catalog
       CatalogEntity catalog1 = createCatalog(Namespace.of("metalake1"), "catalog1", auditInfo);

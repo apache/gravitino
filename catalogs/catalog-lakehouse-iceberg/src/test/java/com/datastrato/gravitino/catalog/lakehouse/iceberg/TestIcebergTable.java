@@ -201,20 +201,19 @@ public class TestIcebergTable {
     // Compare sort and order
 
     // Test exception
+    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     Throwable exception =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableIdentifier,
-                        columns,
-                        ICEBERG_COMMENT,
-                        properties,
-                        new Transform[0],
-                        Distributions.NONE,
-                        sortOrders));
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    columns,
+                    ICEBERG_COMMENT,
+                    properties,
+                    new Transform[0],
+                    Distributions.NONE,
+                    sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
     IcebergColumn withDefaultValue =
@@ -226,7 +225,6 @@ public class TestIcebergTable {
             .withDefaultValue(Literals.NULL)
             .build();
 
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

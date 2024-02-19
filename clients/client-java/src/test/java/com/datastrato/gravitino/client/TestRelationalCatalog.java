@@ -235,9 +235,9 @@ public class TestRelationalCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
     buildMockResource(Method.GET, schemaPath, null, errorResp1, SC_NOT_FOUND);
 
+    SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex1 =
-        Assertions.assertThrows(
-            NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(schemaId));
+        Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId));
     Assertions.assertTrue(ex1.getMessage().contains("schema not found"));
   }
 
@@ -399,13 +399,12 @@ public class TestRelationalCatalog extends TestBase {
               new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
         };
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> emptyMap = Collections.emptyMap();
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(tableId, errorColumns, "comment", Collections.emptyMap()));
+            () -> tableCatalog.createTable(tableId, errorColumns, "comment", emptyMap));
     Assertions.assertEquals(
         "Column cannot be non-nullable with a null default value: col2", exception.getMessage());
 
@@ -414,20 +413,14 @@ public class TestRelationalCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
     buildMockResource(Method.POST, tablePath, req, errorResp, SC_NOT_FOUND);
 
+    SortOrder[] sortOrder =
+        Arrays.stream(sortOrderDTOs)
+            .map(com.datastrato.gravitino.dto.util.DTOConverters::fromDTO)
+            .toArray(SortOrder[]::new);
     Throwable ex =
         Assertions.assertThrows(
             NoSuchSchemaException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId,
-                        columns,
-                        "comment",
-                        Collections.emptyMap(),
-                        Arrays.stream(sortOrderDTOs)
-                            .map(com.datastrato.gravitino.dto.util.DTOConverters::fromDTO)
-                            .toArray(SortOrder[]::new)));
+            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, sortOrder));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
     // Test throw TableAlreadyExistsException
@@ -439,17 +432,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId,
-                        columns,
-                        "comment",
-                        Collections.emptyMap(),
-                        Arrays.stream(sortOrderDTOs)
-                            .map(com.datastrato.gravitino.dto.util.DTOConverters::fromDTO)
-                            .toArray(SortOrder[]::new)));
+            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, sortOrder));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
@@ -533,14 +516,12 @@ public class TestRelationalCatalog extends TestBase {
             TableAlreadyExistsException.class.getSimpleName(), "table already exists");
     buildMockResource(Method.POST, tablePath, req, errorResp1, SC_CONFLICT);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> emptyMap = Collections.emptyMap();
     Throwable ex1 =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId, columns, "comment", Collections.emptyMap(), partitioning));
+            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, partitioning));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
 
     // Test partitioning field not exist in table
@@ -549,10 +530,7 @@ public class TestRelationalCatalog extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId, columns, "comment", Collections.emptyMap(), errorPartitioning));
+                tableCatalog.createTable(tableId, columns, "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(ex2.getMessage().contains("not found in table"));
 
     // Test empty columns
@@ -560,14 +538,8 @@ public class TestRelationalCatalog extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId,
-                        new ColumnDTO[0],
-                        "comment",
-                        Collections.emptyMap(),
-                        errorPartitioning));
+                tableCatalog.createTable(
+                    tableId, new ColumnDTO[0], "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(
         ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
   }
@@ -641,21 +613,21 @@ public class TestRelationalCatalog extends TestBase {
             TableAlreadyExistsException.class.getSimpleName(), "table already exists");
     buildMockResource(Method.POST, tablePath, req, errorResp1, SC_CONFLICT);
 
+    Map<String, String> emptyMap = Collections.emptyMap();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     Throwable ex1 =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableId,
-                        columns,
-                        "comment",
-                        Collections.emptyMap(),
-                        EMPTY_PARTITIONING,
-                        DistributionDTO.NONE,
-                        SortOrderDTO.EMPTY_SORT,
-                        indexDTOS));
+                tableCatalog.createTable(
+                    tableId,
+                    columns,
+                    "comment",
+                    emptyMap,
+                    EMPTY_PARTITIONING,
+                    DistributionDTO.NONE,
+                    SortOrderDTO.EMPTY_SORT,
+                    indexDTOS));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
@@ -705,9 +677,9 @@ public class TestRelationalCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchTableException.class.getSimpleName(), "table not found");
     buildMockResource(Method.GET, tablePath, null, errorResp, SC_NOT_FOUND);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     Throwable ex =
-        Assertions.assertThrows(
-            NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(tableId));
+        Assertions.assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(tableId));
     Assertions.assertTrue(ex.getMessage().contains("table not found"));
   }
 
@@ -1075,9 +1047,10 @@ public class TestRelationalCatalog extends TestBase {
     ErrorResponse errorResp = ErrorResponse.unsupportedOperation("Unsupported operation");
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_METHOD_NOT_ALLOWED);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> catalog.asTableCatalog().purgeTable(tableId),
+        () -> tableCatalog.purgeTable(tableId),
         "Unsupported operation");
   }
 

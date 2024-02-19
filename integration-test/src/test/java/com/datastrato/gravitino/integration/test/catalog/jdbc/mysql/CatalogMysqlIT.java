@@ -26,6 +26,7 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.Column.ColumnImpl;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
@@ -254,9 +255,12 @@ public class CatalogMysqlIT extends AbstractIT {
         Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
+    Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap()));
+        () -> {
+          schemas.createSchema(schemaIdent, schema_comment, emptyMap);
+        });
 
     // drop schema check.
     schemas.dropSchema(schemaIdent, false);
@@ -695,16 +699,13 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0]);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange change =
+        TableChange.updateColumnPosition(
+            new String[] {"no_column"}, TableChange.ColumnPosition.first());
     NotFoundException notFoundException =
         assertThrows(
-            NotFoundException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnPosition(
-                            new String[] {"no_column"}, TableChange.ColumnPosition.first())));
+            NotFoundException.class, () -> tableCatalog.alterTable(tableIdentifier, change));
     Assertions.assertTrue(notFoundException.getMessage().contains("no_column"));
 
     catalog
@@ -768,12 +769,13 @@ public class CatalogMysqlIT extends AbstractIT {
     // Try to drop a database, and cascade equals to true, it should be allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
     // Check database has been dropped
+    SupportsSchemas schemas = catalog.asSchemas();
+    NameIdentifier of = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
-        () ->
-            catalog
-                .asSchemas()
-                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
+        () -> {
+          schemas.loadSchema(of);
+        });
   }
 
   @Test
@@ -817,38 +819,43 @@ public class CatalogMysqlIT extends AbstractIT {
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed");
+    Index[] indexes2 =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
+    SortOrder[] sortOrder = new SortOrder[0];
     IllegalArgumentException illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+                  sortOrder,
+                  indexes2);
             });
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in MySQL"));
 
+    Index[] indexes3 = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
+                  sortOrder,
+                  indexes3);
             });
     Assertions.assertTrue(
         StringUtils.contains(
@@ -987,28 +994,24 @@ public class CatalogMysqlIT extends AbstractIT {
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 
     // Test create auto increment fail(Many index col)
+    ColumnImpl column = Column.of("col_6", Types.LongType.get(), "id2", false, true, null);
+    SortOrder[] sortOrder = new SortOrder[0];
+    Index[] index2 =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})};
+
     runtimeException =
         assertThrows(
             RuntimeException.class,
             () ->
                 tableCatalog.createTable(
                     tableIdentifier,
-                    new Column[] {
-                      col1,
-                      col2,
-                      col3,
-                      col4,
-                      col5,
-                      Column.of("col_6", Types.LongType.get(), "id2", false, true, null)
-                    },
+                    new Column[] {col1, col2, col3, col4, col5, column},
                     table_comment,
                     properties,
                     Transforms.EMPTY_TRANSFORM,
                     Distributions.NONE,
-                    new SortOrder[0],
-                    new Index[] {
-                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})
-                    }));
+                    sortOrder,
+                    index2));
     Assertions.assertTrue(
         StringUtils.contains(
             runtimeException.getMessage(),
