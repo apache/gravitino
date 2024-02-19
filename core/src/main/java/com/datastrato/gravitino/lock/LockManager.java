@@ -210,6 +210,10 @@ public class LockManager {
     }
   }
 
+  public TreeLock createRootTreeLock() {
+    return createTreeLock(ROOT);
+  }
+
   /**
    * Create a tree lock with the given identifier.
    *
