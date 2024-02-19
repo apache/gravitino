@@ -9,8 +9,10 @@ import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -99,6 +101,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> oauthErrorHandler() {
     return OAuthErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Fileset operations.
+   *
+   * @return A Consumer representing the Fileset error handler.
+   */
+  public static Consumer<ErrorResponse> filesetErrorHandler() {
+    return FilesetErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -353,6 +364,40 @@ public class ErrorHandlers {
                 "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
         }
       }
+      super.accept(errorResponse);
+    }
+  }
+
+  /** Error handler specific to Fileset operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class FilesetErrorHandler extends RestErrorHandler {
+
+    private static final FilesetErrorHandler INSTANCE = new FilesetErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchFilesetException.class.getSimpleName())) {
+            throw new NoSuchFilesetException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new FilesetAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+      }
+
       super.accept(errorResponse);
     }
   }
