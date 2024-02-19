@@ -9,7 +9,12 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.utils.Executable;
 
+/** Utility class for tree locks. */
 public class TreeLockUtils {
+
+  private TreeLockUtils() {
+    // Prevent instantiation.
+  }
   /**
    * Execute the given executable with the given tree lock.
    *
@@ -44,12 +49,6 @@ public class TreeLockUtils {
    */
   public static <R, E extends Exception> R doWithRootTreeLock(
       LockType lockType, Executable<R, E> executable) throws E {
-    TreeLock lock = GravitinoEnv.getInstance().getLockManager().createRootTreeLock();
-    try {
-      lock.lock(lockType);
-      return executable.execute();
-    } finally {
-      lock.unlock();
-    }
+    return doWithTreeLock(LockManager.ROOT, lockType, executable);
   }
 }

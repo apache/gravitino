@@ -95,7 +95,8 @@ public class FilesetOperations {
                 NameIdentifier.ofFileset(metalake, catalog, schema, request.getName());
 
             Fileset fileset =
-                TreeLockUtils.doWithRootTreeLock(
+                TreeLockUtils.doWithTreeLock(
+                    ident,
                     LockType.WRITE,
                     () ->
                         dispatcher.createFileset(

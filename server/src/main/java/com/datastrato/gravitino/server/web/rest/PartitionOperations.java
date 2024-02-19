@@ -97,7 +97,8 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithRootTreeLock(
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
                 LockType.READ,
                 () -> {
                   Table loadTable = dispatcher.loadTable(tableIdent);
@@ -128,7 +129,8 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            return TreeLockUtils.doWithRootTreeLock(
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
                 LockType.WRITE,
                 () -> {
                   Table loadTable = dispatcher.loadTable(tableIdent);
