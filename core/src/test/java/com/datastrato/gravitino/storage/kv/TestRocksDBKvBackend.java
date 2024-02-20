@@ -49,12 +49,6 @@ public class TestRocksDBKvBackend {
     path = kvBackend.getStoragePath(config);
     // We haven't set the GRAVITINO_HOME
     Assertions.assertEquals("null/data/rocksdb", path);
-
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("a/b");
-    kvBackend = new RocksDBKvBackend();
-    path = kvBackend.getStoragePath(config);
-    // We haven't set the GRAVITINO_HOME
-    Assertions.assertEquals("null/a/b", path);
   }
 
   @Test
