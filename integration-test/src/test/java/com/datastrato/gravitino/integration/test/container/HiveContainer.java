@@ -66,6 +66,7 @@ public class HiveContainer extends BaseContainer {
   protected boolean checkContainerStatus(int retryLimit) {
     int nRetry = 0;
     boolean isHiveContainerReady = false;
+    int sleepTimeMillis = 10_000;
     while (nRetry++ < retryLimit) {
       try {
         String[] commandAndArgs = new String[] {"bash", "/tmp/check-status.sh"};
@@ -83,7 +84,12 @@ public class HiveContainer extends BaseContainer {
           isHiveContainerReady = true;
           break;
         }
-        Thread.sleep(5000);
+        LOG.info(
+            "Hive container is not ready, recheck({}/{}) after {}ms",
+            nRetry,
+            retryLimit,
+            sleepTimeMillis);
+        Thread.sleep(sleepTimeMillis);
       } catch (RuntimeException e) {
         LOG.error(e.getMessage(), e);
       } catch (InterruptedException e) {
