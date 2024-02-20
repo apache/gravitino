@@ -1,13 +1,22 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.filesystem.hadoop;
 
+import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.client.FilesetCatalog;
+import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
+import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
+import com.datastrato.gravitino.shaded.org.apache.commons.lang3.StringUtils;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -19,49 +28,48 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
 public class GravitinoVirtualFileSystem extends FileSystem {
-  private FileSystem proxyFileSystem;
   private Path workingDirectory;
   private URI uri;
-  private String filesetIdentifier;
+  private GravitinoClient client;
+  private ConcurrentHashMap<NameIdentifier, FileSystem> filesetFileSystemMapping =
+      new ConcurrentHashMap<>();
 
   @Override
-  public void initialize(URI name, Configuration conf) throws IOException {
+  public void initialize(URI name, Configuration configuration) throws IOException {
     if (name.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      try {
-        // TODO We will replace the default uri to get the truly file system when we
-        //  can interact with gravitino server, now we only support hdfs scheme like
-        //  'hdfs://${host}'
-        URI defaultUri = FileSystem.getDefaultUri(conf);
-        URI newUri =
-            new URI(
-                GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + defaultUri.getAuthority());
-        // close cache, so that single fileset can use single fs
-        conf.set(
-            String.format(
-                "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
-            "true");
-        conf.set(
-            String.format(
-                "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME),
-            "true");
-        setConf(conf);
-        this.proxyFileSystem = FileSystem.get(newUri, conf);
-        this.workingDirectory = new Path(name);
-        this.uri = name;
-        // /${metalake}/${catalog}/${schema}/${fileset}
-        this.filesetIdentifier = normalizedIdentifier(name.getPath());
-      } catch (URISyntaxException e) {
-        throw new RuntimeException(
-            String.format("Cannot create proxy file system uri: %s, exception: %s", name, e));
-      }
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(
+              configuration.get(
+                  GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)),
+          "Gravitino server uri is not set in the configuration");
+      NameIdentifier filesetIdentifier = normalizedIdentifier(name.getPath());
+      String serverUri =
+          configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+      // TODO Need support more authentication types, now we only support simple auth
+      this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
+      configuration.set(
+          String.format(
+              "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
+          "true");
+      URI storageUri = checkAndFetchStorageLocation(filesetIdentifier);
+      closeProxyFSCache(configuration, storageUri);
+      setConf(configuration);
+      filesetFileSystemMapping.put(filesetIdentifier, FileSystem.get(storageUri, configuration));
+      this.workingDirectory = new Path(name);
+      this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
+      super.initialize(uri, configuration);
     } else {
       throw new IllegalArgumentException(
           String.format(
               "Unsupported file system scheme: %s for %s: ",
               name.getScheme(), GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME));
     }
+  }
+
+  private void closeProxyFSCache(Configuration configuration, URI storageUri) {
+    // close cache, so that the user can use the independent fs, and prevent underlying storage
+    // permission issues
+    configuration.set(String.format("fs.%s.impl.disable.cache", storageUri.getScheme()), "true");
   }
 
   @Override
@@ -71,7 +79,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    return proxyFileSystem.open(resolvePathScheme(f), bufferSize);
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    return proxyFileSystem.open(proxyPath, bufferSize);
   }
 
   @Override
@@ -84,42 +94,64 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       long blockSize,
       Progressable progress)
       throws IOException {
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
     return proxyFileSystem.create(
-        resolvePathScheme(f), permission, overwrite, bufferSize, replication, blockSize, progress);
+        proxyPath, permission, overwrite, bufferSize, replication, blockSize, progress);
   }
 
   @Override
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
       throws IOException {
-    return proxyFileSystem.append(resolvePathScheme(f), bufferSize, progress);
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    return proxyFileSystem.append(proxyPath, bufferSize, progress);
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    return proxyFileSystem.rename(resolvePathScheme(src), resolvePathScheme(dst));
+    // Fileset identifier is not allowed to be renamed, only subdirectories can be renamed,
+    // otherwise metadata may be inconsistent.
+    NameIdentifier srcIdentifier = reservedIdentifier(src.toString());
+    NameIdentifier dstIdentifier = reservedIdentifier(dst.toString());
+    Preconditions.checkArgument(
+        srcIdentifier.equals(dstIdentifier),
+        "Destination path identifier should be same with src path identifier.");
+    Path srcProxyPath = resolvePathScheme(src);
+    Path dstProxyPath = resolvePathScheme(dst);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(srcIdentifier);
+    return proxyFileSystem.rename(srcProxyPath, dstProxyPath);
   }
 
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    return proxyFileSystem.delete(resolvePathScheme(f), recursive);
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    return proxyFileSystem.delete(proxyPath, recursive);
   }
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    FileStatus[] fileStatusResults = proxyFileSystem.listStatus(resolvePathScheme(f));
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    FileStatus[] fileStatusResults = proxyFileSystem.listStatus(proxyPath);
     return Arrays.stream(fileStatusResults)
         .map(
             fileStatus ->
                 resolveFileStatusPathScheme(
                     fileStatus,
-                    proxyFileSystem.getScheme() + "://" + proxyFileSystem.getUri().getHost(),
+                    concatProxyFsHostPrefix(
+                        proxyFileSystem.getScheme(), proxyFileSystem.getUri().getHost()),
                     GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX))
         .toArray(FileStatus[]::new);
   }
 
   @Override
   public void setWorkingDirectory(Path newDir) {
-    proxyFileSystem.setWorkingDirectory(resolvePathScheme(newDir));
+    Path proxyPath = resolvePathScheme(newDir);
+    FileSystem proxyFileSystem =
+        filesetFileSystemMapping.get(reservedIdentifier(newDir.toString()));
+    proxyFileSystem.setWorkingDirectory(proxyPath);
     this.workingDirectory = newDir;
   }
 
@@ -130,43 +162,60 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
-    return proxyFileSystem.mkdirs(resolvePathScheme(f), permission);
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    return proxyFileSystem.mkdirs(proxyPath, permission);
   }
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    FileStatus fileStatus = proxyFileSystem.getFileStatus(resolvePathScheme(f));
+    Path proxyPath = resolvePathScheme(f);
+    FileSystem proxyFileSystem = filesetFileSystemMapping.get(reservedIdentifier(f.toString()));
+    FileStatus fileStatus = proxyFileSystem.getFileStatus(proxyPath);
     return resolveFileStatusPathScheme(
         fileStatus,
-        proxyFileSystem.getScheme() + "://" + proxyFileSystem.getUri().getHost(),
+        concatProxyFsHostPrefix(proxyFileSystem.getScheme(), proxyFileSystem.getUri().getHost()),
         GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
   }
 
-  private Path resolvePathScheme(Path path) {
-    return resolvePathScheme(path, proxyFileSystem);
+  private String concatProxyFsHostPrefix(String scheme, String host) {
+    return scheme + "://" + host;
   }
 
-  private Path resolvePathScheme(Path path, FileSystem fileSystem) {
-    checkPathValid(path);
+  @VisibleForTesting
+  Path resolvePathScheme(Path path) {
     URI uri = path.toUri();
     if (uri.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       try {
+        NameIdentifier identifier = reservedIdentifier(uri.toString());
+        FileSystem proxyFileSystem = filesetFileSystemMapping.get(identifier);
+        if (proxyFileSystem == null) {
+          URI storageUri = checkAndFetchStorageLocation(identifier);
+          Configuration configuration = getConf();
+          closeProxyFSCache(configuration, storageUri);
+          proxyFileSystem = FileSystem.get(storageUri, configuration);
+          filesetFileSystemMapping.putIfAbsent(identifier, proxyFileSystem);
+        }
         URI newUri =
             new URI(
-                fileSystem.getScheme(),
+                proxyFileSystem.getScheme(),
                 uri.getUserInfo(),
-                fileSystem.getUri().getHost(),
-                fileSystem.getUri().getPort(),
+                proxyFileSystem.getUri().getHost(),
+                proxyFileSystem.getUri().getPort(),
                 uri.getPath(),
                 uri.getQuery(),
                 uri.getFragment());
         return new Path(newUri);
-      } catch (URISyntaxException e) {
+      } catch (Exception e) {
         throw new RuntimeException(
             String.format("Cannot resolve source path: %s to actual storage path", path));
       }
+    } else {
+      throw new InvalidPathException(
+          String.format(
+              "Path %s doesn't start with scheme \"%s\"",
+              uri, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
     }
-    return path;
   }
 
   private FileStatus resolveFileStatusPathScheme(
@@ -182,38 +231,55 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  private void checkPathValid(Path path) {
-    String uri = path.toString();
-    if (!uri.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't start with scheme \"%s\"",
-              uri, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
-    }
-    String reservedUri =
-        uri.substring(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX.length());
-    String reservedIdentifier = normalizedIdentifier(reservedUri);
-    if (!reservedIdentifier.equals(filesetIdentifier)) {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't contains valid identifier \"%s\"", path, filesetIdentifier));
-    }
+  private NameIdentifier reservedIdentifier(String path) {
+    Preconditions.checkArgument(
+        path.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
+        "Path %s doesn't start with scheme \"%s\"");
+    String reservedPath =
+        path.substring((GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX).length());
+    NameIdentifier reservedIdentifier = normalizedIdentifier(reservedPath);
+    return reservedIdentifier;
   }
 
-  private String normalizedIdentifier(String path) {
-    if (path == null || path.length() == 0) {
+  private URI checkAndFetchStorageLocation(NameIdentifier filesetIdentifier) {
+    GravitinoMetaLake metaLake =
+        client.loadMetalake(NameIdentifier.of(filesetIdentifier.namespace().level(0)));
+    Catalog catalog =
+        metaLake.loadCatalog(
+            NameIdentifier.of(
+                filesetIdentifier.namespace().level(0), filesetIdentifier.namespace().level(1)));
+    FilesetCatalog filesetCatalog = (FilesetCatalog) catalog.asFilesetCatalog();
+    Fileset fileset = filesetCatalog.loadFileset(filesetIdentifier);
+    String storageLocation = fileset.storageLocation();
+    Preconditions.checkArgument(
+        storageLocation != null
+            && storageLocation.startsWith(
+                GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME_PREFIX),
+        "Storage location is not valid in the fileset metadata");
+    return new Path(storageLocation).toUri();
+  }
+
+  private NameIdentifier normalizedIdentifier(String path) {
+    if (StringUtils.isBlank(path)) {
       throw new InvalidPathException("Path which need be normalized cannot be null or empty");
     }
 
     // remove first '/' symbol
     String[] reservedDirs = Arrays.stream(path.substring(1).split("/")).toArray(String[]::new);
-    if (reservedDirs.length >= 4) {
-      return String.format(
-          "/%s/%s/%s/%s", reservedDirs[0], reservedDirs[1], reservedDirs[2], reservedDirs[3]);
-    } else {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't contains valid identifier \"%s\"", path, filesetIdentifier));
+    Preconditions.checkArgument(
+        reservedDirs.length >= 4, "Path %s doesn't contains valid identifier", path);
+    return NameIdentifier.of(reservedDirs[0], reservedDirs[1], reservedDirs[2], reservedDirs[3]);
+  }
+
+  @Override
+  public void close() throws IOException {
+    for (FileSystem fileSystem : filesetFileSystemMapping.values()) {
+      try {
+        fileSystem.close();
+      } catch (IOException e) {
+        // ignore
+      }
     }
+    super.close();
   }
 }
