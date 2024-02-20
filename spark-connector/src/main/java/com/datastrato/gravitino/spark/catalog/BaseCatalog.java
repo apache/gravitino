@@ -34,11 +34,11 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * GravitinoCatalog is the base class for the specify catalog like GravitinoHiveCatalog, it provides
- * a basic table and namespace interfaces. The advanced interfaces like view and function should be
+ * BaseCatalog is the base class for the specify catalog like GravitinoHiveCatalog, it provides a
+ * basic table and namespace interfaces. The advanced interfaces like view and function should be
  * provided by the specify catalog if necessary.
  */
-public abstract class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
+public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected TableCatalog sparkCatalog;
 
   private String metalakeName;
@@ -54,7 +54,7 @@ public abstract class GravitinoCatalog implements TableCatalog, SupportsNamespac
   // Create a internal catalog to do IO operations.
   abstract TableCatalog createSparkCatalog();
 
-  public GravitinoCatalog() {
+  public BaseCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.getGravitinoCatalogManager();
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }

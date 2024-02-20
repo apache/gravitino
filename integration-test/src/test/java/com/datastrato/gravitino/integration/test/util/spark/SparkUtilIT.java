@@ -50,8 +50,8 @@ public abstract class SparkUtilIT extends AbstractIT {
     return convertToStringMap(sql("DESC DATABASE EXTENDED " + database));
   }
 
-  protected List<Object[]> sql(String query, Object... args) {
-    List<Row> rows = getSparkSession().sql(String.format(query, args)).collectAsList();
+  protected List<Object[]> sql(String query) {
+    List<Row> rows = getSparkSession().sql(query).collectAsList();
     return rowsToJava(rows);
   }
 

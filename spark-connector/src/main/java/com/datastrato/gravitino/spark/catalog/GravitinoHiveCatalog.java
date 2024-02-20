@@ -12,12 +12,12 @@ import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 /** GravitinoHiveCatalog represents a hive catalog in Gravitino */
-public class GravitinoHiveCatalog extends GravitinoCatalog {
+public class GravitinoHiveCatalog extends BaseCatalog {
 
   @Override
   public Table createSparkTable(
       Identifier identifier, com.datastrato.gravitino.rel.Table gravitinoTable) {
-    throw new NotSupportedException("");
+    throw new NotSupportedException("Not support create spark hive table");
   }
 
   @Override
