@@ -15,7 +15,6 @@ export function NavigationEvents() {
 
   useEffect(() => {
     const url = `${pathname}?${searchParams}`
-    console.log(url)
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams])

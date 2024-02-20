@@ -214,7 +214,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     if (!metalakeExists) {
-      throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+      throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
     }
 
     try {
@@ -268,7 +268,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     CatalogEntity e =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -287,7 +287,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+        throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
       }
 
       // TODO: should avoid a race condition here
@@ -296,7 +296,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
-      throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
+      throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
     } catch (Exception e3) {
@@ -343,7 +343,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
     }
 
     try {
@@ -371,7 +371,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
-                    new CatalogEntity.Builder()
+                    CatalogEntity.builder()
                         .withId(catalog.id())
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
@@ -402,7 +402,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
@@ -452,7 +452,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
 
     } catch (IOException ioe) {
       LOG.error("Failed to load catalog {}", ident, ioe);

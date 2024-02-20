@@ -3,23 +3,37 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Grid, Card, IconButton, Typography, Tooltip } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { Box, Grid, Card, IconButton, Typography, Portal, Tooltip } from '@mui/material'
+import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 
 import Icon from '@/components/Icon'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } from '@/lib/store/metalakes'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake, resetTree } from '@/lib/store/metalakes'
 
 import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
 import DetailsDrawer from '@/components/DetailsDrawer'
 import CreateMetalakeDialog from './CreateMetalakeDialog'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
+
+function TableToolbar(props) {
+  return (
+    <>
+      <Fragment>
+        <Portal container={() => document.getElementById('filter-panel')}>
+          <Box className={`twc-w-full twc-justify-between twc-hidden`}>
+            <GridToolbar {...props} />
+          </Box>
+        </Portal>
+      </Fragment>
+    </>
+  )
+}
 
 const MetalakeList = () => {
   const dispatch = useAppDispatch()
@@ -67,12 +81,23 @@ const MetalakeList = () => {
     setOpenDrawer(true)
   }
 
+  const handleClickLink = () => {
+    dispatch(resetTree())
+  }
+
   useEffect(() => {
     dispatch(fetchMetalakes())
   }, [dispatch])
 
   useEffect(() => {
-    const filteredData = store.metalakes.filter(i => i.name.toLowerCase().includes(value.toLowerCase()))
+    const filteredData = store.metalakes
+      .filter(i => i.name.toLowerCase().includes(value.toLowerCase()))
+      .sort((a, b) => {
+        if (a.name.toLowerCase() === value.toLowerCase()) return -1
+        if (b.name.toLowerCase() === value.toLowerCase()) return 1
+
+        return 0
+      })
 
     dispatch(setFilteredMetalakes(filteredData))
   }, [dispatch, store.metalakes, value])
@@ -81,6 +106,8 @@ const MetalakeList = () => {
     {
       flex: 0.2,
       minWidth: 230,
+      disableColumnMenu: true,
+      filterable: true,
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -88,11 +115,12 @@ const MetalakeList = () => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip title={name} placement='top'>
+            <Tooltip title={name} placement='right'>
               <Typography
                 noWrap
                 component={Link}
                 href={`/ui/metalakes?metalake=${name}`}
+                onClick={() => handleClickLink()}
                 sx={{
                   fontWeight: 500,
                   color: 'primary.main',
@@ -113,8 +141,9 @@ const MetalakeList = () => {
     {
       flex: 0.15,
       minWidth: 150,
+      disableColumnMenu: true,
       field: 'createdBy',
-      headerName: 'Created By',
+      headerName: 'Created by',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
@@ -125,9 +154,11 @@ const MetalakeList = () => {
     },
     {
       flex: 0.15,
-      field: 'createdAt',
       minWidth: 150,
-      headerName: 'Created At',
+      disableColumnMenu: true,
+      valueGetter: params => `${params.row.audit?.createTime}`,
+      field: 'createdAt',
+      headerName: 'Created at',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
@@ -140,6 +171,7 @@ const MetalakeList = () => {
       flex: 0.1,
       minWidth: 90,
       sortable: false,
+      disableColumnMenu: true,
       field: 'actions',
       headerName: 'Actions',
       renderCell: ({ row }) => (
@@ -187,9 +219,18 @@ const MetalakeList = () => {
             setDialogType={setDialogType}
           />
           <DataGrid
+            disableColumnSelector
+            disableDensitySelector
+            slots={{ toolbar: TableToolbar }}
+            slotProps={{
+              toolbar: {
+                printOptions: { disableToolbarButton: true },
+                csvOptions: { disableToolbarButton: true }
+              }
+            }}
             sx={{
               '& .MuiDataGrid-virtualScroller': {
-                height: store.filteredMetalakes.length === 0 ? 100 : 'auto'
+                minHeight: 36
               },
               maxHeight: 'calc(100vh - 23.2rem)'
             }}

@@ -45,7 +45,9 @@ public class TestEntityStore {
     }
 
     @Override
-    public void initialize(Config config) throws RuntimeException {}
+    public void initialize(Config config) throws RuntimeException {
+      this.serde = Mockito.mock(EntitySerDe.class);
+    }
 
     @Override
     public void setSerDe(EntitySerDe entitySerDe) {
@@ -92,7 +94,7 @@ public class TestEntityStore {
           () -> {
             E e = (E) entityMap.get(ident);
             if (e == null) {
-              throw new NoSuchEntityException("Entity " + ident + " does not exist");
+              throw new NoSuchEntityException("Entity %s does not exist", ident);
             }
 
             E newE = updater.apply(e);
@@ -111,7 +113,7 @@ public class TestEntityStore {
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
+        throw new NoSuchEntityException("Entity %s does not exist", ident);
       }
 
       return e;
@@ -155,7 +157,7 @@ public class TestEntityStore {
             .build();
 
     CatalogEntity catalog =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))

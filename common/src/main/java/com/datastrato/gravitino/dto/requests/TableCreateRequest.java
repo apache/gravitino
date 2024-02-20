@@ -25,6 +25,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a table. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -62,10 +63,23 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("indexes")
   private final IndexDTO[] indexes;
 
+  /** Default constructor for Jackson deserialization. */
   public TableCreateRequest() {
     this(null, null, null, null, null, null, null, null);
   }
 
+  /**
+   * Creates a new TableCreateRequest.
+   *
+   * @param name The name of the table.
+   * @param comment The comment of the table.
+   * @param columns The columns of the table.
+   * @param properties The properties of the table.
+   * @param sortOrders The sort orders of the table.
+   * @param distribution The distribution of the table.
+   * @param partitioning The partitioning of the table.
+   * @param indexes The indexes of the table.
+   */
   public TableCreateRequest(
       String name,
       @Nullable String comment,
@@ -85,6 +99,11 @@ public class TableCreateRequest implements RESTRequest {
     this.indexes = indexes;
   }
 
+  /**
+   * Validates the {@link TableCreateRequest} request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -108,7 +127,11 @@ public class TableCreateRequest implements RESTRequest {
 
     List<ColumnDTO> autoIncrementCols =
         Arrays.stream(columns)
-            .peek(ColumnDTO::validate)
+            .map(
+                column -> {
+                  column.validate();
+                  return column;
+                })
             .filter(ColumnDTO::autoIncrement)
             .collect(Collectors.toList());
     String autoIncrementColsStr =

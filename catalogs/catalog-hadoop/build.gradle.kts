@@ -15,15 +15,16 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":common"))
 
-  implementation(libs.slf4j.api)
   implementation(libs.guava)
   implementation(libs.hadoop2.common)
   implementation(libs.hadoop2.hdfs)
+  implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {

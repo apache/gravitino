@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-public class SqliteTypeConverter extends JdbcTypeConverter<String, String> {
+public class SqliteTypeConverter extends JdbcTypeConverter<String> {
 
   protected static final Map<Type, String> GRAVITINO_TO_SQLITE_MAPPING = new HashMap<>();
 
@@ -23,9 +23,9 @@ public class SqliteTypeConverter extends JdbcTypeConverter<String, String> {
   }
 
   @Override
-  public Type toGravitinoType(String type) {
+  public Type toGravitinoType(JdbcTypeBean type) {
     return GRAVITINO_TO_SQLITE_MAPPING.entrySet().stream()
-        .filter(entry -> StringUtils.equalsIgnoreCase(type, entry.getValue()))
+        .filter(entry -> StringUtils.equalsIgnoreCase(type.getTypeName(), entry.getValue()))
         .map(Map.Entry::getKey)
         .findFirst()
         .orElse(null);

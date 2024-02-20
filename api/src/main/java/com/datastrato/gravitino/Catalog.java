@@ -17,9 +17,14 @@ public interface Catalog extends Auditable {
 
   /** The type of the catalog. */
   enum Type {
-    RELATIONAL, // Catalog Type for Relational Data Structure, like db.table, catalog.db.table.
-    FILE, // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file
-    STREAM, // Catalog Type for Streaming Data, like kafka://topic
+    /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
+    RELATIONAL,
+
+    /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
+    FILESET,
+
+    /** Catalog Type for Message Queue, like kafka://topic */
+    STREAM
   }
 
   /**

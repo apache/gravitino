@@ -9,5 +9,7 @@ public enum OperationType {
   CREATE,
   LOAD,
   ALTER,
-  DROP;
+  DROP,
+  /** This is a special operation type that is used to get a partition from a table. */
+  GET
 }

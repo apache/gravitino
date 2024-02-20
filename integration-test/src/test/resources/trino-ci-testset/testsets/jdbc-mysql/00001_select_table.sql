@@ -20,6 +20,8 @@ insert into "test.gt_mysql".gt_db1.tb02(name, salary) select distinct * from "te
 
 select * from "test.gt_mysql".gt_db1.tb02 order by name;
 
+select * from "test.gt_mysql".gt_db1.tb01 join "test.gt_mysql".gt_db1.tb02 t on tb01.salary = t.salary order by tb01.name;
+
 drop table "test.gt_mysql".gt_db1.tb02;
 
 drop table "test.gt_mysql".gt_db1.tb01;

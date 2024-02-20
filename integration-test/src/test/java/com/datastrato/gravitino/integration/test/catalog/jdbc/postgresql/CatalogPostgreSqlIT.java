@@ -4,6 +4,11 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -24,11 +29,17 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -40,10 +51,11 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.datanucleus.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -384,7 +396,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(createdTable.columns()[i], columns[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -397,7 +409,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(columns[i], loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -551,5 +563,536 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+  }
+
+  @Test
+  public void testBackQuoteTable() {
+    Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("delete", Types.IntegerType.get(), "number", false, false, null);
+    Column col3 = Column.of("show", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "abc");
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                newColumns,
+                table_comment,
+                Collections.emptyMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                Indexes.EMPTY_INDEXES));
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.loadTable(tableIdentifier));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"int"}, Types.StringType.get()),
+                  TableChange.deleteColumn(new String[] {"create"}, true),
+                  TableChange.renameColumn(new String[] {"delete"}, "varchar")
+                }));
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, new TableChange[] {TableChange.rename("test")}));
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+  }
+
+  @Test
+  void testCreateIndexTable() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.VarCharType.of(100), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary("k1_pk", new String[][] {{"col_2"}, {"col_1"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
+          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_4"}, {"col_3"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_5"}, {"col_3"}, {"col_2"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}),
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    // Test create many indexes with name success.
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
+
+    // Test create index complex fields fail.
+    IllegalArgumentException illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in PostgreSQL"));
+
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in PostgreSQL"));
+
+    // Test create index with empty name success.
+    table =
+        tableCatalog.createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, "test_null_key"),
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[] {
+              Indexes.of(
+                  Index.IndexType.UNIQUE_KEY,
+                  null,
+                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+            });
+    Assertions.assertEquals(2, table.index().length);
+    Assertions.assertNotNull(table.index()[0].name());
+    Assertions.assertNotNull(table.index()[1].name());
+
+    // Test create index with same col success.
+    table =
+        tableCatalog.createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, "many_index"),
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[] {
+              Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+              Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+            });
+    Assertions.assertEquals(1, table.index().length);
+    Assertions.assertEquals("u4_key_2", table.index()[0].name());
+  }
+
+  @Test
+  void testColumnDefaultValue() {
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.FloatType.get(),
+            "col_1_comment",
+            false,
+            false,
+            FunctionExpression.of("random"));
+    Column col2 =
+        Column.of(
+            "col_2",
+            Types.TimestampType.withoutTimeZone(),
+            "col_2_comment",
+            false,
+            false,
+            FunctionExpression.of("current_timestamp"));
+    Column col3 =
+        Column.of("col_3", Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL);
+    Column col4 = Column.of("col_4", Types.StringType.get(), "col_4_comment", false, false, null);
+    Column col5 =
+        Column.of(
+            "col_5",
+            Types.VarCharType.of(255),
+            "col_5_comment",
+            true,
+            false,
+            Literals.stringLiteral("current_timestamp"));
+    Column col6 =
+        Column.of(
+            "col_6",
+            Types.IntegerType.get(),
+            "col_6_comment",
+            true,
+            false,
+            Literals.integerLiteral(1000));
+
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(
+                    metalakeName,
+                    catalogName,
+                    schemaName,
+                    GravitinoITUtils.genRandomName("pg_it_table")),
+                newColumns,
+                null,
+                ImmutableMap.of());
+
+    Assertions.assertEquals(
+        toFunctionArg(UnparsedExpression.of("random()")), createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
+        createdTable.columns()[1].defaultValue());
+    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[2].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(Literals.varcharLiteral(255, "current_timestamp")),
+        createdTable.columns()[4].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(Literals.integerLiteral(1000)), createdTable.columns()[5].defaultValue());
+  }
+
+  @Test
+  void testColumnDefaultValueConverter() {
+    // test convert from MySQL to Gravitino
+    String tableName = GravitinoITUtils.genRandomName("test_default_value");
+    String fullTableName = TEST_DB_NAME + "." + schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "    int_col_1 int default 431,\n"
+            + "    int_col_2 int default floor(random() * 100),\n"
+            + "    /*Default values must be specified as the same type in PostgreSQL\n"
+            + "    int_col_3 int default '3.321'::int,*/\n"
+            + "    double_col_1 double precision default 123.45,\n"
+            + "    varchar20_col_1 varchar(20) default (10),\n"
+            + "    varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
+            + "    varchar200_col_1 varchar(200) default 'curdate()',\n"
+            + "    varchar200_col_2 varchar(200) default current_date,\n"
+            + "    varchar200_col_3 varchar(200) default current_timestamp,\n"
+            + "    date_col_1 date default current_date,\n"
+            + "    date_col_2 date,\n"
+            + "    date_col_3 date default (current_date + interval '1 year'),\n"
+            + "    date_col_4 date default current_date,\n"
+            // todo: uncomment when we support timestamp in PG catalog
+            // + "    timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
+            + "    decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
+            + ");";
+    System.out.println(sql);
+    postgreSqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "int_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.integerLiteral(431)), column.defaultValue());
+          break;
+        case "int_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("floor((random() * (100)::double precision))")),
+              column.defaultValue());
+          break;
+        case "int_col_3":
+          Assertions.assertEquals(toFunctionArg(Literals.integerLiteral(3)), column.defaultValue());
+          break;
+        case "double_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.doubleLiteral(123.45)), column.defaultValue());
+          break;
+        case "varchar20_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(20, "10")), column.defaultValue());
+          break;
+        case "varchar100_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(100, "CURRENT_TIMESTAMP")),
+              column.defaultValue());
+          break;
+        case "varchar200_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "curdate()")), column.defaultValue());
+          break;
+        case "varchar200_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "CURRENT_DATE")), column.defaultValue());
+          break;
+        case "varchar200_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.varcharLiteral(200, "CURRENT_TIMESTAMP")),
+              column.defaultValue());
+          break;
+        case "date_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("CURRENT_DATE")), column.defaultValue());
+          break;
+        case "date_col_2":
+          Assertions.assertEquals(toFunctionArg(Literals.NULL), column.defaultValue());
+          break;
+        case "date_col_3":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("(CURRENT_DATE + '1 year'::interval)")),
+              column.defaultValue());
+          break;
+        case "date_col_4":
+          Assertions.assertEquals(
+              toFunctionArg(UnparsedExpression.of("CURRENT_DATE")), column.defaultValue());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("2012-12-31T11:30:45")),
+              column.defaultValue());
+          break;
+        case "timestamp_col_2":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.timestampLiteral("1983-09-05T00:00:00")),
+              column.defaultValue());
+          break;
+        case "decimal_6_2_col_1":
+          Assertions.assertEquals(
+              toFunctionArg(Literals.decimalLiteral(Decimal.of("1.2", 6, 2))),
+              column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
+  }
+
+  @Test
+  void testPGSpecialTableName() {
+    // Test create many indexes with name success.
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    String tableName = "t112";
+    Column col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    Column[] columns = {col1};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "t212";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "t_12";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    tableName = "_1__";
+    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
+    columns = new Column[] {col1};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table t1 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t112"));
+    Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
+
+    Table t2 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t212"));
+    Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
+
+    Table t3 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t_12"));
+    Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
+
+    Table t4 =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "_1__"));
+    Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
+  }
+
+  @Test
+  void testPGTableNameCaseSensitive() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes = new Index[0];
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "tablename");
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            "low case table name",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    assertionsTableInfo(
+        "tablename",
+        "low case table name",
+        Arrays.asList(newColumns),
+        properties,
+        indexes,
+        createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
+
+    // Test create table with same name but different case
+    NameIdentifier tableIdentifier2 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "TABLENAME");
+
+    Column[] upperTableColumns = new Column[] {col1, col4, col5};
+    Table tableAgain =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier2,
+                    upperTableColumns,
+                    "upper case table name",
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    indexes));
+    Assertions.assertEquals("TABLENAME", tableAgain.name());
+
+    table = tableCatalog.loadTable(tableIdentifier2);
+    Assertions.assertEquals("TABLENAME", table.name());
+  }
+
+  @Test
+  void testPGListTable() {
+
+    String schemaPrefix = GravitinoITUtils.genRandomName("postgresql_it_schema");
+    String schemaName1 = schemaPrefix + "_";
+    String schemaName2 = schemaPrefix + "_a";
+    String schemaName3 = schemaPrefix + "1";
+    String schemaName4 = schemaPrefix + "1a";
+    String schemaName5 = schemaPrefix + "aaa";
+
+    String[] dbs = {schemaName1, schemaName2, schemaName3, schemaName4, schemaName5};
+
+    for (int i = 0; i < dbs.length; i++) {
+      catalog
+          .asSchemas()
+          .createSchema(
+              NameIdentifier.of(metalakeName, catalogName, dbs[i]), dbs[i], Maps.newHashMap());
+    }
+
+    String tableName1 = "table1";
+    String tableName2 = "table2";
+    String tableName3 = "table3";
+    String tableName4 = "table4";
+    String tableName5 = "table5";
+
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    String[] tables = {tableName1, tableName2, tableName3, tableName4, tableName5};
+
+    for (int i = 0; i < dbs.length; i++) {
+      catalog
+          .asTableCatalog()
+          .createTable(
+              NameIdentifier.of(metalakeName, catalogName, dbs[i], tables[i]),
+              newColumns,
+              dbs[i] + "." + tables[i],
+              Maps.newHashMap(),
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              new Index[0]);
+    }
+
+    // list table in schema1
+    for (int i = 0; i < 5; i++) {
+      NameIdentifier[] tableNames =
+          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, dbs[i]));
+      Assertions.assertEquals(1, tableNames.length);
+      Assertions.assertEquals(tables[i], tableNames[0].name());
+    }
   }
 }

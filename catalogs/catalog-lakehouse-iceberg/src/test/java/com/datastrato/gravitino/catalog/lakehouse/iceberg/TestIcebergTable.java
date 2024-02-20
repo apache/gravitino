@@ -99,7 +99,7 @@ public class TestIcebergTable {
         AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(ICEBERG_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
@@ -141,7 +141,25 @@ public class TestIcebergTable {
             .withComment(ICEBERG_COMMENT)
             .withNullable(false)
             .build();
-    Column[] columns = new Column[] {col1, col2};
+    Types.StructType structTypeInside =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field_inside", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field_inside", Types.StringType.get(), "string field inside"));
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field", Types.StringType.get(), "string field"),
+            Types.StructType.Field.nullableField("struct_field", structTypeInside, "struct field"));
+    IcebergColumn col3 =
+        new IcebergColumn.Builder()
+            .withName("col_3")
+            .withType(structType)
+            .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
+            .build();
+    Column[] columns = new Column[] {col1, col2, col3};
 
     SortOrder[] sortOrders = createSortOrder();
     Table table =
@@ -166,6 +184,7 @@ public class TestIcebergTable {
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
     Assertions.assertTrue(loadedTable.columns()[0].nullable());
     Assertions.assertFalse(loadedTable.columns()[1].nullable());
+    Assertions.assertFalse(loadedTable.columns()[2].nullable());
 
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
@@ -462,7 +481,7 @@ public class TestIcebergTable {
 
     Assertions.assertEquals(ICEBERG_COMMENT + "_new", alteredTable.comment());
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
-    Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
+    Assertions.assertEquals("val2_new", alteredTable.properties().get("key2"));
 
     Assertions.assertEquals(sortOrders.length, alteredTable.sortOrder().length);
 

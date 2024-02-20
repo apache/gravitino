@@ -697,8 +697,7 @@ const createMuiTheme = (config = {}) => {
             columnHeaderTitle: {
               fontWeight: 600,
               fontSize: '0.75rem',
-              letterSpacing: '0.17px',
-              textTransform: 'uppercase'
+              letterSpacing: '0.17px'
             },
             columnSeparator: ({ theme }) => ({
               color: theme.palette.divider

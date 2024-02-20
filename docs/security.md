@@ -79,6 +79,7 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 :::info
 Now Iceberg REST service doesn't support Kerberos authentication.
+The URI must use the hostname of server instead of IP.
 :::
 
 ### Server configuration
@@ -145,11 +146,11 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
-gravitino.authenticator oauth
-gravitino.authenticator.oauth.serviceAudience test
-gravitino.authenticator.oauth.defaultSignKey <the default signing key>
-gravitino.authenticator.oauth.tokenPath /oauth2/token
-gravitino.authenticator.oauth.serverUri http://localhost:8177
+gravitino.authenticator = oauth
+gravitino.authenticator.oauth.serviceAudience = test
+gravitino.authenticator.oauth.defaultSignKey = <the default signing key>
+gravitino.authenticator.oauth.tokenPath = /oauth2/token
+gravitino.authenticator.oauth.serverUri = http://localhost:8177
 ```
 
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test`, and scope `test`.
@@ -202,7 +203,7 @@ Both the Gravitino server and Iceberg REST service can configure HTTPS.
 | Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
 |------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
 | `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | No                                                | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `9433`        | No                                                | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | No                                                | 0.3.0         |
@@ -257,11 +258,11 @@ Configuration doesn't support resolving environment variables, so you should rep
 Then, You can start the Gravitino server.
 
 ```text
-gravitino.server.webserver.host localhost
-gravitino.server.webserver.enableHttps true
-gravitino.server.webserver.keyStorePath ${JAVA_HOME}/localhost.jks
-gravitino.server.webserver.keyStorePassword localhost
-gravitino.server.webserver.managerPassword localhost
+gravitino.server.webserver.host = localhost
+gravitino.server.webserver.enableHttps = true
+gravitino.server.webserver.keyStorePath = ${JAVA_HOME}/localhost.jks
+gravitino.server.webserver.keyStorePassword = localhost
+gravitino.server.webserver.managerPassword = localhost
 ```
 
 6. Request the Gravitino server

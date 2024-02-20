@@ -4,7 +4,6 @@ name: Improvement
 title: "[Improvement] "
 description: Suggest an improvement on performance, code quality, user experience, etc
 labels: [ "improvement" ]
-projects: [ "datastrato/1" ]
 body:
 
   - type: textarea

@@ -1,0 +1,42 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
+   f1 varchar(200),
+   f2 char(20),
+   f3 varbinary,
+   f4 decimal(10, 3),
+   f5 real,
+   f6 double,
+   f7 boolean,
+   f8 tinyint,
+   f9 smallint,
+   f10 integer,
+   f11 integer,
+   f12 bigint,
+   f13 date,
+   f15 timestamp(3)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb01',
+   table_type = 'MANAGED_TABLE'
+)"
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","1","100","1000","1000","100000","2024-01-01","2024-01-01 08:00:00.000"
+"","","","","","","","","","","","","",""
+
+DROP TABLE
+
+DROP SCHEMA

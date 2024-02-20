@@ -4,35 +4,33 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
+import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
-import net.sf.jsqlparser.statement.create.table.ColDataType;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -42,30 +40,12 @@ import org.apache.commons.lang3.StringUtils;
 public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   public static final String PG_QUOTE = "\"";
-
-  private static final String SHOW_COLUMN_COMMENT_SQL =
-      "SELECT \n"
-          + "    a.attname as col_name,\n"
-          + "    col_description(a.attrelid, a.attnum) as comment\n"
-          + "FROM \n"
-          + "    pg_class AS c\n"
-          + "JOIN \n"
-          + "    pg_attribute AS a ON a.attrelid = c.oid\n"
-          + "JOIN\n"
-          + "    pg_namespace AS n ON n.oid = c.relnamespace\n"
-          + "WHERE \n"
-          + "    a.attnum > 0 \n"
-          + "    AND c.relname = ? AND n.nspname = ?";
-
-  private static final String SHOW_COLUMN_INFO_SQL =
-      "select * FROM information_schema.columns WHERE table_name = ? AND table_schema = ? order by ordinal_position";
-
-  private static final String SHOW_TABLE_COMMENT_SQL =
-      "SELECT tb.table_name, d.description\n"
-          + "FROM information_schema.tables tb\n"
-          + "         JOIN pg_class c ON c.relname = tb.table_name\n"
-          + "         LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = '0'\n"
-          + "WHERE tb.table_name = ? AND table_schema = ?;";
+  public static final String NEW_LINE = "\n";
+  public static final String ALTER_TABLE = "ALTER TABLE ";
+  public static final String ALTER_COLUMN = "ALTER COLUMN ";
+  public static final String IS = " IS '";
+  public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
+  public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
   private String database;
 
@@ -74,150 +54,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
+    super.initialize(
+        dataSource, exceptionMapper, jdbcTypeConverter, jdbcColumnDefaultValueConverter, conf);
     database = new JdbcConfig(conf).getJdbcDatabase();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
-  }
-
-  @Override
-  public JdbcTable load(String schema, String tableName) throws NoSuchTableException {
-    try (Connection connection = getConnection(schema)) {
-      // The first step is to obtain the comment information of the column.
-      Map<String, String> columnCommentMap = selectColumnComment(schema, tableName, connection);
-
-      // The second step is to obtain the column information of the table.
-      List<JdbcColumn> jdbcColumns =
-          selectColumnInfoAndExecute(
-              schema,
-              tableName,
-              connection,
-              (builder, s) -> builder.withComment(columnCommentMap.get(s)));
-
-      // The third step is to obtain the comment information of the table.
-      String comment = selectTableComment(schema, tableName, connection);
-      return new JdbcTable.Builder()
-          .withName(tableName)
-          .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
-          .withComment(comment)
-          .withAuditInfo(AuditInfo.EMPTY)
-          .withProperties(Collections.emptyMap())
-          .build();
-    } catch (SQLException e) {
-      throw this.exceptionMapper.toGravitinoException(e);
-    }
-  }
-
-  private List<JdbcColumn> selectColumnInfoAndExecute(
-      String schemaName,
-      String tableName,
-      Connection connection,
-      BiConsumer<JdbcColumn.Builder, String> builderConsumer)
-      throws SQLException {
-    List<JdbcColumn> jdbcColumns = new ArrayList<>();
-    try (PreparedStatement preparedStatement = connection.prepareStatement(SHOW_COLUMN_INFO_SQL)) {
-      preparedStatement.setString(1, tableName);
-      preparedStatement.setString(2, schemaName);
-      try (ResultSet resultSet = preparedStatement.executeQuery()) {
-        while (resultSet.next()) {
-          ColDataType colDataType = new ColDataType();
-          colDataType.setDataType(resultSet.getString("data_type"));
-          colDataType.setArgumentsStringList(getArgList(resultSet));
-          String columnName = resultSet.getString("column_name");
-          JdbcColumn.Builder builder =
-              new JdbcColumn.Builder()
-                  .withName(columnName)
-                  // TODO: uncomment this once we support column default values.
-                  // .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
-                  .withNullable("YES".equalsIgnoreCase(resultSet.getString("is_nullable")))
-                  .withType(typeConverter.toGravitinoType(colDataType))
-                  .withAutoIncrement("YES".equalsIgnoreCase(resultSet.getString("is_identity")));
-          builderConsumer.accept(builder, columnName);
-          jdbcColumns.add(builder.build());
-        }
-      }
-    }
-    if (jdbcColumns.isEmpty()) {
-      throw new NoSuchTableException("Table " + tableName + " does not exist.");
-    }
-    return jdbcColumns;
-  }
-
-  private static List<String> getArgList(ResultSet resultSet) throws SQLException {
-    List<String> result = new ArrayList<>();
-    String characterMaximumLength = resultSet.getString("character_maximum_length");
-    if (StringUtils.isNotEmpty(characterMaximumLength)) {
-      result.add(characterMaximumLength);
-    }
-    String numericPrecision = resultSet.getString("numeric_precision");
-    if (StringUtils.isNotEmpty(numericPrecision)) {
-      result.add(numericPrecision);
-    }
-    String numericScale = resultSet.getString("numeric_scale");
-    if (StringUtils.isNotEmpty(numericScale)) {
-      result.add(numericScale);
-    }
-    String datetimePrecision = resultSet.getString("datetime_precision");
-    if (StringUtils.isNotEmpty(datetimePrecision)) {
-      result.add(datetimePrecision);
-    }
-    return result;
-  }
-
-  private String selectTableComment(String schema, String tableName, Connection connection)
-      throws SQLException {
-    try (PreparedStatement preparedStatement =
-        connection.prepareStatement(SHOW_TABLE_COMMENT_SQL)) {
-      preparedStatement.setString(1, tableName);
-      preparedStatement.setString(2, schema);
-      try (ResultSet resultSet = preparedStatement.executeQuery()) {
-        if (resultSet.next()) {
-          return resultSet.getString("description");
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * @return Returns the column names and comments of the table
-   * @throws SQLException
-   */
-  private Map<String, String> selectColumnComment(
-      String schema, String tableName, Connection connection) throws SQLException {
-    Map<String, String> columnCommentMap = new HashMap<>();
-
-    try (PreparedStatement preparedStatement =
-        connection.prepareStatement(SHOW_COLUMN_COMMENT_SQL)) {
-      preparedStatement.setString(1, tableName);
-      preparedStatement.setString(2, schema);
-      try (ResultSet resultSet = preparedStatement.executeQuery()) {
-        while (resultSet.next()) {
-          String comment = resultSet.getString("comment");
-          if (null != comment) {
-            String columnName = resultSet.getString("col_name");
-            columnCommentMap.put(columnName, comment);
-          }
-        }
-      }
-    }
-    return columnCommentMap;
-  }
-
-  private static String extractDefaultValue(String columnDefault) {
-    if (columnDefault == null) {
-      return null;
-    }
-
-    // Remove single quotes and '::'
-    int i = columnDefault.indexOf("::");
-    if (-1 != i) {
-      columnDefault = columnDefault.substring(0, i);
-    }
-    String replace = columnDefault.replace("'", "");
-    return "NULL".equalsIgnoreCase(replace) ? null : replace;
   }
 
   @Override
@@ -233,20 +77,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in PostgreSQL");
     }
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
+    sqlBuilder
+        .append("CREATE TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" (")
+        .append(NEW_LINE);
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    \"").append(column.name()).append(PG_QUOTE);
+      sqlBuilder.append("    ").append(PG_QUOTE).append(column.name()).append(PG_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
-        sqlBuilder.append(",\n");
+        sqlBuilder.append(",").append(NEW_LINE);
       }
     }
-    sqlBuilder.append("\n)");
+    appendIndexesSql(indexes, sqlBuilder);
+    sqlBuilder.append(NEW_LINE).append(")");
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 will add properties
@@ -258,9 +109,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder
-          .append("\nCOMMENT ON TABLE ")
+          .append(NEW_LINE)
+          .append(TABLE_COMMENT)
           .append(tableName)
-          .append(" IS '")
+          .append(IS)
           .append(comment)
           .append("';");
     }
@@ -269,11 +121,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .forEach(
             jdbcColumn ->
                 sqlBuilder
-                    .append("\nCOMMENT ON COLUMN ")
+                    .append(NEW_LINE)
+                    .append(COLUMN_COMMENT)
                     .append(tableName)
                     .append(".")
                     .append(jdbcColumn.name())
-                    .append(" IS '")
+                    .append(IS)
                     .append(jdbcColumn.comment())
                     .append("';"));
 
@@ -284,7 +137,41 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  @VisibleForTesting
+  static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    for (Index index : indexes) {
+      String fieldStr =
+          Arrays.stream(index.fieldNames())
+              .map(
+                  colNames -> {
+                    if (colNames.length > 1) {
+                      throw new IllegalArgumentException(
+                          "Index does not support complex fields in PostgreSQL");
+                    }
+                    return PG_QUOTE + colNames[0] + PG_QUOTE;
+                  })
+              .collect(Collectors.joining(", "));
+      sqlBuilder.append(",").append(NEW_LINE);
+      switch (index.type()) {
+        case PRIMARY_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          break;
+        default:
+          throw new IllegalArgumentException("PostgreSQL doesn't support index : " + index.type());
+      }
+    }
+  }
+
+  private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
     sqlBuilder
         .append(SPACE)
@@ -309,27 +196,22 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    // TODO: uncomment this once we support column default values.
-    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    // }
-
-    // Add column properties if specified
-    if (CollectionUtils.isNotEmpty(column.getProperties())) {
-      // TODO #804 will add properties
-      throw new IllegalArgumentException("Properties are not supported yet");
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
     }
-    return sqlBuilder;
   }
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "ALTER TABLE " + oldTableName + " RENAME TO " + newTableName;
+    return ALTER_TABLE + PG_QUOTE + oldTableName + PG_QUOTE + " RENAME TO " + newTableName;
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    return "DROP TABLE " + PG_QUOTE + tableName + PG_QUOTE;
   }
 
   @Override
@@ -378,9 +260,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        alterSql.add(
-            updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, tableName));
+        TableChange.UpdateColumnNullability updateColumnNullability =
+            (TableChange.UpdateColumnNullability) change;
+
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
+
+        alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -405,9 +291,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnNullability.fieldName()[0];
     if (updateColumnNullability.nullable()) {
-      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " DROP NOT NULL;";
+      return ALTER_TABLE
+          + PG_QUOTE
+          + tableName
+          + PG_QUOTE
+          + " "
+          + ALTER_COLUMN
+          + PG_QUOTE
+          + col
+          + PG_QUOTE
+          + " DROP NOT NULL;";
     } else {
-      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " SET NOT NULL;";
+      return ALTER_TABLE
+          + PG_QUOTE
+          + tableName
+          + PG_QUOTE
+          + " "
+          + ALTER_COLUMN
+          + PG_QUOTE
+          + col
+          + PG_QUOTE
+          + " SET NOT NULL;";
     }
   }
 
@@ -423,7 +327,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         }
       }
     }
-    return "COMMENT ON TABLE " + jdbcTable.name() + " IS '" + newComment + "';";
+    return TABLE_COMMENT + PG_QUOTE + jdbcTable.name() + PG_QUOTE + IS + newComment + "';";
   }
 
   private String deleteColumnFieldDefinition(
@@ -441,7 +345,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "ALTER TABLE " + table.name() + " DROP COLUMN " + deleteColumn.fieldName()[0] + ";";
+    return ALTER_TABLE
+        + PG_QUOTE
+        + table.name()
+        + PG_QUOTE
+        + " DROP COLUMN "
+        + PG_QUOTE
+        + deleteColumn.fieldName()[0]
+        + PG_QUOTE
+        + ";";
   }
 
   private String updateColumnTypeFieldDefinition(
@@ -457,17 +369,25 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                 .findFirst()
                 .orElse(null);
     if (null == column) {
-      throw new NoSuchColumnException("Column " + col + " does not exist.");
+      throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder = new StringBuilder("ALTER TABLE " + jdbcTable.name());
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
     sqlBuilder
         .append("\n")
-        .append("ALTER COLUMN ")
+        .append(ALTER_COLUMN)
+        .append(PG_QUOTE)
         .append(col)
+        .append(PG_QUOTE)
         .append(" SET DATA TYPE ")
         .append(typeConverter.fromGravitinoType(updateColumnType.getNewDataType()));
     if (!column.nullable()) {
-      sqlBuilder.append(",\n").append("ALTER COLUMN ").append(col).append(" SET NOT NULL");
+      sqlBuilder
+          .append(",\n")
+          .append(ALTER_COLUMN)
+          .append(PG_QUOTE)
+          .append(col)
+          .append(PG_QUOTE)
+          .append(" SET NOT NULL");
     }
     return sqlBuilder.append(";").toString();
   }
@@ -477,18 +397,22 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     if (renameColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
     }
-    return "ALTER TABLE "
+    return ALTER_TABLE
         + tableName
         + " RENAME COLUMN "
+        + PG_QUOTE
         + renameColumn.fieldName()[0]
+        + PG_QUOTE
         + SPACE
         + "TO"
         + SPACE
+        + PG_QUOTE
         + renameColumn.getNewName()
+        + PG_QUOTE
         + ";";
   }
 
-  private JdbcTable getOrCreateTable(
+  public JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadTable) {
     if (null == lazyLoadTable) {
       return load(databaseName, tableName);
@@ -506,11 +430,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
-        .append("ALTER TABLE ")
+        .append(ALTER_TABLE)
         .append(lazyLoadTable.name())
         .append(SPACE)
         .append("ADD COLUMN ")
+        .append(PG_QUOTE)
         .append(col)
+        .append(PG_QUOTE)
         .append(SPACE)
         .append(typeConverter.fromGravitinoType(addColumn.getDataType()))
         .append(SPACE);
@@ -530,11 +456,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       result.add(
-          "COMMENT ON COLUMN "
+          COLUMN_COMMENT
+              + PG_QUOTE
               + lazyLoadTable.name()
+              + PG_QUOTE
               + "."
+              + PG_QUOTE
               + col
-              + " IS '"
+              + PG_QUOTE
+              + IS
               + addColumn.getComment()
               + "';");
     }
@@ -548,19 +478,29 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
     }
     String col = updateColumnComment.fieldName()[0];
-    return "COMMENT ON COLUMN " + tableName + "." + col + " IS '" + newComment + "';";
+    return COLUMN_COMMENT
+        + PG_QUOTE
+        + tableName
+        + PG_QUOTE
+        + "."
+        + PG_QUOTE
+        + col
+        + PG_QUOTE
+        + IS
+        + newComment
+        + "';";
   }
 
   @Override
-  protected Map<String, String> extractPropertiesFromResultSet(ResultSet table) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table columns is not supported yet");
+  protected ResultSet getIndexInfo(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getIndexInfo(database, schemaName, tableName, false, false);
   }
 
   @Override
-  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet column) {
-    // We have rewritten the `load` method, so there is no need to implement this method
-    throw new UnsupportedOperationException("Extracting table columns is not supported yet");
+  protected ResultSet getPrimaryKeys(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getPrimaryKeys(database, schemaName, tableName);
   }
 
   @Override
@@ -569,5 +509,19 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     connection.setCatalog(database);
     connection.setSchema(schema);
     return connection;
+  }
+
+  @Override
+  protected ResultSet getTable(Connection connection, String schema, String tableName)
+      throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
+    return metaData.getTables(database, schema, tableName, null);
+  }
+
+  @Override
+  protected ResultSet getColumns(Connection connection, String schema, String tableName)
+      throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
+    return metaData.getColumns(database, schema, tableName, null);
   }
 }

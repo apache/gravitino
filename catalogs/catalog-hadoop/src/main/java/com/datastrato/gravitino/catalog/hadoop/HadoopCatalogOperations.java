@@ -107,7 +107,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
       if (!store.exists(schemaIdent, Entity.EntityType.SCHEMA)) {
-        throw new NoSuchSchemaException("Schema " + schemaIdent + " does not exist");
+        throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
       }
 
       List<FilesetEntity> filesets =
@@ -136,9 +136,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           .build();
 
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchFilesetException("Fileset " + ident + " does not exist", exception);
+      throw new NoSuchFilesetException(exception, "Fileset %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load fileset " + ident, ioe);
+      throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
     }
   }
 
@@ -152,7 +152,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     try {
       if (store.exists(ident, Entity.EntityType.FILESET)) {
-        throw new FilesetAlreadyExistsException("Fileset " + ident + " already exists");
+        throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to check if fileset " + ident + " exists", ioe);
@@ -163,7 +163,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       schemaEntity = store.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException("Schema " + schemaIdent + " does not exist", exception);
+      throw new NoSuchSchemaException(exception, "Schema %s does not exist", schemaIdent);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load schema " + schemaIdent, ioe);
     }
@@ -250,7 +250,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchFilesetException, IllegalArgumentException {
     try {
       if (!store.exists(ident, Entity.EntityType.FILESET)) {
-        throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+        throw new NoSuchFilesetException("Fileset %s does not exist", ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
@@ -276,7 +276,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to update fileset " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
-      throw new NoSuchFilesetException("Fileset " + ident + " does not exist", nsee);
+      throw new NoSuchFilesetException(nsee, "Fileset %s does not exist", ident);
     } catch (AlreadyExistsException aee) {
       // This is happened when renaming a fileset to an existing fileset name.
       throw new RuntimeException(
@@ -332,7 +332,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       if (store.exists(ident, Entity.EntityType.SCHEMA)) {
-        throw new SchemaAlreadyExistsException("Schema " + ident + " already exists");
+        throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
@@ -402,7 +402,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           .build();
 
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist", exception);
+      throw new NoSuchSchemaException(exception, "Schema %s does not exist", ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load schema " + ident, ioe);
     }
@@ -413,7 +413,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchSchemaException {
     try {
       if (!store.exists(ident, Entity.EntityType.SCHEMA)) {
-        throw new NoSuchSchemaException("Schema " + ident + " does not exist");
+        throw new NoSuchSchemaException("Schema %s does not exist", ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
@@ -437,7 +437,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to update schema " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist", nsee);
+      throw new NoSuchSchemaException(nsee, "Schema %s does not exist", ident);
     } catch (AlreadyExistsException aee) {
       throw new RuntimeException(
           "Schema with the same name "
@@ -468,7 +468,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       if (fs.listStatus(schemaPath).length > 0 && !cascade) {
         throw new NonEmptySchemaException(
-            "Schema " + ident + " with location " + schemaPath + " is not empty");
+            "Schema %s with location %s is not empty", ident, schemaPath);
       } else {
         fs.delete(schemaPath, true);
       }

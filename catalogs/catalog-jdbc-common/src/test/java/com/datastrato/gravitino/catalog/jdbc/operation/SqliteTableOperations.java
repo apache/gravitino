@@ -5,12 +5,17 @@
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.google.common.collect.Lists;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 public class SqliteTableOperations extends JdbcTableOperations {
@@ -34,6 +39,12 @@ public class SqliteTableOperations extends JdbcTableOperations {
       if (!column.nullable()) {
         sqlBuilder.append(" NOT NULL");
       }
+
+      if (!Column.DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+        sqlBuilder.append(" DEFAULT ");
+        sqlBuilder.append(columnDefaultValueConverter.fromGravitino(column.defaultValue()));
+      }
+
       sqlBuilder.append(",");
     }
 
@@ -77,20 +88,30 @@ public class SqliteTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) throws SQLException {
-    return new JdbcColumn.Builder()
-        .withName(resultSet.getString("COLUMN_NAME"))
-        .withComment(null)
-        .withType(typeConverter.toGravitinoType(resultSet.getString("TYPE_NAME")))
-        .withNullable(resultSet.getBoolean("NULLABLE"))
-        // TODO: uncomment this once we support column default values.
-        // .withDefaultValue(resultSet.getString("COLUMN_DEF"))
-        .build();
+  protected JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    throw new UnsupportedOperationException("Sqlite does not support lazy load create table.");
   }
 
   @Override
-  protected Map<String, String> extractPropertiesFromResultSet(ResultSet table) {
-    // Sqlite does not support table properties.
-    return Collections.emptyMap();
+  protected boolean getAutoIncrementInfo(ResultSet columns) {
+    return false;
+  }
+
+  @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      final List<String> names = Lists.newArrayList();
+      try (ResultSet tables = getTables(connection)) {
+        // tables.getString("TABLE_SCHEM") is always null.
+        while (tables.next()) {
+          names.add(tables.getString("TABLE_NAME"));
+        }
+      }
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      return names;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
   }
 }

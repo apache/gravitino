@@ -8,7 +8,6 @@
   "scripts": {
     "analyze": "env-cmd -f .env.analyze pnpm build",
     "dev": "next dev --turbo",
-    "server": "next dev --turbo",
     "build": "pnpm format && next build",
     "dist": "env-cmd -f .env.static pnpm build",
     "start": "next start",
@@ -26,6 +25,7 @@
     "@mui/x-data-grid": "^6.18.2",
     "@mui/x-tree-view": "^6.17.0",
     "@reduxjs/toolkit": "^1.9.7",
+    "antd": "^5.13.3",
     "axios": "^1.6.5",
     "chroma-js": "^2.4.2",
     "clsx": "^2.0.0",

@@ -6,6 +6,8 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.google.common.base.Joiner;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 
 /**
@@ -92,6 +94,18 @@ public class Namespace {
   }
 
   /**
+   * Create a namespace for fileset.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for fileset
+   */
+  public static Namespace ofFileset(String metalake, String catalog, String schema) {
+    return of(metalake, catalog, schema);
+  }
+
+  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
@@ -100,8 +114,8 @@ public class Namespace {
   public static void checkMetalake(Namespace namespace) {
     check(
         namespace != null && namespace.isEmpty(),
-        String.format(
-            "Metalake namespace must be non-null and empty, the input namespace is %s", namespace));
+        "Metalake namespace must be non-null and empty, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -113,9 +127,8 @@ public class Namespace {
   public static void checkCatalog(Namespace namespace) {
     check(
         namespace != null && namespace.length() == 1,
-        String.format(
-            "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
-            namespace));
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -127,9 +140,8 @@ public class Namespace {
   public static void checkSchema(Namespace namespace) {
     check(
         namespace != null && namespace.length() == 2,
-        String.format(
-            "Schema namespace must be non-null and have 2 levels, the input namespace is %s",
-            namespace));
+        "Schema namespace must be non-null and have 2 levels, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -141,9 +153,21 @@ public class Namespace {
   public static void checkTable(Namespace namespace) {
     check(
         namespace != null && namespace.length() == 3,
-        String.format(
-            "Table namespace must be non-null and have 3 levels, the input namespace is %s",
-            namespace));
+        "Table namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given fileset namespace is legal, throw an {@link IllegalNamespaceException} if
+   * it's illegal.
+   *
+   * @param namespace The fileset namespace
+   */
+  public static void checkFileset(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Fileset namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
   }
 
   private Namespace(String[] levels) {
@@ -190,7 +214,7 @@ public class Namespace {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null || !(other instanceof Namespace)) {
+    if (!(other instanceof Namespace)) {
       return false;
     }
 
@@ -208,9 +232,17 @@ public class Namespace {
     return DOT.join(levels);
   }
 
-  public static void check(boolean expression, String message, Object... args) {
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
+   *
+   * @param expression The expression to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
+  @FormatMethod
+  public static void check(boolean expression, @FormatString String message, Object... args) {
     if (!expression) {
-      throw new IllegalNamespaceException(String.format(message, args));
+      throw new IllegalNamespaceException(message, args);
     }
   }
 }

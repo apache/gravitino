@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -21,7 +22,6 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -55,7 +55,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
 
@@ -104,7 +104,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Catalog catalog = createCatalog(catalogName);
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
-    Schema schema = catalog.asSchemas().createSchema(ident, "comment", prop);
+    Schema schema = catalog.asSchemas().createSchema(ident, null, prop);
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
   }
@@ -126,8 +126,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", properties);
+        .createSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), null, properties);
     Table table =
         catalog
             .asTableCatalog()

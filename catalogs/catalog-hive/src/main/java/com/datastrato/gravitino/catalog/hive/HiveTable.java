@@ -63,6 +63,7 @@ public class HiveTable extends BaseTable {
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
   private String schemaName;
   private CachedClientPool clientPool;
+  private StorageDescriptor sd;
 
   private HiveTable() {}
 
@@ -135,7 +136,8 @@ public class HiveTable extends BaseTable {
             table.getPartitionKeys().stream()
                 .map(p -> identity(p.getName()))
                 .toArray(Transform[]::new))
-        .withSchemaName(table.getDbName());
+        .withSchemaName(table.getDbName())
+        .withStorageDescriptor(table.getSd());
   }
 
   public CachedClientPool clientPool() {
@@ -151,6 +153,10 @@ public class HiveTable extends BaseTable {
 
   public String schemaName() {
     return schemaName;
+  }
+
+  public StorageDescriptor storageDescriptor() {
+    return sd;
   }
 
   private static Map<String, String> buildTableProperties(Table table) {
@@ -217,7 +223,7 @@ public class HiveTable extends BaseTable {
     return parameters;
   }
 
-  private List<FieldSchema> buildPartitionKeys() {
+  public List<FieldSchema> buildPartitionKeys() {
     return Arrays.stream(partitioning)
         .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName()))
         .collect(Collectors.toList());
@@ -318,6 +324,7 @@ public class HiveTable extends BaseTable {
 
     private String schemaName;
     private CachedClientPool clientPool;
+    private StorageDescriptor sd;
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -327,6 +334,17 @@ public class HiveTable extends BaseTable {
      */
     public Builder withSchemaName(String schemaName) {
       this.schemaName = schemaName;
+      return this;
+    }
+
+    /**
+     * Sets the StorageDescriptor to be used for adding partition.
+     *
+     * @param sd The StorageDescriptor instance of the HiveTable.
+     * @return This Builder instance.
+     */
+    public Builder withStorageDescriptor(StorageDescriptor sd) {
+      this.sd = sd;
       return this;
     }
 
@@ -359,6 +377,8 @@ public class HiveTable extends BaseTable {
       hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
       hiveTable.clientPool = clientPool;
+      hiveTable.sd = sd;
+      hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters
       if (comment != null) {

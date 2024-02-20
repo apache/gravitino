@@ -17,10 +17,14 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 datastrato/gravitino
+docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 ```
 
 Changelog
+
+- gravitino:0.4.0
+  - Based on Gravitino 0.4.0, you can know more information from 0.4.0 release notes.
+
 
 - gravitino:0.3.1
   - Fix some issues
@@ -54,6 +58,10 @@ Changelog
 ### Trino image
 
 Changelog
+
+- trino:426-gravitino-0.4.0
+  - Based on Gravitino 0.4.0, you can know more information from 0.4.0 release notes.
+
 
 - trino:426-gravitino-0.3.1
   - Fix some issues

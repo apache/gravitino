@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.rel;
 
+import com.datastrato.gravitino.catalog.OperationsProxy;
+import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
@@ -13,6 +15,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.ToString;
 
@@ -38,6 +41,8 @@ public abstract class BaseTable implements Table {
 
   @Nullable protected Index[] indexes;
 
+  protected Optional<ProxyPlugin> proxyPlugin;
+
   private volatile TableOperations ops;
 
   /**
@@ -56,7 +61,14 @@ public abstract class BaseTable implements Table {
     if (ops == null) {
       synchronized (this) {
         if (ops == null) {
-          ops = newOps();
+          TableOperations newOps = newOps();
+          ops =
+              proxyPlugin
+                  .map(
+                      plugin -> {
+                        return OperationsProxy.createProxy(newOps, plugin);
+                      })
+                  .orElse(newOps);
         }
       }
     }
@@ -148,6 +160,8 @@ public abstract class BaseTable implements Table {
 
     SELF withIndexes(Index[] indexes);
 
+    SELF withProxyPlugin(ProxyPlugin plugin);
+
     T build();
   }
 
@@ -169,6 +183,7 @@ public abstract class BaseTable implements Table {
 
     protected Distribution distribution;
     protected Index[] indexes;
+    protected Optional<ProxyPlugin> proxyPlugin = Optional.empty();
 
     /**
      * Sets the name of the table.
@@ -254,6 +269,11 @@ public abstract class BaseTable implements Table {
 
     public SELF withIndexes(Index[] indexes) {
       this.indexes = indexes;
+      return (SELF) this;
+    }
+
+    public SELF withProxyPlugin(ProxyPlugin proxyPlugin) {
+      this.proxyPlugin = Optional.ofNullable(proxyPlugin);
       return (SELF) this;
     }
 

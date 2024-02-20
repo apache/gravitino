@@ -208,7 +208,7 @@ public class Types {
       this.scale = scale;
     }
 
-    public static void checkPrecisionScale(int precision, int scale) {
+    static void checkPrecisionScale(int precision, int scale) {
       Preconditions.checkArgument(
           precision <= 38,
           "Decimals with precision larger than 38 are not supported: %s",
@@ -217,15 +217,18 @@ public class Types {
           scale <= precision, "Scale cannot be larger than precision: %s > %s", scale, precision);
     }
 
+    /** @return The name of the decimal type. */
     @Override
     public Name name() {
       return Name.DECIMAL;
     }
 
+    /** @return The precision of the decimal type. */
     public int precision() {
       return precision;
     }
 
+    /** @return The scale of the decimal type. */
     public int scale() {
       return scale;
     }
@@ -264,6 +267,7 @@ public class Types {
 
     private DateType() {}
 
+    /** @return The name of the date type. */
     @Override
     public Name name() {
       return Name.DATE;
@@ -318,6 +322,7 @@ public class Types {
       this.withTimeZone = withTimeZone;
     }
 
+    /** @return True if the timestamp type has time zone, false otherwise. */
     public boolean hasTimeZone() {
       return withTimeZone;
     }
@@ -327,6 +332,7 @@ public class Types {
       return Name.TIMESTAMP;
     }
 
+    /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
       return withTimeZone ? "timestamp_tz" : "timestamp";
@@ -449,6 +455,7 @@ public class Types {
       return Name.FIXED;
     }
 
+    /** @return The length of the fixed type. */
     public int length() {
       return length;
     }
@@ -498,6 +505,7 @@ public class Types {
       return Name.VARCHAR;
     }
 
+    /** @return The length of the var char type. */
     public int length() {
       return length;
     }
@@ -547,6 +555,7 @@ public class Types {
       return Name.FIXEDCHAR;
     }
 
+    /** @return The length of the fixed char type. */
     public int length() {
       return length;
     }
@@ -618,6 +627,7 @@ public class Types {
       this.fields = fields;
     }
 
+    /** @return The fields of the struct type. */
     public Field[] fields() {
       return fields;
     }
@@ -756,6 +766,7 @@ public class Types {
         return Objects.hash(name, type, nullable);
       }
 
+      /** @return The simple string representation of the field. */
       public String simpleString() {
         return String.format(
             "%s: %s %s COMMENT %s",
@@ -770,14 +781,34 @@ public class Types {
   /** A list type. Note, this type is not supported in the current version of Gravitino. */
   public static class ListType extends Type.ComplexType {
 
+    /**
+     * Create a new {@link ListType} with the given element type and the type is nullable.
+     *
+     * @param elementType The element type of the list.
+     * @return A new {@link ListType} instance.
+     */
     public static ListType nullable(Type elementType) {
       return of(elementType, true);
     }
 
+    /**
+     * Create a new {@link ListType} with the given element type.
+     *
+     * @param elementType The element type of the list.
+     * @return A new {@link ListType} instance.
+     */
     public static ListType notNull(Type elementType) {
       return of(elementType, false);
     }
 
+    /**
+     * Create a new {@link ListType} with the given element type and whether the element is
+     * nullable.
+     *
+     * @param elementType The element type of the list.
+     * @param elementNullable Whether the element of the list is nullable.
+     * @return A new {@link ListType} instance.
+     */
     public static ListType of(Type elementType, boolean elementNullable) {
       return new ListType(elementType, elementNullable);
     }
@@ -791,10 +822,12 @@ public class Types {
       this.elementNullable = elementNullable;
     }
 
+    /** @return The element type of the list. */
     public Type elementType() {
       return elementType;
     }
 
+    /** @return Whether the element of the list is nullable. */
     public boolean elementNullable() {
       return elementNullable;
     }
@@ -836,14 +869,38 @@ public class Types {
    */
   public static class MapType extends Type.ComplexType {
 
+    /**
+     * Create a new {@link MapType} with the given key type, value type and the value is nullable.
+     *
+     * @param keyType The key type of the map.
+     * @param valueType The value type of the map.
+     * @return A new {@link MapType} instance.
+     */
     public static MapType valueNullable(Type keyType, Type valueType) {
       return of(keyType, valueType, true);
     }
 
+    /**
+     * Create a new {@link MapType} with the given key type, value type and the value is not
+     * nullable.
+     *
+     * @param keyType The key type of the map.
+     * @param valueType The value type of the map.
+     * @return A new {@link MapType} instance.
+     */
     public static MapType valueNotNull(Type keyType, Type valueType) {
       return of(keyType, valueType, false);
     }
 
+    /**
+     * Create a new {@link MapType} with the given key type, value type and whether the value is
+     * nullable
+     *
+     * @param keyType The key type of the map.
+     * @param valueType The value type of the map.
+     * @param valueNullable Whether the value of the map is nullable.
+     * @return A new {@link MapType} instance.
+     */
     public static MapType of(Type keyType, Type valueType, boolean valueNullable) {
       return new MapType(keyType, valueType, valueNullable);
     }
@@ -863,14 +920,17 @@ public class Types {
       return Name.MAP;
     }
 
+    /** @return The key type of the map. */
     public Type keyType() {
       return keyType;
     }
 
+    /** @return The value type of the map. */
     public Type valueType() {
       return valueType;
     }
 
+    /** @return Whether the value of the map is nullable. */
     public boolean valueNullable() {
       return valueNullable;
     }
@@ -906,6 +966,12 @@ public class Types {
    */
   public static class UnionType extends Type.ComplexType {
 
+    /**
+     * Create a new {@link UnionType} with the given types.
+     *
+     * @param types The types of the union.
+     * @return A new {@link UnionType} instance.
+     */
     public static UnionType of(Type... types) {
       return new UnionType(types);
     }
@@ -916,6 +982,7 @@ public class Types {
       this.types = types;
     }
 
+    /** @return The types of the union. */
     public Type[] types() {
       return types;
     }
@@ -957,4 +1024,6 @@ public class Types {
   public static boolean allowAutoIncrement(Type dataType) {
     return dataType instanceof IntegerType || dataType instanceof LongType;
   }
+
+  private Types() {}
 }

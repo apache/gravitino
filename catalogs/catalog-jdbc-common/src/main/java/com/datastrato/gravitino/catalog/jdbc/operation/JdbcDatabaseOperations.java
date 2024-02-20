@@ -62,7 +62,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   @Override
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       DatabaseMetaData metaData = connection.getMetaData();
       ResultSet resultSet = metaData.getCatalogs();
       while (resultSet.next()) {
@@ -101,7 +101,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * Check whether it is a system database.
    *
    * @param dbName The name of the database.
-   * @return
+   * @return false for all cases.
    */
   protected boolean isSystemDatabase(String dbName) {
     return false;

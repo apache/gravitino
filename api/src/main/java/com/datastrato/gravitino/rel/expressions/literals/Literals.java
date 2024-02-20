@@ -141,6 +141,16 @@ public class Literals {
   }
 
   /**
+   * Creates a timestamp type literal with the given value.
+   *
+   * @param value the timestamp literal value, must be in the format "yyyy-MM-ddTHH:mm:ss"
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalDateTime> timestampLiteral(String value) {
+    return timestampLiteral(LocalDateTime.parse(value));
+  }
+
+  /**
    * Creates a string type literal with the given value.
    *
    * @param value the string literal value
@@ -148,6 +158,17 @@ public class Literals {
    */
   public static LiteralImpl<String> stringLiteral(String value) {
     return of(value, Types.StringType.get());
+  }
+
+  /**
+   * Creates a varchar type literal with the given value.
+   *
+   * @param value the string literal value
+   * @param length the length of the varchar
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<String> varcharLiteral(int length, String value) {
+    return of(value, Types.VarCharType.of(length));
   }
 
   /**
@@ -182,7 +203,7 @@ public class Literals {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      LiteralImpl<?> literal = (LiteralImpl<?>) o;
+      LiteralImpl<?> literal = (LiteralImpl) o;
       return Objects.equals(value, literal.value) && Objects.equals(dataType, literal.dataType);
     }
 
@@ -190,5 +211,12 @@ public class Literals {
     public int hashCode() {
       return Objects.hash(value, dataType);
     }
+
+    @Override
+    public String toString() {
+      return "LiteralImpl{" + "value=" + value + ", dataType=" + dataType + '}';
+    }
   }
+
+  private Literals() {}
 }

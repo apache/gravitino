@@ -5,4 +5,4 @@
 
 export const nameRegex = /^[a-zA-Z_][a-zA-Z0-9_]*$/
 
-export const propKeyRegex = /^[a-zA-Z_][a-zA-Z0-9-_.]*$/
+export const keyRegex = /^[a-zA-Z_][a-zA-Z0-9-_.]*$/

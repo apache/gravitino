@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -25,23 +26,24 @@ import org.apache.commons.lang3.StringUtils;
 /** Database operations for MySQL. */
 public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
-  public static final Set<String> SYS_MYSQL_DATABASE_NAMES =
-      Collections.unmodifiableSet(
-          new HashSet<String>() {
-            {
-              add("information_schema");
-              add("mysql");
-              add("performance_schema");
-              add("sys");
-            }
-          });
+  public static final Set<String> SYS_MYSQL_DATABASE_NAMES = createSysMysqlDatabaseNames();
+
+  private static Set<String> createSysMysqlDatabaseNames() {
+    Set<String> set = new HashSet<>();
+    set.add("information_schema");
+    set.add("mysql");
+    set.add("performance_schema");
+    set.add("sys");
+    return Collections.unmodifiableSet(set);
+  }
 
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    if (StringUtils.isNotEmpty(comment)) {
-      LOG.warn(
-          "Ignoring comment option on database create. mysql does not support comment option on database create.");
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "MySQL doesn't support set schema comment: " + originComment);
     }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 
@@ -99,24 +101,23 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           if (!resultSet.next()) {
             throw new NoSuchSchemaException(
-                String.format(
-                    "Database %s could not be found in information_schema.SCHEMATA", databaseName));
+                "Database %s could not be found in information_schema.SCHEMATA", databaseName);
           }
           String schemaName = resultSet.getString("SCHEMA_NAME");
           // Mysql currently only supports these two attributes
           String characterSetName = resultSet.getString("DEFAULT_CHARACTER_SET_NAME");
           String collationName = resultSet.getString("DEFAULT_COLLATION_NAME");
-          return new JdbcSchema.Builder()
-              .withName(schemaName)
-              .withProperties(
-                  new HashMap<String, String>() {
-                    {
-                      put("CHARACTER SET", characterSetName);
-                      put("COLLATE", collationName);
-                    }
-                  })
-              .withAuditInfo(AuditInfo.EMPTY)
-              .build();
+          Map<String, String> properties = new HashMap<>();
+          properties.put("CHARACTER SET", characterSetName);
+          properties.put("COLLATE", collationName);
+
+          JdbcSchema.Builder builder =
+              new JdbcSchema.Builder()
+                  .withName(schemaName)
+                  .withProperties(properties)
+                  .withAuditInfo(AuditInfo.EMPTY);
+
+          return builder.build();
         }
       }
     } catch (final SQLException se) {

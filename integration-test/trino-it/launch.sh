@@ -29,7 +29,7 @@ echo "The docker-compose log is: $LOG_PATH"
 
 nohup docker-compose logs -f  -t >> $LOG_PATH &
 
-max_attempts=180
+max_attempts=600
 
 for ((i = 0; i < max_attempts; i++)); do
     docker-compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {

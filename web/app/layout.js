@@ -14,11 +14,14 @@ import Layout from '@/lib/layout/Layout'
 
 import Loading from '@/lib/layout/Loading'
 
-import { Toaster } from 'react-hot-toast'
+import StyledToast from '../components/StyledToast'
 
 export const metadata = {
   title: 'Gravitino',
-  description: 'A high-performance, geo-distributed and federated metadata lake.'
+  description: 'A high-performance, geo-distributed and federated metadata lake.',
+  icons: {
+    icon: '/icons/gravitino.svg'
+  }
 }
 
 const RootLayout = props => {
@@ -33,7 +36,7 @@ const RootLayout = props => {
             <Layout>{children}</Layout>
           </Suspense>
         </Provider>
-        <Toaster position='top-right' />
+        <StyledToast />
       </body>
     </html>
   )

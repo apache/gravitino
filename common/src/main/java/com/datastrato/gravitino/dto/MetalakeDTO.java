@@ -31,8 +31,17 @@ public class MetalakeDTO implements Metalake {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  /** Default constructor for Jackson deserialization. */
   protected MetalakeDTO() {}
 
+  /**
+   * Creates a new instance of MetalakeDTO.
+   *
+   * @param name The name of the Metalake DTO.
+   * @param comment The comment of the Metalake DTO.
+   * @param properties The properties of the Metalake DTO.
+   * @param audit The audit information of the Metalake DTO.
+   */
   protected MetalakeDTO(
       String name, String comment, Map<String, String> properties, AuditDTO audit) {
     this.name = name;
@@ -41,21 +50,25 @@ public class MetalakeDTO implements Metalake {
     this.audit = audit;
   }
 
+  /** @return The name of the Metalake DTO. */
   @Override
   public String name() {
     return name;
   }
 
+  /** @return The comment of the Metalake DTO. */
   @Override
   public String comment() {
     return comment;
   }
 
+  /** @return The properties of the Metalake DTO. */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
+  /** @return The audit information of the Metalake DTO. */
   @Override
   public Audit auditInfo() {
     return audit;
@@ -68,11 +81,19 @@ public class MetalakeDTO implements Metalake {
    */
   public static class Builder<S extends Builder> {
 
+    /** The name of the Metalake DTO. */
     protected String name;
+
+    /** The comment of the Metalake DTO. */
     protected String comment;
+
+    /** The properties of the Metalake DTO. */
     protected Map<String, String> properties;
+
+    /** The audit information of the Metalake DTO. */
     protected AuditDTO audit;
 
+    /** Default constructor. */
     public Builder() {}
 
     /**

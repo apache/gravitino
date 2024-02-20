@@ -39,8 +39,19 @@ public class CatalogDTO implements Catalog {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  /** Default constructor for Jackson. */
   protected CatalogDTO() {}
 
+  /**
+   * Constructor for the catalog.
+   *
+   * @param name The name of the catalog.
+   * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
+   * @param comment The comment of the catalog.
+   * @param properties The properties of the catalog.
+   * @param audit The audit information of the catalog.
+   */
   protected CatalogDTO(
       String name,
       Type type,
@@ -56,31 +67,61 @@ public class CatalogDTO implements Catalog {
     this.audit = audit;
   }
 
+  /**
+   * Get the name of the catalog.
+   *
+   * @return The name of the catalog.
+   */
   @Override
   public String name() {
     return name;
   }
 
+  /**
+   * Get the type of the catalog.
+   *
+   * @return The type of the catalog.
+   */
   @Override
   public Type type() {
     return type;
   }
 
+  /**
+   * Get the provider of the catalog.
+   *
+   * @return The provider of the catalog.
+   */
   @Override
   public String provider() {
     return provider;
   }
 
+  /**
+   * Get the comment of the catalog.
+   *
+   * @return The comment of the catalog.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
+  /**
+   * Get the properties of the catalog.
+   *
+   * @return The properties of the catalog.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
+  /**
+   * Get the audit information of the catalog.
+   *
+   * @return The audit information of the catalog.
+   */
   @Override
   public Audit auditInfo() {
     return audit;
@@ -92,13 +133,26 @@ public class CatalogDTO implements Catalog {
    * @param <S> The type of the builder instance.
    */
   public static class Builder<S extends Builder> {
+
+    /** The name of the catalog. */
     protected String name;
+
+    /** The type of the catalog. */
     protected Type type;
+
+    /** The provider of the catalog. */
     protected String provider;
+
+    /** The comment of the catalog. */
     protected String comment;
+
+    /** The properties of the catalog. */
     protected Map<String, String> properties;
+
+    /** The audit information of the catalog. */
     protected AuditDTO audit;
 
+    /** Default constructor for the builder. */
     public Builder() {}
 
     /**

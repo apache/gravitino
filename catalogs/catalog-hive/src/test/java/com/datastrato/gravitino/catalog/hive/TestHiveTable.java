@@ -45,11 +45,11 @@ import org.junit.jupiter.api.Test;
 
 public class TestHiveTable extends MiniHiveMetastoreService {
 
-  private static final String META_LAKE_NAME = "metalake";
+  protected static final String META_LAKE_NAME = "metalake";
 
-  private static final String HIVE_CATALOG_NAME = "test_catalog";
-  private static final String HIVE_SCHEMA_NAME = "test_schema";
-  private static final String HIVE_COMMENT = "test_comment";
+  protected static final String HIVE_CATALOG_NAME = "test_catalog";
+  protected static final String HIVE_SCHEMA_NAME = "test_schema";
+  protected static final String HIVE_COMMENT = "test_comment";
   private static HiveCatalog hiveCatalog;
   private static HiveSchema hiveSchema;
   private static final NameIdentifier schemaIdent =
@@ -57,31 +57,30 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   @BeforeAll
   private static void setup() {
-    initHiveCatalog();
-    initHiveSchema();
+    hiveCatalog = initHiveCatalog();
+    hiveSchema = initHiveSchema(hiveCatalog);
   }
 
   @AfterEach
   private void resetSchema() {
     hiveCatalog.asSchemas().dropSchema(schemaIdent, true);
-    initHiveSchema();
+    hiveSchema = initHiveSchema(hiveCatalog);
   }
 
-  private static void initHiveSchema() {
+  protected static HiveSchema initHiveSchema(HiveCatalog hiveCatalog) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    hiveSchema =
-        (HiveSchema) hiveCatalog.asSchemas().createSchema(schemaIdent, HIVE_COMMENT, properties);
+    return (HiveSchema) hiveCatalog.asSchemas().createSchema(schemaIdent, HIVE_COMMENT, properties);
   }
 
-  private static void initHiveCatalog() {
+  protected static HiveCatalog initHiveCatalog() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(HIVE_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
@@ -106,7 +105,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
         hiveConf.get(HiveConf.ConfVars.HIVE_IN_TEST.varname));
 
-    hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    return new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 
   private Distribution createDistribution() {
@@ -362,40 +361,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testListPartitionNames() {
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-
-    HiveColumn col1 =
-        new HiveColumn.Builder()
-            .withName("city")
-            .withType(Types.ByteType.get())
-            .withComment(HIVE_COMMENT)
-            .build();
-    HiveColumn col2 =
-        new HiveColumn.Builder()
-            .withName("dt")
-            .withType(Types.DateType.get())
-            .withComment(HIVE_COMMENT)
-            .build();
-    Column[] columns = new Column[] {col1, col2};
-
-    Transform[] partitions = new Transform[] {identity(col2.name())};
-
-    String[] partitionNames =
-        hiveCatalog
-            .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions)
-            .supportPartitions()
-            .listPartitionNames();
-    // TODO: update following assertion after implementing addPartition
-    Assertions.assertEquals(0, partitionNames.length);
-  }
-
-  @Test
   public void testDropHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
@@ -613,7 +578,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Assertions.assertEquals(HIVE_COMMENT + "_new", alteredTable.comment());
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
-    Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
+    Assertions.assertEquals("val2_new", alteredTable.properties().get("key2"));
 
     Assertions.assertEquals(createdTable.auditInfo().creator(), alteredTable.auditInfo().creator());
     Assertions.assertNull(alteredTable.auditInfo().lastModifier());

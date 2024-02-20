@@ -6,6 +6,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+
 import { useSearchParams } from 'next/navigation'
 
 import MetalakeView from '@/app/ui/metalakes/MetalakeView'
@@ -13,25 +14,8 @@ import MetalakeView from '@/app/ui/metalakes/MetalakeView'
 const MetalakePage = () => {
   const params = useSearchParams()
 
-  const [routeParams, setRouteParams] = useState({
-    metalake: params.get('metalake'),
-    catalog: params.get('catalog'),
-    schema: params.get('schema'),
-    table: params.get('table')
-  })
+  const [routeParams, setRouteParams] = useState({})
 
-  useEffect(() => {
-    setRouteParams({
-      metalake: params.get('metalake'),
-      catalog: params.get('catalog'),
-      schema: params.get('schema'),
-      table: params.get('table')
-    })
-  }, [params])
-
-  // console.log(params.get('metalake'))
-
-  // console.log(params.keys().includes('metalake'))
   const getProps = () => {
     if (params.size === 1 && params.has('metalake')) {
       return {
@@ -60,6 +44,17 @@ const MetalakePage = () => {
       }
     }
   }
+
+  useEffect(() => {
+    const takeParams = {
+      metalake: params.get('metalake'),
+      catalog: params.get('catalog'),
+      schema: params.get('schema'),
+      table: params.get('table')
+    }
+
+    setRouteParams(takeParams)
+  }, [params])
 
   return <MetalakeView page={getProps().page} tableTitle={getProps().title} routeParams={routeParams} />
 }

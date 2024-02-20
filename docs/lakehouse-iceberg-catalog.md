@@ -58,7 +58,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema 
 
@@ -72,11 +72,13 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table 
 
 ### Table capabilities
+
+- Doesn't support column default value.
 
 #### Table partitions
 
@@ -193,7 +195,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
+| `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -232,9 +234,13 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `identifier-fields`             | The identifier fields for defining the table.           |
 | `write.distribution-mode`       | Defines distribution of write data                      |
 
+### Table indexes
+
+- Doesn't support table indexes.
+
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
@@ -254,7 +260,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-Iceberg just supports updating primitive types.
 :::
 
 :::caution

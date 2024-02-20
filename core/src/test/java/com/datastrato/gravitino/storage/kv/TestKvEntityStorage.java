@@ -77,7 +77,7 @@ public class TestKvEntityStorage {
   }
 
   public static CatalogEntity createCatalog(Namespace namespace, String name, AuditInfo auditInfo) {
-    return new CatalogEntity.Builder()
+    return CatalogEntity.builder()
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)

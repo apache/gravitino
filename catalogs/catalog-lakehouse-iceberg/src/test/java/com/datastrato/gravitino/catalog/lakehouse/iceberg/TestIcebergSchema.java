@@ -130,7 +130,7 @@ public class TestIcebergSchema {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
@@ -158,7 +158,7 @@ public class TestIcebergSchema {
 
   private IcebergCatalog initIcebergCatalog(String name) {
     CatalogEntity entity =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(1L)
             .withName(name)
             .withNamespace(Namespace.of(META_LAKE_NAME))

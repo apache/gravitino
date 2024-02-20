@@ -9,9 +9,12 @@ import static java.util.Collections.emptyList;
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Transforming MySQL connector configuration and components into Gravitino connector. */
@@ -19,9 +22,11 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
 
   private final PropertyConverter catalogConverter;
   private static int version = 0;
+  private final HasPropertyMeta propertyMetadata;
 
   public MySQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
+    this.propertyMetadata = new MySQLPropertyMeta();
   }
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
@@ -40,5 +45,15 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new MySQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
+  }
+
+  @Override
+  public List<PropertyMetadata<?>> getTableProperties() {
+    return propertyMetadata.getTablePropertyMetadata();
+  }
+
+  @Override
+  public List<PropertyMetadata<?>> getColumnProperties() {
+    return propertyMetadata.getColumnPropertyMetadata();
   }
 }

@@ -36,7 +36,7 @@ public abstract class Config {
    *
    * @param loadDefaults Set to true if default configurations should be loaded.
    */
-  public Config(boolean loadDefaults) {
+  protected Config(boolean loadDefaults) {
     configMap = new ConcurrentHashMap<>();
     if (loadDefaults) {
       loadFromProperties(System.getProperties());
@@ -88,9 +88,9 @@ public abstract class Config {
    * @throws NoSuchElementException If the configuration entry is not found.
    */
   public <T> T get(ConfigEntry<T> entry) throws NoSuchElementException {
-    if (entry.isDeprecated()) {
+    if (entry.isDeprecated() && LOG.isWarnEnabled()) {
       LOG.warn("Config {} is deprecated.", entry.getKey());
-      if (!entry.getAlternatives().isEmpty()) {
+      if (!entry.getAlternatives().isEmpty() && LOG.isWarnEnabled()) {
         LOG.warn("Please use {} instead.", String.join(", ", entry.getAlternatives()));
       }
     }
@@ -132,6 +132,11 @@ public abstract class Config {
     return MapUtils.getPrefixMap(configMap, prefix);
   }
 
+  /**
+   * Retrieves a map containing all configuration entries.
+   *
+   * @return An unmodifiable map containing all configuration entries.
+   */
   public Map<String, String> getAllConfig() {
     return MapUtils.unmodifiableMap(configMap);
   }
@@ -144,14 +149,14 @@ public abstract class Config {
    * @param <T> The type of the configuration value.
    */
   public <T> void set(ConfigEntry<T> entry, T value) {
-    if (entry.isDeprecated()) {
+    if (entry.isDeprecated() && LOG.isWarnEnabled()) {
       LOG.warn("Config {} is deprecated.", entry.getKey());
-      if (!entry.getAlternatives().isEmpty()) {
+      if (!entry.getAlternatives().isEmpty() && LOG.isWarnEnabled()) {
         LOG.warn("Please use {} instead.", String.join(", ", entry.getAlternatives()));
       }
     }
 
-    if (value == null) {
+    if (value == null && LOG.isWarnEnabled()) {
       LOG.warn("Config {} value to set is null, ignore setting to Config.", entry.getKey());
     }
 
@@ -202,7 +207,7 @@ public abstract class Config {
       return properties;
 
     } catch (Exception e) {
-      LOG.error("Failed to load properties from " + file.getAbsolutePath(), e);
+      LOG.error("Failed to load properties from {}", file.getAbsolutePath(), e);
       throw new IOException("Failed to load properties from " + file.getAbsolutePath(), e);
     }
   }

@@ -37,12 +37,19 @@ import org.ietf.jgss.Oid;
 // Split method `doAs` into two methods
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
+
+/** Utility class for Kerberos related tests. */
 public class KerberosUtils {
 
   private KerberosUtils() {}
 
+  /** Oid instance for Kerberos spnego mechanism. */
   public static final Oid GSS_SPNEGO_MECH_OID = getNumericOidInstance("1.3.6.1.5.5.2");
+
+  /** Oid instance for Kerberos mechanism. */
   public static final Oid GSS_KRB5_MECH_OID = getNumericOidInstance("1.2.840.113554.1.2.2");
+
+  /** Oid instance for Kerberos principal name. */
   public static final Oid NT_GSS_KRB5_PRINCIPAL_OID =
       getNumericOidInstance("1.2.840.113554.1.2.2.1");
 
@@ -56,6 +63,14 @@ public class KerberosUtils {
     }
   }
 
+  /**
+   * Login to KDC using principal and keytab file.
+   *
+   * @param principal The principal name
+   * @param keyTabFile The keytab file
+   * @return The login context
+   * @throws LoginException If login fails, or if the principal and keytab file are invalid.
+   */
   public static LoginContext login(String principal, String keyTabFile) throws LoginException {
     Set<Principal> principals = new HashSet<>();
     principals.add(new KerberosPrincipal(principal));
@@ -66,6 +81,15 @@ public class KerberosUtils {
     return loginContext;
   }
 
+  /**
+   * Execute the given action as the given subject.
+   *
+   * @param subject The subject to execute the action as.
+   * @param callable The action to execute.
+   * @param <T> The return type of the action
+   * @return The result of the action
+   * @throws Exception If the action throws an exception
+   */
   public static <T> T doAs(Subject subject, final Callable<T> callable) throws Exception {
     try {
       return Subject.doAs(
@@ -97,10 +121,10 @@ public class KerberosUtils {
       if (keyTabFile != null) {
         options.put("useKeyTab", "true");
         options.put("keyTab", keyTabFile);
+        options.put("storeKey", "true");
       }
 
       options.put("principal", principal);
-      options.put("storeKey", "true");
       options.put("doNotPrompt", "true");
       options.put("useTicketCache", "true");
       options.put("renewTGT", "true");
@@ -121,7 +145,7 @@ public class KerberosUtils {
     }
   }
 
-  /* Return the Kerberos login module name */
+  /** @return The Kerberos login module name. */
   public static String getKrb5LoginModuleName() {
     return "com.sun.security.auth.module.Krb5LoginModule";
   }

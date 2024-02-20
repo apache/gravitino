@@ -72,7 +72,7 @@ To configure Gravitino connector correctly, you need to put the following config
 
 ```text
 connector.name=gravitino
-gravitino.url=http://gravitino-server-host:8090
+gravitino.uri=http://gravitino-server-host:8090
 gravitino.metalake=test
 ```
 
@@ -113,7 +113,7 @@ system
 
 You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
 docker exec -it trino trino

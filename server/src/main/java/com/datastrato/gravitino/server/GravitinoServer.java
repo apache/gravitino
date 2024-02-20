@@ -132,6 +132,7 @@ public class GravitinoServer extends ResourceConfig {
                     // Register some clean-up tasks that need to be done before shutting down
                     Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
                   } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     LOG.error("Interrupted exception:", e);
                   } catch (Exception e) {
                     LOG.error("Error while running clean-up tasks in shutdown hook", e);

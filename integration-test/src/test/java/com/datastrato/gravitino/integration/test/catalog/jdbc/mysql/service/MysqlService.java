@@ -66,14 +66,21 @@ public class MysqlService {
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (!resultSet.next()) {
           throw new NoSuchSchemaException(
-              String.format(
-                  "Database %s could not be found in information_schema.SCHEMATA", databaseName));
+              "Database %s could not be found in information_schema.SCHEMATA", databaseName);
         }
         String schemaName = resultSet.getString("SCHEMA_NAME");
         return new JdbcSchema.Builder().withName(schemaName).withAuditInfo(AuditInfo.EMPTY).build();
       }
     } catch (final SQLException se) {
       throw new RuntimeException(se);
+    }
+  }
+
+  public void executeQuery(String sql) {
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
     }
   }
 

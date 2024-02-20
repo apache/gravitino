@@ -14,15 +14,36 @@ import java.util.Objects;
 
 /** Helper methods to create logical transforms to pass into Gravitino. */
 public class Transforms {
+  /** An empty array of transforms. */
   public static final Transform[] EMPTY_TRANSFORM = new Transform[0];
+  /** The name of the identity transform. */
   public static final String NAME_OF_IDENTITY = "identity";
+  /** The name of the year transform. The year transform returns the year of the input value. */
   public static final String NAME_OF_YEAR = "year";
+
+  /** The name of the month transform. The month transform returns the month of the input value. */
   public static final String NAME_OF_MONTH = "month";
+
+  /** The name of the day transform. The day transform returns the day of the input value. */
   public static final String NAME_OF_DAY = "day";
+
+  /** The name of the hour transform. The hour transform returns the hour of the input value. */
   public static final String NAME_OF_HOUR = "hour";
+
+  /**
+   * The name of the bucket transform. The bucket transform returns the bucket of the input value.
+   */
   public static final String NAME_OF_BUCKET = "bucket";
+
+  /**
+   * The name of the truncate transform. The truncate transform returns the truncated value of the
+   */
   public static final String NAME_OF_TRUNCATE = "truncate";
+
+  /** The name of the list transform. The list transform includes multiple fields in a list. */
   public static final String NAME_OF_LIST = "list";
+
+  /** The name of the range transform. The range transform returns the range of the input value. */
   public static final String NAME_OF_RANGE = "range";
 
   /**
@@ -192,22 +213,52 @@ public class Transforms {
     return new ApplyTransform(name, arguments);
   }
 
+  /**
+   * Create an identity transform that applies a function to the input value.
+   *
+   * @param ref The reference to transform.
+   * @return An identity transform.
+   */
   private static IdentityTransform identity(NamedReference ref) {
     return new IdentityTransform(ref);
   }
 
+  /**
+   * Create a year transform that applies a function to the input value.
+   *
+   * @param ref The reference to transform.
+   * @return A year transform.
+   */
   private static YearTransform year(NamedReference ref) {
     return new YearTransform(ref);
   }
 
+  /**
+   * Create a month transform that applies a function to the input value.
+   *
+   * @param ref The reference to transform.
+   * @return A month transform.
+   */
   private static MonthTransform month(NamedReference ref) {
     return new MonthTransform(ref);
   }
 
+  /**
+   * Create a day transform that applies a function to the input value.
+   *
+   * @param ref The reference to transform.
+   * @return A day transform.
+   */
   private static DayTransform day(NamedReference ref) {
     return new DayTransform(ref);
   }
 
+  /**
+   * Create a hour transform that applies a function to the input value.
+   *
+   * @param ref The reference to transform.
+   * @return A hour transform.
+   */
   private static HourTransform hour(NamedReference ref) {
     return new HourTransform(ref);
   }
@@ -218,6 +269,7 @@ public class Transforms {
       this.ref = ref;
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_IDENTITY;
@@ -240,6 +292,7 @@ public class Transforms {
       this.ref = ref;
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_YEAR;
@@ -262,6 +315,7 @@ public class Transforms {
       this.ref = ref;
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_MONTH;
@@ -284,6 +338,7 @@ public class Transforms {
       this.ref = ref;
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_DAY;
@@ -306,6 +361,7 @@ public class Transforms {
       this.ref = ref;
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_HOUR;
@@ -333,19 +389,23 @@ public class Transforms {
       this.fields = fields;
     }
 
+    /** @return The number of buckets to use. */
     public int numBuckets() {
       return numBuckets.value();
     }
 
+    /** @return The field names to transform. */
     public String[][] fieldNames() {
       return Arrays.stream(fields).map(NamedReference::fieldName).toArray(String[][]::new);
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_BUCKET;
     }
 
+    /** @return The arguments to the transform. */
     @Override
     public Expression[] arguments() {
       return ObjectArrays.concat(numBuckets, fields);
@@ -382,19 +442,23 @@ public class Transforms {
       this.field = field;
     }
 
+    /** @return The width to truncate to. */
     public int width() {
       return width.value();
     }
 
+    /** @return The field name to transform. */
     public String[] fieldName() {
       return field.fieldName();
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_TRUNCATE;
     }
 
+    /** @return The arguments to the transform. */
     @Override
     public Expression[] arguments() {
       return new Expression[] {width, field};
@@ -427,20 +491,24 @@ public class Transforms {
       this.fields = fields;
     }
 
+    /** @return The field names to include in the list. */
     public String[][] fieldNames() {
       return Arrays.stream(fields).map(NamedReference::fieldName).toArray(String[][]::new);
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_LIST;
     }
 
+    /** @return The arguments to the transform. */
     @Override
     public Expression[] arguments() {
       return fields;
     }
 
+    /** @return The assignments to the transform. */
     @Override
     public Expression[] assignments() {
       // todo: resolve this
@@ -474,20 +542,24 @@ public class Transforms {
       this.field = field;
     }
 
+    /** @return The field name to transform. */
     public String[] fieldName() {
       return field.fieldName();
     }
 
+    /** @return The name of the transform. */
     @Override
     public String name() {
       return NAME_OF_RANGE;
     }
 
+    /** @return The arguments to the transform. */
     @Override
     public Expression[] arguments() {
       return new Expression[] {field};
     }
 
+    /** @return The assignments to the transform. */
     @Override
     public Expression[] assignments() {
       // todo: resolve this
@@ -519,11 +591,13 @@ public class Transforms {
       this.arguments = arguments;
     }
 
+    /** @return The name of the function to apply. */
     @Override
     public String name() {
       return name;
     }
 
+    /** @return The arguments to the function. */
     @Override
     public Expression[] arguments() {
       return arguments;
@@ -548,4 +622,6 @@ public class Transforms {
       return result;
     }
   }
+
+  private Transforms() {}
 }

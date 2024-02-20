@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
@@ -21,12 +22,18 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -69,7 +76,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     System.setProperty("user.name", "datastrato");
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();
@@ -114,27 +121,20 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     // create schema normally using user datastrato
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
     NameIdentifier anotherIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, anotherSchemaName);
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
-    String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    String comment = "comment";
+    createSchema(schemaName, ident, comment);
+
     Database db = hiveClientPool.run(client -> client.getDatabase(schemaName));
     Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
     Assertions.assertEquals(
         EXPECT_USER, hdfs.getFileStatus(new Path(db.getLocationUri())).getOwner());
 
     // create schema with exception using the system user
+    Map<String, String> properties = Maps.newHashMap();
     properties.put(
         "location",
         String.format(
@@ -156,23 +156,16 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     String anotherTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
     NameIdentifier nameIdentifier =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, tableName);
     NameIdentifier anotherNameIdentifier =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, anotherTableName);
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
+
     String comment = "comment";
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    createSchema(schemaName, ident, comment);
+
     Table createdTable =
         catalog
             .asTableCatalog()
@@ -204,6 +197,86 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
+  private static void createSchema(String schemaName, NameIdentifier ident, String comment) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+    properties.put(
+        "location",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse/%s.db",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
+            schemaName.toLowerCase()));
+    catalog.asSchemas().createSchema(ident, comment, properties);
+  }
+
+  @Test
+  public void testOperatePartition() throws Exception {
+
+    // create schema
+    String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+
+    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, tableName);
+
+    String comment = "comment";
+    createSchema(schemaName, ident, comment);
+
+    // create a partitioned table
+    Column[] columns = createColumns();
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                "comment",
+                createProperties(),
+                new Transform[] {
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
+                });
+
+    // add partition "col2=2023-01-02/col3=gravitino_it_test2" by user datastrato
+    String[] field1 = new String[] {"col2"};
+    String[] field2 = new String[] {"col3"};
+    Literal<?> primaryPartition = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
+    Literal<?> secondaryPartition = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity =
+        Partitions.identity(
+            new String[][] {field1, field2},
+            new Literal<?>[] {primaryPartition, secondaryPartition});
+
+    Partition partition = table.supportPartitions().addPartition(identity);
+
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
+        hiveClientPool.run(client -> client.getPartition(schemaName, tableName, partition.name()));
+
+    Assertions.assertEquals(
+        EXPECT_USER, hdfs.getFileStatus(new Path(partitionGot.getSd().getLocation())).getOwner());
+
+    Literal<?> anotherSecondaryPartition = Literals.stringLiteral("gravitino_it_test3");
+    Partition anotherIdentity =
+        Partitions.identity(
+            new String[][] {field1, field2},
+            new Literal<?>[] {primaryPartition, anotherSecondaryPartition});
+
+    // create partition with exception with system user
+    Exception e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                anotherCatalog
+                    .asTableCatalog()
+                    .loadTable(nameIdentifier)
+                    .supportPartitions()
+                    .addPartition(anotherIdentity));
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
+  }
+
   private Column[] createColumns() {
     Column col1 = Column.of("col1", Types.ByteType.get(), "col_1_comment");
     Column col2 = Column.of("col2", Types.DateType.get(), "col_2_comment");
@@ -221,6 +294,13 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
+  }
+
+  private Map<String, String> createProperties() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+    return properties;
   }
 
   private static void createCatalog() {

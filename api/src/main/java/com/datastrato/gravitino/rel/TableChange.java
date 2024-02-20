@@ -403,6 +403,12 @@ public interface TableChange {
     private final String property;
     private final String value;
 
+    /**
+     * Creates a new SetProperty instance.
+     *
+     * @param property The name of the property to be set.
+     * @param value The new value of the property.
+     */
     public SetProperty(String property, String value) {
       this.property = property;
       this.value = value;
@@ -529,14 +535,22 @@ public interface TableChange {
    */
   interface ColumnPosition {
 
+    /** @return The first position of ColumnPosition instance. */
     static ColumnPosition first() {
       return First.INSTANCE;
     }
 
+    /**
+     * Returns the position after the given column.
+     *
+     * @param column The name of the reference column to place the new column after.
+     * @return The position after the given column.
+     */
     static ColumnPosition after(String column) {
       return new After(column);
     }
 
+    /** @return The default position of ColumnPosition instance. */
     static ColumnPosition defaultPos() {
       return Default.INSTANCE;
     }
@@ -630,6 +644,12 @@ public interface TableChange {
    * The interface for all column changes. Column changes are used to modify the schema of a table.
    */
   interface ColumnChange extends TableChange {
+
+    /**
+     * Retrieves the field name of the column to be modified.
+     *
+     * @return An array of strings representing the field name.
+     */
     String[] fieldName();
   }
 
@@ -1103,11 +1123,21 @@ public interface TableChange {
       this.nullable = nullable;
     }
 
+    /**
+     * Retrieves the field name of the column whose nullability is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
     @Override
     public String[] fieldName() {
       return fieldName;
     }
 
+    /**
+     * The nullable flag of the column.
+     *
+     * @return true if the column is nullable; false otherwise.
+     */
     public boolean nullable() {
       return nullable;
     }

@@ -1,0 +1,31 @@
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+components:
+  schemas:
+    IndexesSpec:
+      type: array
+      items:
+        $ref: "#/components/schemas/IndexSpec"
+
+    IndexSpec:
+      type: object
+      required:
+        - indexType
+        - fieldNames
+      properties:
+        indexType:
+          type: string
+          enum:
+            - "primary_key"
+            - "unique_key"
+        name:
+          type: string
+          description: The name of the index
+          nullable: true
+        fieldNames:
+          $ref: "./tables.yaml#/components/schemas/FieldNames"

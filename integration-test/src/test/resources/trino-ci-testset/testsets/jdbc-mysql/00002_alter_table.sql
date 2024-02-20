@@ -18,6 +18,16 @@ show create table "test.gt_mysql".gt_db1.tb01;
 alter table "test.gt_mysql".gt_db1.tb01 alter column salary set data type bigint;
 show create table "test.gt_mysql".gt_db1.tb01;
 
+comment on column "test.gt_mysql".gt_db1.tb01.name is 'test column comments';
+show create table "test.gt_mysql".gt_db1.tb01;
+
+comment on table "test.gt_mysql".gt_db1.tb01 is 'test table comments';
+show create table "test.gt_mysql".gt_db1.tb01;
+
+alter table "test.gt_mysql".gt_db1.tb01 rename column name to s;
+show create table "test.gt_mysql".gt_db1.tb01;
+
+-- alter table "test.gt_mysql".gt_db1.tb01 add column city varchar(50) not null comment 'aaa';
 alter table "test.gt_mysql".gt_db1.tb01 add column city varchar(50) comment 'aaa';
 show create table "test.gt_mysql".gt_db1.tb01;
 

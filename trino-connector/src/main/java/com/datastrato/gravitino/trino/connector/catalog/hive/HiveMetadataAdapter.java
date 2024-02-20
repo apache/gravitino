@@ -10,8 +10,6 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SORT_ORDER_KEY;
 
 import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
@@ -193,11 +191,11 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     }
 
     if (gravitinoTable.getDistribution() != null
-        && !DistributionDTO.NONE.equals(gravitinoTable.getDistribution())) {
+        && !Distributions.NONE.equals(gravitinoTable.getDistribution())) {
       properties.put(
           HIVE_BUCKET_KEY,
           Arrays.stream(gravitinoTable.getDistribution().expressions())
-              .map(ts -> ((FieldReferenceDTO) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
+              .map(ts -> ((NamedReference) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
               .collect(Collectors.toList()));
 
       properties.put(HIVE_BUCKET_COUNT_KEY, gravitinoTable.getDistribution().number());
@@ -220,7 +218,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
                             ? Order.ASCENDING
                             : Order.DESCENDING;
                     return new SortingColumn(
-                        ((FieldReferenceDTO) expression).fieldName()[0].toLowerCase(Locale.ENGLISH),
+                        ((NamedReference) expression).fieldName()[0].toLowerCase(Locale.ENGLISH),
                         order);
                   })
               .collect(Collectors.toList()));

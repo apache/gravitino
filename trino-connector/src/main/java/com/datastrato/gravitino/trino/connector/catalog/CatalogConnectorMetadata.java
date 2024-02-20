@@ -39,13 +39,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** This class implements gravitino metadata operators. */
 public class CatalogConnectorMetadata {
-
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadata.class);
 
   private final GravitinoMetaLake metalake;
   private final String catalogName;
@@ -125,7 +121,7 @@ public class CatalogConnectorMetadata {
     try {
       tableCatalog.createTable(
           identifier,
-          table.getColumnDTOs(),
+          table.getRawColumns(),
           table.getComment(),
           table.getProperties(),
           table.getPartitioning(),

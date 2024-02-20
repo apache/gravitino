@@ -96,11 +96,13 @@ public class StringIdentifier {
     }
 
     if (properties.containsKey(ID_KEY)) {
-      LOG.warn(
-          "Property {}:{} already existed in the properties, this is unexpected, we will "
-              + "ignore adding the identifier to the properties",
-          ID_KEY,
-          properties.get(ID_KEY));
+      if (LOG.isWarnEnabled()) {
+        LOG.warn(
+            "Property {}:{} already existed in the properties, this is unexpected, we will "
+                + "ignore adding the identifier to the properties",
+            ID_KEY,
+            properties.get(ID_KEY));
+      }
       return Collections.unmodifiableMap(properties);
     }
 

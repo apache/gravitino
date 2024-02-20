@@ -80,7 +80,7 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
    *
    * @param partitionSpec
    * @param schema
-   * @return
+   * @return array of transforms for partition fields.
    */
   @VisibleForTesting
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {

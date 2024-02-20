@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
@@ -43,7 +44,11 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
       TABLE_OPERATIONS = new PostgreSqlTableOperations();
       DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, config);
       TABLE_OPERATIONS.initialize(
-          DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+          DATA_SOURCE,
+          JDBC_EXCEPTION_CONVERTER,
+          new PostgreSqlTypeConverter(),
+          new PostgreSqlColumnDefaultValueConverter(),
+          config);
       DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);

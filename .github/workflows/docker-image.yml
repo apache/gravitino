@@ -76,9 +76,5 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 
-      - name: Build and Push the main branch Docker image
-        if: ${{ github.ref_name == 'main' }}
+      - name: Build and Push the Docker image
         run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
-      - name: Build and Push the other branch Docker image
-        if: ${{ github.ref_name != 'main' }}
-        run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }}

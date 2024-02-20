@@ -85,4 +85,6 @@ public class SortOrders {
       return nullOrdering;
     }
   }
+
+  private SortOrders() {}
 }

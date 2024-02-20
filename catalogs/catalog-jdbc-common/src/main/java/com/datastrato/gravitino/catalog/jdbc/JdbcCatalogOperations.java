@@ -12,6 +12,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.DatabaseOperation;
@@ -78,6 +79,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private DataSource dataSource;
 
+  private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
@@ -94,13 +97,15 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
-      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata) {
+      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
+      JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
     this.tableOperation = tableOperation;
     this.jdbcTablePropertiesMetadata = jdbcTablePropertiesMetadata;
+    this.columnDefaultValueConverter = columnDefaultValueConverter;
   }
 
   /**
@@ -124,7 +129,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
-    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
+    this.tableOperation.initialize(
+        dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
 
@@ -268,25 +274,26 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     String tableName = tableIdent.name();
     JdbcTable load = tableOperation.load(databaseName, tableName);
+    Map<String, String> properties =
+        load.properties() == null
+            ? Maps.newHashMap()
+            : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
       LOG.warn(
           "The table {} comment {} does not contain gravitino id attribute", tableName, comment);
-      return load;
+    } else {
+      properties = StringIdentifier.newPropertiesWithId(id, properties);
+      // Remove id from comment
+      comment = StringIdentifier.removeIdFromComment(comment);
     }
-    Map<String, String> properties =
-        load.properties() == null
-            ? Maps.newHashMap()
-            : jdbcTablePropertiesMetadata.convertFromJdbcProperties(load.properties());
-    properties = StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcTable.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
         .withAuditInfo(load.auditInfo())
-        // Remove id from comment
-        .withComment(StringIdentifier.removeIdFromComment(load.comment()))
+        .withComment(comment)
         .withProperties(properties)
         .withIndexes(load.index())
         .build();
@@ -385,6 +392,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withType(column.dataType())
                         .withComment(column.comment())
                         .withNullable(column.nullable())
+                        .withAutoIncrement(column.autoIncrement())
+                        .withDefaultValue(column.defaultValue())
                         .build())
             .toArray(JdbcColumn[]::new);
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();

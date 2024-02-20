@@ -14,6 +14,7 @@ public class SqliteExceptionConverter extends JdbcExceptionConverter {
   public static final int NO_SUCH_TABLE = 1;
   public static final int SCHEMA_ALREADY_EXISTS_CODE = 2;
 
+  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException sqlException) {
     if (sqlException.getErrorCode() == NO_SUCH_TABLE) {

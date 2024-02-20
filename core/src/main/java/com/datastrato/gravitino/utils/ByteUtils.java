@@ -79,4 +79,6 @@ public class ByteUtils {
     }
     return sb.toString();
   }
+
+  private ByteUtils() {}
 }

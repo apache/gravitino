@@ -87,6 +87,7 @@ public class CatalogIcebergIT extends AbstractIT {
   public static String ICEBERG_COL_NAME1 = "iceberg_col_name1";
   public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
+  public static String ICEBERG_COL_NAME4 = "iceberg_col_name4";
   private static final String provider = "lakehouse-iceberg";
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -233,7 +234,24 @@ public class CatalogIcebergIT extends AbstractIT {
             .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
             .build();
-    return new ColumnDTO[] {col1, col2, col3};
+    Types.StructType structTypeInside =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field_inside", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field_inside", Types.StringType.get(), "string field inside"));
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field", Types.StringType.get(), "string field"),
+            Types.StructType.Field.nullableField("struct_field", structTypeInside, "struct field"));
+    ColumnDTO col4 =
+        new ColumnDTO.Builder()
+            .withName(ICEBERG_COL_NAME4)
+            .withDataType(structType)
+            .withComment("col_4_comment")
+            .build();
+    return new ColumnDTO[] {col1, col2, col3, col4};
   }
 
   private Map<String, String> createProperties() {
@@ -542,7 +560,7 @@ public class CatalogIcebergIT extends AbstractIT {
             TableChange.updateComment(table_comment + "_new"),
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
-            TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"col_5_for_add"}, Types.StringType.get()),
             TableChange.renameColumn(new String[] {ICEBERG_COL_NAME2}, "col_2_new"),
             TableChange.updateColumnComment(new String[] {ICEBERG_COL_NAME1}, "comment_new"),
             TableChange.updateColumnType(
@@ -567,9 +585,13 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(Types.StringType.get(), table.columns()[2].dataType());
     Assertions.assertEquals("col_3_comment", table.columns()[2].comment());
 
-    Assertions.assertEquals("col_4", table.columns()[3].name());
-    Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
-    Assertions.assertNull(table.columns()[3].comment());
+    Assertions.assertEquals(ICEBERG_COL_NAME4, table.columns()[3].name());
+    Assertions.assertEquals(columns[3].dataType(), table.columns()[3].dataType());
+    Assertions.assertEquals("col_4_comment", table.columns()[3].comment());
+
+    Assertions.assertEquals("col_5_for_add", table.columns()[4].name());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[4].dataType());
+    Assertions.assertNull(table.columns()[4].comment());
 
     Assertions.assertEquals(1, table.partitioning().length);
     Assertions.assertEquals(
@@ -727,14 +749,22 @@ public class CatalogIcebergIT extends AbstractIT {
     TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
     List<String> values = new ArrayList<>();
     for (int i = 1; i < 5; i++) {
-      values.add(
+      String structValue =
           String.format(
-              "(%s, %s, %s)", i, "date_sub(current_date(), " + i + ")", "'data" + i + "'"));
+              "STRUCT(%d, 'string%d', %s)",
+              i * 10, // integer_field
+              i, // string_field
+              String.format(
+                  "STRUCT(%d, 'inner%d')",
+                  i, i) // struct_field, alternating NULL and non-NULL values
+              );
+      values.add(
+          String.format("(%d, date_sub(current_date(), %d), 'data%d', %s)", i, i, i, structValue));
     }
     // insert data
     String insertSQL =
         String.format(
-            INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE, tableIdentifier, String.join(",", values));
+            INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE, tableIdentifier, String.join(", ", values));
     spark.sql(insertSQL);
 
     // select data
@@ -746,7 +776,9 @@ public class CatalogIcebergIT extends AbstractIT {
     for (int i = 0; i < result.length; i++) {
       LocalDate previousDay = currentDate.minusDays(i + 1);
       Assertions.assertEquals(
-          String.format("[%s,%s,data%s]", i + 1, previousDay.format(formatter), i + 1),
+          String.format(
+              "[%s,%s,data%s,[%s,string%s,[%s,inner%s]]]",
+              i + 1, previousDay.format(formatter), i + 1, (i + 1) * 10, i + 1, i + 1, i + 1),
           result[i].toString());
     }
 
@@ -762,12 +794,16 @@ public class CatalogIcebergIT extends AbstractIT {
       if (i == result.length - 1) {
         LocalDate previousDay = currentDate.minusDays(1);
         Assertions.assertEquals(
-            String.format("[100,%s,data%s]", previousDay.format(formatter), 1),
+            String.format(
+                "[100,%s,data%s,[%s,string%s,[%s,inner%s]]]",
+                previousDay.format(formatter), 1, 10, 1, 1, 1),
             result[i].toString());
       } else {
         LocalDate previousDay = currentDate.minusDays(i + 2);
         Assertions.assertEquals(
-            String.format("[%s,%s,data%s]", i + 2, previousDay.format(formatter), i + 2),
+            String.format(
+                "[%s,%s,data%s,[%s,string%s,[%s,inner%s]]]",
+                i + 2, previousDay.format(formatter), i + 2, (i + 2) * 10, i + 2, i + 2, i + 2),
             result[i].toString());
       }
     }
@@ -780,7 +816,9 @@ public class CatalogIcebergIT extends AbstractIT {
     for (int i = 0; i < result.length; i++) {
       LocalDate previousDay = currentDate.minusDays(i + 2);
       Assertions.assertEquals(
-          String.format("[%s,%s,data%s]", i + 2, previousDay.format(formatter), i + 2),
+          String.format(
+              "[%s,%s,data%s,[%s,string%s,[%s,inner%s]]]",
+              i + 2, previousDay.format(formatter), i + 2, (i + 2) * 10, i + 2, i + 2, i + 2),
           result[i].toString());
     }
   }

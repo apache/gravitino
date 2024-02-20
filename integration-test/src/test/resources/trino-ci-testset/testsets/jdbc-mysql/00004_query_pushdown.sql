@@ -42,7 +42,7 @@ explain select sum(totalprice) from orders;
 explain select orderdate, sum(totalprice) from orders group by orderdate order by orderdate limit 10;
 
 -- join push down
--- explain select * from customer join orders on customer.custkey = orders.custkey limit 10;
+explain select * from customer join orders on customer.custkey = orders.custkey limit 10;
 
 drop table customer;
 

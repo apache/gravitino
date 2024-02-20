@@ -8,9 +8,16 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.ArrayUtils;
 
+/** Data transfer object representing day partitioning. */
 @EqualsAndHashCode(callSuper = true)
 public final class DayPartitioningDTO extends Partitioning.SingleFieldPartitioning {
 
+  /**
+   * Creates a new instance of {@link DayPartitioningDTO}.
+   *
+   * @param fieldName The field name.
+   * @return The new instance.
+   */
   public static DayPartitioningDTO of(String... fieldName) {
     return new DayPartitioningDTO(fieldName);
   }
@@ -21,6 +28,7 @@ public final class DayPartitioningDTO extends Partitioning.SingleFieldPartitioni
     this.fieldName = fieldName;
   }
 
+  /** @return The strategy of the partitioning. */
   @Override
   public Strategy strategy() {
     return Strategy.DAY;

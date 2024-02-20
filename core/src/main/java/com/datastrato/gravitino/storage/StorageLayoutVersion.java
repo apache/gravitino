@@ -25,7 +25,6 @@ public enum StorageLayoutVersion {
       }
     }
     throw new StorageLayoutException(
-        "Unknown storage version, maybe the data is broken, please "
-            + "check the storage directory.");
+        "Unknown storage version, maybe the data is broken, please check the storage directory.");
   }
 }

@@ -9,6 +9,7 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import net.ltgt.gradle.errorprone.errorprone
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -44,6 +45,7 @@ plugins {
   alias(libs.plugins.bom)
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
+  alias(libs.plugins.errorprone)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -51,6 +53,11 @@ if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
     "Gravitino current doesn't support building with " +
       "Java version: ${extra["jdkVersion"]}. Please use JDK8, 11 or 17."
   )
+}
+
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+if (scalaVersion !in listOf("2.12", "2.13")) {
+  throw GradleException("Found unsupported Scala version: $scalaVersion")
 }
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
@@ -79,7 +86,8 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.base/sun.nio.cs=ALL-UNNAMED",
     "--add-opens", "java.base/sun.security.action=ALL-UNNAMED",
     "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
-    "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+    "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED"
   )
 }
 
@@ -195,9 +203,33 @@ subprojects {
     }
   }
 
+  if (project.name != "meta") {
+    apply(plugin = "net.ltgt.errorprone")
+    dependencies {
+      errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+      options.errorprone.isEnabled.set(true)
+      options.errorprone.disableAllChecks.set(true)
+      options.errorprone.enable(
+        "AnnotateFormatMethod",
+        "FormatStringAnnotation"
+      )
+    }
+  }
+
   tasks.withType<Javadoc> {
     options.encoding = "UTF-8"
     options.locale = "en_US"
+
+    val projectName = project.name
+    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+      options {
+        (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
+        isFailOnError = true
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {

@@ -6,9 +6,6 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -92,16 +89,18 @@ public class GravitinoTable {
     return columns;
   }
 
-  public ColumnDTO[] getColumnDTOs() {
-    ColumnDTO[] gravitinoColumns = new ColumnDTO[columns.size()];
+  public Column[] getRawColumns() {
+    Column[] gravitinoColumns = new Column[columns.size()];
     for (int i = 0; i < columns.size(); i++) {
+      GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
-          ColumnDTO.builder()
-              .withName(columns.get(i).getName())
-              .withDataType(columns.get(i).getType())
-              .withComment(columns.get(i).getComment())
-              .withNullable(columns.get(i).isNullable())
-              .build();
+          Column.of(
+              column.getName(),
+              column.getType(),
+              column.getComment(),
+              column.isNullable(),
+              column.isAutoIncrement(),
+              null);
     }
     return gravitinoColumns;
   }
@@ -126,16 +125,6 @@ public class GravitinoTable {
 
   public String getComment() {
     return comment;
-  }
-
-  public TableDTO getTableDTO() {
-    return TableDTO.builder()
-        .withName(tableName)
-        .withComment(comment)
-        .withColumns(getColumnDTOs())
-        .withProperties(properties)
-        .withAudit(new AuditDTO.Builder().build())
-        .build();
   }
 
   public void setSortOrders(SortOrder[] sortOrders) {

@@ -192,6 +192,11 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     }
   }
 
+  /**
+   * Retrieves the version of the Gravitino API.
+   *
+   * @return A GravitinoVersion instance representing the version of the Gravitino API.
+   */
   public GravitinoVersion getVersion() {
     VersionResponse resp =
         restClient.get(

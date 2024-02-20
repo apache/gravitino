@@ -23,10 +23,25 @@ public enum Strategy {
    * of the underlying system.
    */
   NONE,
+
+  /** Uses the hash value of the expression to distribute data. */
   HASH,
+
+  /**
+   * Uses the range of the expression specified to distribute data. The range is specified using the
+   * rangeStart and rangeEnd properties.
+   */
   RANGE,
+
+  /** Distributes data evenly across partitions. */
   EVEN;
 
+  /**
+   * Get the distribution strategy by name.
+   *
+   * @param name The name of the distribution strategy.
+   * @return The distribution strategy.
+   */
   public static Strategy getByName(String name) {
     for (Strategy strategy : Strategy.values()) {
       if (strategy.name().equalsIgnoreCase(name)) {
