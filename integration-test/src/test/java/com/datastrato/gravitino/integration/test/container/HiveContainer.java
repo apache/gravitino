@@ -84,7 +84,11 @@ public class HiveContainer extends BaseContainer {
           isHiveContainerReady = true;
           break;
         }
-        LOG.info("Hive container is not ready, recheck({}/{}) after {}ms", nRetry, retryLimit, sleepTimeMillis);
+        LOG.info(
+            "Hive container is not ready, recheck({}/{}) after {}ms",
+            nRetry,
+            retryLimit,
+            sleepTimeMillis);
         Thread.sleep(sleepTimeMillis);
       } catch (RuntimeException e) {
         LOG.error(e.getMessage(), e);
