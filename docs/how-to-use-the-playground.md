@@ -126,7 +126,7 @@ GROUP BY e.employee_id,  given_name, family_name;
 ### Using Iceberg REST service
 
 If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service, too. You can will use Spark to access REST catalog to write the table data.
+Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.
 Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):

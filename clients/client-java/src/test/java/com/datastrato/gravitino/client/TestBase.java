@@ -77,4 +77,8 @@ public abstract class TestBase {
       throws JsonProcessingException {
     buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
   }
+
+  protected static String withSlash(String path) {
+    return "/" + path;
+  }
 }

@@ -186,7 +186,7 @@ public class KvEntityStore implements EntityStore {
                   byte[] key = entityKeyEncoder.encode(ident, entityType);
                   byte[] value = transactionalKvBackend.get(key);
                   if (value == null) {
-                    throw new NoSuchEntityException(ident.toString());
+                    throw new NoSuchEntityException("No such entity:%s", ident.toString());
                   }
 
                   E e = serDe.deserialize(value, type);
@@ -201,9 +201,7 @@ public class KvEntityStore implements EntityStore {
                   boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
                   if (newEntityExist) {
                     throw new AlreadyExistsException(
-                        String.format(
-                            "Entity %s already exist, please check again",
-                            updatedE.nameIdentifier()));
+                        "Entity %s already exist, please check again", updatedE.nameIdentifier());
                   }
 
                   // Update the name mapping
@@ -287,13 +285,13 @@ public class KvEntityStore implements EntityStore {
                     () -> {
                       byte[] key = entityKeyEncoder.encode(ident, entityType, true);
                       if (key == null) {
-                        throw new NoSuchEntityException(ident.toString());
+                        throw new NoSuchEntityException("No such entity:%s", ident.toString());
                       }
                       return transactionalKvBackend.get(key);
                     }),
             reentrantReadWriteLock);
     if (value == null) {
-      throw new NoSuchEntityException(ident.toString());
+      throw new NoSuchEntityException("No such entity:%s", ident.toString());
     }
     return serDe.deserialize(value, e);
   }
@@ -389,9 +387,8 @@ public class KvEntityStore implements EntityStore {
                     }
 
                     throw new NonEmptyEntityException(
-                        String.format(
-                            "Entity %s has sub-entities %s, you should remove sub-entities first",
-                            ident, subEntities));
+                        "Entity %s has sub-entities %s, you should remove sub-entities first",
+                        ident, subEntities);
                   }
 
                   for (byte[] prefix : subEntityPrefix) {

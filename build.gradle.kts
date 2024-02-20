@@ -9,6 +9,7 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import net.ltgt.gradle.errorprone.errorprone
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -44,6 +45,7 @@ plugins {
   alias(libs.plugins.bom)
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
+  alias(libs.plugins.errorprone)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -198,6 +200,22 @@ subprojects {
   gradle.projectsEvaluated {
     tasks.withType<JavaCompile> {
       options.compilerArgs.addAll(arrayOf("-Xlint:deprecation", "-Werror"))
+    }
+  }
+
+  if (project.name != "meta") {
+    apply(plugin = "net.ltgt.errorprone")
+    dependencies {
+      errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+      options.errorprone.isEnabled.set(true)
+      options.errorprone.disableAllChecks.set(true)
+      options.errorprone.enable(
+        "AnnotateFormatMethod",
+        "FormatStringAnnotation"
+      )
     }
   }
 

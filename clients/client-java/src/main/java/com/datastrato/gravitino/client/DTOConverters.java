@@ -11,9 +11,11 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
+import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
 
@@ -57,7 +59,7 @@ class DTOConverters {
   static Catalog toCatalog(CatalogDTO catalog, RESTClient client) {
     switch (catalog.type()) {
       case RELATIONAL:
-        return new RelationalCatalog.Builder()
+        return RelationalCatalog.builder()
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())
@@ -67,7 +69,17 @@ class DTOConverters {
             .withRestClient(client)
             .build();
 
-      case FILE:
+      case FILESET:
+        return FilesetCatalog.builder()
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
+
       case STREAM:
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
@@ -135,6 +147,26 @@ class DTOConverters {
     } else if (change instanceof TableChange.ColumnChange) {
       return toColumnUpdateRequest((TableChange.ColumnChange) change);
 
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static FilesetUpdateRequest toFilesetUpdateRequest(FilesetChange change) {
+    if (change instanceof FilesetChange.RenameFileset) {
+      return new FilesetUpdateRequest.RenameFilesetRequest(
+          ((FilesetChange.RenameFileset) change).getNewName());
+    } else if (change instanceof FilesetChange.UpdateFilesetComment) {
+      return new FilesetUpdateRequest.UpdateFilesetCommentRequest(
+          ((FilesetChange.UpdateFilesetComment) change).getNewComment());
+    } else if (change instanceof FilesetChange.SetProperty) {
+      return new FilesetUpdateRequest.SetFilesetPropertiesRequest(
+          ((FilesetChange.SetProperty) change).getProperty(),
+          ((FilesetChange.SetProperty) change).getValue());
+    } else if (change instanceof FilesetChange.RemoveProperty) {
+      return new FilesetUpdateRequest.RemoveFilesetPropertiesRequest(
+          ((FilesetChange.RemoveProperty) change).getProperty());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());

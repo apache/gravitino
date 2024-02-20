@@ -312,7 +312,7 @@ public class IcebergTableOpsHelper {
    * Therefore, we need to handle this difference here.
    *
    * @param namespace GravitinoNamespace
-   * @return
+   * @return Iceberg Namespace
    */
   public static Namespace getIcebergNamespace(com.datastrato.gravitino.Namespace namespace) {
     return getIcebergNamespace(namespace.level(namespace.length() - 1));
@@ -328,7 +328,7 @@ public class IcebergTableOpsHelper {
    *
    * @param namespace
    * @param name
-   * @return
+   * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(
       com.datastrato.gravitino.Namespace namespace, String name) {
@@ -341,7 +341,7 @@ public class IcebergTableOpsHelper {
    * `{namespace}.{table}`, so we need to perform truncation here.
    *
    * @param nameIdentifier GravitinoNameIdentifier
-   * @return
+   * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();

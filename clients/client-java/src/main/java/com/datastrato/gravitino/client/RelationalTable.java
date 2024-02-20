@@ -24,8 +24,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
-import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -247,6 +247,6 @@ public class RelationalTable implements Table, SupportsPartitions {
   @VisibleForTesting
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
   protected static String formatPartitionRequestPath(String prefix, String partitionName) {
-    return prefix + "/" + URLEncoder.encode(partitionName, "UTF-8");
+    return prefix + "/" + RESTUtils.encodeString(partitionName);
   }
 }

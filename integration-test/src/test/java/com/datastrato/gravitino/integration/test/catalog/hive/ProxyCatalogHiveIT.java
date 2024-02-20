@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
@@ -30,7 +31,6 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -78,7 +78,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     System.setProperty("user.name", "datastrato");
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();

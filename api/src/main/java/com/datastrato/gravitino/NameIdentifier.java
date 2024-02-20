@@ -7,6 +7,8 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 
 /**
@@ -158,6 +160,17 @@ public class NameIdentifier {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a fileset identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The fileset {@link NameIdentifier} to check.
+   */
+  public static void checkFileset(NameIdentifier ident) {
+    check(ident != null, "Fileset identifier must not be null");
+    Namespace.checkFileset(ident.namespace);
+  }
+
+  /**
    * Create a {@link NameIdentifier} from the given identifier string.
    *
    * @param identifier The identifier string
@@ -237,9 +250,10 @@ public class NameIdentifier {
    * @param message The message to throw.
    * @param args The arguments to the message.
    */
-  public static void check(boolean condition, String message, Object... args) {
+  @FormatMethod
+  public static void check(boolean condition, @FormatString String message, Object... args) {
     if (!condition) {
-      throw new IllegalNameIdentifierException(String.format(message, args));
+      throw new IllegalNameIdentifierException(message, args);
     }
   }
 }

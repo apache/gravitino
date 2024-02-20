@@ -21,7 +21,7 @@ public class ToIcebergPartitionSpec {
    * Convert iceberg table to iceberg partition spec through gravitino.
    *
    * @param icebergTable the iceberg table.
-   * @return
+   * @return a PartitionSpec
    */
   @VisibleForTesting
   public static PartitionSpec toPartitionSpec(IcebergTable icebergTable) {

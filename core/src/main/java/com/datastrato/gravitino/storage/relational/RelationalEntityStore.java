@@ -96,7 +96,7 @@ public class RelationalEntityStore implements EntityStore {
       throws NoSuchEntityException, IOException {
     E entity = backend.get(ident, entityType);
     if (entity == null) {
-      throw new NoSuchEntityException(ident.toString());
+      throw new NoSuchEntityException("No such entity:%s", ident.toString());
     }
     return entity;
   }

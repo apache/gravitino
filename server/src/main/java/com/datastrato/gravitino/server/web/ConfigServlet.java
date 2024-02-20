@@ -15,13 +15,16 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
 import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConfigServlet extends HttpServlet {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ConfigServlet.class);
 
   private static final ImmutableSet<ConfigEntry<?>> oauthConfigEntries =
       ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
@@ -46,19 +49,17 @@ public class ConfigServlet extends HttpServlet {
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse res)
-      throws UnsupportedEncodingException, IllegalStateException, IOException {
+      throws IllegalStateException, IOException {
     try (PrintWriter writer = res.getWriter()) {
       ObjectMapper objectMapper = JsonUtils.objectMapper();
       res.setContentType("application/json;charset=utf-8");
       writer.write(objectMapper.writeValueAsString(configs));
-    } catch (UnsupportedEncodingException exception) {
-      throw new RuntimeException("Failed to use returned character encoding", exception);
     } catch (IllegalStateException exception) {
-      throw new RuntimeException("Wrong usage of getWriter()", exception);
+      LOG.error("Illegal state occurred when calling getWriter()");
     } catch (IOException exception) {
-      throw new RuntimeException("Failed to perform IO", exception);
+      LOG.error("Failed to perform IO");
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error(e.getMessage());
     }
   }
 }

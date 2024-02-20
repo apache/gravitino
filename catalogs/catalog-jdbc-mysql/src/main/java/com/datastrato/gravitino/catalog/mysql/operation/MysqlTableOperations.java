@@ -233,7 +233,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         }
 
         throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+            "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
     }
   }
