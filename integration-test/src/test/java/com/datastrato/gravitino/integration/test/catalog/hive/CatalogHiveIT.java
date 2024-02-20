@@ -406,19 +406,18 @@ public class CatalogHiveIT extends AbstractIT {
     // Bad name in distribution
     final Distribution badDistribution =
         Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     Assertions.assertThrows(
         Exception.class,
         () -> {
-          catalog
-              .asTableCatalog()
-              .createTable(
-                  nameIdentifier,
-                  columns,
-                  TABLE_COMMENT,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  badDistribution,
-                  sortOrders);
+          tableCatalog.createTable(
+              nameIdentifier,
+              columns,
+              TABLE_COMMENT,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              badDistribution,
+              sortOrders);
         });
 
     final SortOrder[] badSortOrders =
@@ -432,16 +431,14 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertThrows(
         Exception.class,
         () -> {
-          catalog
-              .asTableCatalog()
-              .createTable(
-                  nameIdentifier,
-                  columns,
-                  TABLE_COMMENT,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  distribution,
-                  badSortOrders);
+          tableCatalog.createTable(
+              nameIdentifier,
+              columns,
+              TABLE_COMMENT,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              distribution,
+              badSortOrders);
         });
   }
 
