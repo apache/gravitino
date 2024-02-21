@@ -7,6 +7,7 @@ package com.datastrato.gravitino.dto.rel.partitioning;
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
 
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
@@ -23,18 +24,29 @@ public final class ListPartitioningDTO implements Partitioning {
    * @return The new ListPartitioningDTO.
    */
   public static ListPartitioningDTO of(String[][] fieldNames) {
-    return new ListPartitioningDTO(fieldNames);
+    return of(fieldNames, new ListPartitionDTO[0]);
+  }
+
+  public static ListPartitioningDTO of(String[][] fieldNames, ListPartitionDTO[] assignments) {
+    return new ListPartitioningDTO(fieldNames, assignments);
   }
 
   private final String[][] fieldNames;
+  private final ListPartitionDTO[] assignments;
 
-  private ListPartitioningDTO(String[][] fieldNames) {
+  private ListPartitioningDTO(String[][] fieldNames, ListPartitionDTO[] assignments) {
     this.fieldNames = fieldNames;
+    this.assignments = assignments;
   }
 
   /** @return The names of the fields to partition. */
   public String[][] fieldNames() {
     return fieldNames;
+  }
+
+  @Override
+  public ListPartitionDTO[] assignments() {
+    return assignments;
   }
 
   /** @return The strategy of the partitioning. */
@@ -64,35 +76,5 @@ public final class ListPartitioningDTO implements Partitioning {
   @Override
   public Expression[] arguments() {
     return Arrays.stream(fieldNames).map(NamedReference::field).toArray(Expression[]::new);
-  }
-
-  /** The builder for ListPartitioningDTO. */
-  public static class Builder {
-    private String[][] fieldNames;
-
-    /**
-     * Set the field names for the builder.
-     *
-     * @param fieldNames The names of the fields to partition.
-     * @return The builder.
-     */
-    public Builder withFieldNames(String[][] fieldNames) {
-      this.fieldNames = fieldNames;
-      return this;
-    }
-
-    /**
-     * Builds the ListPartitioningDTO.
-     *
-     * @return The ListPartitioningDTO.
-     */
-    public ListPartitioningDTO build() {
-      return new ListPartitioningDTO(fieldNames);
-    }
-  }
-
-  /** @return the builder for creating a new instance of ListPartitioningDTO. */
-  public static Builder builder() {
-    return new Builder();
   }
 }

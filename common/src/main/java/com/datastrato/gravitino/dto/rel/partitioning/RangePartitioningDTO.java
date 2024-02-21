@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExist
 import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
 
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import lombok.EqualsAndHashCode;
 
@@ -22,13 +23,19 @@ public final class RangePartitioningDTO implements Partitioning {
    * @return The new RangePartitioningDTO.
    */
   public static RangePartitioningDTO of(String[] fieldName) {
-    return new RangePartitioningDTO(fieldName);
+    return of(fieldName, new RangePartitionDTO[0]);
+  }
+
+  public static RangePartitioningDTO of(String[] fieldName, RangePartitionDTO[] assignments) {
+    return new RangePartitioningDTO(fieldName, assignments);
   }
 
   private final String[] fieldName;
+  private final RangePartitionDTO[] assignments;
 
-  private RangePartitioningDTO(String[] fieldName) {
+  private RangePartitioningDTO(String[] fieldName, RangePartitionDTO[] assignments) {
     this.fieldName = fieldName;
+    this.assignments = assignments;
   }
 
   /** @return The name of the field to partition. */
@@ -40,6 +47,11 @@ public final class RangePartitioningDTO implements Partitioning {
   @Override
   public String name() {
     return strategy().name().toLowerCase();
+  }
+
+  @Override
+  public RangePartitionDTO[] assignments() {
+    return assignments;
   }
 
   /** @return The arguments of the partitioning. */
@@ -63,35 +75,5 @@ public final class RangePartitioningDTO implements Partitioning {
   @Override
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
     validateFieldExistence(columns, fieldName);
-  }
-
-  /** The builder for the RangePartitioningDTO. */
-  public static class Builder {
-    private String[] fieldName;
-
-    /**
-     * Set the field name for the builder.
-     *
-     * @param fieldName The name of the field to partition.
-     * @return The builder.
-     */
-    public Builder withFieldName(String[] fieldName) {
-      this.fieldName = fieldName;
-      return this;
-    }
-
-    /**
-     * Builds the RangePartitioningDTO.
-     *
-     * @return The new RangePartitioningDTO.
-     */
-    public RangePartitioningDTO build() {
-      return new RangePartitioningDTO(fieldName);
-    }
-  }
-
-  /** @return the builder for creating a new instance of RangePartitioningDTO. */
-  public static Builder builder() {
-    return new Builder();
   }
 }
