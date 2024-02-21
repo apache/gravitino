@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.TestEntityStore.InMemoryEntityStore;
@@ -192,16 +193,16 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 ident2, Catalog.Type.RELATIONAL, provider, "comment", props2));
 
+    CatalogChange change1 = CatalogChange.setProperty("key1", "value1");
     Exception e1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> catalogManager.alterCatalog(ident, CatalogChange.setProperty("key1", "value1")));
+            IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident, change1));
     Assertions.assertTrue(e1.getMessage().contains("Property key1 is immutable"));
 
+    CatalogChange change2 = CatalogChange.setProperty("key3", "value2");
     Exception e2 =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key3", "value2")));
+            IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change2));
     Assertions.assertTrue(e2.getMessage().contains("Property key3 is immutable"));
 
     Assertions.assertDoesNotThrow(
@@ -209,14 +210,12 @@ public class TestCatalogManager {
     Assertions.assertDoesNotThrow(
         () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key2", "value2")));
 
+    CatalogChange change3 = CatalogChange.setProperty("key4", "value4");
+    CatalogChange change4 = CatalogChange.removeProperty("key1");
     Exception e3 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                catalogManager.alterCatalog(
-                    ident2,
-                    CatalogChange.setProperty("key4", "value4"),
-                    CatalogChange.removeProperty("key1")));
+            () -> catalogManager.alterCatalog(ident2, change3, change4));
     Assertions.assertTrue(e3.getMessage().contains("Property key1 is immutable"));
     reset();
   }
@@ -352,9 +351,10 @@ public class TestCatalogManager {
 
     // Test list under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
+    Namespace namespace = ident2.namespace();
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> catalogManager.listCatalogs(ident2.namespace()));
+            NoSuchMetalakeException.class, () -> catalogManager.listCatalogs(namespace));
     Assertions.assertTrue(exception.getMessage().contains("Metalake metalake1 does not exist"));
   }
 

@@ -171,14 +171,12 @@ public class TestJdbcTableOperations {
     allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(newName, allTables.get(0));
 
+    TableChange tableChange =
+        TableChange.updateColumnType(new String[] {col_a.name()}, Types.StringType.get());
     // Sqlite does not support modifying the column type of table
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () ->
-            JDBC_TABLE_OPERATIONS.alterTable(
-                DATABASE_NAME,
-                newName,
-                TableChange.updateColumnType(new String[] {col_a.name()}, Types.StringType.get())));
+        () -> JDBC_TABLE_OPERATIONS.alterTable(DATABASE_NAME, newName, tableChange));
 
     // delete table.
     JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName);

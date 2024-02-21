@@ -192,9 +192,9 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
 
     UpdateNamespacePropertiesResponse r =
         response.readEntity(UpdateNamespacePropertiesResponse.class);
-    Assertions.assertEquals(r.removed(), Arrays.asList("a"));
-    Assertions.assertEquals(r.missing(), Arrays.asList("a1"));
-    Assertions.assertEquals(r.updated(), Arrays.asList("b"));
+    Assertions.assertEquals(Arrays.asList("a"), r.removed());
+    Assertions.assertEquals(Arrays.asList("a1"), r.missing());
+    Assertions.assertEquals(Arrays.asList("b"), r.updated());
   }
 
   private void verifyUpdateNamespaceFail(int status, String name) {

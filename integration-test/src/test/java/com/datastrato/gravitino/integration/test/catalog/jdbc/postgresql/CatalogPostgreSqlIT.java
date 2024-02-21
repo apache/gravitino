@@ -322,9 +322,12 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.stream(postgreSqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
+    Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap()));
+        () -> {
+          schemas.createSchema(schemaIdent, schema_comment, emptyMap);
+        });
 
     // drop schema check.
     schemas.dropSchema(schemaIdent, false);
@@ -649,38 +652,44 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create index complex fields fail.
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed");
+    SortOrder[] sortOrder = new SortOrder[0];
+    Index[] primaryIndex =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
     IllegalArgumentException illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+                  sortOrder,
+                  primaryIndex);
             });
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
 
+    Index[] primaryIndex2 =
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
+                  sortOrder,
+                  primaryIndex2);
             });
     Assertions.assertTrue(
         StringUtils.contains(

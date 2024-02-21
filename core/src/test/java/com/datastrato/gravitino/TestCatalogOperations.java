@@ -85,7 +85,7 @@ public class TestCatalogOperations
     if (tables.containsKey(ident)) {
       return tables.get(ident);
     } else {
-      throw new NoSuchTableException("Table " + ident + " does not exist");
+      throw new NoSuchTableException("Table %s does not exist", ident);
     }
   }
 
@@ -117,7 +117,7 @@ public class TestCatalogOperations
             .build();
 
     if (tables.containsKey(ident)) {
-      throw new TableAlreadyExistsException("Table " + ident + " already exists");
+      throw new TableAlreadyExistsException("Table %s already exists", ident);
     } else {
       tables.put(ident, table);
     }
@@ -139,7 +139,7 @@ public class TestCatalogOperations
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     if (!tables.containsKey(ident)) {
-      throw new NoSuchTableException("Table " + ident + " does not exist");
+      throw new NoSuchTableException("Table %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =
@@ -219,7 +219,7 @@ public class TestCatalogOperations
             .build();
 
     if (schemas.containsKey(ident)) {
-      throw new SchemaAlreadyExistsException("Schema " + ident + " already exists");
+      throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
     } else {
       schemas.put(ident, schema);
     }
@@ -232,7 +232,7 @@ public class TestCatalogOperations
     if (schemas.containsKey(ident)) {
       return schemas.get(ident);
     } else {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist");
+      throw new NoSuchSchemaException("Schema %s does not exist", ident);
     }
   }
 
@@ -240,7 +240,7 @@ public class TestCatalogOperations
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     if (!schemas.containsKey(ident)) {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist");
+      throw new NoSuchSchemaException("Schema %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =
@@ -398,7 +398,7 @@ public class TestCatalogOperations
     if (filesets.containsKey(ident)) {
       return filesets.get(ident);
     } else {
-      throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+      throw new NoSuchFilesetException("Fileset %s does not exist", ident);
     }
   }
 
@@ -423,7 +423,7 @@ public class TestCatalogOperations
             .build();
 
     if (tables.containsKey(ident)) {
-      throw new FilesetAlreadyExistsException("Fileset " + ident + " already exists");
+      throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
     } else {
       filesets.put(ident, fileset);
     }
@@ -435,7 +435,7 @@ public class TestCatalogOperations
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
     if (!filesets.containsKey(ident)) {
-      throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+      throw new NoSuchFilesetException("Fileset %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =

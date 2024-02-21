@@ -11,26 +11,16 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
-import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -55,11 +45,9 @@ import org.slf4j.LoggerFactory;
  * operations, for example, schemas and tables list, creation, update and deletion. A Relational
  * catalog is under the metalake.
  */
-public class RelationalCatalog extends CatalogDTO implements TableCatalog, SupportsSchemas {
+public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
-
-  private final RESTClient restClient;
 
   RelationalCatalog(
       String name,
@@ -69,13 +57,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, provider, comment, properties, auditDTO);
-    this.restClient = restClient;
-  }
-
-  @Override
-  public SupportsSchemas asSchemas() {
-    return this;
+    super(name, type, provider, comment, properties, auditDTO, restClient);
   }
 
   @Override
@@ -267,143 +249,6 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     }
   }
 
-  /**
-   * List all the schemas under the given catalog namespace.
-   *
-   * @param namespace The namespace of the catalog.
-   * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
-   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
-   */
-  @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    Namespace.checkSchema(namespace);
-
-    EntityListResponse resp =
-        restClient.get(
-            formatSchemaRequestPath(namespace),
-            EntityListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return resp.identifiers();
-  }
-
-  /**
-   * Create a new schema with specified identifier, comment and metadata.
-   *
-   * @param ident The name identifier of the schema.
-   * @param comment The comment of the schema.
-   * @param properties The properties of the schema.
-   * @return The created {@link Schema}.
-   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
-   * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
-   */
-  @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    NameIdentifier.checkSchema(ident);
-
-    SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, properties);
-    req.validate();
-
-    SchemaResponse resp =
-        restClient.post(
-            formatSchemaRequestPath(ident.namespace()),
-            req,
-            SchemaResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return resp.getSchema();
-  }
-
-  /**
-   * Load the schema with specified identifier.
-   *
-   * @param ident The name identifier of the schema.
-   * @return The {@link Schema} with specified identifier.
-   * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
-   */
-  @Override
-  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(ident);
-
-    SchemaResponse resp =
-        restClient.get(
-            formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
-            SchemaResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return resp.getSchema();
-  }
-
-  /**
-   * Alter the schema with specified identifier by applying the changes.
-   *
-   * @param ident The name identifier of the schema.
-   * @param changes The metadata changes to apply.
-   * @return The altered {@link Schema}.
-   * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
-   */
-  @Override
-  public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
-      throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(ident);
-
-    List<SchemaUpdateRequest> reqs =
-        Arrays.stream(changes)
-            .map(DTOConverters::toSchemaUpdateRequest)
-            .collect(Collectors.toList());
-    SchemaUpdatesRequest updatesRequest = new SchemaUpdatesRequest(reqs);
-    updatesRequest.validate();
-
-    SchemaResponse resp =
-        restClient.put(
-            formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
-            updatesRequest,
-            SchemaResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return resp.getSchema();
-  }
-
-  /**
-   * Drop the schema with specified identifier.
-   *
-   * @param ident The name identifier of the schema.
-   * @param cascade Whether to drop all the tables under the schema.
-   * @return true if the schema is dropped successfully, false otherwise.
-   * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
-   */
-  @Override
-  public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    NameIdentifier.checkSchema(ident);
-
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
-              Collections.singletonMap("cascade", String.valueOf(cascade)),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.schemaErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (NonEmptySchemaException e) {
-      throw e;
-    } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", ident, e);
-      return false;
-    }
-  }
-
   @VisibleForTesting
   static String formatTableRequestPath(Namespace ns) {
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
@@ -415,19 +260,20 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
         .toString();
   }
 
-  @VisibleForTesting
-  static String formatSchemaRequestPath(Namespace ns) {
-    return new StringBuilder()
-        .append("api/metalakes/")
-        .append(ns.level(0))
-        .append("/catalogs/")
-        .append(ns.level(1))
-        .append("/schemas")
-        .toString();
+  /**
+   * Create a new builder for the relational catalog.
+   *
+   * @return A new builder for the relational catalog.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
+    /** The REST client to send the requests. */
     private RESTClient restClient;
+
+    private Builder() {}
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
@@ -437,10 +283,9 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     @Override
     public RelationalCatalog build() {
       Preconditions.checkArgument(restClient != null, "restClient must be set");
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(provider), "provider must not be null or empty");
+      Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
       return new RelationalCatalog(name, type, provider, comment, properties, audit, restClient);

@@ -51,7 +51,9 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -403,19 +405,18 @@ public class CatalogHiveIT extends AbstractIT {
     // Bad name in distribution
     final Distribution badDistribution =
         Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     Assertions.assertThrows(
         Exception.class,
         () -> {
-          catalog
-              .asTableCatalog()
-              .createTable(
-                  nameIdentifier,
-                  columns,
-                  TABLE_COMMENT,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  badDistribution,
-                  sortOrders);
+          tableCatalog.createTable(
+              nameIdentifier,
+              columns,
+              TABLE_COMMENT,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              badDistribution,
+              sortOrders);
         });
 
     final SortOrder[] badSortOrders =
@@ -429,16 +430,14 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertThrows(
         Exception.class,
         () -> {
-          catalog
-              .asTableCatalog()
-              .createTable(
-                  nameIdentifier,
-                  columns,
-                  TABLE_COMMENT,
-                  properties,
-                  Transforms.EMPTY_TRANSFORM,
-                  distribution,
-                  badSortOrders);
+          tableCatalog.createTable(
+              nameIdentifier,
+              columns,
+              TABLE_COMMENT,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              distribution,
+              badSortOrders);
         });
   }
 
@@ -559,15 +558,14 @@ public class CatalogHiveIT extends AbstractIT {
     checkTableReadWrite(actualTable2);
 
     // test alter properties exception
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    TableChange change = TableChange.setProperty(TRANSIENT_LAST_DDL_TIME, "1234");
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
-              catalog
-                  .asTableCatalog()
-                  .alterTable(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                      TableChange.setProperty(TRANSIENT_LAST_DDL_TIME, "1234"));
+              tableCatalog.alterTable(id, change);
             });
     Assertions.assertTrue(exception.getMessage().contains("cannot be set"));
   }
@@ -646,21 +644,18 @@ public class CatalogHiveIT extends AbstractIT {
     checkTableReadWrite(hiveTab);
 
     // test exception
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Transform[] transforms =
+        new Transform[] {
+          IdentityPartitioningDTO.of(columns[0].name()),
+          IdentityPartitioningDTO.of(columns[1].name())
+        };
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
             () -> {
-              catalog
-                  .asTableCatalog()
-                  .createTable(
-                      nameIdentifier,
-                      columns,
-                      TABLE_COMMENT,
-                      properties,
-                      new Transform[] {
-                        IdentityPartitioningDTO.of(columns[0].name()),
-                        IdentityPartitioningDTO.of(columns[1].name())
-                      });
+              tableCatalog.createTable(
+                  nameIdentifier, columns, TABLE_COMMENT, properties, transforms);
             });
     Assertions.assertTrue(
         exception
@@ -906,10 +901,12 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   void testAlterUnknownTable() {
     NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName, "unknown");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange change = TableChange.updateComment("new_comment");
     Assertions.assertThrows(
         NoSuchTableException.class,
         () -> {
-          catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("new_comment"));
+          tableCatalog.alterTable(identifier, change);
         });
   }
 
@@ -972,16 +969,15 @@ public class CatalogHiveIT extends AbstractIT {
     checkTableReadWrite(hiveTab);
 
     // test alter partition column exception
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME);
+    TableChange updateType =
+        TableChange.updateColumnType(new String[] {HIVE_COL_NAME3}, Types.IntegerType.get());
     RuntimeException exception =
         assertThrows(
             RuntimeException.class,
             () -> {
-              catalog
-                  .asTableCatalog()
-                  .alterTable(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME),
-                      TableChange.updateColumnType(
-                          new String[] {HIVE_COL_NAME3}, Types.IntegerType.get()));
+              tableCatalog.alterTable(id, updateType);
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
@@ -1022,16 +1018,13 @@ public class CatalogHiveIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0]);
 
+    TableChange updatePos =
+        TableChange.updateColumnPosition(
+            new String[] {"date_of_birth"}, TableChange.ColumnPosition.first());
     exception =
         assertThrows(
             IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnPosition(
-                            new String[] {"date_of_birth"}, TableChange.ColumnPosition.first())));
+            () -> tableCatalog.alterTable(tableIdentifier, updatePos));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -1122,69 +1115,48 @@ public class CatalogHiveIT extends AbstractIT {
     for (int i = 1; i < metalakeName.length(); i++) {
       // We can't get the metalake by prefix
       final int length = i;
-      Assertions.assertThrows(
-          NoSuchMetalakeException.class,
-          () -> client.loadMetalake(NameIdentifier.of(metalakeName.substring(0, length))));
+      final NameIdentifier id = NameIdentifier.of(metalakeName.substring(0, length));
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
     }
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> client.loadMetalake(NameIdentifier.of(metalakeName + "a")));
+    final NameIdentifier idA = NameIdentifier.of(metalakeName + "a");
+    Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(idA));
 
     for (int i = 1; i < catalogName.length(); i++) {
       // We can't get the catalog by prefix
       final int length = i;
-      Assertions.assertThrows(
-          NoSuchCatalogException.class,
-          () ->
-              metalake.loadCatalog(
-                  NameIdentifier.of(metalakeName, catalogName.substring(0, length))));
+      final NameIdentifier id = NameIdentifier.of(metalakeName, catalogName.substring(0, length));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id));
     }
 
     // We can't load the catalog.
-    Assertions.assertThrows(
-        NoSuchCatalogException.class,
-        () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName + "a")));
+    final NameIdentifier idB = NameIdentifier.of(metalakeName, catalogName + "a");
+    Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB));
+
+    SupportsSchemas schemas = catalog.asSchemas();
 
     for (int i = 1; i < schemaName.length(); i++) {
       // We can't get the schema by prefix
       final int length = i;
-      Assertions.assertThrows(
-          NoSuchSchemaException.class,
-          () ->
-              catalog
-                  .asSchemas()
-                  .loadSchema(
-                      NameIdentifier.of(
-                          metalakeName, catalogName, schemaName.substring(0, length))));
+      final NameIdentifier id =
+          NameIdentifier.of(metalakeName, catalogName, schemaName.substring(0, length));
+      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id));
     }
 
-    Assertions.assertThrows(
-        NoSuchSchemaException.class,
-        () ->
-            catalog
-                .asSchemas()
-                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName + "a")));
+    NameIdentifier idC = NameIdentifier.of(metalakeName, catalogName, schemaName + "a");
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC));
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
 
     for (int i = 1; i < tableName.length(); i++) {
       // We can't get the table by prefix
       final int length = i;
-      Assertions.assertThrows(
-          NoSuchTableException.class,
-          () ->
-              catalog
-                  .asTableCatalog()
-                  .loadTable(
-                      NameIdentifier.of(
-                          metalakeName, catalogName, schemaName, tableName.substring(0, length))));
+      final NameIdentifier id =
+          NameIdentifier.of(metalakeName, catalogName, schemaName, tableName.substring(0, length));
+      Assertions.assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(id));
     }
 
-    Assertions.assertThrows(
-        NoSuchTableException.class,
-        () ->
-            catalog
-                .asTableCatalog()
-                .loadTable(
-                    NameIdentifier.of(metalakeName, catalogName, schemaName, tableName + "a")));
+    NameIdentifier idD = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName + "a");
+    Assertions.assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(idD));
   }
 
   @Test
@@ -1195,21 +1167,17 @@ public class CatalogHiveIT extends AbstractIT {
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
     // Test rename metalake
+    NameIdentifier id = NameIdentifier.of(metalakeName);
+    NameIdentifier newId = NameIdentifier.of(newMetalakeName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(
-          NoSuchMetalakeException.class,
-          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
-      client.alterMetalake(NameIdentifier.of(metalakeName), MetalakeChange.rename(newMetalakeName));
-      client.loadMetalake(NameIdentifier.of(newMetalakeName));
-      Assertions.assertThrows(
-          NoSuchMetalakeException.class,
-          () -> client.loadMetalake(NameIdentifier.of(metalakeName)));
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
+      client.alterMetalake(id, MetalakeChange.rename(newMetalakeName));
+      client.loadMetalake(newId);
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
 
-      client.alterMetalake(NameIdentifier.of(newMetalakeName), MetalakeChange.rename(metalakeName));
-      client.loadMetalake(NameIdentifier.of(metalakeName));
-      Assertions.assertThrows(
-          NoSuchMetalakeException.class,
-          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
+      client.alterMetalake(newId, MetalakeChange.rename(metalakeName));
+      client.loadMetalake(id);
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
     }
 
     String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
@@ -1223,23 +1191,19 @@ public class CatalogHiveIT extends AbstractIT {
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
+    NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
+    NameIdentifier oldId = NameIdentifier.of(metalakeName, catalogName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(
-          NoSuchCatalogException.class,
-          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
       metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
-      Assertions.assertThrows(
-          NoSuchCatalogException.class,
-          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId));
 
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
-      catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-      Assertions.assertThrows(
-          NoSuchCatalogException.class,
-          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
+      catalog = metalake.loadCatalog(oldId);
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
     }
 
     // Schema does not have the rename operation.
@@ -1263,41 +1227,25 @@ public class CatalogHiveIT extends AbstractIT {
             createProperties(),
             Transforms.EMPTY_TRANSFORM);
 
+    NameIdentifier id3 = NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName);
+    NameIdentifier id4 = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    TableChange newRename = TableChange.rename(newTableName);
+    TableChange oldRename = TableChange.rename(tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableCatalog tableCata = cata.asTableCatalog();
+
     for (int i = 0; i < 2; i++) {
       // The table to be renamed does not exist
-      Assertions.assertThrows(
-          NoSuchTableException.class,
-          () ->
-              cata.asTableCatalog()
-                  .loadTable(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName)));
-      catalog
-          .asTableCatalog()
-          .alterTable(
-              NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-              TableChange.rename(newTableName));
-      Table table =
-          catalog
-              .asTableCatalog()
-              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName));
+      Assertions.assertThrows(NoSuchTableException.class, () -> tableCata.loadTable(id3));
+      tableCatalog.alterTable(id4, newRename);
+      Table table = tableCatalog.loadTable(id3);
       Assertions.assertNotNull(table);
 
       // Old Table should not exist anymore.
-      Assertions.assertThrows(
-          NoSuchTableException.class,
-          () ->
-              cata.asTableCatalog()
-                  .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)));
+      Assertions.assertThrows(NoSuchTableException.class, () -> tableCata.loadTable(id4));
 
-      catalog
-          .asTableCatalog()
-          .alterTable(
-              NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName),
-              TableChange.rename(tableName));
-      table =
-          catalog
-              .asTableCatalog()
-              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+      tableCatalog.alterTable(id3, oldRename);
+      table = catalog.asTableCatalog().loadTable(id4);
       Assertions.assertNotNull(table);
     }
   }
@@ -1319,8 +1267,12 @@ public class CatalogHiveIT extends AbstractIT {
 
     client.loadMetalake(NameIdentifier.of(metalakeName2));
 
+    NameIdentifier of = NameIdentifier.of(metalakeName1);
     Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName1)));
+        NoSuchMetalakeException.class,
+        () -> {
+          client.loadMetalake(of);
+        });
   }
 
   @Test
@@ -1418,12 +1370,12 @@ public class CatalogHiveIT extends AbstractIT {
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     checkTableReadWrite(hiveTab);
     Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
-          catalog
-              .asTableCatalog()
-              .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+          tableCatalog.purgeTable(id);
         },
         "Can't purge a external hive table");
 

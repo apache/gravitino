@@ -191,6 +191,8 @@ public class TestHadoopCatalogOperations {
     String comment = "comment15";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog15";
     Schema schema = createSchema(name, comment, catalogPath, null);
+    NameIdentifier schema16 = NameIdentifier.ofSchema("m1", "c1", "schema16");
+
     Assertions.assertEquals(name, schema.name());
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
@@ -207,9 +209,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       Throwable exception =
-          Assertions.assertThrows(
-              NoSuchSchemaException.class,
-              () -> ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", "schema16")));
+          Assertions.assertThrows(NoSuchSchemaException.class, () -> ops.loadSchema(schema16));
       Assertions.assertEquals("Schema m1.c1.schema16 does not exist", exception.getMessage());
     }
   }
@@ -289,10 +289,11 @@ public class TestHadoopCatalogOperations {
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
+    NameIdentifier id = NameIdentifier.ofSchema("m1", "c1", name);
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath));
-      Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
+      Schema schema1 = ops.loadSchema(id);
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
@@ -303,7 +304,7 @@ public class TestHadoopCatalogOperations {
           "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
-      ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), false);
+      ops.dropSchema(id, false);
 
       Path schemaPath = new Path(new Path(catalogPath), name);
       FileSystem fs = schemaPath.getFileSystem(new Configuration());
@@ -315,15 +316,13 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(fs.exists(subPath));
 
       Throwable exception1 =
-          Assertions.assertThrows(
-              NonEmptySchemaException.class,
-              () -> ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), false));
+          Assertions.assertThrows(NonEmptySchemaException.class, () -> ops.dropSchema(id, false));
       Assertions.assertEquals(
           "Schema m1.c1.schema20 with location " + schemaPath + " is not empty",
           exception1.getMessage());
 
       // Test drop non-empty schema with cascade = true
-      ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), true);
+      ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
     }
   }

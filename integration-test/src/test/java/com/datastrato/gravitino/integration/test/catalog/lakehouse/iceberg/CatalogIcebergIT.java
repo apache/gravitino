@@ -302,18 +302,21 @@ public class CatalogIcebergIT extends AbstractIT {
             IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name()));
     Assertions.assertTrue(hiveCatalogProps.containsKey("t1"));
 
+    Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap()));
+        () -> schemas.createSchema(schemaIdent, schema_comment, emptyMap));
 
     // drop schema check.
     schemas.dropSchema(schemaIdent, false);
     Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+    org.apache.iceberg.catalog.Namespace icebergNamespace =
+        IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name());
     Assertions.assertThrows(
         NoSuchNamespaceException.class,
-        () ->
-            hiveCatalog.loadNamespaceMetadata(
-                IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name())));
+        () -> {
+          hiveCatalog.loadNamespaceMetadata(icebergNamespace);
+        });
 
     nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
     schemaMap =
@@ -634,16 +637,13 @@ public class CatalogIcebergIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0]);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange change =
+        TableChange.updateColumnPosition(
+            new String[] {"no_column"}, TableChange.ColumnPosition.first());
     IllegalArgumentException illegalArgumentException =
         assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnPosition(
-                            new String[] {"no_column"}, TableChange.ColumnPosition.first())));
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(tableIdentifier, change));
     Assertions.assertTrue(illegalArgumentException.getMessage().contains("no_column"));
 
     catalog
@@ -831,10 +831,11 @@ public class CatalogIcebergIT extends AbstractIT {
     prop.put("key2", "val2");
 
     // create
+    SupportsSchemas schemas = catalog.asSchemas();
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> catalog.asSchemas().createSchema(ident, schema_comment, prop));
+            () -> schemas.createSchema(ident, schema_comment, prop));
     Assertions.assertTrue(
         illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.remove(IcebergSchemaPropertiesMetadata.COMMENT);
@@ -847,9 +848,9 @@ public class CatalogIcebergIT extends AbstractIT {
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
 
     // alter
+    SchemaChange change = SchemaChange.setProperty("comment", "v1");
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("comment", "v1")));
+        IllegalArgumentException.class, () -> schemas.alterSchema(ident, change));
 
     Assertions.assertDoesNotThrow(
         () ->
@@ -861,8 +862,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
     // drop
     Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
-    Assertions.assertThrows(
-        NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(ident));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(ident));
   }
 
   @Test
@@ -935,6 +935,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
 
     // Create a data table for Distributions.NONE and set field name
+    Distribution hash = Distributions.hash(0, NamedReference.field(ICEBERG_COL_NAME1));
     IllegalArgumentException illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -945,7 +946,7 @@ public class CatalogIcebergIT extends AbstractIT {
                   table_comment,
                   properties,
                   partitioning,
-                  Distributions.hash(0, NamedReference.field(ICEBERG_COL_NAME1)),
+                  hash,
                   sortOrders);
             });
     Assertions.assertTrue(
@@ -979,6 +980,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
 
     // Create a data table for Distributions.range and set field name
+    Distribution of = Distributions.of(Strategy.RANGE, 0, NamedReference.field(ICEBERG_COL_NAME1));
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -989,7 +991,7 @@ public class CatalogIcebergIT extends AbstractIT {
                   table_comment,
                   properties,
                   partitioning,
-                  Distributions.of(Strategy.RANGE, 0, NamedReference.field(ICEBERG_COL_NAME1)),
+                  of,
                   sortOrders);
             });
     Assertions.assertTrue(

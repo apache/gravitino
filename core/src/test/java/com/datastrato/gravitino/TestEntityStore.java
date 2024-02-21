@@ -94,7 +94,7 @@ public class TestEntityStore {
           () -> {
             E e = (E) entityMap.get(ident);
             if (e == null) {
-              throw new NoSuchEntityException("Entity " + ident + " does not exist");
+              throw new NoSuchEntityException("Entity %s does not exist", ident);
             }
 
             E newE = updater.apply(e);
@@ -113,7 +113,7 @@ public class TestEntityStore {
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
+        throw new NoSuchEntityException("Entity %s does not exist", ident);
       }
 
       return e;
@@ -208,9 +208,9 @@ public class TestEntityStore {
     Assertions.assertEquals(tableEntity, retrievedTable);
 
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
+    NameIdentifier id = metalake.nameIdentifier();
     Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+        NoSuchEntityException.class, () -> store.get(id, EntityType.METALAKE, BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
     store.close();

@@ -9,6 +9,7 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import net.ltgt.gradle.errorprone.errorprone
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -44,6 +45,7 @@ plugins {
   alias(libs.plugins.bom)
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
+  alias(libs.plugins.errorprone)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -96,40 +98,38 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
-  if ((project.name != "catalogs") && project.name != "clients") {
-    apply(plugin = "com.diffplug.spotless")
-    repositories {
-      mavenCentral()
-      mavenLocal()
-    }
+  apply(plugin = "com.diffplug.spotless")
+  repositories {
+    mavenCentral()
+    mavenLocal()
+  }
 
-    plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
-      configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-        java {
-          // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-          // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-          // JDK17.
-          googleJavaFormat("1.7")
-          removeUnusedImports()
-          trimTrailingWhitespace()
-          replaceRegex(
-            "Remove wildcard imports",
-            "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-            "$1"
-          )
-          replaceRegex(
-            "Remove static wildcard imports",
-            "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-            "$1"
-          )
+  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+      java {
+        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+        // JDK17.
+        googleJavaFormat("1.7")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        replaceRegex(
+          "Remove wildcard imports",
+          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
+        replaceRegex(
+          "Remove static wildcard imports",
+          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
 
-          targetExclude("**/build/**")
-        }
+        targetExclude("**/build/**")
+      }
 
-        kotlinGradle {
-          target("*.gradle.kts")
-          ktlint().editorConfigOverride(mapOf("indent_size" to 2))
-        }
+      kotlinGradle {
+        target("*.gradle.kts")
+        ktlint().editorConfigOverride(mapOf("indent_size" to 2))
       }
     }
   }
@@ -189,15 +189,114 @@ subprojects {
     }
   }
 
-  if ((project.name == "catalogs") || project.name == "clients") {
-    tasks.withType<Jar> {
-      enabled = false
+  gradle.projectsEvaluated {
+    tasks.withType<JavaCompile> {
+      options.compilerArgs.addAll(
+        arrayOf(
+          "-Xlint:cast",
+          "-Xlint:deprecation",
+          "-Xlint:divzero",
+          "-Xlint:empty",
+          "-Xlint:fallthrough",
+          "-Xlint:finally",
+          "-Xlint:overrides",
+          "-Xlint:static",
+          "-Werror"
+        )
+      )
     }
   }
 
-  gradle.projectsEvaluated {
-    tasks.withType<JavaCompile> {
-      options.compilerArgs.addAll(arrayOf("-Xlint:deprecation", "-Werror"))
+  if (project.name != "meta") {
+    apply(plugin = "net.ltgt.errorprone")
+    dependencies {
+      errorprone("com.google.errorprone:error_prone_core:2.10.0")
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+      options.errorprone.isEnabled.set(true)
+      options.errorprone.disableAllChecks.set(true)
+      options.errorprone.enable(
+        "AnnotateFormatMethod",
+        "FormatStringAnnotation",
+        "AlwaysThrows",
+        "ArrayEquals",
+        "ArrayToString",
+        "ArraysAsListPrimitiveArray",
+        "ArrayFillIncompatibleType",
+        "BoxedPrimitiveEquality",
+        "ChainingConstructorIgnoresParameter",
+        "CheckNotNullMultipleTimes",
+        "CollectionIncompatibleType",
+        "CollectionToArraySafeParameter",
+        "ComparingThisWithNull",
+        "ComparisonOutOfRange",
+        "CompatibleWithAnnotationMisuse",
+        "CompileTimeConstant",
+        "ConditionalExpressionNumericPromotion",
+        "DangerousLiteralNull",
+        "DeadException",
+        "DeadThread",
+        "DoNotCall",
+        "DoNotMock",
+        "DuplicateMapKeys",
+        "EqualsNaN",
+        "EqualsNull",
+        "EqualsReference",
+        "EqualsWrongThing",
+        "ForOverride",
+        "FormatString",
+        "GetClassOnAnnotation",
+        "GetClassOnClass",
+        "HashtableContains",
+        "IdentityBinaryExpression",
+        "IdentityHashMapBoxing",
+        "Immutable",
+        "Incomparable",
+        "IncompatibleArgumentType",
+        "IndexOfChar",
+        "InfiniteRecursion",
+        "InvalidJavaTimeConstant",
+        "InvalidPatternSyntax",
+        "IsInstanceIncompatibleType",
+        "JUnit4ClassAnnotationNonStatic",
+        "JUnit4SetUpNotRun",
+        "JUnit4TearDownNotRun",
+        "JUnit4TestNotRun",
+        "JUnitAssertSameCheck",
+        "LockOnBoxedPrimitive",
+        "LoopConditionChecker",
+        "LossyPrimitiveCompare",
+        "MathRoundIntLong",
+        "MissingSuperCall",
+        "ModifyingCollectionWithItself",
+        "NonCanonicalStaticImport",
+        "NonFinalCompileTimeConstant",
+        "NonRuntimeAnnotation",
+        "NullTernary",
+        "OptionalEquality",
+        "PackageInfo",
+        "ParametersButNotParameterized",
+        "RandomCast",
+        "RandomModInteger",
+        "SelfAssignment",
+        "SelfComparison",
+        "SelfEquals",
+        "SizeGreaterThanOrEqualsZero",
+        "StreamToString",
+        "StringBuilderInitWithChar",
+        "SubstringOfZero",
+        "ThrowNull",
+        "TruthSelfEquals",
+        "TryFailThrowable",
+        "TypeParameterQualifier",
+        "UnnecessaryCheckNotNull",
+        "UnnecessaryTypeArgument",
+        "UnusedAnonymousClass",
+        "UnusedCollectionModifiedInPlace",
+        "VarTypeName",
+        "XorPower"
+      )
     }
   }
 

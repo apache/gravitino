@@ -45,6 +45,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -202,10 +203,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-        String[] principalComponents = catalogPrincipal.split("@");
+        @SuppressWarnings("null")
+        List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
         Preconditions.checkArgument(
-            principalComponents.length == 2, "The principal has the wrong format");
-        this.kerberosRealm = principalComponents[1];
+            principalComponents.size() == 2, "The principal has the wrong format");
+        this.kerberosRealm = principalComponents.get(1);
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
@@ -336,9 +338,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (AlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
-          String.format(
-              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) '%s' already exists in Hive Metastore", ident.name());
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -367,9 +367,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException | UnknownDBException e) {
       throw new NoSuchSchemaException(
-          String.format(
-              "Hive schema (database) does not exist: %s in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) does not exist: %s in Hive Metastore", ident.name());
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -430,8 +428,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(
-          String.format("Hive schema (database) %s does not exist in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) %s does not exist in Hive Metastore", ident.name());
 
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
@@ -463,9 +460,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (InvalidOperationException e) {
       throw new NonEmptySchemaException(
-          String.format(
-              "Hive schema (database) %s is not empty. One or more tables exist.", ident.name()),
-          e);
+          e, "Hive schema (database) %s is not empty. One or more tables exist.", ident.name());
 
     } catch (NoSuchObjectException e) {
       LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
@@ -491,7 +486,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     if (!schemaExists(schemaIdent)) {
-      throw new NoSuchSchemaException("Schema (database) does not exist " + namespace);
+      throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
     }
 
     try {
@@ -515,7 +510,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                   .toArray(NameIdentifier[]::new));
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(
-          "Schema (database) does not exist " + namespace + " in Hive Metastore");
+          "Schema (database) does not exist %s in Hive Metastore", namespace);
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -556,7 +551,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
-          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
+          e, "Hive table does not exist: %s in Hive Metastore", tableIdent.name());
 
     } catch (InterruptedException | TException e) {
       throw new RuntimeException(
@@ -709,7 +704,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
-        throw new NoSuchSchemaException("Hive Schema (database) does not exist " + schemaIdent);
+        throw new NoSuchSchemaException("Hive Schema (database) does not exist: %s ", schemaIdent);
       }
 
       HiveTable hiveTable =
@@ -740,7 +735,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return hiveTable;
 
     } catch (AlreadyExistsException e) {
-      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name(), e);
+      throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);

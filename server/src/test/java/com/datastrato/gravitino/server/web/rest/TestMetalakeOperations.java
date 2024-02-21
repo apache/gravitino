@@ -195,7 +195,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertNull(metalake1.properties());
 
     // Test when specified metalake is not found.
-    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name %s", metalakeName))
         .when(metalakeManager)
         .loadMetalake(any());
 
@@ -280,7 +280,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertNull(metalake1.properties());
 
     // Test when specified metalake is not found.
-    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name %s", metalakeName))
         .when(metalakeManager)
         .alterMetalake(any(), any(), any());
 

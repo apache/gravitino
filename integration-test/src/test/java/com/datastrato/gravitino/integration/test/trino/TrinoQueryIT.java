@@ -239,7 +239,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
    *
    * @param expectResult
    * @param result
-   * @return
+   * @return false if the expected result is empty or the actual result does not match the expected.
+   *     For {@literal <BLANK_LINE>} case, return true if the actual result is empty. For {@literal
+   *     <QUERY_FAILED>} case, replace the placeholder with "^Query \\w+ failed.*: " and do match.
    */
   static boolean match(String expectResult, String result) {
     if (expectResult.isEmpty()) {

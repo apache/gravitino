@@ -100,29 +100,34 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
     Assertions.assertEquals("Empty token authorization header", e.getMessage());
 
     // case2 : Invalid token authorization header
+    byte[] bytes = "Xx".getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () -> kerberosAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
+            () -> {
+              kerberosAuthenticator.authenticateToken(bytes);
+            });
     Assertions.assertEquals("Invalid token authorization header", e.getMessage());
 
     // case 3: Blank token found
+    byte[] bytes2 = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () ->
-                kerberosAuthenticator.authenticateToken(
-                    AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER.getBytes(StandardCharsets.UTF_8)));
+            () -> {
+              kerberosAuthenticator.authenticateToken(bytes2);
+            });
     Assertions.assertEquals("Blank token found", e.getMessage());
 
     // case 4: Fail to validate the token
+    String header = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + "xxxx";
+    byte[] bytes3 = header.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () ->
-                kerberosAuthenticator.authenticateToken(
-                    (AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + "xxxx")
-                        .getBytes(StandardCharsets.UTF_8)));
+            () -> {
+              kerberosAuthenticator.authenticateToken(bytes3);
+            });
     Assertions.assertEquals("Fail to validate the token", e.getMessage());
   }
 

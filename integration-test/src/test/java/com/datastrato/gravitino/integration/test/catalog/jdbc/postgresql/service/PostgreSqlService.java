@@ -70,7 +70,7 @@ public class PostgreSqlService {
       statement.setString(2, database);
       try (ResultSet resultSet = statement.executeQuery()) {
         if (!resultSet.next()) {
-          throw new NoSuchSchemaException("No such schema: " + schema);
+          throw new NoSuchSchemaException("No such schema: %s", schema);
         }
         String schemaName = resultSet.getString(1);
         return new JdbcSchema.Builder().withName(schemaName).build();

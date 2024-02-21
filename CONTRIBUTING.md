@@ -17,6 +17,7 @@ Before you get started, please read and follow these guidelines to ensure a smoo
   - [Code of Conduct](#code-of-conduct)
   - [Reporting Bugs](#reporting-bugs)
   - [Suggesting Enhancements](#suggesting-enhancements)
+  - [Good First Issues](#good-first-issues)
   - [Working on Issues](#working-on-issues)
   - [Creating Pull Requests](#creating-pull-requests)
 - [Development Setup](#development-setup)
@@ -52,9 +53,13 @@ If you find a bug in Gravitino, please open an issue on GitHub. Be sure to inclu
 
 If you have ideas for enhancements or new features, feel free to create an issue to discuss them. Gravitino welcomes suggestions and provides prompt feedback on their feasibility and relevance.
 
+### Good first issues
+
+If you are new to open source or can't find something to work on check out the [Good First Issues list](https://github.com/datastrato/gravitino/contribute).
+
 ### Working on issues
 
-Check out the list of open issues and find one that interests you. You can also assign an issue to yourself to indicate that you're working on it. Please keep the issue updated with your progress.
+Check out the list of open issues and find one that interests you. You can also comment on an issue to indicate that you're working on it. Please keep the issue updated with your progress.
 
 ## Creating pull requests
 

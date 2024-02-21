@@ -6,11 +6,13 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -52,11 +54,12 @@ public class TestIcebergSchema {
     Assertions.assertTrue(names.contains(ident.name()));
 
     // Test schema already exists
+    SupportsSchemas schemas = icebergCatalog.asSchemas();
     Throwable exception =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
             () -> {
-              icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
+              schemas.createSchema(ident, COMMENT_VALUE, properties);
             });
     Assertions.assertTrue(exception.getMessage().contains("already exists"));
   }
@@ -116,10 +119,10 @@ public class TestIcebergSchema {
 
     Assertions.assertFalse(icebergCatalog.asSchemas().dropSchema(ident, false));
 
+    SupportsSchemas schemas = icebergCatalog.asSchemas();
     Throwable exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> icebergCatalog.asSchemas().dropSchema(ident, true));
+            IllegalArgumentException.class, () -> schemas.dropSchema(ident, true));
     Assertions.assertTrue(
         exception.getMessage().contains("Iceberg does not support cascading delete operations"));
   }
@@ -143,13 +146,15 @@ public class TestIcebergSchema {
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
       ops.initialize(conf);
+      Map<String, String> map = Maps.newHashMap();
+      map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
+      PropertiesMetadata metadata = ops.schemaPropertiesMetadata();
+
       IllegalArgumentException illegalArgumentException =
           Assertions.assertThrows(
               IllegalArgumentException.class,
               () -> {
-                Map<String, String> map = Maps.newHashMap();
-                map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
-                ops.schemaPropertiesMetadata().validatePropertyForCreate(map);
+                metadata.validatePropertyForCreate(map);
               });
       Assertions.assertTrue(
           illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));

@@ -147,8 +147,7 @@ public class TestKvNameMappingService {
       Mockito.doReturn(2L).when(idGenerator).nextId();
       nameMappingService.getOrCreateIdFromName("name2");
 
-      TransactionalKvBackend spyKvBackend =
-          Mockito.spy(((KvNameMappingService) nameMappingService).transactionalKvBackend);
+      TransactionalKvBackend spyKvBackend = Mockito.spy(nameMappingService.transactionalKvBackend);
       // All deletes && puts will be converted to put operations.
       Mockito.doThrow(new ArithmeticException())
           .when(spyKvBackend)

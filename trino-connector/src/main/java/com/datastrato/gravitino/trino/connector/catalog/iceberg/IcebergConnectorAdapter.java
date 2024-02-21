@@ -14,11 +14,12 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Transforming Iceberg connector configuration and components into Gravitino connector. */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
-  private static int version = 0;
+  private static final AtomicInteger VERSION = new AtomicInteger(0);
   private final IcebergPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
@@ -31,7 +32,8 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
       throws Exception {
     Map<String, Object> config = new HashMap<>();
     config.put(
-        "catalogHandle", String.format("%s_v%d:normal:default", catalog.getName(), version++));
+        "catalogHandle",
+        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
     config.put("connectorName", "iceberg");
 
     Map<String, String> properties =

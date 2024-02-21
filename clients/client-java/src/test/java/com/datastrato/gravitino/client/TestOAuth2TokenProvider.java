@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider.Builder;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
@@ -46,21 +47,15 @@ public class TestOAuth2TokenProvider {
 
   @Test
   void testProviderInitException() throws Exception {
+    Builder tokenProvider1 = DefaultOAuth2TokenProvider.builder().withUri("test");
+    Builder tokenProvider2 =
+        DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx");
+    Builder tokenProvider3 =
+        DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").withScope("test");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DefaultOAuth2TokenProvider.builder().withUri("test").build());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").build());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            DefaultOAuth2TokenProvider.builder()
-                .withUri("test")
-                .withCredential("xx")
-                .withScope("test")
-                .build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider1.build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider2.build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider3.build());
   }
 
   @Test

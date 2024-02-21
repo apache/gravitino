@@ -75,7 +75,7 @@ public class MetalakeManager implements SupportsMetalakes {
       return store.get(ident, EntityType.METALAKE, BaseMetalake.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
-      throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
+      throw new NoSuchMetalakeException("Metalake %s does not exist", ident);
     } catch (IOException ioe) {
       LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
@@ -118,7 +118,7 @@ public class MetalakeManager implements SupportsMetalakes {
       return metalake;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
-      throw new MetalakeAlreadyExistsException("Metalake " + ident + " already exists");
+      throw new MetalakeAlreadyExistsException("Metalake %s already exists", ident);
     } catch (IOException ioe) {
       LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
@@ -173,7 +173,7 @@ public class MetalakeManager implements SupportsMetalakes {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Metalake {} does not exist", ident, ne);
-      throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
+      throw new NoSuchMetalakeException("Metalake %s does not exist", ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);

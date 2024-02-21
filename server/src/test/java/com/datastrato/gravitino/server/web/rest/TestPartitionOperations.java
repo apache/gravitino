@@ -124,6 +124,7 @@ public class TestPartitionOperations extends JerseyTest {
     return mockPartitionedTable(table, columns, comment, properties, transforms, partitionNames);
   }
 
+  @SuppressWarnings("FormatStringAnnotation")
   private Table mockPartitionedTable(
       String tableName,
       Column[] columns,
