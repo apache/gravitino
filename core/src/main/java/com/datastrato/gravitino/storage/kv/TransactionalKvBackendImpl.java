@@ -53,10 +53,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @VisibleForTesting
   final ThreadLocal<List<Pair<byte[], byte[]>>> putPairs =
-      ThreadLocal.withInitial(() -> Lists.newArrayList());
+      ThreadLocal.withInitial(Lists::newArrayList);
 
   private final ThreadLocal<List<byte[]>> originalKeys =
-      ThreadLocal.withInitial(() -> Lists.newArrayList());
+      ThreadLocal.withInitial(Lists::newArrayList);
 
   @VisibleForTesting final ThreadLocal<Long> txId = new ThreadLocal<>();
 
@@ -124,8 +124,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public void closeTransaction() {
-    putPairs.get().clear();
-    originalKeys.get().clear();
+    putPairs.remove();
+    originalKeys.remove();
     txId.remove();
   }
 
