@@ -52,6 +52,8 @@ public class CatalogFilesetIT extends AbstractIT {
 
   @BeforeAll
   public static void setup() throws IOException {
+    containerSuite.startHiveContainer();
+
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
     hdfs = FileSystem.get(conf);
