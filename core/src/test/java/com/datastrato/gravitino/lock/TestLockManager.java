@@ -595,6 +595,7 @@ public class TestLockManager {
               lock.lock(j % 2 == 0 ? LockType.READ : LockType.WRITE);
               try {
                 // Deliberately throw an exception here.
+                @SuppressWarnings("divzero")
                 int a = 1 / 0;
               } catch (Exception e) {
                 // Ignore

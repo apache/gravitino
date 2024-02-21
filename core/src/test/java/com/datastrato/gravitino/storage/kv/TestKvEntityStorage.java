@@ -986,9 +986,7 @@ public class TestKvEntityStorage {
           NameIdentifier.of("metalake1", "catalog2", "schema1"),
           SchemaEntity.class,
           EntityType.SCHEMA,
-          e ->
-              createSchemaEntity(
-                  Namespace.of("metalake1", "catalog2"), "schema2", (AuditInfo) e.auditInfo()));
+          e -> createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema2", e.auditInfo()));
 
       // Test table
       TableEntity table1 =
@@ -1011,9 +1009,7 @@ public class TestKvEntityStorage {
           EntityType.TABLE,
           e ->
               createTableEntity(
-                  Namespace.of("metalake1", "catalog2", "schema2"),
-                  "table2",
-                  (AuditInfo) e.auditInfo()));
+                  Namespace.of("metalake1", "catalog2", "schema2"), "table2", e.auditInfo()));
     }
   }
 
