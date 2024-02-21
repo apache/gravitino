@@ -36,10 +36,10 @@ public class TestMapUtils {
             "regular", "value");
     Map<String, String> expected =
         ImmutableMap.of(
-            "secret", "*********(redacted)",
-            "password", "*********(redacted)",
-            "token", "*********(redacted)",
-            "jdbc-password", "*********(redacted)",
+            "secret", MapUtils.REDACTION_REPLACEMENT_TEXT,
+            "password", MapUtils.REDACTION_REPLACEMENT_TEXT,
+            "token", MapUtils.REDACTION_REPLACEMENT_TEXT,
+            "jdbc-password", MapUtils.REDACTION_REPLACEMENT_TEXT,
             "regular", "value");
 
     Map<String, String> result = MapUtils.redactSensitiveValueByKey(source);

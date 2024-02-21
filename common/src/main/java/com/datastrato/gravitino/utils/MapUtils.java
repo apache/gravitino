@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -14,7 +15,8 @@ import java.util.regex.Pattern;
 public class MapUtils {
   private static final String PROPERTIES_REDACTION_PATTERN = "(?i)secret|password|token";
   private static final Pattern PROPERTIES_REDACTION = Pattern.compile(PROPERTIES_REDACTION_PATTERN);
-  private static final String REDACTION_REPLACEMENT_TEXT = "*********(redacted)";
+
+  @VisibleForTesting static final String REDACTION_REPLACEMENT_TEXT = "*********(redacted)";
 
   /**
    * Returns a map with all keys that start with the given prefix.
@@ -46,6 +48,12 @@ public class MapUtils {
     return Collections.unmodifiableMap(m);
   }
 
+  /**
+   * Returns a redacted map.
+   *
+   * @param source The map to redact.
+   * @return Map.
+   */
   public static Map<String, String> redactSensitiveValueByKey(Map<String, String> source) {
     Map<String, String> redactedMap = Maps.newHashMap(source);
     redactedMap.replaceAll(
