@@ -191,7 +191,19 @@ subprojects {
 
   gradle.projectsEvaluated {
     tasks.withType<JavaCompile> {
-      options.compilerArgs.addAll(arrayOf("-Xlint:deprecation", "-Werror"))
+      options.compilerArgs.addAll(
+        arrayOf(
+          "-Xlint:cast",
+          "-Xlint:deprecation",
+          "-Xlint:divzero",
+          "-Xlint:empty",
+          "-Xlint:fallthrough",
+          "-Xlint:finally",
+          "-Xlint:overrides",
+          "-Xlint:static",
+          "-Werror"
+        )
+      )
     }
   }
 
