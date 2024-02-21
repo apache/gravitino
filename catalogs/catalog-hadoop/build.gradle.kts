@@ -43,7 +43,9 @@ tasks {
     from("src/main/resources")
     into("$rootDir/distribution/package/catalogs/hadoop/conf")
 
-    // TODO. add configuration file later on.
+    include("hadoop.conf")
+    include("core-site.xml.template")
+    include("hdfs-site.xml.template")
 
     rename { original ->
       if (original.endsWith(".template")) {

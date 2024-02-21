@@ -132,6 +132,22 @@ public class TestEntityProtoSerDe {
             catalogBytes, com.datastrato.gravitino.meta.CatalogEntity.class);
     Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
 
+    // Test Fileset catalog
+    com.datastrato.gravitino.meta.CatalogEntity filesetCatalogEntity =
+        com.datastrato.gravitino.meta.CatalogEntity.builder()
+            .withId(catalogId)
+            .withName(catalogName)
+            .withComment(comment)
+            .withType(com.datastrato.gravitino.Catalog.Type.FILESET)
+            .withProvider(provider)
+            .withAuditInfo(auditInfo)
+            .build();
+    byte[] filesetCatalogBytes = protoEntitySerDe.serialize(filesetCatalogEntity);
+    com.datastrato.gravitino.meta.CatalogEntity filesetCatalogEntityFromBytes =
+        protoEntitySerDe.deserialize(
+            filesetCatalogBytes, com.datastrato.gravitino.meta.CatalogEntity.class);
+    Assertions.assertEquals(filesetCatalogEntity, filesetCatalogEntityFromBytes);
+
     // Test SchemaEntity
     Long schemaId = 1L;
     String schemaName = "schema";
