@@ -46,7 +46,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   private GravitinoCatalogManager gravitinoCatalogManager;
   private Catalog gravitinoCatalog;
 
-  // Create a catalog specify table with different capabilities. Proxies schema and property
+  // Create a catalog specific table with different capabilities. Proxies schema and property
   // to GravitinoTable while IO operations to internal catalog.
   abstract Table createSparkTable(
       Identifier identifier, com.datastrato.gravitino.rel.Table gravitinoTable);

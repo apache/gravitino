@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.spark.catalog;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
@@ -89,9 +90,11 @@ public class GravitinoCatalogManager {
               try {
                 String catalogName = nameIdentifier.name();
                 Catalog catalog = metalake.loadCatalog(nameIdentifier);
-                gravitinoCatalogs.put(catalogName, catalog);
-                LOG.info(
-                    "Load catalog {} in metalake {} successfully.", catalogName, metalake.name());
+                if (Type.RELATIONAL.equals(catalog.type())) {
+                  gravitinoCatalogs.put(catalogName, catalog);
+                  LOG.info(
+                      "Load catalog {} in metalake {} successfully.", catalogName, metalake.name());
+                }
               } catch (Exception e) {
                 // the catalog maybe not used by SQL, delay the error to SQL analysis phase
                 LOG.warn(
