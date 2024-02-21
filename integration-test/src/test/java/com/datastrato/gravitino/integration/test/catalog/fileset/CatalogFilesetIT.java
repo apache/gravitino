@@ -9,6 +9,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
@@ -111,7 +112,7 @@ public class CatalogFilesetIT extends AbstractIT {
 
     catalog.asSchemas().createSchema(ident, comment, properties);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
-    Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
+    Assertions.assertEquals(schemaName, loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
     Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
@@ -146,7 +147,7 @@ public class CatalogFilesetIT extends AbstractIT {
 
     // test create a fileset that already exist
     Assertions.assertThrows(
-        com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException.class,
+        FilesetAlreadyExistsException.class,
         () ->
             createFileset(
                 filesetName,
