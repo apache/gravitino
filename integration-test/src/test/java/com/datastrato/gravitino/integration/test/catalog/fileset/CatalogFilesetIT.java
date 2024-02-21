@@ -104,13 +104,7 @@ public class CatalogFilesetIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
-    properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hadoop/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
+    properties.put("location", defaultBaseLocation());
     String comment = "comment";
 
     catalog.asSchemas().createSchema(ident, comment, properties);
@@ -167,7 +161,7 @@ public class CatalogFilesetIT extends AbstractIT {
     Assertions.assertEquals("comment", fileset2.comment(), "comment should be null");
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset2.type(), "type should be MANAGED");
     Assertions.assertEquals(
-        defaultBaseLocation() + filesetName2,
+        storageLocation(filesetName2),
         fileset2.storageLocation(),
         "storage location should be created");
 
@@ -524,8 +518,7 @@ public class CatalogFilesetIT extends AbstractIT {
             .filesetExists(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)),
         "fileset should be exists");
     Assertions.assertTrue(
-        hdfs.exists(new Path(defaultBaseLocation() + filesetName)),
-        "storage location should be exists");
+        hdfs.exists(new Path(storageLocation(filesetName))), "storage location should be exists");
   }
 
   private static String defaultBaseLocation() {
