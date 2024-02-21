@@ -27,8 +27,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -61,7 +63,6 @@ public class CatalogFilesetIT extends AbstractIT {
 
     createMetalake();
     createCatalog();
-    createSchema();
   }
 
   @AfterAll
@@ -77,6 +78,16 @@ public class CatalogFilesetIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
+  }
+
+  @BeforeEach
+  public void init() {
+    createSchema();
+  }
+
+  @AfterEach
+  public void clear() {
+    dropSchema();
   }
 
   private static void createMetalake() {
@@ -167,7 +178,7 @@ public class CatalogFilesetIT extends AbstractIT {
     String filesetName2 = "test_create_fileset_no_storage_location";
     Fileset fileset2 = createFileset(filesetName2, null, Fileset.Type.MANAGED, null, null);
     Assertions.assertNotNull(fileset2, "fileset should be created");
-    Assertions.assertEquals("comment", fileset2.comment(), "comment should be null");
+    Assertions.assertNull(fileset2.comment(), "comment should be null");
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset2.type(), "type should be MANAGED");
     Assertions.assertEquals(
         storageLocation(filesetName2),
@@ -338,10 +349,6 @@ public class CatalogFilesetIT extends AbstractIT {
 
   @Test
   public void testListFilesets() throws IOException {
-    // clear schema
-    dropSchema();
-    createSchema();
-
     // test no fileset exists
     NameIdentifier[] nameIdentifiers =
         catalog
@@ -391,13 +398,8 @@ public class CatalogFilesetIT extends AbstractIT {
     String filesetName = "test_rename_fileset";
     String storageLocation = storageLocation(filesetName);
 
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
     // rename fileset
@@ -408,10 +410,10 @@ public class CatalogFilesetIT extends AbstractIT {
             .alterFileset(
                 NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
                 FilesetChange.rename(newFilesetName));
-    assertFilesetExists(newFilesetName);
 
     // verify fileset is updated
     Assertions.assertNotNull(newFileset, "fileset should be created");
+    Assertions.assertEquals(newFilesetName, newFileset.name(), "fileset name should be updated");
     Assertions.assertEquals("comment", newFileset.comment(), "comment should not be change");
     Assertions.assertEquals(Fileset.Type.MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
