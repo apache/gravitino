@@ -43,7 +43,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    catalogManager = GravitinoCatalogManager.createGravitinoCatalogManager(gravitinoUri, metalake);
+    catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     catalogManager.loadCatalogsFromGravitino();
     registerGravitinoCatalogs(conf, catalogManager.getGravitinoCatalogs());
     registerSqlExtensions();

@@ -55,7 +55,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   abstract TableCatalog createSparkCatalog();
 
   public BaseCatalog() {
-    gravitinoCatalogManager = GravitinoCatalogManager.getGravitinoCatalogManager();
+    gravitinoCatalogManager = GravitinoCatalogManager.get();
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
 

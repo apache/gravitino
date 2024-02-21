@@ -33,8 +33,7 @@ public class GravitinoCatalogManager {
     this.gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
   }
 
-  public static synchronized GravitinoCatalogManager createGravitinoCatalogManager(
-      String gravitinoUrl, String metalakeName) {
+  public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
     if (gravitinoCatalogManager != null) {
       throw new RuntimeException("should not create duplicate GravitinoCatalogManager");
     }
@@ -42,7 +41,7 @@ public class GravitinoCatalogManager {
     return gravitinoCatalogManager;
   }
 
-  public static synchronized GravitinoCatalogManager getGravitinoCatalogManager() {
+  public static GravitinoCatalogManager get() {
     if (gravitinoCatalogManager == null) {
       throw new RuntimeException("GravitinoCatalogManager has not created yet");
     }
@@ -71,7 +70,6 @@ public class GravitinoCatalogManager {
   }
 
   public void loadCatalogsFromGravitino() {
-    LOG.info("Load metalake: " + metalakeName);
     GravitinoMetaLake metalake =
         gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
     loadCatalogs(metalake);
