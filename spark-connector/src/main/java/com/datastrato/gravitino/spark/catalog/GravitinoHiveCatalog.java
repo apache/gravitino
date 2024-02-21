@@ -17,7 +17,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   public Table createSparkTable(
       Identifier identifier, com.datastrato.gravitino.rel.Table gravitinoTable) {
-    throw new NotSupportedException("Not support create spark hive table");
+    throw new NotSupportedException("Doesn't support creating spark hive table");
   }
 
   @Override

@@ -18,12 +18,12 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val kyuubiVersion: String = libs.versions.kyuubi.get()
 
 dependencies {
-  implementation(project(":clients:client-java"))
   implementation(project(":api"))
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":common"))
+  implementation(libs.bundles.log4j)
   implementation(libs.guava)
   implementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
-  implementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
-  implementation(libs.bundles.log4j)
+  implementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
 }

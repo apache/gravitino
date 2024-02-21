@@ -61,20 +61,20 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Identifier[] listTables(String[] namespace) throws NoSuchNamespaceException {
-    throw new NotSupportedException("Not support list table");
+    throw new NotSupportedException("Doesn't support listing table");
   }
 
   @Override
   public Table createTable(
       Identifier ident, Column[] columns, Transform[] partitions, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
-    throw new NotSupportedException("Not support create table");
+    throw new NotSupportedException("Doesn't support creating table");
   }
 
   // Will create a catalog specify table by invoking createSparkTable()
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
-    throw new NotSupportedException("Not support load table");
+    throw new NotSupportedException("Doesn't support loading table");
   }
 
   @SuppressWarnings("deprecation")
@@ -87,18 +87,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    throw new NotSupportedException("Not support alter table");
+    throw new NotSupportedException("Doesn't support altering table");
   }
 
   @Override
   public boolean dropTable(Identifier ident) {
-    throw new NotSupportedException("Not support drop table");
+    throw new NotSupportedException("Doesn't support drop table");
   }
 
   @Override
   public void renameTable(Identifier oldIdent, Identifier newIdent)
       throws NoSuchTableException, TableAlreadyExistsException {
-    throw new NotSupportedException("Not support rename table");
+    throw new NotSupportedException("Doesn't support renaming table");
   }
 
   @Override
@@ -129,7 +129,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       return listNamespaces();
     }
     throw new NotSupportedException(
-        "Not support list namespaces with " + String.join(".", namespace));
+        "Doesn't support listing namespaces with " + String.join(".", namespace));
   }
 
   @Override
@@ -172,7 +172,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void alterNamespace(String[] namespace, NamespaceChange... changes)
       throws NoSuchNamespaceException {
-    throw new NotSupportedException("Not support alter namespace");
+    throw new NotSupportedException("Doesn't support altering namespace");
   }
 
   @Override
@@ -191,6 +191,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   private void valiateNamespace(String[] namespace) {
     Preconditions.checkArgument(
         namespace.length == 1,
-        "Unsupported multi level " + "namespaces:" + String.join(".", namespace));
+        "Doesn't support multi level namespaces: " + String.join(".", namespace));
   }
 }

@@ -48,7 +48,7 @@ public class SparkEnvIT extends SparkUtilIT {
     initMetalakeCatalogs();
     initSparkEnv();
     LOG.info(
-        "Startup Spark env succ, gravitino uri: {}, hive metastore uri: {}",
+        "Startup Spark env successfully, gravitino uri: {}, hive metastore uri: {}",
         gravitinoUri,
         hiveMetastoreUri);
   }

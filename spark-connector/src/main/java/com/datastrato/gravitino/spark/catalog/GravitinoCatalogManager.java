@@ -32,8 +32,7 @@ public class GravitinoCatalogManager {
     this.gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
   }
 
-  // It's not thread safe, and is expected to be invoked only once.
-  public static GravitinoCatalogManager createGravitinoCatalogManager(
+  public static synchronized GravitinoCatalogManager createGravitinoCatalogManager(
       String gravitinoUrl, String metalakeName) {
     if (gravitinoCatalogManager != null) {
       throw new RuntimeException("should not create duplicate GravitinoCatalogManager");
@@ -42,7 +41,7 @@ public class GravitinoCatalogManager {
     return gravitinoCatalogManager;
   }
 
-  public static GravitinoCatalogManager getGravitinoCatalogManager() {
+  public static synchronized GravitinoCatalogManager getGravitinoCatalogManager() {
     if (gravitinoCatalogManager == null) {
       throw new RuntimeException("GravitinoCatalogManager has not created yet");
     }
