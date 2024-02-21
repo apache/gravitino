@@ -231,10 +231,6 @@ public class CatalogFilesetIT extends AbstractIT {
 
   @Test
   public void testLoadFileset() throws IOException {
-    // clear schema
-    dropSchema();
-    createSchema();
-
     // create fileset
     String filesetName = "test_load_fileset";
     String storageLocation = storageLocation(filesetName);
@@ -342,6 +338,10 @@ public class CatalogFilesetIT extends AbstractIT {
 
   @Test
   public void testListFilesets() throws IOException {
+    // clear schema
+    dropSchema();
+    createSchema();
+
     // test no fileset exists
     NameIdentifier[] nameIdentifiers =
         catalog
