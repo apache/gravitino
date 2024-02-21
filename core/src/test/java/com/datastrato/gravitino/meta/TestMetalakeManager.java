@@ -96,10 +96,10 @@ public class TestMetalakeManager {
     testProperties(props, loadedMetalake.properties());
 
     // Test with NoSuchMetalakeException
+    NameIdentifier id = NameIdentifier.of("test3");
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> metalakeManager.loadMetalake(NameIdentifier.of("test3")));
+            NoSuchMetalakeException.class, () -> metalakeManager.loadMetalake(id));
     Assertions.assertTrue(exception.getMessage().contains("Metalake test3 does not exist"));
   }
 
@@ -141,10 +141,10 @@ public class TestMetalakeManager {
     testProperties(expectedProps, alteredMetalake2.properties());
 
     // Test with NoSuchMetalakeException
+    NameIdentifier id = NameIdentifier.of("test3");
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> metalakeManager.alterMetalake(NameIdentifier.of("test3"), change));
+            NoSuchMetalakeException.class, () -> metalakeManager.alterMetalake(id, change));
     Assertions.assertTrue(exception.getMessage().contains("Metalake test3 does not exist"));
   }
 

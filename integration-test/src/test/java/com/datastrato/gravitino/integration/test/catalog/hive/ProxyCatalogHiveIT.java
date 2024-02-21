@@ -21,7 +21,9 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -142,10 +144,10 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             anotherSchemaName.toLowerCase()));
+    SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class,
-            () -> anotherCatalog.asSchemas().createSchema(anotherIdent, comment, properties));
+            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -182,18 +184,15 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(EXPECT_USER, hiveTab.getOwner());
 
     // create table with exception with system user
+    TableCatalog tableCatalog = anotherCatalog.asTableCatalog();
+    ImmutableMap<String, String> of = ImmutableMap.of();
     Exception e =
         Assertions.assertThrows(
             RuntimeException.class,
-            () ->
-                anotherCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        anotherNameIdentifier,
-                        columns,
-                        comment,
-                        ImmutableMap.of(),
-                        Partitioning.EMPTY_PARTITIONING));
+            () -> {
+              tableCatalog.createTable(
+                  anotherNameIdentifier, columns, comment, of, Partitioning.EMPTY_PARTITIONING);
+            });
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -265,12 +264,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             new Literal<?>[] {primaryPartition, anotherSecondaryPartition});
 
     // create partition with exception with system user
+    TableCatalog tableCatalog = anotherCatalog.asTableCatalog();
     Exception e =
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                anotherCatalog
-                    .asTableCatalog()
+                tableCatalog
                     .loadTable(nameIdentifier)
                     .supportPartitions()
                     .addPartition(anotherIdentity));

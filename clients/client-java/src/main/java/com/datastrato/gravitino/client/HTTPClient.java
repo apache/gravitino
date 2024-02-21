@@ -361,7 +361,10 @@ public class HTTPClient implements RESTClient {
       if (responseBody == null) {
         throw new RESTException(
             "Invalid (null) response body for request (expected %s): method=%s, path=%s, status=%d",
-            responseType.getSimpleName(), method.name(), path, response.getCode());
+            responseType != null ? responseType.getSimpleName() : "unknown",
+            method.name(),
+            path,
+            response.getCode());
       }
 
       try {
@@ -371,7 +374,7 @@ public class HTTPClient implements RESTClient {
             e,
             "Received a success response code of %d, but failed to parse response body into %s",
             response.getCode(),
-            responseType.getSimpleName());
+            responseType != null ? responseType.getSimpleName() : "unknown");
       }
     } catch (IOException e) {
       throw new RESTException(e, "Error occurred while processing %s request", method);

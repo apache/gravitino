@@ -191,14 +191,11 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     alterColumns.remove(newColumn);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
+    TableChange deleteColumn = TableChange.deleteColumn(new String[] {newColumn.name()}, false);
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                TABLE_OPERATIONS.alterTable(
-                    TEST_DB_NAME,
-                    newName,
-                    TableChange.deleteColumn(new String[] {newColumn.name()}, false)));
+            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, newName, deleteColumn));
     Assertions.assertEquals(
         "Delete column does not exist: " + newColumn.name(), illegalArgumentException.getMessage());
 
@@ -470,18 +467,21 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .build());
 
     // Testing does not support auto increment column types
+    String randomName = GravitinoITUtils.genRandomName("increment_table_");
+    JdbcColumn[] jdbcColumns = columns.toArray(new JdbcColumn[0]);
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                TABLE_OPERATIONS.create(
-                    TEST_DB_NAME,
-                    GravitinoITUtils.genRandomName("increment_table_"),
-                    columns.toArray(new JdbcColumn[0]),
-                    tableComment,
-                    properties,
-                    null,
-                    Indexes.EMPTY_INDEXES));
+            () -> {
+              TABLE_OPERATIONS.create(
+                  TEST_DB_NAME,
+                  randomName,
+                  jdbcColumns,
+                  tableComment,
+                  properties,
+                  null,
+                  Indexes.EMPTY_INDEXES);
+            });
 
     Assertions.assertTrue(
         StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
@@ -546,22 +546,25 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
 
     // Test create table index failed.
+    JdbcColumn[] jdbcColumns = columns.toArray(new JdbcColumn[0]);
+    Index[] primaryIndex =
+        new Index[] {
+          Indexes.primary("no_exist_pk", new String[][] {{"no_exist_1"}}),
+          Indexes.unique("no_exist_key", new String[][] {{"no_exist_2"}, {"no_exist_3"}})
+        };
     GravitinoRuntimeException gravitinoRuntimeException =
         Assertions.assertThrows(
             GravitinoRuntimeException.class,
-            () ->
-                TABLE_OPERATIONS.create(
-                    TEST_DB_NAME,
-                    tableName,
-                    columns.toArray(new JdbcColumn[0]),
-                    tableComment,
-                    properties,
-                    null,
-                    new Index[] {
-                      Indexes.primary("no_exist_pk", new String[][] {{"no_exist_1"}}),
-                      Indexes.unique(
-                          "no_exist_key", new String[][] {{"no_exist_2"}, {"no_exist_3"}})
-                    }));
+            () -> {
+              TABLE_OPERATIONS.create(
+                  TEST_DB_NAME,
+                  tableName,
+                  jdbcColumns,
+                  tableComment,
+                  properties,
+                  null,
+                  primaryIndex);
+            });
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(),
