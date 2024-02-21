@@ -24,4 +24,26 @@ public class TestMapUtils {
     Assertions.assertEquals(ImmutableMap.of("a", ""), MapUtils.getPrefixMap(configs, "b."));
     Assertions.assertEquals(configs, MapUtils.getPrefixMap(configs, ""));
   }
+
+  @Test
+  public void testRedactSensitiveValueByKey() {
+    Map<String, String> source =
+        ImmutableMap.of(
+            "secret", "value",
+            "password", "value",
+            "token", "value",
+            "jdbc-password", "value",
+            "regular", "value");
+    Map<String, String> expected =
+        ImmutableMap.of(
+            "secret", "*********(redacted)",
+            "password", "*********(redacted)",
+            "token", "*********(redacted)",
+            "jdbc-password", "*********(redacted)",
+            "regular", "value");
+
+    Map<String, String> result = MapUtils.redactSensitiveValueByKey(source);
+
+    Assertions.assertEquals(expected, result);
+  }
 }

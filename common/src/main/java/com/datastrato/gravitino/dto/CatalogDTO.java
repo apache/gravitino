@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.utils.MapUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -233,6 +234,11 @@ public class CatalogDTO implements Catalog {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(provider), "provider cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+
+      // redact properties
+      if (properties != null) {
+        properties = MapUtils.redactSensitiveValueByKey(properties);
+      }
 
       return new CatalogDTO(name, type, provider, comment, properties, audit);
     }
