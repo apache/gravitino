@@ -48,17 +48,17 @@ public class TestPostgreSqlTableOperations {
         successBuilder.toString());
 
     // Test append index sql failed.
+    Index primary = Indexes.primary("test_pk", new String[][] {{"col_1", "col_2"}});
+    Index unique1 = Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}});
+    Index unique2 = Indexes.unique("u2_key", new String[][] {{"col_3", "col_4"}});
+    StringBuilder stringBuilder = new StringBuilder();
+
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 PostgreSqlTableOperations.appendIndexesSql(
-                    new Index[] {
-                      Indexes.primary("test_pk", new String[][] {{"col_1", "col_2"}}),
-                      Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}}),
-                      Indexes.unique("u2_key", new String[][] {{"col_3", "col_4"}})
-                    },
-                    new StringBuilder()));
+                    new Index[] {primary, unique1, unique2}, stringBuilder));
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
