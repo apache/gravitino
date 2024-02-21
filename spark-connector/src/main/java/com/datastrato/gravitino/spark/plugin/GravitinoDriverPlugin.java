@@ -64,16 +64,18 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           Preconditions.checkArgument(
               sparkConf.contains(sparkCatalogConfigName) == false,
               catalogName + " is already registered to SparkCatalogManager");
-          if (catalog.provider().equalsIgnoreCase("hive")) {
-            registerGravitinoHiveCatalog(sparkConf, catalog, sparkCatalogConfigName);
-            LOG.info("Register " + catalogName + " to Spark catalog manager");
-          } else {
-            LOG.info(
-                "Skip register "
-                    + catalogName
-                    + ", because "
-                    + catalog.provider()
-                    + "is not supported");
+          try {
+            if (catalog.provider().equalsIgnoreCase("hive")) {
+              registerGravitinoHiveCatalog(sparkConf, catalog, sparkCatalogConfigName);
+              LOG.info("Register {} catalog to Spark catalog manager", catalogName);
+            } else {
+              LOG.info(
+                  "Skip register {} catalog, because {} is not supported",
+                  catalogName,
+                  catalog.provider());
+            }
+          } catch (Exception e) {
+            LOG.warn("Register " + catalogName + " to Spark catalog manager failed,", e);
           }
         });
   }
