@@ -37,6 +37,21 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
+  void testStoragePath() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/a/b");
+    RocksDBKvBackend kvBackend = new RocksDBKvBackend();
+    String path = kvBackend.getStoragePath(config);
+    Assertions.assertEquals("/a/b", path);
+
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("");
+    kvBackend = new RocksDBKvBackend();
+    path = kvBackend.getStoragePath(config);
+    // We haven't set the GRAVITINO_HOME
+    Assertions.assertEquals("null/data/rocksdb", path);
+  }
+
+  @Test
   void testPutAndGet() throws IOException, RocksDBException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
