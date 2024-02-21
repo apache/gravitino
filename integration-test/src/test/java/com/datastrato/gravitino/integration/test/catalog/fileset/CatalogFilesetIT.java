@@ -119,6 +119,12 @@ public class CatalogFilesetIT extends AbstractIT {
     Assertions.assertNotNull(loadSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
   }
 
+  private static void dropSchema() {
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    catalog.asSchemas().dropSchema(ident, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(ident));
+  }
+
   @Test
   public void testCreateFileset() throws IOException {
     // create fileset
@@ -194,8 +200,6 @@ public class CatalogFilesetIT extends AbstractIT {
     // create fileset
     String filesetName = "test_external_fileset";
     String storageLocation = storageLocation(filesetName);
-    hdfs.create(new Path(storageLocation));
-    Assertions.assertTrue(hdfs.exists(new Path(storageLocation)), "storage location should exists");
     Fileset fileset =
         createFileset(
             filesetName,
@@ -217,23 +221,20 @@ public class CatalogFilesetIT extends AbstractIT {
 
     // create fileset with storage location that not exist
     String filesetName2 = "test_external_fileset_no_exist";
-    String storageLocation2 = storageLocation(filesetName2);
-    Assertions.assertFalse(
-        hdfs.exists(new Path(storageLocation2)), "storage location should not exists");
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             createFileset(
-                filesetName2,
-                "comment",
-                Fileset.Type.EXTERNAL,
-                storageLocation2,
-                ImmutableMap.of("k1", "v1")),
-        "Should throw IllegalArgumentException when storage location not exists");
+                filesetName2, "comment", Fileset.Type.EXTERNAL, null, ImmutableMap.of("k1", "v1")),
+        "Should throw IllegalArgumentException when storage location is null");
   }
 
   @Test
   public void testLoadFileset() throws IOException {
+    // clear schema
+    dropSchema();
+    createSchema();
+
     // create fileset
     String filesetName = "test_load_fileset";
     String storageLocation = storageLocation(filesetName);
@@ -421,18 +422,13 @@ public class CatalogFilesetIT extends AbstractIT {
   }
 
   @Test
-  public void testUpdateFilesetComment() throws IOException {
+  public void testFilesetUpdateComment() throws IOException {
     // create fileset
     String filesetName = "test_update_fileset_comment";
     String storageLocation = storageLocation(filesetName);
 
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
     // update fileset comment
@@ -457,18 +453,13 @@ public class CatalogFilesetIT extends AbstractIT {
   }
 
   @Test
-  public void testUpdateFilesetProperties() throws IOException {
+  public void testFilesetSetProperties() throws IOException {
     // create fileset
     String filesetName = "test_update_fileset_properties";
     String storageLocation = storageLocation(filesetName);
 
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
     // update fileset properties
@@ -491,17 +482,47 @@ public class CatalogFilesetIT extends AbstractIT {
         "v2", newFileset.properties().get("k1"), "properties should be updated");
   }
 
+  @Test
+  public void testFilesetRemoveProperties() throws IOException {
+    // create fileset
+    String filesetName = "test_remove_fileset_properties";
+    String storageLocation = storageLocation(filesetName);
+
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    // update fileset properties
+    Fileset newFileset =
+        catalog
+            .asFilesetCatalog()
+            .alterFileset(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
+                FilesetChange.removeProperty("k1"));
+    assertFilesetExists(filesetName);
+
+    // verify fileset is updated
+    Assertions.assertNotNull(newFileset, "fileset should be created");
+    Assertions.assertEquals("comment", newFileset.comment(), "comment should not be change");
+    Assertions.assertEquals(Fileset.Type.MANAGED, newFileset.type(), "type should not be change");
+    Assertions.assertEquals(
+        storageLocation, newFileset.storageLocation(), "storage location should not be change");
+    Assertions.assertEquals(0, newFileset.properties().size(), "properties should be removed");
+  }
+
   private Fileset createFileset(
       String filesetName,
       String comment,
       Fileset.Type type,
       String storageLocation,
       Map<String, String> properties) {
-    Path location = new Path(storageLocation);
-    try {
-      hdfs.deleteOnExit(location);
-    } catch (IOException e) {
-      LOG.warn("Failed to delete location: {}", location, e);
+    if (storageLocation != null) {
+      Path location = new Path(storageLocation);
+      try {
+        hdfs.deleteOnExit(location);
+      } catch (IOException e) {
+        LOG.warn("Failed to delete location: {}", location, e);
+      }
     }
 
     return catalog
