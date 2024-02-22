@@ -7,7 +7,6 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import java.util.List;
-import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -25,56 +24,76 @@ public interface MetalakeMetaMapper {
   String TABLE_NAME = "metalake_meta";
 
   @Select(
-      "SELECT id, metalake_name as metalakeName, metalake_comment as metalakeComment,"
-          + " properties, audit_info as auditInfo, schema_version as schemaVersion"
+      "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
+          + " metalake_comment as metalakeComment, properties,"
+          + " audit_info as auditInfo, schema_version as schemaVersion,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
           + " FROM "
-          + TABLE_NAME)
+          + TABLE_NAME
+          + " WHERE deleted_at = 0")
   List<MetalakePO> listMetalakePOs();
 
   @Select(
-      "SELECT id, metalake_name as metalakeName,"
+      "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
           + " metalake_comment as metalakeComment, properties,"
-          + " audit_info as auditInfo, schema_version as schemaVersion"
+          + " audit_info as auditInfo, schema_version as schemaVersion,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
           + " FROM "
           + TABLE_NAME
-          + " WHERE metalake_name = #{metalakeName}")
+          + " WHERE metalake_name = #{metalakeName} and deleted_at = 0")
   MetalakePO selectMetalakeMetaByName(@Param("metalakeName") String name);
 
-  @Select("SELECT id FROM " + TABLE_NAME + " WHERE metalake_name = #{metalakeName}")
+  @Select(
+      "SELECT metalake_id FROM "
+          + TABLE_NAME
+          + " WHERE metalake_name = #{metalakeName} and deleted_at = 0")
   Long selectMetalakeIdMetaByName(@Param("metalakeName") String name);
 
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
-          + "(id, metalake_name, metalake_comment, properties, audit_info, schema_version)"
+          + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+          + " schema_version, current_version, last_version, deleted_at)"
           + " VALUES("
-          + " #{metalakeMeta.id},"
+          + " #{metalakeMeta.metalakeId},"
           + " #{metalakeMeta.metalakeName},"
           + " #{metalakeMeta.metalakeComment},"
           + " #{metalakeMeta.properties},"
           + " #{metalakeMeta.auditInfo},"
-          + " #{metalakeMeta.schemaVersion}"
+          + " #{metalakeMeta.schemaVersion},"
+          + " #{metalakeMeta.currentVersion},"
+          + " #{metalakeMeta.lastVersion},"
+          + " #{metalakeMeta.deletedAt}"
           + " )")
   void insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO);
 
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
-          + "(id, metalake_name, metalake_comment, properties, audit_info, schema_version)"
+          + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+          + " schema_version, current_version, last_version, deleted_at)"
           + " VALUES("
-          + " #{metalakeMeta.id},"
+          + " #{metalakeMeta.metalakeId},"
           + " #{metalakeMeta.metalakeName},"
           + " #{metalakeMeta.metalakeComment},"
           + " #{metalakeMeta.properties},"
           + " #{metalakeMeta.auditInfo},"
-          + " #{metalakeMeta.schemaVersion}"
+          + " #{metalakeMeta.schemaVersion},"
+          + " #{metalakeMeta.currentVersion},"
+          + " #{metalakeMeta.lastVersion},"
+          + " #{metalakeMeta.deletedAt}"
           + " )"
           + " ON DUPLICATE KEY UPDATE"
           + " metalake_name = #{metalakeMeta.metalakeName},"
           + " metalake_comment = #{metalakeMeta.metalakeComment},"
           + " properties = #{metalakeMeta.properties},"
           + " audit_info = #{metalakeMeta.auditInfo},"
-          + " schema_version = #{metalakeMeta.schemaVersion}")
+          + " schema_version = #{metalakeMeta.schemaVersion},"
+          + " current_version = #{metalakeMeta.currentVersion},"
+          + " last_version = #{metalakeMeta.lastVersion},"
+          + " deleted_at = #{metalakeMeta.deletedAt}")
   void insertMetalakeMetaOnDuplicateKeyUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
 
   @Update(
@@ -84,17 +103,25 @@ public interface MetalakeMetaMapper {
           + " metalake_comment = #{newMetalakeMeta.metalakeComment},"
           + " properties = #{newMetalakeMeta.properties},"
           + " audit_info = #{newMetalakeMeta.auditInfo},"
-          + " schema_version = #{newMetalakeMeta.schemaVersion}"
-          + " WHERE id = #{oldMetalakeMeta.id}"
+          + " schema_version = #{newMetalakeMeta.schemaVersion},"
+          + " current_version = #{newMetalakeMeta.currentVersion},"
+          + " last_version = #{newMetalakeMeta.lastVersion}"
+          + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
           + " and metalake_name = #{oldMetalakeMeta.metalakeName}"
           + " and metalake_comment = #{oldMetalakeMeta.metalakeComment}"
           + " and properties = #{oldMetalakeMeta.properties}"
           + " and audit_info = #{oldMetalakeMeta.auditInfo}"
-          + " and schema_version = #{oldMetalakeMeta.schemaVersion}")
+          + " and schema_version = #{oldMetalakeMeta.schemaVersion}"
+          + " and current_version = #{oldMetalakeMeta.currentVersion}"
+          + " and last_version = #{oldMetalakeMeta.lastVersion}"
+          + " and deleted_at = 0")
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
-  @Delete("DELETE FROM " + TABLE_NAME + " WHERE id = #{id}")
-  Integer deleteMetalakeMetaById(@Param("id") Long id);
+  @Update(
+      "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP() WHERE metalake_id = #{metalakeId}")
+  Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
 }

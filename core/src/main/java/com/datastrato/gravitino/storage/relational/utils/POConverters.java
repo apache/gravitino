@@ -29,16 +29,55 @@ public class POConverters {
   public static MetalakePO toMetalakePO(BaseMetalake baseMetalake) {
     try {
       return new MetalakePO.Builder()
-          .withId(baseMetalake.id())
+          .withMetalakeId(baseMetalake.id())
           .withMetalakeName(baseMetalake.name())
           .withMetalakeComment(baseMetalake.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.auditInfo()))
-          .withVersion(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.getVersion()))
+          .withSchemaVersion(
+              JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.getVersion()))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Initialize MetalakePO version
+   *
+   * @param metalakePO MetalakePO object
+   * @return MetalakePO object with version initialized
+   */
+  public static MetalakePO initializeMetalakePOVersion(MetalakePO metalakePO) {
+    return new MetalakePO.Builder()
+        .withMetalakeId(metalakePO.getMetalakeId())
+        .withMetalakeName(metalakePO.getMetalakeName())
+        .withMetalakeComment(metalakePO.getMetalakeComment())
+        .withProperties(metalakePO.getProperties())
+        .withAuditInfo(metalakePO.getAuditInfo())
+        .withSchemaVersion(metalakePO.getSchemaVersion())
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  public static MetalakePO updateMetalakePOVersion(
+      MetalakePO oldMetalakePO, MetalakePO newMetalakePO) {
+    Long lastVersion = oldMetalakePO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    return new MetalakePO.Builder()
+        .withMetalakeId(newMetalakePO.getMetalakeId())
+        .withMetalakeName(newMetalakePO.getMetalakeName())
+        .withMetalakeComment(newMetalakePO.getMetalakeComment())
+        .withProperties(newMetalakePO.getProperties())
+        .withAuditInfo(newMetalakePO.getAuditInfo())
+        .withSchemaVersion(newMetalakePO.getSchemaVersion())
+        .withCurrentVersion(nextVersion)
+        .withLastVersion(nextVersion)
+        .withDeletedAt(0L)
+        .build();
   }
 
   /**
@@ -50,7 +89,7 @@ public class POConverters {
   public static BaseMetalake fromMetalakePO(MetalakePO metalakePO) {
     try {
       return new BaseMetalake.Builder()
-          .withId(metalakePO.getId())
+          .withId(metalakePO.getMetalakeId())
           .withName(metalakePO.getMetalakeName())
           .withComment(metalakePO.getMetalakeComment())
           .withProperties(

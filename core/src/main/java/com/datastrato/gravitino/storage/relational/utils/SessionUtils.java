@@ -29,7 +29,7 @@ public class SessionUtils {
   public static <T> void doWithCommit(Class<T> mapperClazz, Consumer<T> consumer) {
     try (SqlSession session = SqlSessions.getSqlSession()) {
       try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
+        T mapper = session.getMapper(mapperClazz);
         consumer.accept(mapper);
         SqlSessions.commitAndCloseSqlSession();
       } catch (Throwable t) {
@@ -52,7 +52,7 @@ public class SessionUtils {
   public static <T, R> R doWithCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
     try (SqlSession session = SqlSessions.getSqlSession()) {
       try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
+        T mapper = session.getMapper(mapperClazz);
         R result = func.apply(mapper);
         SqlSessions.commitAndCloseSqlSession();
         return result;
@@ -93,7 +93,7 @@ public class SessionUtils {
   public static <T, R> R getWithoutCommit(Class<T> mapperClazz, Function<T, R> func) {
     try (SqlSession session = SqlSessions.getSqlSession()) {
       try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
+        T mapper = session.getMapper(mapperClazz);
         return func.apply(mapper);
       } catch (Throwable t) {
         throw new RuntimeException(t);

@@ -52,7 +52,7 @@ public class TestPOConverters {
     MetalakePO actualMetalakePO = POConverters.toMetalakePO(metalake);
 
     // Assert
-    assertEquals(expectedMetalakePO.getId(), actualMetalakePO.getId());
+    assertEquals(expectedMetalakePO.getMetalakeId(), actualMetalakePO.getMetalakeId());
     assertEquals(expectedMetalakePO.getMetalakeName(), actualMetalakePO.getMetalakeName());
     assertEquals(expectedMetalakePO.getMetalakeComment(), actualMetalakePO.getMetalakeComment());
     assertEquals(expectedMetalakePO.getProperties(), actualMetalakePO.getProperties());
@@ -82,12 +82,12 @@ public class TestPOConverters {
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
     return new MetalakePO.Builder()
-        .withId(id)
+        .withMetalakeId(id)
         .withMetalakeName(name)
         .withMetalakeComment(comment)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
-        .withVersion(JsonUtils.anyFieldMapper().writeValueAsString(SchemaVersion.V_0_1))
+        .withSchemaVersion(JsonUtils.anyFieldMapper().writeValueAsString(SchemaVersion.V_0_1))
         .build();
   }
 }

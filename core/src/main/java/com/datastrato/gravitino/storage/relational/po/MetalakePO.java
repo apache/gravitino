@@ -8,59 +8,50 @@ package com.datastrato.gravitino.storage.relational.po;
 import com.google.common.base.Objects;
 
 public class MetalakePO {
-  private Long id;
+  private Long metalakeId;
   private String metalakeName;
   private String metalakeComment;
   private String properties;
   private String auditInfo;
   private String schemaVersion;
+  private Long currentVersion;
+  private Long lastVersion;
+  private Long deletedAt;
 
-  public Long getId() {
-    return id;
-  }
-
-  public void setId(Long id) {
-    this.id = id;
+  public Long getMetalakeId() {
+    return metalakeId;
   }
 
   public String getMetalakeName() {
     return metalakeName;
   }
 
-  public void setMetalakeName(String metalakeName) {
-    this.metalakeName = metalakeName;
-  }
-
   public String getMetalakeComment() {
     return metalakeComment;
-  }
-
-  public void setMetalakeComment(String metalakeComment) {
-    this.metalakeComment = metalakeComment;
   }
 
   public String getProperties() {
     return properties;
   }
 
-  public void setProperties(String properties) {
-    this.properties = properties;
-  }
-
   public String getAuditInfo() {
     return auditInfo;
-  }
-
-  public void setAuditInfo(String auditInfo) {
-    this.auditInfo = auditInfo;
   }
 
   public String getSchemaVersion() {
     return schemaVersion;
   }
 
-  public void setSchemaVersion(String schemaVersion) {
-    this.schemaVersion = schemaVersion;
+  public Long getCurrentVersion() {
+    return currentVersion;
+  }
+
+  public Long getLastVersion() {
+    return lastVersion;
+  }
+
+  public Long getDeletedAt() {
+    return deletedAt;
   }
 
   @Override
@@ -72,23 +63,29 @@ public class MetalakePO {
       return false;
     }
     MetalakePO that = (MetalakePO) o;
-    return Objects.equal(getId(), that.getId())
+    return Objects.equal(getMetalakeId(), that.getMetalakeId())
         && Objects.equal(getMetalakeName(), that.getMetalakeName())
         && Objects.equal(getMetalakeComment(), that.getMetalakeComment())
         && Objects.equal(getProperties(), that.getProperties())
         && Objects.equal(getAuditInfo(), that.getAuditInfo())
-        && Objects.equal(getSchemaVersion(), that.getSchemaVersion());
+        && Objects.equal(getSchemaVersion(), that.getSchemaVersion())
+        && Objects.equal(getCurrentVersion(), that.getCurrentVersion())
+        && Objects.equal(getLastVersion(), that.getLastVersion())
+        && Objects.equal(getDeletedAt(), that.getDeletedAt());
   }
 
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getId(),
+        getMetalakeId(),
         getMetalakeName(),
         getMetalakeComment(),
         getProperties(),
         getAuditInfo(),
-        getSchemaVersion());
+        getSchemaVersion(),
+        getCurrentVersion(),
+        getLastVersion(),
+        getDeletedAt());
   }
 
   public static class Builder {
@@ -98,8 +95,8 @@ public class MetalakePO {
       metalakePO = new MetalakePO();
     }
 
-    public MetalakePO.Builder withId(Long id) {
-      metalakePO.id = id;
+    public MetalakePO.Builder withMetalakeId(Long id) {
+      metalakePO.metalakeId = id;
       return this;
     }
 
@@ -123,8 +120,23 @@ public class MetalakePO {
       return this;
     }
 
-    public MetalakePO.Builder withVersion(String version) {
+    public MetalakePO.Builder withSchemaVersion(String version) {
       metalakePO.schemaVersion = version;
+      return this;
+    }
+
+    public MetalakePO.Builder withCurrentVersion(Long currentVersion) {
+      metalakePO.currentVersion = currentVersion;
+      return this;
+    }
+
+    public MetalakePO.Builder withLastVersion(Long lastVersion) {
+      metalakePO.lastVersion = lastVersion;
+      return this;
+    }
+
+    public MetalakePO.Builder withDeletedAt(Long deletedAt) {
+      metalakePO.deletedAt = deletedAt;
       return this;
     }
 

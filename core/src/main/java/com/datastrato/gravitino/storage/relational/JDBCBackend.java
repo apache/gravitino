@@ -76,11 +76,13 @@ public class JDBCBackend implements RelationalBackend {
         SessionUtils.doWithCommit(
             MetalakeMetaMapper.class,
             mapper -> {
+              MetalakePO po =
+                  POConverters.initializeMetalakePOVersion(
+                      POConverters.toMetalakePO((BaseMetalake) e));
               if (overwritten) {
-                mapper.insertMetalakeMetaOnDuplicateKeyUpdate(
-                    POConverters.toMetalakePO((BaseMetalake) e));
+                mapper.insertMetalakeMetaOnDuplicateKeyUpdate(po);
               } else {
-                mapper.insertMetalakeMeta(POConverters.toMetalakePO((BaseMetalake) e));
+                mapper.insertMetalakeMeta(po);
               }
             });
       } catch (RuntimeException re) {
@@ -110,6 +112,9 @@ public class JDBCBackend implements RelationalBackend {
       MetalakePO oldMetalakePO =
           SessionUtils.getWithoutCommit(
               MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+      if (oldMetalakePO == null) {
+        throw new NoSuchEntityException("No such entity:%s", ident.toString());
+      }
 
       BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
       BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
@@ -118,13 +123,14 @@ public class JDBCBackend implements RelationalBackend {
           "The updated metalake entity id: %s should same with the metalake entity id before: %s",
           newMetalakeEntity.id(),
           oldMetalakeEntity.id());
+      MetalakePO newMetalakePO =
+          POConverters.updateMetalakePOVersion(
+              oldMetalakePO, POConverters.toMetalakePO(newMetalakeEntity));
 
       Integer updateResult =
           SessionUtils.doWithCommitAndFetchResult(
               MetalakeMetaMapper.class,
-              mapper ->
-                  mapper.updateMetalakeMeta(
-                      POConverters.toMetalakePO(newMetalakeEntity), oldMetalakePO));
+              mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
       if (updateResult > 0) {
         return (E) newMetalakeEntity;
       } else {
@@ -166,7 +172,7 @@ public class JDBCBackend implements RelationalBackend {
               () ->
                   SessionUtils.doWithoutCommit(
                       MetalakeMetaMapper.class,
-                      mapper -> mapper.deleteMetalakeMetaById(metalakeId)),
+                      mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
               () -> {
                 // TODO We will cascade delete the metadata of sub-resources under the metalake
               });
@@ -174,7 +180,8 @@ public class JDBCBackend implements RelationalBackend {
           // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
           //  deletion is not allowed.
           SessionUtils.doWithCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.deleteMetalakeMetaById(metalakeId));
+              MetalakeMetaMapper.class,
+              mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId));
         }
       }
       return true;
