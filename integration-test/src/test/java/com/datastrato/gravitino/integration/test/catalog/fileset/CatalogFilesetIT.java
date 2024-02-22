@@ -187,8 +187,9 @@ public class CatalogFilesetIT extends AbstractIT {
 
     // create fileset with null fileset type
     String filesetName3 = "test_create_fileset_no_type";
+    String storageLocation3 = storageLocation(filesetName3);
     Fileset fileset3 =
-        createFileset(filesetName3, "comment", null, storageLocation, ImmutableMap.of("k1", "v1"));
+        createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName3);
     Assertions.assertEquals(
         Fileset.Type.MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
