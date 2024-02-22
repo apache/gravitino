@@ -43,10 +43,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
   private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
-
-  public static final String API_METALAKES_ALTER_LOAD_OR_DROP_PATH = "api/metalakes/";
-
-  public static final String API_METALAKES_CREATE_AND_LIST_PATH = "api/metalakes";
+  public static final String API_METALAKES_PATH = "api/metalakes";
 
   private final RESTClient restClient;
 
@@ -73,7 +70,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   public GravitinoMetaLake[] listMetalakes() {
     MetalakeListResponse resp =
         restClient.get(
-            API_METALAKES_CREATE_AND_LIST_PATH,
+                API_METALAKES_PATH,
             MetalakeListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -97,7 +94,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.get(
-            API_METALAKES_ALTER_LOAD_OR_DROP_PATH + ident.name(),
+            API_METALAKES_PATH +"/" + ident.name(),
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -127,7 +124,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.post(
-            API_METALAKES_CREATE_AND_LIST_PATH,
+                API_METALAKES_PATH,
             req,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -160,7 +157,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.put(
-            API_METALAKES_ALTER_LOAD_OR_DROP_PATH + ident.name(),
+                API_METALAKES_PATH +"/" + ident.name(),
             updatesRequest,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -183,7 +180,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     try {
       DropResponse resp =
           restClient.delete(
-              API_METALAKES_ALTER_LOAD_OR_DROP_PATH + ident.name(),
+                  API_METALAKES_PATH +"/" + ident.name(),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.metalakeErrorHandler());
