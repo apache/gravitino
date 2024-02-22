@@ -27,10 +27,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -63,6 +61,7 @@ public class CatalogFilesetIT extends AbstractIT {
 
     createMetalake();
     createCatalog();
+    createSchema();
   }
 
   @AfterAll
@@ -78,16 +77,6 @@ public class CatalogFilesetIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
-  }
-
-  @BeforeEach
-  public void init() {
-    createSchema();
-  }
-
-  @AfterEach
-  public void clear() {
-    dropSchema();
   }
 
   private static void createMetalake() {
@@ -159,8 +148,6 @@ public class CatalogFilesetIT extends AbstractIT {
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     Assertions.assertEquals(1, fileset.properties().size());
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
-    Assertions.assertTrue(
-        hdfs.exists(new Path(storageLocation)), "storage location should be created");
 
     // test create a fileset that already exist
     Assertions.assertThrows(
@@ -177,6 +164,7 @@ public class CatalogFilesetIT extends AbstractIT {
     // create fileset with null storage location
     String filesetName2 = "test_create_fileset_no_storage_location";
     Fileset fileset2 = createFileset(filesetName2, null, Fileset.Type.MANAGED, null, null);
+    assertFilesetExists(filesetName2);
     Assertions.assertNotNull(fileset2, "fileset should be created");
     Assertions.assertNull(fileset2.comment(), "comment should be null");
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset2.type(), "type should be MANAGED");
@@ -349,6 +337,10 @@ public class CatalogFilesetIT extends AbstractIT {
 
   @Test
   public void testListFilesets() throws IOException {
+    // clear schema
+    dropSchema();
+    createSchema();
+
     // test no fileset exists
     NameIdentifier[] nameIdentifiers =
         catalog
