@@ -11,6 +11,7 @@ import com.datastrato.gravitino.spark.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.spark.catalog.GravitinoHiveCatalog;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.SparkConf;
@@ -64,36 +65,30 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           Preconditions.checkArgument(
               sparkConf.contains(sparkCatalogConfigName) == false,
               catalogName + " is already registered to SparkCatalogManager");
-          try {
-            if (catalog.provider().equalsIgnoreCase("hive")) {
-              registerGravitinoHiveCatalog(sparkConf, catalog, sparkCatalogConfigName);
-              LOG.info("Register {} catalog to Spark catalog manager", catalogName);
-            } else {
-              LOG.info(
-                  "Skip register {} catalog, because {} is not supported",
-                  catalogName,
-                  catalog.provider());
-            }
-          } catch (Exception e) {
-            LOG.warn("Register " + catalogName + " to Spark catalog manager failed,", e);
+          String sparkCatalogClassName = getCatalogClassName(catalog.provider());
+          if (sparkCatalogClassName != null) {
+            sparkConf.set(sparkCatalogConfigName, sparkCatalogClassName);
+            LOG.info("Register {} catalog to Spark catalog manager", catalogName);
+          } else {
+            LOG.info(
+                "Skip register {} catalog, because {} is not supported",
+                catalogName,
+                catalog.provider());
           }
         });
   }
 
-  private void registerGravitinoHiveCatalog(
-      SparkConf sparkConf, Catalog catalog, String sparkCatalogConfigName) {
-    sparkConf.set(sparkCatalogConfigName, GravitinoHiveCatalog.class.getName());
-    Preconditions.checkArgument(
-        catalog.properties() != null, "Hive Catalog properties should not be null");
-    String metastoreUri =
-        catalog.properties().get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
-    Preconditions.checkArgument(
-        StringUtils.isNoneBlank(metastoreUri),
-        "Couldn't get "
-            + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
-            + " from catalog properties");
-    sparkConf.set(
-        sparkCatalogConfigName + "." + GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
+  private String getCatalogClassName(String provider) {
+    if (provider == null) {
+      return null;
+    }
+
+    switch (provider.toLowerCase(Locale.ROOT)) {
+      case "hive":
+        return GravitinoHiveCatalog.class.getName();
+      default:
+        return null;
+    }
   }
 
   // Todo inject Iceberg extensions

@@ -40,11 +40,11 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected TableCatalog sparkCatalog;
+  protected Catalog gravitinoCatalog;
 
   private String metalakeName;
   private String catalogName;
   private GravitinoCatalogManager gravitinoCatalogManager;
-  private Catalog gravitinoCatalog;
 
   // Create a catalog specific table with different capabilities. Proxies schema and property
   // to GravitinoTable while IO operations to internal catalog.
@@ -52,7 +52,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       Identifier identifier, com.datastrato.gravitino.rel.Table gravitinoTable);
 
   // Create a internal catalog to do IO operations.
-  abstract TableCatalog createSparkCatalog();
+  abstract TableCatalog createAndInitSparkCatalog(String name, CaseInsensitiveStringMap options);
 
   public BaseCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
@@ -105,8 +105,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
     gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
-    sparkCatalog = createSparkCatalog();
-    sparkCatalog.initialize(name, options);
+    sparkCatalog = createAndInitSparkCatalog(name, options);
   }
 
   @Override

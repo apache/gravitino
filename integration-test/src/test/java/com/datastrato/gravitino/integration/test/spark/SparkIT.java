@@ -51,6 +51,8 @@ public class SparkIT extends SparkEnvIT {
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    // underlying catalog may change /user to file:/user
+    Assertions.assertTrue(databaseMeta.get("Location").contains("/user"));
     properties = databaseMeta.get("Properties");
     Assertions.assertEquals("((ID,001))", properties);
   }
