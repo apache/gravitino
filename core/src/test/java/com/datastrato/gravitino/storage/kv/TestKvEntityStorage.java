@@ -29,6 +29,7 @@ import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -108,6 +109,16 @@ public class TestKvEntityStorage {
         .build();
   }
 
+  public static FilesetEntity createFilesetEntity(
+      Namespace namespace, String name, AuditInfo auditInfo) {
+    return new FilesetEntity.Builder()
+        .withId(1L)
+        .withName(name)
+        .withNamespace(namespace)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
   @Test
   void testRestart() throws IOException {
     Config config = Mockito.mock(Config.class);
@@ -136,6 +147,8 @@ public class TestKvEntityStorage {
           createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
       TableEntity table1 =
           createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+      FilesetEntity fileset1 =
+          createFilesetEntity(Namespace.of("metalake", "catalog", "schema1"), "fileset1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -143,6 +156,7 @@ public class TestKvEntityStorage {
       store.put(catalogCopy);
       store.put(schema1);
       store.put(table1);
+      store.put(fileset1);
 
       Assertions.assertDoesNotThrow(
           () -> store.get(NameIdentifier.of("metalake"), EntityType.METALAKE, BaseMetalake.class));
@@ -164,6 +178,12 @@ public class TestKvEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "table1"),
                   EntityType.TABLE,
                   TableEntity.class));
+        Assertions.assertDoesNotThrow(
+            () ->
+                store.get(
+                    NameIdentifier.of("metalake", "catalog", "schema1", "fileset1"),
+                    EntityType.FILESET,
+                    FilesetEntity.class));
     }
 
     // It will automatically close the store we create before, then we reopen the entity store
@@ -192,6 +212,12 @@ public class TestKvEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "table1"),
                   EntityType.TABLE,
                   TableEntity.class));
+        Assertions.assertDoesNotThrow(
+            () ->
+                store.get(
+                    NameIdentifier.of("metalake", "catalog", "schema1", "fileset1"),
+                    EntityType.FILESET,
+                    FilesetEntity.class));
     }
   }
 
@@ -222,11 +248,15 @@ public class TestKvEntityStorage {
           createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
       TableEntity table1 =
           createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+      FilesetEntity fileset1 =
+          createFilesetEntity(Namespace.of("metalake", "catalog", "schema1"), "fileset1", auditInfo);
 
       SchemaEntity schema2 =
           createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
       TableEntity table1InSchema2 =
           createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+      FilesetEntity fileset1InSchema2 =
+          createFilesetEntity(Namespace.of("metalake", "catalog", "schema2"), "fileset1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -236,6 +266,8 @@ public class TestKvEntityStorage {
       store.put(schema2);
       store.put(table1);
       store.put(table1InSchema2);
+      store.put(fileset1);
+      store.put(fileset1InSchema2);
 
       // Try to check an update option is what we expected
       store.update(
@@ -273,14 +305,24 @@ public class TestKvEntityStorage {
               TableEntity.class));
       Assertions.assertNotNull(
           store.get(
+              NameIdentifier.of("metalakeChanged", "catalog", "schema1", "fileset1"),
+              EntityType.FILESET,
+              FilesetEntity.class));
+      Assertions.assertNotNull(
+          store.get(
               NameIdentifier.of("metalakeChanged", "catalog", "schema2"),
               EntityType.SCHEMA,
               SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
-              NameIdentifier.of("metalakeChanged", "catalog", "schema1", "table1"),
+              NameIdentifier.of("metalakeChanged", "catalog", "schema2", "table1"),
               EntityType.TABLE,
               TableEntity.class));
+      Assertions.assertNotNull(
+          store.get(
+              NameIdentifier.of("metalakeChanged", "catalog", "schema2", "fileset1"),
+              EntityType.FILESET,
+              FilesetEntity.class));
 
       // Check catalog entities and sub-entities are already changed.
       store.update(
@@ -316,6 +358,11 @@ public class TestKvEntityStorage {
               EntityType.TABLE,
               TableEntity.class));
       Assertions.assertNotNull(
+            store.get(
+                NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1", "fileset1"),
+                EntityType.FILESET,
+                FilesetEntity.class));
+      Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
               EntityType.SCHEMA,
@@ -325,6 +372,11 @@ public class TestKvEntityStorage {
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
               TableEntity.class));
+        Assertions.assertNotNull(
+            store.get(
+                NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "fileset1"),
+                EntityType.FILESET,
+                FilesetEntity.class));
 
       // Check schema entities and sub-entities are already changed.
       store.update(
@@ -363,6 +415,11 @@ public class TestKvEntityStorage {
               EntityType.TABLE,
               TableEntity.class));
       Assertions.assertNotNull(
+            store.get(
+                NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged", "fileset1"),
+                EntityType.FILESET,
+                FilesetEntity.class));
+      Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
               EntityType.SCHEMA,
@@ -372,6 +429,11 @@ public class TestKvEntityStorage {
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
               TableEntity.class));
+      Assertions.assertNotNull(
+            store.get(
+                NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "fileset2"),
+                EntityType.FILESET,
+                FilesetEntity.class));
 
       // Check table entities
       store.update(

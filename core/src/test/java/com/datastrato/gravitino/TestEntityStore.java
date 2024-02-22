@@ -9,6 +9,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -182,6 +183,14 @@ public class TestEntityStore {
             .withAuditInfo(auditInfo)
             .build();
 
+    FilesetEntity filesetEntity =
+        new FilesetEntity.Builder()
+            .withId(1L)
+            .withName("fileset")
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withAuditInfo(auditInfo)
+            .build();
+
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
     store.setSerDe(Mockito.mock(EntitySerDe.class));
@@ -190,6 +199,7 @@ public class TestEntityStore {
     store.put(catalog);
     store.put(schemaEntity);
     store.put(tableEntity);
+    store.put(filesetEntity);
 
     Metalake retrievedMetalake =
         store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -206,6 +216,10 @@ public class TestEntityStore {
     TableEntity retrievedTable =
         store.get(tableEntity.nameIdentifier(), EntityType.TABLE, TableEntity.class);
     Assertions.assertEquals(tableEntity, retrievedTable);
+
+    FilesetEntity retrievedFileset =
+        store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class);
+    Assertions.assertEquals(filesetEntity, retrievedFileset);
 
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
     NameIdentifier id = metalake.nameIdentifier();
