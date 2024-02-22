@@ -26,7 +26,7 @@ function TableToolbar(props) {
     <>
       <Fragment>
         <Portal container={() => document.getElementById('filter-panel')}>
-          <Box className={` twc-flex twc-w-full twc-justify-between`}>
+          <Box className={`twc-flex twc-w-full twc-justify-between`}>
             <GridToolbar {...props} />
           </Box>
         </Portal>
