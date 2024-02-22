@@ -34,6 +34,7 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
@@ -537,8 +538,10 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testFormalizePath() throws IOException {
+
     String[] paths =
         new String[] {
+          "tmp/catalog",
           "/tmp/catalog",
           "file:/tmp/catalog",
           "file:///tmp/catalog",
@@ -549,6 +552,7 @@ public class TestHadoopCatalogOperations {
 
     String[] expected =
         new String[] {
+          "file:" + Paths.get("").toAbsolutePath() + "/tmp/catalog",
           "file:/tmp/catalog",
           "file:/tmp/catalog",
           "file:/tmp/catalog",
