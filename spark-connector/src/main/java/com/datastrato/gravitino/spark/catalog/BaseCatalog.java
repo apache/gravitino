@@ -34,9 +34,9 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * BaseCatalog is the base class for the specify catalog like GravitinoHiveCatalog, it provides a
+ * BaseCatalog is the base class for the specific catalog like GravitinoHiveCatalog, it provides a
  * basic table and namespace interfaces. The advanced interfaces like view and function should be
- * provided by the specify catalog if necessary.
+ * provided by the specific catalog if necessary.
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected TableCatalog sparkCatalog;
@@ -71,7 +71,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     throw new NotSupportedException("Doesn't support creating table");
   }
 
-  // Will create a catalog specify table by invoking createSparkTable()
+  // Will create a catalog specific table by invoking createSparkTable()
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     throw new NotSupportedException("Doesn't support loading table");
