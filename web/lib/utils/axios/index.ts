@@ -42,6 +42,9 @@ import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
 import axios from 'axios'
 import { useAuth as Auth } from '../../provider/session'
+import qs from 'qs'
+
+let isRefreshing = false
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -146,8 +149,8 @@ const transform: AxiosTransform = {
           config.params = params
         } else {
           // ** If no data is provided for non-GET requests, the params will be treated as data
-          config.data = params
-          config.params = undefined
+          // config.data = params
+          // config.params = undefined
         }
         if (joinParamsToUrl) {
           config.url = setObjToUrlParams(config.url as string, Object.assign({}, config.params, config.data))
@@ -190,14 +193,42 @@ const transform: AxiosTransform = {
    * @description: Error Response Handling
    */
   responseInterceptorsCatch: (axiosInstance: AxiosInstance, error: any) => {
-    const { response, code, message, config } = error || {}
-    const errorMessageMode = config?.requestOptions?.errorMessageMode || 'none'
+    const { response, code, message, config: originConfig } = error || {}
+    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
     const msg: string = response?.data?.error?.message ?? response?.data?.message ?? ''
     const err: string = error?.toString?.() ?? ''
     let errMessage = ''
 
     if (axios.isCancel(error)) {
       return Promise.reject(error)
+    }
+
+    if (response?.status === 401 && !originConfig._retry) {
+      originConfig._retry = true
+
+      if (!isRefreshing) {
+        isRefreshing = true
+
+        try {
+          refreshToken()
+            .then(res => {
+              const { access_token } = res
+              localStorage.setItem('accessToken', access_token)
+
+              return defHttp.request(originConfig)
+            })
+            .catch(err => {
+              console.error('refreshToken error =>', err)
+              localStorage.removeItem('accessToken')
+              window.location.href = '/ui/login'
+            })
+        } catch (err) {
+          console.error(err)
+        } finally {
+          isRefreshing = false
+          location.reload()
+        }
+      }
     }
 
     try {
@@ -224,8 +255,8 @@ const transform: AxiosTransform = {
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = config.requestOptions.retryRequest
-    config.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const { isOpenRetry } = originConfig.requestOptions.retryRequest
+    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }
@@ -268,6 +299,13 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
       opt || {}
     )
   )
+}
+
+const refreshToken = () => {
+  const url = localStorage.getItem('oauthUrl')
+  const params = localStorage.getItem('authParams')
+
+  return defHttp.post({ url: `${url}?${qs.stringify(JSON.parse(params))}` }, { withToken: false }).then(res => res)
 }
 
 export const defHttp = createAxios()

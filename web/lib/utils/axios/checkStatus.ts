@@ -28,7 +28,6 @@ SOFTWARE.
 
 import type { ErrorMessageMode } from '@/types/axios'
 import toast from 'react-hot-toast'
-import { useRouter as Router } from 'next/navigation'
 
 export function checkStatus(status: number, msg: string, errorMessageMode: ErrorMessageMode = 'message'): void {
   let errMessage = ''
@@ -39,12 +38,8 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       break
 
     case 401:
-      errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
-
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('version')
-
-      Router().push('/ui/login')
+      // ** reserve error message
+      // errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
 
       break
     case 403:
