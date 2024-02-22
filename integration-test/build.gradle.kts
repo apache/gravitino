@@ -275,7 +275,7 @@ tasks.test {
       dependsOn(":trino-connector:jar")
     } else {
       // Check the version gravitino related jars in build equal to the current project version
-      val gravitinoJars = buildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }.filter {
+      val gravitinoJars = buildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
         val jarVersion = name.substringAfterLast("-").substringBeforeLast(".")
         jarVersion != version
       }

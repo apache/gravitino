@@ -60,7 +60,7 @@ RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then \
 
 
 # The following ENV are needed to update configuration file before starting Trino server, you need to
-# pass these ENV variables to the container when starting it.
+# pass these ENV variables to the container when starting it like `docker run --env GRAVITINO_HOST_IP=xxx --env GRAVITINO_HOST_PORT=xxxx`
 #ENV GRAVITINO_HOST_IP
 #ENV GRAVITINO_HOST_PORT
 #ENV GRAVITINO_METALAKE_NAME
