@@ -191,7 +191,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             : new Path(schemaPath, ident.name());
 
     try {
-      //formalize the path to avoid path without scheme, uri, authority, etc.
+      // formalize the path to avoid path without scheme, uri, authority, etc.
       filesetPath = formalizePath(filesetPath, hadoopConf);
       FileSystem fs = filesetPath.getFileSystem(hadoopConf);
       if (!fs.exists(filesetPath)) {

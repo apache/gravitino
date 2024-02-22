@@ -537,27 +537,28 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testFormalizePath() throws IOException {
-    String[] paths = new String[] {
-        "/tmp/catalog",
-        "file:/tmp/catalog",
-        "file:///tmp/catalog",
-        "hdfs://localhost:9000/tmp/catalog",
-        "s3://bucket/tmp/catalog",
-        "gs://bucket/tmp/catalog"
-    };
+    String[] paths =
+        new String[] {
+          "/tmp/catalog",
+          "file:/tmp/catalog",
+          "file:///tmp/catalog",
+          "hdfs://localhost:9000/tmp/catalog",
+          "s3://bucket/tmp/catalog",
+          "gs://bucket/tmp/catalog"
+        };
 
-    String[] expected = new String[] {
-        "file:/tmp/catalog",
-        "file:/tmp/catalog",
-        "file:/tmp/catalog",
-        "hdfs://localhost:9000/tmp/catalog",
-        "s3://bucket/tmp/catalog",
-        "gs://bucket/tmp/catalog"
-    };
+    String[] expected =
+        new String[] {
+          "file:/tmp/catalog",
+          "file:/tmp/catalog",
+          "file:/tmp/catalog",
+          "hdfs://localhost:9000/tmp/catalog",
+          "s3://bucket/tmp/catalog",
+          "gs://bucket/tmp/catalog"
+        };
 
     for (int i = 0; i < paths.length; i++) {
-      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]),
-          new Configuration());
+      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]), new Configuration());
       Assertions.assertEquals(expected[i], actual.toString());
     }
   }
