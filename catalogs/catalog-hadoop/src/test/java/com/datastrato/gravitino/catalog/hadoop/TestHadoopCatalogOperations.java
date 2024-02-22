@@ -58,8 +58,10 @@ public class TestHadoopCatalogOperations {
   private static final String ROCKS_DB_STORE_PATH =
       "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
-  private static final String TEST_ROOT_PATH =
-      "file:/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
+  private static final String UNFORMALIZED_TEST_ROOT_PATH =
+      "/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
+
+  private static final String TEST_ROOT_PATH = "file:" + UNFORMALIZED_TEST_ROOT_PATH;
 
   private static EntityStore store;
 
@@ -533,6 +535,33 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  @Test
+  public void testFormalizePath() throws IOException {
+    String[] paths = new String[] {
+        "/tmp/catalog",
+        "file:/tmp/catalog",
+        "file:///tmp/catalog",
+        "hdfs://localhost:9000/tmp/catalog",
+        "s3://bucket/tmp/catalog",
+        "gs://bucket/tmp/catalog"
+    };
+
+    String[] expected = new String[] {
+        "file:/tmp/catalog",
+        "file:/tmp/catalog",
+        "file:/tmp/catalog",
+        "hdfs://localhost:9000/tmp/catalog",
+        "s3://bucket/tmp/catalog",
+        "gs://bucket/tmp/catalog"
+    };
+
+    for (int i = 0; i < paths.length; i++) {
+      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]),
+          new Configuration());
+      Assertions.assertEquals(expected[i], actual.toString());
+    }
+  }
+
   private static Stream<Arguments> locationArguments() {
     return Stream.of(
         // Honor the catalog location
@@ -606,7 +635,79 @@ public class TestHadoopCatalogOperations {
             null,
             null,
             TEST_ROOT_PATH + "/fileset19",
-            TEST_ROOT_PATH + "/fileset19"));
+            TEST_ROOT_PATH + "/fileset19"),
+        // Honor the catalog location
+        Arguments.of(
+            "fileset101",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog201",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog201/s1_fileset101/fileset101"),
+        Arguments.of(
+            // honor the schema location
+            "fileset102",
+            Fileset.Type.MANAGED,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset102",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset102/fileset102"),
+        Arguments.of(
+            // honor the schema location
+            "fileset103",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog202",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset103",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset103/fileset103"),
+        Arguments.of(
+            // honor the storage location
+            "fileset104",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog203",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset104",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset104",
+            TEST_ROOT_PATH + "/fileset104"),
+        Arguments.of(
+            // honor the storage location
+            "fileset105",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset105",
+            TEST_ROOT_PATH + "/fileset105"),
+        Arguments.of(
+            // honor the storage location
+            "fileset106",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog204",
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset106",
+            TEST_ROOT_PATH + "/fileset106"),
+        Arguments.of(
+            // honor the storage location
+            "fileset107",
+            Fileset.Type.EXTERNAL,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog205",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset107",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset107",
+            TEST_ROOT_PATH + "/fileset107"),
+        Arguments.of(
+            // honor the storage location
+            "fileset108",
+            Fileset.Type.EXTERNAL,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset108",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset108",
+            TEST_ROOT_PATH + "/fileset108"),
+        Arguments.of(
+            // honor the storage location
+            "fileset109",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset109",
+            TEST_ROOT_PATH + "/fileset109"));
   }
 
   private static Stream<Arguments> testRenameArguments() {
