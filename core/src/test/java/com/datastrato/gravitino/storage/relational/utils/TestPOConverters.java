@@ -16,7 +16,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +44,52 @@ public class TestPOConverters {
         expectedMetalake.properties().get("key"), convertedMetalake.properties().get("key"));
     assertEquals(expectedMetalake.auditInfo().creator(), convertedMetalake.auditInfo().creator());
     assertEquals(expectedMetalake.getVersion(), convertedMetalake.getVersion());
+  }
+
+  @Test
+  public void testFromMetalakePOs() throws JsonProcessingException {
+    MetalakePO metalakePO1 = createMetalakePO(1L, "test", "this is test");
+    MetalakePO metalakePO2 = createMetalakePO(2L, "test2", "this is test2");
+    List<MetalakePO> metalakePOs = new ArrayList<>(Arrays.asList(metalakePO1, metalakePO2));
+    List<BaseMetalake> convertedMetalakes = POConverters.fromMetalakePOs(metalakePOs);
+
+    BaseMetalake expectedMetalake1 = createMetalake(1L, "test", "this is test");
+    BaseMetalake expectedMetalake2 = createMetalake(2L, "test2", "this is test2");
+    List<BaseMetalake> expectedMetalakes =
+        new ArrayList<>(Arrays.asList(expectedMetalake1, expectedMetalake2));
+
+    // Assert
+    int index = 0;
+    for (BaseMetalake metalake : convertedMetalakes) {
+      assertEquals(expectedMetalakes.get(index).id(), metalake.id());
+      assertEquals(expectedMetalakes.get(index).name(), metalake.name());
+      assertEquals(expectedMetalakes.get(index).comment(), metalake.comment());
+      assertEquals(
+          expectedMetalakes.get(index).properties().get("key"), metalake.properties().get("key"));
+      assertEquals(
+          expectedMetalakes.get(index).auditInfo().creator(), metalake.auditInfo().creator());
+      assertEquals(expectedMetalakes.get(index).getVersion(), metalake.getVersion());
+      index++;
+    }
+  }
+
+  @Test
+  public void testInitMetalakePOVersion() throws JsonProcessingException {
+    MetalakePO metalakePO = createMetalakePO(1L, "test", "this is test");
+    MetalakePO initPO = POConverters.initializeMetalakePOVersion(metalakePO);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+  }
+
+  @Test
+  public void testUpdateMetalakePOVersion() throws JsonProcessingException {
+    MetalakePO metalakePO = createMetalakePO(1L, "test", "this is test");
+    MetalakePO initPO = POConverters.initializeMetalakePOVersion(metalakePO);
+    MetalakePO updatePO = POConverters.updateMetalakePOVersion(initPO, initPO);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
   }
 
   @Test

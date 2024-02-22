@@ -62,6 +62,13 @@ public class POConverters {
         .build();
   }
 
+  /**
+   * Update MetalakePO version
+   *
+   * @param oldMetalakePO the old MetalakePO object
+   * @param newMetalakePO the new MetalakePO object
+   * @return MetalakePO object with updated version
+   */
   public static MetalakePO updateMetalakePOVersion(
       MetalakePO oldMetalakePO, MetalakePO newMetalakePO) {
     Long lastVersion = oldMetalakePO.getLastVersion();

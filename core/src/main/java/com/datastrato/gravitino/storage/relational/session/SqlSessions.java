@@ -50,9 +50,12 @@ public final class SqlSessions {
   public static void commitAndCloseSqlSession() {
     SqlSession sqlSession = sessions.get();
     if (sqlSession != null) {
-      sqlSession.commit();
-      sqlSession.close();
-      sessions.remove();
+      try {
+        sqlSession.commit();
+        sqlSession.close();
+      } finally {
+        sessions.remove();
+      }
     }
   }
 
@@ -63,9 +66,12 @@ public final class SqlSessions {
   public static void rollbackAndCloseSqlSession() {
     SqlSession sqlSession = sessions.get();
     if (sqlSession != null) {
-      sqlSession.rollback();
-      sqlSession.close();
-      sessions.remove();
+      try {
+        sqlSession.rollback();
+        sqlSession.close();
+      } finally {
+        sessions.remove();
+      }
     }
   }
 
@@ -73,8 +79,11 @@ public final class SqlSessions {
   public static void closeSqlSession() {
     SqlSession sqlSession = sessions.get();
     if (sqlSession != null) {
-      sqlSession.close();
-      sessions.remove();
+      try {
+        sqlSession.close();
+      } finally {
+        sessions.remove();
+      }
     }
   }
 
