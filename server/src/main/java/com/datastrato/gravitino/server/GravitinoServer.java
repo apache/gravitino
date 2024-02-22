@@ -37,6 +37,7 @@ public class GravitinoServer extends ResourceConfig {
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
 
   public static final String SERVER_NAME = "Gravitino-webserver";
+  private static final String API = "/api/";
 
   private final ServerConfig serverConfig;
 
@@ -84,12 +85,12 @@ public class GravitinoServer extends ResourceConfig {
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);
-    server.addServlet(servlet, "/api/*");
+    server.addServlet(servlet, API + "*");
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addCustomFilters("/api/*");
-    server.addFilter(new VersioningFilter(), "/api/*");
-    server.addSystemFilters("/api/*");
+    server.addCustomFilters(API + "*");
+    server.addFilter(new VersioningFilter(), API + "*");
+    server.addSystemFilters(API + "*");
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }
