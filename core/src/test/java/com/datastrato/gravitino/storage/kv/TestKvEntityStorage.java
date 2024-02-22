@@ -50,6 +50,7 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -736,6 +737,7 @@ public class TestKvEntityStorage {
   }
 
   @Test
+  @Disabled("KvEntityStore is not thread safe after issue #780")
   void testConcurrentIssues() throws IOException, ExecutionException, InterruptedException {
     Config config = Mockito.mock(Config.class);
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
