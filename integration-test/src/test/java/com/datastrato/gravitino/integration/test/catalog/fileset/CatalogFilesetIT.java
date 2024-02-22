@@ -172,6 +172,7 @@ public class CatalogFilesetIT extends AbstractIT {
         storageLocation(filesetName2),
         fileset2.storageLocation(),
         "storage location should be created");
+    Assertions.assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
 
     // create fileset with null fileset name
     Assertions.assertThrows(
