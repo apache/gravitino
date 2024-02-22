@@ -189,7 +189,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         StringUtils.isNotBlank(storageLocation)
             ? new Path(storageLocation)
             : new Path(schemaPath, ident.name());
+
     try {
+      // formalize the path to avoid path without scheme, uri, authority, etc.
+      filesetPath = formalizePath(filesetPath, hadoopConf);
       FileSystem fs = filesetPath.getFileSystem(hadoopConf);
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
@@ -598,5 +601,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return Optional.ofNullable(schemaLocation)
         .map(Path::new)
         .orElse(catalogStorageLocation.map(p -> new Path(p, name)).orElse(null));
+  }
+
+  @VisibleForTesting
+  static Path formalizePath(Path path, Configuration configuration) throws IOException {
+    FileSystem defaultFs = FileSystem.get(configuration);
+    return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
 }
