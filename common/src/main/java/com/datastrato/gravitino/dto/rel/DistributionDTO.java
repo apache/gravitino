@@ -16,7 +16,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Objects;
 
 /** Data transfer object representing distribution information. */
 @JsonSerialize(using = JsonUtils.DistributionSerializer.class)
@@ -173,7 +172,7 @@ public class DistributionDTO implements Distribution {
     if (!Arrays.equals(args, that.args)) {
       return false;
     }
-    return Objects.equals(o, that);
+    return strategy == that.strategy;
   }
 
   @Override
