@@ -17,8 +17,6 @@ import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.json.JsonUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.net.URI;
@@ -41,8 +39,6 @@ import org.slf4j.LoggerFactory;
 public class GravitinoClient implements SupportsMetalakes, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
-
-  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
 
   private final RESTClient restClient;
 

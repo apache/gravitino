@@ -42,7 +42,7 @@ public class CatalogConnectorContext {
     this.internalConnector = internalConnector;
     this.adapter = adapter;
 
-    this.connector = new GravitinoConnector(catalogName, this);
+    this.connector = new GravitinoConnector(this.catalogName, this);
   }
 
   public GravitinoMetaLake getMetalake() {
