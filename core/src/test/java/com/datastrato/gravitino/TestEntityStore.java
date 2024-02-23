@@ -6,6 +6,7 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -187,6 +188,8 @@ public class TestEntityStore {
         new FilesetEntity.Builder()
             .withId(1L)
             .withName("fileset")
+            .withFilesetType(Fileset.Type.MANAGED)
+            .withStorageLocation("file:/tmp")
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
             .build();
