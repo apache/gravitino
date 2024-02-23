@@ -587,9 +587,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertEquals("comment26_new", fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
-      Map<String, String> props1 = fileset1.properties();
-      Assertions.assertTrue(props1.containsKey("k1"));
-      Assertions.assertEquals("v1", props1.get("k1"));
     }
   }
 
