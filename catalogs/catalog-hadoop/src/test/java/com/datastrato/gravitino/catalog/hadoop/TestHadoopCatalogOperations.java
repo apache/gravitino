@@ -149,7 +149,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath = new Path(catalogPath, name);
     FileSystem fs = schemaPath.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath));
-    Assertions.assertTrue(fs.isDirectory(schemaPath));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath).length == 0);
   }
 
@@ -165,7 +165,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
   }
 
@@ -181,7 +181,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
 
     Assertions.assertFalse(fs.exists(new Path(catalogPath)));

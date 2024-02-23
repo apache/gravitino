@@ -64,10 +64,10 @@ dependencies {
 
   implementation(libs.caffeine)
   implementation(libs.guava)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("*")
   }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
   implementation(libs.slf4j.api)

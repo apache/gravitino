@@ -56,11 +56,11 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
   }
-  implementation(libs.hadoop2.hdfs)
-  implementation(libs.hadoop2.mapreduce.client.core)
+  implementation(libs.hadoop3.hdfs)
+  implementation(libs.hadoop3.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
 
   testImplementation(libs.jersey.test.framework.core) {

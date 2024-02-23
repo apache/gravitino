@@ -16,8 +16,8 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
-  implementation(libs.hadoop2.common)
-  implementation(libs.hadoop2.hdfs)
+  implementation(libs.hadoop3.common)
+  implementation(libs.hadoop3.hdfs)
   implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
