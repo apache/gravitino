@@ -37,6 +37,8 @@ public class GravitinoServer extends ResourceConfig {
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
 
   public static final String SERVER_NAME = "Gravitino-webserver";
+
+  /** Path to Gravitino server REST interface. */
   private static final String API = "/api/";
 
   private final ServerConfig serverConfig;
