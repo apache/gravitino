@@ -170,7 +170,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     String indexSql =
         Arrays.stream(indexes)
-            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0]))
+            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(indexSql);

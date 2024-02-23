@@ -37,6 +37,8 @@ public class ContainerSuite implements Closeable {
   private static TrinoContainer trinoContainer;
   private static TrinoITContainers trinoITContainers;
 
+  private static DorisContainer dorisContainer;
+
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private ContainerSuite() {
@@ -125,6 +127,17 @@ public class ContainerSuite implements Closeable {
     trinoContainer.start();
   }
 
+  public void startDorisContainer() {
+    if (dorisContainer != null) {
+      return;
+    }
+    // Start Doris container
+    DorisContainer.Builder dorisBuilder =
+        DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
+    dorisContainer = closer.register(dorisBuilder.build());
+    dorisContainer.start();
+  }
+
   public TrinoContainer getTrinoContainer() {
     return trinoContainer;
   }
@@ -139,6 +152,10 @@ public class ContainerSuite implements Closeable {
 
   public HiveContainer getHiveContainer() {
     return hiveContainer;
+  }
+
+  public DorisContainer getDorisContainer() {
+    return dorisContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid `mac-docker-connector` needing to

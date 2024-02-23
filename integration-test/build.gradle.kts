@@ -319,6 +319,7 @@ tasks.test {
       // Gravitino CI Docker image
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "doris_ci:test")
 
       // Change poll image pause time from 30s to 60s
       environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
