@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.dyn;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.datastrato.gravitino.catalog.hive.dyn.DynFields;
@@ -103,6 +104,7 @@ public class TestDynFields {
 
     builder.defaultAlwaysNull();
     UnboundField<Object> nameField = builder.impl(TestObject.class, "lastname").buildChecked();
+    assertTrue(nameField.isAlwaysNull());
   }
 
   @Test
