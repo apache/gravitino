@@ -73,7 +73,10 @@ public interface Type {
     UNION,
 
     /** The null type. A null type represents a value that is null. */
-    NULL
+    NULL,
+
+    /** The unparsed type. An unparsed type represents an unresolvable type. */
+    UNPARSED
   }
 
   /** The base type of all primitive types. */

@@ -55,7 +55,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
       case BINARY:
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean.getTypeName());
+        return Types.UnparsedType.of(typeBean.getTypeName());
     }
   }
 
@@ -90,6 +90,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
     } else if (type instanceof Types.BinaryType) {
       return type.simpleString();
     }
-    throw new IllegalArgumentException("Not a supported type: " + type.toString());
+    throw new IllegalArgumentException(
+        String.format("Couldn't convert Gravitino type %s to MySQL type", type.simpleString()));
   }
 }

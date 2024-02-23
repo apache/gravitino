@@ -1225,4 +1225,80 @@ public class CatalogMysqlIT extends AbstractIT {
     assertionsTableInfo(
         "TABLENAME", table_comment, Arrays.asList(newColumns), properties, indexes, table);
   }
+
+  @Test
+  void testMySQLSchemaNameCaseSensitive() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3};
+
+    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+
+    String[] schemas = {"db_", "db_1", "db_2", "db12"};
+    SupportsSchemas schemaSupport = catalog.asSchemas();
+
+    for (String schema : schemas) {
+      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
+      schemaSupport.createSchema(schemaIdentifier, null, Collections.emptyMap());
+      Assertions.assertNotNull(schemaSupport.loadSchema(schemaIdentifier));
+    }
+
+    Set<String> schemaNames =
+        Arrays.stream(schemaSupport.listSchemas(Namespace.of(metalakeName, catalogName)))
+            .map(NameIdentifier::name)
+            .collect(Collectors.toSet());
+
+    Assertions.assertTrue(schemaNames.containsAll(Arrays.asList(schemas)));
+
+    String tableName = "test1";
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    for (String schema : schemas) {
+      tableCatalog.createTable(
+          NameIdentifier.of(metalakeName, catalogName, schema, tableName),
+          newColumns,
+          table_comment,
+          properties,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          new SortOrder[0],
+          indexes);
+      tableCatalog.createTable(
+          NameIdentifier.of(
+              metalakeName, catalogName, schema, GravitinoITUtils.genRandomName("test2")),
+          newColumns,
+          table_comment,
+          properties,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          new SortOrder[0],
+          Indexes.EMPTY_INDEXES);
+    }
+
+    for (String schema : schemas) {
+      NameIdentifier[] nameIdentifiers =
+          tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schema));
+      Assertions.assertEquals(2, nameIdentifiers.length);
+      Assertions.assertTrue(
+          Arrays.stream(nameIdentifiers)
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet())
+              .stream()
+              .anyMatch(n -> n.equals(tableName)));
+    }
+  }
+
+  @Test
+  void testUnparsedTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
+    mysqlService.executeQuery(
+        String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertEquals(Types.UnparsedType.of("BIT"), loadedTable.columns()[0].dataType());
+  }
 }
