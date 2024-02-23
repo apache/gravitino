@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
+import static com.datastrato.gravitino.Entity.EntityType.FILESET;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
@@ -307,15 +308,19 @@ public class KvEntityStore implements EntityStore {
         prefixes.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case CATALOG:
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case SCHEMA:
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case TABLE:
+      case FILESET:
         break;
       default:
         LOG.warn("Currently unknown type: {}, please check it", type);

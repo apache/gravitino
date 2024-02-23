@@ -25,6 +25,7 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":catalogs:catalog-hadoop"))
   implementation(project(":clients:client-java"))
   implementation(project(":common"))
   implementation(project(":core"))
