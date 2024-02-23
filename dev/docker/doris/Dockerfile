@@ -5,9 +5,7 @@
 FROM ubuntu:22.04
 LABEL maintainer="support@datastrato.com"
 
-ARG DORIS_PACKAGE_NAME
-ARG DORIS_FILE_NAME
-ARG TARGET_ARCH
+ARG DORIS_VERSION
 
 WORKDIR /
 
@@ -30,23 +28,21 @@ ENV DORIS_BE_HOME=${DORIS_HOME}/be
 
 ENV PATH=${JAVA_HOME}/bin:${DORIS_FE_HOME}/bin:${DORIS_BE_HOME}/bin:${PATH}
 
+RUN mkdir ${DORIS_HOME}
+COPY packages /tmp/packages
+COPY start.sh ${DORIS_HOME}
+
 ################################################################################
-# setup java
+# setup java, unzip doris package
 
 RUN ARCH=$(uname -m) && \
   if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
     ln -s /usr/lib/jvm/java-8-openjdk-arm64 ${JAVA_HOME}; \
+    tar -xv -C "${DORIS_HOME}" --strip-components 1 -f /tmp/packages/apache-doris-${DORIS_VERSION}-bin-arm64.tar.xz; \
   else \
     ln -s /usr/lib/jvm/java-8-openjdk-amd64 ${JAVA_HOME}; \
+    tar -xv -C "${DORIS_HOME}" --strip-components 1 -f /tmp/packages/apache-doris-${DORIS_VERSION}-bin-x64.tar.xz; \
   fi
-
-#################################################################################
-## add files
-
-ADD packages/${DORIS_FILE_NAME} /opt
-RUN ln -s /opt/${DORIS_PACKAGE_NAME} ${DORIS_HOME}
-
-COPY start.sh ${DORIS_HOME}
 
 ################################################################################
 # set WORKDIR/EXPOSE/CMD

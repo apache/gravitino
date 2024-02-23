@@ -80,7 +80,7 @@ elif [ "${component_type}" == "gravitino" ]; then
   . ${script_dir}/gravitino/gravitino-dependency.sh
 elif [ "${component_type}" == "doris" ]; then
   . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
-  build_args="--build-arg DORIS_PACKAGE_NAME=${DORIS_PACKAGE_NAME} --build-arg DORIS_FILE_NAME=${DORIS_FILE_NAME}"
+  build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
