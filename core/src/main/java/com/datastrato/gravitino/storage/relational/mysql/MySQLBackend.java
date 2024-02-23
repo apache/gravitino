@@ -23,6 +23,8 @@ import java.util.function.Function;
  */
 public class MySQLBackend implements RelationalBackend {
 
+  private static final String UNSUPPORTED_OPERATION_NOW = "Unsupported operation now.";
+
   /** Initialize the MySQL backend instance. */
   @Override
   public void initialize(Config config) {}
@@ -30,36 +32,36 @@ public class MySQLBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Entity.EntityType entityType) throws NoSuchEntityException {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws NoSuchEntityException {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
-    throw new UnsupportedOperationException("Unsupported operation now.");
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION_NOW);
   }
 
   @Override

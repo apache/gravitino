@@ -68,6 +68,7 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST = "Catalog %s does not exist";
+  private static final String METALAKE_DOES_NOT_EXIST = "Metalake %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -216,7 +217,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     if (!metalakeExists) {
-      throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST, metalakeIdent);
     }
 
     try {
@@ -289,7 +290,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST, metalakeIdent);
       }
 
       // TODO: should avoid a race condition here

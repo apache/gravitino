@@ -47,6 +47,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
   public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
+  private static final String POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN =
+      "PostgreSQL does not support nested column names.";
+
   private String database;
 
   @Override
@@ -287,7 +290,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability updateColumnNullability, String tableName) {
     if (updateColumnNullability.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     String col = updateColumnNullability.fieldName()[0];
     if (updateColumnNullability.nullable()) {
@@ -333,7 +336,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable table) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists =
@@ -359,7 +362,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column =
@@ -395,7 +398,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private String renameColumnFieldDefinition(
       TableChange.RenameColumn renameColumn, String tableName) {
     if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     return ALTER_TABLE
         + tableName
@@ -423,7 +426,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private List<String> addColumnFieldDefinition(
       TableChange.AddColumn addColumn, JdbcTable lazyLoadTable) {
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     List<String> result = new ArrayList<>();
     String col = addColumn.fieldName()[0];
@@ -475,7 +478,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       TableChange.UpdateColumnComment updateColumnComment, String tableName) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN);
     }
     String col = updateColumnComment.fieldName()[0];
     return COLUMN_COMMENT
