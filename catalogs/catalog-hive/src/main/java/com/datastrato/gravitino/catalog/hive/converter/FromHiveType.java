@@ -21,6 +21,7 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFr
 
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
@@ -40,9 +41,8 @@ public class FromHiveType {
    *
    * @param hiveType The Hive data type string to convert.
    * @return The equivalent Gravitino data type.
-   * @throws IllegalArgumentException If the Hive data type is unknown or unsupported.
    */
-  public static Type convert(String hiveType) throws IllegalArgumentException {
+  public static Type convert(String hiveType) {
     TypeInfo hiveTypeInfo = getTypeInfoFromTypeString(hiveType);
     return toGravitinoType(hiveTypeInfo);
   }
@@ -52,9 +52,9 @@ public class FromHiveType {
    *
    * @param hiveTypeInfo The Hive TypeInfo object to convert.
    * @return The equivalent Gravitino Type.
-   * @throws IllegalArgumentException if the Hive data type category is unknown or unsupported.
    */
-  private static Type toGravitinoType(TypeInfo hiveTypeInfo) throws IllegalArgumentException {
+  @VisibleForTesting
+  public static Type toGravitinoType(TypeInfo hiveTypeInfo) {
     switch (hiveTypeInfo.getCategory()) {
       case PRIMITIVE:
         switch (hiveTypeInfo.getTypeName()) {
@@ -98,8 +98,7 @@ public class FromHiveType {
               return Types.DecimalType.of(decimalTypeInfo.precision(), decimalTypeInfo.scale());
             }
 
-            throw new IllegalArgumentException(
-                "Unknown Hive type: " + hiveTypeInfo.getQualifiedName());
+            return Types.UnparsedType.of(hiveTypeInfo.getQualifiedName());
         }
       case LIST:
         return Types.ListType.nullable(
@@ -128,8 +127,7 @@ public class FromHiveType {
                 .map(FromHiveType::toGravitinoType)
                 .toArray(Type[]::new));
       default:
-        throw new IllegalArgumentException(
-            "Unknown category of Hive type: " + hiveTypeInfo.getCategory());
+        return Types.UnparsedType.of(hiveTypeInfo.getQualifiedName());
     }
   }
 

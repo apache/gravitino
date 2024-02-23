@@ -1018,6 +1018,61 @@ public class Types {
   }
 
   /**
+   * Represents a type that is not parsed yet. The parsed type is represented by other types of
+   * {@link Types}.
+   */
+  public static class UnparsedType implements Type {
+
+    /**
+     * Creates a new {@link UnparsedType} with the given unparsed type.
+     *
+     * @param unparsedType The unparsed type.
+     * @return A new {@link UnparsedType} with the given unparsed type.
+     */
+    public static UnparsedType of(String unparsedType) {
+      return new UnparsedType(unparsedType);
+    }
+
+    private final String unparsedType;
+
+    private UnparsedType(String unparsedType) {
+      this.unparsedType = unparsedType;
+    }
+
+    /** @return The unparsed type as a string. */
+    public String unparsedType() {
+      return unparsedType;
+    }
+
+    @Override
+    public Name name() {
+      return Name.UNPARSED;
+    }
+
+    @Override
+    public String simpleString() {
+      return String.format("unparsed(%s)", unparsedType);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      UnparsedType that = (UnparsedType) o;
+      return Objects.equals(unparsedType, that.unparsedType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(unparsedType);
+    }
+  }
+
+  /**
    * @param dataType The data type to check.
    * @return True if the given data type is allowed to be an auto-increment column.
    */
