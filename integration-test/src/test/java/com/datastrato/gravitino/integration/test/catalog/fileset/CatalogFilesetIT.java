@@ -21,7 +21,9 @@ import com.datastrato.gravitino.rel.Schema;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -381,6 +383,7 @@ public class CatalogFilesetIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .listFilesets(Namespace.ofFileset(metalakeName, catalogName, schemaName));
+    Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());
     Assertions.assertEquals(fileset2.name(), nameIdentifiers1[1].name());
