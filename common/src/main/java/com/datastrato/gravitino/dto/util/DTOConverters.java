@@ -15,7 +15,6 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.DistributionDTO.Builder;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
@@ -236,7 +235,7 @@ public class DTOConverters {
       return (DistributionDTO) distribution;
     }
 
-    return new Builder()
+    return new DistributionDTO.Builder()
         .withStrategy(distribution.strategy())
         .withNumber(distribution.number())
         .withArgs(

@@ -19,6 +19,7 @@
 package com.datastrato.gravitino.exceptions;
 
 import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
 // Referred from Apache Iceberg's RESTException implementation
 // api/src/main/java/org/apache/iceberg/exceptions/RESTException.java
@@ -33,7 +34,7 @@ public class RESTException extends RuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public RESTException(String message, Object... args) {
+  public RESTException(@FormatString String message, Object... args) {
     super(String.format(message, args));
   }
 
@@ -45,7 +46,7 @@ public class RESTException extends RuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public RESTException(Throwable cause, String message, Object... args) {
+  public RESTException(Throwable cause, @FormatString String message, Object... args) {
     super(String.format(message, args), cause);
   }
 }

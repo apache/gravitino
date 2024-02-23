@@ -20,11 +20,11 @@ public interface Catalog extends Auditable {
     /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
     RELATIONAL,
 
-    /** Catalog Type for File System (including HDFS, S3, etc.), like path/to/file */
-    FILE,
+    /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
+    FILESET,
 
     /** Catalog Type for Message Queue, like kafka://topic */
-    STREAM,
+    STREAM
   }
 
   /**

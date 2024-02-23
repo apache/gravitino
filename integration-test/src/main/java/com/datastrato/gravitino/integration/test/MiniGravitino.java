@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -22,7 +23,6 @@ import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -95,7 +95,7 @@ public class MiniGravitino {
     if (AuthenticatorType.OAUTH
         .name()
         .toLowerCase()
-        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
@@ -104,7 +104,7 @@ public class MiniGravitino {
     } else if (AuthenticatorType.KERBEROS
         .name()
         .toLowerCase()
-        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
@@ -134,7 +134,7 @@ public class MiniGravitino {
       if (started || future.isDone()) {
         break;
       }
-      Thread.sleep(500);
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     }
     if (!started) {
       try {
@@ -152,13 +152,13 @@ public class MiniGravitino {
     LOG.debug("MiniGravitino shutDown...");
 
     executor.shutdown();
-    Thread.sleep(500);
+    sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     executor.shutdownNow();
 
     long beginTime = System.currentTimeMillis();
     boolean started = true;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      Thread.sleep(500);
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
       started = checkIfServerIsRunning();
       if (!started) {
         break;

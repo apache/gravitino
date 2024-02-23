@@ -13,7 +13,7 @@ HIVE_VERSION="2.3.9"
 MYSQL_JDBC_DRIVER_VERSION="8.0.15"
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz" # Must export this variable for Dockerfile
-HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
+HADOOP_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
 
 HIVE_PACKAGE_NAME="apache-hive-${HIVE_VERSION}-bin.tar.gz" # Must export this variable for Dockerfile
 HIVE_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/${HIVE_PACKAGE_NAME}"
@@ -27,11 +27,11 @@ if [[ ! -d "${hive_dir}/packages" ]]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${HADOOP_PACKAGE_NAME}" ]; then
-  curl -s -o "${hive_dir}/packages/${HADOOP_PACKAGE_NAME}" ${HADOOP_DOWNLOAD_URL}
+  curl -L -s -o "${hive_dir}/packages/${HADOOP_PACKAGE_NAME}" ${HADOOP_DOWNLOAD_URL}
 fi
 
 if [ ! -f "${hive_dir}/packages/${HIVE_PACKAGE_NAME}" ]; then
-  curl -s -o "${hive_dir}/packages/${HIVE_PACKAGE_NAME}" ${HIVE_DOWNLOAD_URL}
+  curl -L -s -o "${hive_dir}/packages/${HIVE_PACKAGE_NAME}" ${HIVE_DOWNLOAD_URL}
 fi
 
 if [ ! -f "${hive_dir}/packages/${JDBC_DIVER_PACKAGE_NAME}" ]; then

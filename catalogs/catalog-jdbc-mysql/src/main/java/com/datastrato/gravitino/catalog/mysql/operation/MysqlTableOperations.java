@@ -233,7 +233,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         }
 
         throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+            "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
     }
   }
@@ -367,7 +367,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN "
+    return MODIFY_COLUMN
         + BACK_QUOTE
         + col
         + BACK_QUOTE
@@ -404,7 +404,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN "
+    return MODIFY_COLUMN
         + BACK_QUOTE
         + col
         + BACK_QUOTE
@@ -442,7 +442,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
       columnDefinition
-          .append("AFTER ")
+          .append(AFTER)
           .append(BACK_QUOTE)
           .append(afterPosition.getColumn())
           .append(BACK_QUOTE);
@@ -493,18 +493,18 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("MODIFY COLUMN ").append(col);
+    columnDefinition.append(MODIFY_COLUMN).append(col);
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(afterPosition.getColumn());
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
     }
     return columnDefinition.toString();
   }
@@ -538,7 +538,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(col)

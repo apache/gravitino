@@ -156,4 +156,6 @@ public class Indexes {
       }
     }
   }
+
+  private Indexes() {}
 }

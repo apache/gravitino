@@ -56,6 +56,7 @@ kerby = "2.0.3"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
 sun-activation-version = "1.2.0"
+error-prone = "3.1.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -114,12 +115,8 @@ trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trin
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
 trino-cli= { group = "io.trino", name = "trino-cli", version.ref = "trino" }
 trino-client= { group = "io.trino", name = "trino-client", version.ref = "trino" }
-iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.13", version.ref = "iceberg" }
-spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
-scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 testng = { group = "org.testng", name = "testng", version.ref = "testng" }
-spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
@@ -171,3 +168,4 @@ node = { id = "com.github.node-gradle.node", version.ref = "node-plugin" }
 tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.5"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
+errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}

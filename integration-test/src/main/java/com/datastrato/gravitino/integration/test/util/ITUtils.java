@@ -40,4 +40,6 @@ public class ITUtils {
       }
     }
   }
+
+  private ITUtils() {}
 }

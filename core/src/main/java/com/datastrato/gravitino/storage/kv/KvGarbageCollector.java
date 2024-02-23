@@ -294,6 +294,7 @@ public final class KvGarbageCollector implements Closeable {
     try {
       garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       LOG.error("Failed to close garbage collector", e);
     }
   }

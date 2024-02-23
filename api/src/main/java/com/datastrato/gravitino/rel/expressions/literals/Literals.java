@@ -217,4 +217,6 @@ public class Literals {
       return "LiteralImpl{" + "value=" + value + ", dataType=" + dataType + '}';
     }
   }
+
+  private Literals() {}
 }

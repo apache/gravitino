@@ -86,7 +86,12 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
       // In case of time skew, we will wait maxSkewTimeInSecond(default 2) seconds.
       int retries = 0;
       while (current <= old + maxSkewTimeInMs && retries++ < maxSkewTimeInMs / 100) {
-        Thread.sleep(100);
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Thread was interrupted, exception: ", e);
+        }
         current = System.currentTimeMillis();
       }
 
@@ -96,7 +101,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
                 "Failed to initialize transaction id generator after %d milliseconds, time skew is too large",
                 maxSkewTimeInMs));
       }
-    } catch (IOException | InterruptedException e) {
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
@@ -111,13 +116,13 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   }
 
   /**
-   * We use the timestamp as the high 48 bits and the incrementId as the low 16 bits. The timestamp
+   * We use the timestamp as the high 46 bits and the incrementId as the low 18 bits. The timestamp
    * is always incremental.
    */
   @Override
   public synchronized long nextId() {
     incrementId++;
-    if (incrementId >= (1 << 18 - 1)) {
+    if (incrementId >= ((1 << 18) - 1)) {
       incrementId = 0;
     }
 
@@ -136,6 +141,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
     try {
       scheduledThreadPoolExecutor.awaitTermination(2000, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       LOGGER.warn(
           "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl with in 2000 milliseconds",
           e);

@@ -7,6 +7,7 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
@@ -27,8 +28,6 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
-  private EntitySerDe entitySerDe;
-
   private CatalogManager catalogManager;
 
   private CatalogOperationDispatcher catalogOperationDispatcher;
@@ -40,6 +39,8 @@ public class GravitinoEnv {
   private AuxiliaryServiceManager auxServiceManager;
 
   private MetricsSystem metricsSystem;
+
+  private LockManager lockManager;
 
   private GravitinoEnv() {}
 
@@ -68,13 +69,9 @@ public class GravitinoEnv {
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
-    // Initialize EntitySerDe
-    this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);
-
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    entityStore.setSerDe(entitySerDe);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
@@ -91,6 +88,8 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX));
 
+    // Tree lock
+    this.lockManager = new LockManager(config);
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -101,15 +100,6 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
-  }
-
-  /**
-   * Get the EntitySerDe associated with the Gravitino environment.
-   *
-   * @return The EntitySerDe instance.
-   */
-  public EntitySerDe entitySerDe() {
-    return entitySerDe;
   }
 
   /**
@@ -165,6 +155,10 @@ public class GravitinoEnv {
    */
   public MetricsSystem metricsSystem() {
     return metricsSystem;
+  }
+
+  public LockManager getLockManager() {
+    return lockManager;
   }
 
   public void start() {

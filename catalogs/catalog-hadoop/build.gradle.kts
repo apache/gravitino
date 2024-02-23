@@ -15,10 +15,10 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":common"))
 
-  implementation(libs.slf4j.api)
   implementation(libs.guava)
   implementation(libs.hadoop2.common)
   implementation(libs.hadoop2.hdfs)
+  implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -43,7 +43,9 @@ tasks {
     from("src/main/resources")
     into("$rootDir/distribution/package/catalogs/hadoop/conf")
 
-    // TODO. add configuration file later on.
+    include("hadoop.conf")
+    include("core-site.xml.template")
+    include("hdfs-site.xml.template")
 
     rename { original ->
       if (original.endsWith(".template")) {
