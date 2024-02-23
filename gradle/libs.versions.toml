@@ -45,6 +45,7 @@ postgresql = "42.6.0"
 immutables-value = "2.10.0"
 selenium = "3.141.59"
 rauschig = "1.2.0"
+openapi-generator = "6.6.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -146,6 +147,7 @@ sun-activation = { group = "com.sun.activation", name = "javax.activation", vers
 
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }
+openapiGenerator = { group = "org.openapitools", name = "openapi-generator-gradle-plugin", version.ref = "openapi-generator" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
@@ -169,3 +171,4 @@ tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.5"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
+openapiGenerator = {id = "org.openapi.generator", version.ref = "openapi-generator"}

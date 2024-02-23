@@ -46,6 +46,7 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+  alias(libs.plugins.openapiGenerator)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -158,6 +159,30 @@ nexusPublishing {
 
 dependencies {
   testImplementation(libs.testng)
+}
+
+apply(plugin = "org.openapi.generator")
+openApiGenerate {
+  inputSpec = "$rootDir/docs/open-api/openapi.yaml".toString()
+  generatorName = "python"
+  outputDir = "$rootDir/clients/client-python"
+  modelPackage = "dto"
+  modelNameSuffix = "dto"
+  generateApiDocumentation.set(false)
+  generateModelDocumentation.set(false)
+  generateApiTests.set(false)
+  generateModelTests.set(false)
+  packageName.set("com.datastrato.gravitino.client")
+  cleanupOutput.set(true)
+
+  globalProperties.set(mapOf(
+          "apis" to "false",
+          "models" to "Audit,Catalog,Metalake,Version"
+  ))
+
+  configOptions.set(mapOf(
+          "generateSourceCodeOnly" to "true"
+  ))
 }
 
 subprojects {
@@ -452,7 +477,8 @@ tasks.rat {
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
-    "**/NOTICE.*"
+    "**/NOTICE.*",
+    "clients/client-python/**"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
