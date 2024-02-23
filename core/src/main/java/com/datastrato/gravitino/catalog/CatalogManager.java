@@ -67,6 +67,8 @@ import org.slf4j.LoggerFactory;
 /** Manages the catalog instances and operations. */
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
+  private static final String CATALOG_DOES_NOT_EXIST = "Catalog %s does not exist";
+
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
   /** Wrapper class for a catalog instance and its class loader. */
@@ -343,7 +345,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST, ident);
     }
 
     try {
@@ -402,7 +404,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST, ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
@@ -452,7 +454,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST, ident);
 
     } catch (IOException ioe) {
       LOG.error("Failed to load catalog {}", ident, ioe);
