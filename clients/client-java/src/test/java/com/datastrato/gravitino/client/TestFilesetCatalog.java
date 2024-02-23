@@ -30,6 +30,7 @@ import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -324,9 +325,11 @@ public class TestFilesetCatalog extends TestBase {
         new FilesetUpdatesRequest(ImmutableList.of(req)),
         errResp,
         SC_NOT_FOUND);
+    com.datastrato.gravitino.file.FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+    FilesetChange filesetChange = req.filesetChange();
     Assertions.assertThrows(
         NoSuchFilesetException.class,
-        () -> catalog.asFilesetCatalog().alterFileset(fileset, req.filesetChange()),
+        () -> filesetCatalog.alterFileset(fileset, filesetChange),
         "fileset not found");
 
     // Test RuntimeException
@@ -339,7 +342,7 @@ public class TestFilesetCatalog extends TestBase {
         SC_SERVER_ERROR);
     Assertions.assertThrows(
         RuntimeException.class,
-        () -> catalog.asFilesetCatalog().alterFileset(fileset, req.filesetChange()),
+        () -> filesetCatalog.alterFileset(fileset, filesetChange),
         "internal error");
   }
 
