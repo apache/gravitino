@@ -11,6 +11,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
@@ -93,11 +94,14 @@ public class TestFilesetCatalog extends TestBase {
   public void testListFileset() throws JsonProcessingException {
     NameIdentifier fileset1 = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
     NameIdentifier fileset2 = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset2");
-    String filesetPath = withSlash(FilesetCatalog.formatFilesetRequestPath(fileset1.namespace()));
+    Namespace namespace = fileset1.namespace();
+    String filesetPath = withSlash(FilesetCatalog.formatFilesetRequestPath(namespace));
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {fileset1, fileset2});
     buildMockResource(Method.GET, filesetPath, null, resp, SC_OK);
-    NameIdentifier[] filesets = catalog.asFilesetCatalog().listFilesets(fileset1.namespace());
+    com.datastrato.gravitino.file.FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+
+    NameIdentifier[] filesets = filesetCatalog.listFilesets(namespace);
 
     Assertions.assertEquals(2, filesets.length);
     Assertions.assertEquals(fileset1, filesets[0]);
@@ -109,7 +113,7 @@ public class TestFilesetCatalog extends TestBase {
     buildMockResource(Method.GET, filesetPath, null, errResp, SC_NOT_FOUND);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
-        () -> catalog.asFilesetCatalog().listFilesets(fileset1.namespace()),
+        () -> filesetCatalog.listFilesets(namespace),
         "schema not found");
 
     // Throw fileset not found exception
@@ -117,17 +121,13 @@ public class TestFilesetCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchFileException.class.getSimpleName(), "fileset not found");
     buildMockResource(Method.GET, filesetPath, null, errResp1, SC_NOT_FOUND);
     Assertions.assertThrows(
-        NotFoundException.class,
-        () -> catalog.asFilesetCatalog().listFilesets(fileset1.namespace()),
-        "fileset not found");
+        NotFoundException.class, () -> filesetCatalog.listFilesets(namespace), "fileset not found");
 
     // Throw Runtime exception
     ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, filesetPath, null, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class,
-        () -> catalog.asFilesetCatalog().listFilesets(fileset1.namespace()),
-        "internal error");
+        RuntimeException.class, () -> filesetCatalog.listFilesets(namespace), "internal error");
   }
 
   @Test
@@ -145,6 +145,7 @@ public class TestFilesetCatalog extends TestBase {
             ImmutableMap.of("k1", "v1"));
     FilesetResponse resp = new FilesetResponse(mockFileset);
     buildMockResource(Method.GET, filesetPath, null, resp, SC_OK);
+    com.datastrato.gravitino.file.FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
     Fileset loadedFileset = catalog.asFilesetCatalog().loadFileset(fileset);
     Assertions.assertNotNull(loadedFileset);
     assertFileset(mockFileset, loadedFileset);
@@ -154,24 +155,18 @@ public class TestFilesetCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
     buildMockResource(Method.GET, filesetPath, null, errResp, SC_NOT_FOUND);
     Assertions.assertThrows(
-        NoSuchSchemaException.class,
-        () -> catalog.asFilesetCatalog().loadFileset(fileset),
-        "schema not found");
+        NoSuchSchemaException.class, () -> filesetCatalog.loadFileset(fileset), "schema not found");
 
     ErrorResponse errResp1 =
         ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "fileset not found");
     buildMockResource(Method.GET, filesetPath, null, errResp1, SC_NOT_FOUND);
     Assertions.assertThrows(
-        NotFoundException.class,
-        () -> catalog.asFilesetCatalog().loadFileset(fileset),
-        "fileset not found");
+        NotFoundException.class, () -> filesetCatalog.loadFileset(fileset), "fileset not found");
 
     ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, filesetPath, null, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class,
-        () -> catalog.asFilesetCatalog().loadFileset(fileset),
-        "internal error");
+        RuntimeException.class, () -> filesetCatalog.loadFileset(fileset), "internal error");
   }
 
   @Test
@@ -213,17 +208,14 @@ public class TestFilesetCatalog extends TestBase {
         ErrorResponse.alreadyExists(
             FilesetAlreadyExistsException.class.getSimpleName(), "fileset already exists");
     buildMockResource(Method.POST, filesetPath, req, errResp, SC_CONFLICT);
+    com.datastrato.gravitino.file.FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+    ImmutableMap<String, String> properties = ImmutableMap.of("k1", "v1");
     Assertions.assertThrows(
         AlreadyExistsException.class,
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .createFileset(
-                    fileset,
-                    "mock comment",
-                    Fileset.Type.MANAGED,
-                    "mock location",
-                    ImmutableMap.of("k1", "v1")),
+        () -> {
+          filesetCatalog.createFileset(
+              fileset, "mock comment", Fileset.Type.MANAGED, "mock location", properties);
+        },
         "fileset already exists");
 
     // Test RuntimeException
@@ -232,14 +224,8 @@ public class TestFilesetCatalog extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () ->
-            catalog
-                .asFilesetCatalog()
-                .createFileset(
-                    fileset,
-                    "mock comment",
-                    Fileset.Type.MANAGED,
-                    "mock location",
-                    ImmutableMap.of("k1", "v1")),
+            filesetCatalog.createFileset(
+                fileset, "mock comment", Fileset.Type.MANAGED, "mock location", properties),
         "internal error");
   }
 
@@ -262,10 +248,9 @@ public class TestFilesetCatalog extends TestBase {
     // Test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, filesetPath, null, errResp, SC_SERVER_ERROR);
+    com.datastrato.gravitino.file.FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
     Assertions.assertThrows(
-        RuntimeException.class,
-        () -> catalog.asFilesetCatalog().dropFileset(fileset),
-        "internal error");
+        RuntimeException.class, () -> filesetCatalog.dropFileset(fileset), "internal error");
   }
 
   @Test
