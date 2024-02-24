@@ -561,6 +561,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             ? Maps.newHashMap()
             : Maps.newHashMap(filesetEntity.properties());
     String newName = ident.name();
+    String newComment = filesetEntity.comment();
 
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
@@ -571,6 +572,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         props.remove(removeProperty.getProperty());
       } else if (change instanceof FilesetChange.RenameFileset) {
         newName = ((FilesetChange.RenameFileset) change).getNewName();
+      } else if (change instanceof FilesetChange.UpdateFilesetComment) {
+        newComment = ((FilesetChange.UpdateFilesetComment) change).getNewComment();
       } else {
         throw new IllegalArgumentException(
             "Unsupported fileset change: " + change.getClass().getSimpleName());
@@ -581,7 +584,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withName(newName)
         .withNamespace(ident.namespace())
         .withId(filesetEntity.id())
-        .withComment(filesetEntity.comment())
+        .withComment(newComment)
         .withFilesetType(filesetEntity.filesetType())
         .withStorageLocation(filesetEntity.storageLocation())
         .withProperties(props)
