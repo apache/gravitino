@@ -270,7 +270,7 @@ public class TestHTTPClient {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof Item)) {
         return false;
       }
       Item item = (Item) o;

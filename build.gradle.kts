@@ -295,7 +295,8 @@ subprojects {
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
         "VarTypeName",
-        "XorPower"
+        "XorPower",
+        "EqualsGetClass"
       )
     }
   }
