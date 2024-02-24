@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,7 +125,33 @@ public abstract class BaseContainer implements AutoCloseable {
     container.start();
   }
 
-  protected abstract boolean checkContainerStatus(int retryLimit);
+  protected abstract boolean checkContainerStatus(int timeoutMillis);
+
+  protected boolean checkContainerStatusWithRetry(int timeoutMillis, BooleanSupplier... checker) {
+    int nRetry = 0;
+    int sleepTimeMillis = 5_000;
+    int totalSleepTimeMillis = 0;
+
+    // retry until timeout
+    for (BooleanSupplier check : checker) {
+      while (totalSleepTimeMillis < timeoutMillis) {
+        if (check.getAsBoolean()) {
+          break;
+        }
+
+        sleepTimeMillis = sleepTimeMillis * (int) Math.pow(2, nRetry++);
+        sleepTimeMillis = Math.min(sleepTimeMillis, timeoutMillis - totalSleepTimeMillis);
+        LOG.info("retrying after {}ms (retry count: {})", sleepTimeMillis, nRetry);
+        try {
+          Thread.sleep(sleepTimeMillis);
+        } catch (InterruptedException e) {
+          // ignore
+        }
+        totalSleepTimeMillis += sleepTimeMillis;
+      }
+    }
+    return totalSleepTimeMillis < timeoutMillis;
+  }
 
   // Execute the command in the container.
   public Container.ExecResult executeInContainer(String... commandAndArgs) {

@@ -61,28 +61,12 @@ public class TrinoContainer extends BaseContainer {
     super.start();
 
     Preconditions.check("Initialization Trino JDBC connect failed!", initTrinoJdbcConnection());
-    Preconditions.check("Trino container startup failed!", checkContainerStatus(5));
+    Preconditions.check("Trino container startup failed!", checkContainerStatus(60_000));
   }
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isTrinoJdbcConnectionReady = false;
-    int sleepTime = 5000;
-    while (nRetry++ < retryLimit && !isTrinoJdbcConnectionReady) {
-      isTrinoJdbcConnectionReady = testTrinoJdbcConnection();
-      if (isTrinoJdbcConnectionReady) {
-        break;
-      } else {
-        try {
-          Thread.sleep(sleepTime);
-          LOG.warn("Waiting for trino server to be ready... ({}ms)", nRetry * sleepTime);
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      }
-    }
-    return isTrinoJdbcConnectionReady;
+    return checkContainerStatusWithRetry(retryLimit, this::testTrinoJdbcConnection);
   }
 
   @Override
@@ -150,6 +134,7 @@ public class TrinoContainer extends BaseContainer {
       return false;
     }
 
+    LOG.info("Trino JDBC connection test success!");
     return true;
   }
 
