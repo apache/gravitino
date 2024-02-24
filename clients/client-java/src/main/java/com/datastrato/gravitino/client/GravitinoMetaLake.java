@@ -39,6 +39,8 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetaLake.class);
 
+  private static final String METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
+
   private final RESTClient restClient;
 
   GravitinoMetaLake(
@@ -86,7 +88,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
 
     CatalogResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs/%s", ident.namespace().level(0), ident.name()),
+            String.format(METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -156,7 +158,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
 
     CatalogResponse resp =
         restClient.put(
-            String.format("api/metalakes/%s/catalogs/%s", ident.namespace().level(0), ident.name()),
+            String.format(METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
             updatesRequest,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -180,7 +182,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
       DropResponse resp =
           restClient.delete(
               String.format(
-                  "api/metalakes/%s/catalogs/%s", ident.namespace().level(0), ident.name()),
+                      METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.catalogErrorHandler());
