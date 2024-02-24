@@ -46,7 +46,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String BACK_QUOTE = "`";
   public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
-  private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN =
+  private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Mysql does not support nested column names.";
 
   @Override
@@ -393,7 +393,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       TableChange.UpdateColumnComment updateColumnComment, JdbcTable jdbcTable) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -416,7 +416,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = addColumn.fieldName()[0];
 
@@ -459,7 +459,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String renameColumnFieldDefinition(
       TableChange.RenameColumn renameColumn, JdbcTable jdbcTable) {
     if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
 
     String oldColumnName = renameColumn.fieldName()[0];
@@ -490,7 +490,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, JdbcTable jdbcTable) {
     if (updateColumnPosition.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -514,7 +514,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable jdbcTable) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists = true;
@@ -536,7 +536,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN);
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);

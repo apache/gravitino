@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 /** Operations for interacting with the Jdbc catalog in Gravitino. */
 public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
-  private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST =
+  private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
       "The gravitino id attribute does not exist in properties";
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcCatalogOperations.class);
@@ -174,7 +174,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     StringIdentifier identifier =
         Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST);
+            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     String notAllowedKey =
         properties.keySet().stream()
             .filter(s -> !StringUtils.equals(s, StringIdentifier.ID_KEY))
@@ -379,7 +379,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     StringIdentifier identifier =
         Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST);
+            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     // The properties we write to the database do not require the id field, so it needs to be
     // removed.
     HashMap<String, String> resultProperties =

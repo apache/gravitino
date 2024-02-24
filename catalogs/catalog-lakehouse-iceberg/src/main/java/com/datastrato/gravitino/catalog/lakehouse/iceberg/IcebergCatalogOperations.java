@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
 /** Operations for interacting with the Iceberg catalog in Gravitino. */
 public class IcebergCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
-  private static final String ICEBERG_TABLE_DOES_NOT_EXIST = "Iceberg table does not exist: %s";
+  private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
@@ -356,7 +356,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       LOG.info("Loaded Iceberg table {}", tableIdent.name());
       return icebergTable;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST, tableIdent.name());
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
@@ -404,7 +404,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST, tableIdent.name());
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
@@ -430,7 +430,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       icebergTableOps.renameTable(renameTableRequest);
       return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST, tableIdent.name());
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
