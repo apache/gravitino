@@ -181,8 +181,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
     try {
       DropResponse resp =
           restClient.delete(
-              String.format(
-                      METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+              String.format(METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.catalogErrorHandler());
