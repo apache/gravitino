@@ -46,7 +46,8 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
   private final RESTClient restClient;
 
-  private static final String METALAKES_PATH = "api/metalakes/";
+  private static final String API_METALAKES_LIST_PATH = "api/metalakes";
+  private static final String API_METALAKES_IDENTIFIER_PATH = "api/metalakes/";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -71,7 +72,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   public GravitinoMetaLake[] listMetalakes() {
     MetalakeListResponse resp =
         restClient.get(
-            "api/metalakes",
+            API_METALAKES_LIST_PATH,
             MetalakeListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -95,7 +96,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.get(
-            METALAKES_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + ident.name(),
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -125,7 +126,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.post(
-            "api/metalakes",
+            API_METALAKES_LIST_PATH,
             req,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -158,7 +159,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.put(
-            METALAKES_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + ident.name(),
             updatesRequest,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -181,7 +182,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     try {
       DropResponse resp =
           restClient.delete(
-              METALAKES_PATH + ident.name(),
+              API_METALAKES_IDENTIFIER_PATH + ident.name(),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.metalakeErrorHandler());
