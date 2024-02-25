@@ -9,7 +9,15 @@ import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIME;
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIMESTAMP;
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARCHAR;
-import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.*;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.BIGINT;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.BINARY;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.CHAR;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DECIMAL;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DOUBLE;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.FLOAT;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.INT;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.TINYINT;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.INT_UNSIGNED;
 
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
