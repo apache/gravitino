@@ -75,8 +75,8 @@ public class TestPOConverters {
 
   @Test
   public void testInitMetalakePOVersion() throws JsonProcessingException {
-    MetalakePO metalakePO = createMetalakePO(1L, "test", "this is test");
-    MetalakePO initPO = POConverters.initializeMetalakePOVersion(metalakePO);
+    BaseMetalake metalakePO = createMetalake(1L, "test", "this is test");
+    MetalakePO initPO = POConverters.initializeMetalakePOWithVersion(metalakePO);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -84,12 +84,14 @@ public class TestPOConverters {
 
   @Test
   public void testUpdateMetalakePOVersion() throws JsonProcessingException {
-    MetalakePO metalakePO = createMetalakePO(1L, "test", "this is test");
-    MetalakePO initPO = POConverters.initializeMetalakePOVersion(metalakePO);
-    MetalakePO updatePO = POConverters.updateMetalakePOVersion(initPO, initPO);
+    BaseMetalake metalake = createMetalake(1L, "test", "this is test");
+    BaseMetalake updatedMetalake = createMetalake(1L, "test", "this is test2");
+    MetalakePO initPO = POConverters.initializeMetalakePOWithVersion(metalake);
+    MetalakePO updatePO = POConverters.updateMetalakePOWithVersion(initPO, updatedMetalake);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertEquals("this is test2", updatePO.getMetalakeComment());
   }
 
   @Test

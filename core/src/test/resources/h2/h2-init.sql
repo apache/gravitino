@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'metalake last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 NULL COMMENT 'metalake deleted at',
     PRIMARY KEY (metalake_id),
-    CONSTRAINT uk_mn UNIQUE (metalake_name)
+    CONSTRAINT uk_mn_del UNIQUE (metalake_name, deleted_at)
 ) ENGINE = InnoDB;

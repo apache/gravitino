@@ -11,6 +11,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,7 +27,8 @@ public class POConverters {
    * @param baseMetalake BaseMetalake object
    * @return MetalakePO object from BaseMetalake object
    */
-  public static MetalakePO toMetalakePO(BaseMetalake baseMetalake) {
+  @VisibleForTesting
+  static MetalakePO toMetalakePO(BaseMetalake baseMetalake) {
     try {
       return new MetalakePO.Builder()
           .withMetalakeId(baseMetalake.id())
@@ -43,12 +45,13 @@ public class POConverters {
   }
 
   /**
-   * Initialize MetalakePO version
+   * Initialize MetalakePO
    *
-   * @param metalakePO MetalakePO object
+   * @param baseMetalake BaseMetalake object
    * @return MetalakePO object with version initialized
    */
-  public static MetalakePO initializeMetalakePOVersion(MetalakePO metalakePO) {
+  public static MetalakePO initializeMetalakePOWithVersion(BaseMetalake baseMetalake) {
+    MetalakePO metalakePO = toMetalakePO(baseMetalake);
     return new MetalakePO.Builder()
         .withMetalakeId(metalakePO.getMetalakeId())
         .withMetalakeName(metalakePO.getMetalakeName())
@@ -66,11 +69,12 @@ public class POConverters {
    * Update MetalakePO version
    *
    * @param oldMetalakePO the old MetalakePO object
-   * @param newMetalakePO the new MetalakePO object
+   * @param newMetalake the new BaseMetalake object
    * @return MetalakePO object with updated version
    */
-  public static MetalakePO updateMetalakePOVersion(
-      MetalakePO oldMetalakePO, MetalakePO newMetalakePO) {
+  public static MetalakePO updateMetalakePOWithVersion(
+      MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
+    MetalakePO newMetalakePO = toMetalakePO(newMetalake);
     Long lastVersion = oldMetalakePO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;

@@ -2,8 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.exceptions;
+package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
