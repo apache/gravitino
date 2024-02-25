@@ -175,14 +175,18 @@ openApiGenerate {
   packageName.set("com.datastrato.gravitino.client")
   cleanupOutput.set(true)
 
-  globalProperties.set(mapOf(
-          "apis" to "false",
-          "models" to "Audit,Catalog,Metalake,Version"
-  ))
+  globalProperties.set(
+    mapOf(
+      "apis" to "false",
+      "models" to "Audit,Catalog,Metalake,Version"
+    )
+  )
 
-  configOptions.set(mapOf(
-          "generateSourceCodeOnly" to "true"
-  ))
+  configOptions.set(
+    mapOf(
+      "generateSourceCodeOnly" to "true"
+    )
+  )
 }
 
 subprojects {
