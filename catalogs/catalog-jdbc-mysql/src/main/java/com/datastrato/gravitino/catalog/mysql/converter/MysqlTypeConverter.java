@@ -14,6 +14,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
   static final String TINYINT = "tinyint";
   static final String SMALLINT = "smallint";
   static final String INT = "int";
+  static final String INT_UNSIGNED = "int unsigned";
   static final String BIGINT = "bigint";
   static final String FLOAT = "float";
   static final String DOUBLE = "double";
@@ -31,6 +32,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
         return Types.ShortType.get();
       case INT:
         return Types.IntegerType.get();
+      case INT_UNSIGNED:
       case BIGINT:
         return Types.LongType.get();
       case FLOAT:
