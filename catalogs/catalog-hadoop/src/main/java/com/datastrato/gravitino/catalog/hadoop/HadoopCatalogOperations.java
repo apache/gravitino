@@ -12,6 +12,7 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
@@ -511,7 +512,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private Map<String, String> addManagedFlagToProperties(Map<String, String> properties) {
     return ImmutableMap.<String, String>builder()
         .putAll(properties)
-        .put(HadoopSchemaPropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
+        .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
         .build();
   }
 
