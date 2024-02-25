@@ -25,6 +25,7 @@ public class DorisContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_DORIS_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-doris";
   public static final String USER_NAME = "root";
+  public static final String PASSWORD = "root";
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
 
@@ -53,6 +54,7 @@ public class DorisContainer extends BaseContainer {
   public void start() {
     super.start();
     Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
+    changePassword();
   }
 
   @Override
@@ -68,13 +70,10 @@ public class DorisContainer extends BaseContainer {
         Connection connection = DriverManager.getConnection(dorisMySQLUrl, USER_NAME, "");
 
         // execute `SHOW PROC '/backends';` to check if backends is ready
-        String query = "SHOW PROC '/backends'";
+        String query = "SHOW PROC '/backends';";
         Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery(query);
-        LOG.info("test " + resultSet.toString());
-        if (resultSet.getFetchSize() == 0) {
-          LOG.info("Doris be not exist");
-        } else {
+        while (resultSet.next()) {
           String alive = resultSet.getString("Alive");
           if (alive.equalsIgnoreCase("true")) {
             LOG.info("Doris container startup success!");
@@ -82,13 +81,33 @@ public class DorisContainer extends BaseContainer {
             break;
           }
         }
-        Thread.sleep(5000);
+
+        if (!isDorisContainerReady) {
+          LOG.info("Doris container is not ready yet!");
+          Thread.sleep(5000);
+        } else {
+          break;
+        }
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
       }
     }
 
     return isDorisContainerReady;
+  }
+
+  private void changePassword() {
+    try {
+      String dorisMySQLUrl = format("jdbc:mysql://%s:%d/", getContainerIpAddress(), FE_MYSQL_PORT);
+      Connection connection = DriverManager.getConnection(dorisMySQLUrl, USER_NAME, "");
+
+      // execute `SHOW PROC '/backends';` to check if backends is ready
+      String query = String.format("SET PASSWORD FOR '%s' = PASSWORD('%s');", USER_NAME, PASSWORD);
+      Statement statement = connection.createStatement();
+      statement.execute(query);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public static class Builder

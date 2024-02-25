@@ -28,11 +28,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -198,33 +195,7 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Table %s does not exist in %s.", tableName, connection.getCatalog());
     }
 
-    return Collections.unmodifiableMap(extractTablePropertiesFromSql(createTableSql));
-  }
-
-  @VisibleForTesting
-  static Map<String, String> extractTablePropertiesFromSql(String createTableSql) {
-    Map<String, String> properties = new HashMap<>();
-    String[] lines = createTableSql.split("\n");
-
-    boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s{0,}=\\s{0,}\"(.*)\",?";
-    final Pattern patternProperties = Pattern.compile(sProperties);
-
-    for (String line : lines) {
-      if (line.contains("PROPERTIES")) {
-        isProperties = true;
-      }
-
-      if (isProperties) {
-        final Matcher matcherProperties = patternProperties.matcher(line);
-        if (matcherProperties.find()) {
-          final String key = matcherProperties.group(1).trim();
-          String value = matcherProperties.group(2).trim();
-          properties.put(key, value);
-        }
-      }
-    }
-    return properties;
+    return Collections.unmodifiableMap(DorisUtils.extractPropertiesFromSql(createTableSql));
   }
 
   @Override

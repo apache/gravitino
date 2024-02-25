@@ -8,11 +8,13 @@ import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
@@ -63,8 +65,10 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
                 "Database %s could not be found in information_schema.SCHEMATA", databaseName);
           }
           String schemaName = resultSet.getString("SCHEMA_NAME");
+          Map<String, String> properties = getDatabaseProperties(connection, databaseName);
           return new JdbcSchema.Builder()
               .withName(schemaName)
+              .withProperties(properties)
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
         }
@@ -72,5 +76,29 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  protected Map<String, String> getDatabaseProperties(Connection connection, String databaseName)
+      throws SQLException {
+
+    String showCreateDatabaseSql = String.format("SHOW CREATE DATABASE `%s`", databaseName);
+
+    StringBuilder createDatabaseSb = new StringBuilder();
+    try (PreparedStatement statement = connection.prepareStatement(showCreateDatabaseSql)) {
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          createDatabaseSb.append(resultSet.getString("Create Database"));
+        }
+      }
+    }
+
+    String createDatabaseSql = createDatabaseSb.toString();
+
+    if (StringUtils.isEmpty(createDatabaseSql)) {
+      throw new NoSuchTableException(
+          "Database %s does not exist in %s.", databaseName, connection.getCatalog());
+    }
+
+    return Collections.unmodifiableMap(DorisUtils.extractPropertiesFromSql(createDatabaseSql));
   }
 }

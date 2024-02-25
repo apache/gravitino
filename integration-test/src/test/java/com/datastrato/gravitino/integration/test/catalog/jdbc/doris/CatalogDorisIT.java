@@ -39,10 +39,14 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogDorisIT extends AbstractIT {
+  public static final Logger LOG = LoggerFactory.getLogger(CatalogDorisIT.class);
+
   private static final String provider = "jdbc-doris";
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
@@ -57,12 +61,13 @@ public class CatalogDorisIT extends AbstractIT {
   public String alertTableName = "alert_table_name";
   public String table_comment = "table_comment";
 
+  // Doris doesn't support schema comment
   public String schema_comment = null;
-  public String MYSQL_COL_NAME1 = "mysql_col_name1";
-  public String MYSQL_COL_NAME2 = "mysql_col_name2";
-  public String MYSQL_COL_NAME3 = "mysql_col_name3";
-  public String MYSQL_COL_NAME4 = "mysql_col_name4";
-  public String MYSQL_COL_NAME5 = "mysql_col_name5";
+  public String DORIS_COL_NAME1 = "doris_col_name1";
+  public String DORIS_COL_NAME2 = "doris_col_name2";
+  public String DORIS_COL_NAME3 = "doris_col_name3";
+  public String DORIS_COL_NAME4 = "doris_col_name4";
+  public String DORIS_COL_NAME5 = "doris_col_name5";
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetaLake metalake;
@@ -76,7 +81,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
 
@@ -90,7 +95,7 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    //    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(NameIdentifier.of(metalakeName));
   }
 
   @AfterEach
@@ -100,14 +105,12 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    //    NameIdentifier[] nameIdentifiers =
-    //        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName,
-    // schemaName));
-    //    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-    //      catalog.asTableCatalog().dropTable(nameIdentifier);
-    //    }
-    //    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName),
-    // false);
+    NameIdentifier[] nameIdentifiers =
+        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      catalog.asTableCatalog().dropTable(nameIdentifier);
+    }
+    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
   private void createMetalake() {
@@ -135,13 +138,14 @@ public class CatalogDorisIT extends AbstractIT {
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
     catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), DorisContainer.USER_NAME);
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), DorisContainer.PASSWORD);
 
     Catalog createdCatalog =
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
             provider,
-            "comment",
+            "doris catalog comment",
             catalogProperties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals(createdCatalog, loadCatalog);
@@ -151,30 +155,34 @@ public class CatalogDorisIT extends AbstractIT {
 
   private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    String propKey = "key";
+    String propValue = "value";
     Map<String, String> prop = Maps.newHashMap();
+    prop.put(propKey, propValue);
 
     Schema createdSchema = catalog.asSchemas().createSchema(ident, schema_comment, prop);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
-    prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
+
+    Assertions.assertEquals(createdSchema.properties().get(propKey), propValue);
   }
 
   private ColumnDTO[] createColumns() {
     ColumnDTO col1 =
         new ColumnDTO.Builder()
-            .withName(MYSQL_COL_NAME1)
+            .withName(DORIS_COL_NAME1)
             .withDataType(Types.IntegerType.get())
             .withComment("col_1_comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
-            .withName(MYSQL_COL_NAME2)
+            .withName(DORIS_COL_NAME2)
             .withDataType(Types.DateType.get())
             .withComment("col_2_comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
-            .withName(MYSQL_COL_NAME3)
+            .withName(DORIS_COL_NAME3)
             .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
             .build();
