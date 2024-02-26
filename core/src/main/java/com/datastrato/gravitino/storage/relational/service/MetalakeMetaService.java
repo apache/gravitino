@@ -9,8 +9,12 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -38,12 +42,12 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
-  public BaseMetalake getMetalakeByIdent(NameIdentifier ident) {
+  public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (metalakePO == null) {
-      throw new NoSuchEntityException("No such entity: %s", ident.toString());
+      throw new NoSuchEntityException("No such an entity: %s", ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
   }
@@ -82,7 +86,7 @@ public class MetalakeMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (oldMetalakePO == null) {
-      throw new NoSuchEntityException("No such entity: %s", ident.toString());
+      throw new NoSuchEntityException("No such an entity: %s", ident.toString());
     }
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
@@ -107,25 +111,36 @@ public class MetalakeMetaService {
   }
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
-    Long metalakeId =
+    MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));
-    if (metalakeId != null) {
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+    if (metalakePO != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
             () ->
                 SessionUtils.doWithoutCommit(
                     MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+                    mapper ->
+                        mapper.softDeleteMetalakeMetaByMetalakeId(metalakePO.getMetalakeId())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    CatalogMetaMapper.class,
+                    mapper ->
+                        mapper.softDeleteCatalogMetasByMetalakeId(metalakePO.getMetalakeId())),
             () -> {
               // TODO We will cascade delete the metadata of sub-resources under the metalake
             });
       } else {
-        // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
-        //  deletion is not allowed.
+        List<CatalogEntity> catalogEntities =
+            CatalogMetaService.getInstance()
+                .listCatalogsByNamespace(Namespace.ofCatalog(metalakePO.getMetalakeName()));
+        if (!catalogEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", ident);
+        }
         SessionUtils.doWithCommit(
             MetalakeMetaMapper.class,
-            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId));
+            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakePO.getMetalakeId()));
       }
     }
     return true;

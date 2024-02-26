@@ -137,22 +137,75 @@ public class POConverters {
    * @param metalakeId Metalake id to be associated with the catalog
    * @return CatalogPO object from CatalogEntity object
    */
-  public static CatalogPO toCatalogPO(CatalogEntity catalogEntity, Long metalakeId) {
+  @VisibleForTesting
+  static CatalogPO toCatalogPO(CatalogEntity catalogEntity, Long metalakeId) {
     try {
       return new CatalogPO.Builder()
-          .withId(catalogEntity.id())
+          .withCatalogId(catalogEntity.id())
           .withCatalogName(catalogEntity.name())
           .withMetalakeId(metalakeId)
-          .withType(catalogEntity.type().name())
+          .withType(catalogEntity.getType().name())
           .withProvider(catalogEntity.getProvider())
           .withCatalogComment(catalogEntity.getComment())
           .withProperties(
-              JsonUtils.objectMapper().writeValueAsString(catalogEntity.getProperties()))
-          .withAuditInfo(JsonUtils.objectMapper().writeValueAsString(catalogEntity.auditInfo()))
+              JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.getProperties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.auditInfo()))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Initialize CatalogPO
+   *
+   * @param catalogEntity CatalogEntity object
+   * @return CatalogPO object with version initialized
+   */
+  public static CatalogPO initializeCatalogPOWithVersion(
+      CatalogEntity catalogEntity, Long metalakeId) {
+    CatalogPO catalogPO = toCatalogPO(catalogEntity, metalakeId);
+    return new CatalogPO.Builder()
+        .withCatalogId(catalogPO.getCatalogId())
+        .withCatalogName(catalogPO.getCatalogName())
+        .withMetalakeId(metalakeId)
+        .withType(catalogPO.getType())
+        .withProvider(catalogPO.getProvider())
+        .withCatalogComment(catalogPO.getCatalogComment())
+        .withProperties(catalogPO.getProperties())
+        .withAuditInfo(catalogPO.getAuditInfo())
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  /**
+   * Update CatalogPO version
+   *
+   * @param oldCatalogPO the old CatalogPO object
+   * @param newCatalog the new CatalogEntity object
+   * @return CatalogPO object with updated version
+   */
+  public static CatalogPO updateCatalogPOWithVersion(
+      CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
+    CatalogPO newCatalogPO = toCatalogPO(newCatalog, metalakeId);
+    Long lastVersion = oldCatalogPO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    return new CatalogPO.Builder()
+        .withCatalogId(newCatalogPO.getCatalogId())
+        .withCatalogName(newCatalogPO.getCatalogName())
+        .withMetalakeId(metalakeId)
+        .withType(newCatalogPO.getType())
+        .withProvider(newCatalogPO.getProvider())
+        .withCatalogComment(newCatalogPO.getCatalogComment())
+        .withProperties(newCatalogPO.getProperties())
+        .withAuditInfo(newCatalogPO.getAuditInfo())
+        .withCurrentVersion(nextVersion)
+        .withLastVersion(nextVersion)
+        .withDeletedAt(0L)
+        .build();
   }
 
   /**
@@ -165,15 +218,16 @@ public class POConverters {
   public static CatalogEntity fromCatalogPO(CatalogPO catalogPO, Namespace namespace) {
     try {
       return CatalogEntity.builder()
-          .withId(catalogPO.getId())
+          .withId(catalogPO.getCatalogId())
           .withName(catalogPO.getCatalogName())
           .withNamespace(namespace)
           .withType(Catalog.Type.valueOf(catalogPO.getType()))
           .withProvider(catalogPO.getProvider())
           .withComment(catalogPO.getCatalogComment())
-          .withProperties(JsonUtils.objectMapper().readValue(catalogPO.getProperties(), Map.class))
+          .withProperties(
+              JsonUtils.anyFieldMapper().readValue(catalogPO.getProperties(), Map.class))
           .withAuditInfo(
-              JsonUtils.objectMapper().readValue(catalogPO.getAuditInfo(), AuditInfo.class))
+              JsonUtils.anyFieldMapper().readValue(catalogPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);

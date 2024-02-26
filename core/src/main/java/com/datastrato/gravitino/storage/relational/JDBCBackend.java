@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
@@ -15,6 +16,8 @@ import com.datastrato.gravitino.UnsupportedEntityTypeException;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.IOException;
@@ -41,6 +44,8 @@ public class JDBCBackend implements RelationalBackend {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
+      case CATALOG:
+        return (List<E>) CatalogMetaService.getInstance().listCatalogsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -62,6 +67,8 @@ public class JDBCBackend implements RelationalBackend {
       throws EntityAlreadyExistsException {
     if (e instanceof BaseMetalake) {
       MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
+    } else if (e instanceof CatalogEntity) {
+      CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -75,6 +82,8 @@ public class JDBCBackend implements RelationalBackend {
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
+      case CATALOG:
+        return (E) CatalogMetaService.getInstance().updateCatalog(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -86,7 +95,9 @@ public class JDBCBackend implements RelationalBackend {
       NameIdentifier ident, Entity.EntityType entityType) throws NoSuchEntityException {
     switch (entityType) {
       case METALAKE:
-        return (E) MetalakeMetaService.getInstance().getMetalakeByIdent(ident);
+        return (E) MetalakeMetaService.getInstance().getMetalakeByIdentifier(ident);
+      case CATALOG:
+        return (E) CatalogMetaService.getInstance().getCatalogByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -98,6 +109,8 @@ public class JDBCBackend implements RelationalBackend {
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
+      case CATALOG:
+        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

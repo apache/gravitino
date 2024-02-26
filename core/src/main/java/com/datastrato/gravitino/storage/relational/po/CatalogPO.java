@@ -5,11 +5,10 @@
 
 package com.datastrato.gravitino.storage.relational.po;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Objects;
 
 public class CatalogPO {
-  private Long id;
+  private Long catalogId;
   private String catalogName;
   private Long metalakeId;
   private String type;
@@ -17,69 +16,52 @@ public class CatalogPO {
   private String catalogComment;
   private String properties;
   private String auditInfo;
+  private Long currentVersion;
+  private Long lastVersion;
+  private Long deletedAt;
 
-  public Long getId() {
-    return id;
-  }
-
-  public void setId(Long id) {
-    this.id = id;
+  public Long getCatalogId() {
+    return catalogId;
   }
 
   public String getCatalogName() {
     return catalogName;
   }
 
-  public void setCatalogName(String catalogName) {
-    this.catalogName = catalogName;
-  }
-
   public Long getMetalakeId() {
     return metalakeId;
-  }
-
-  public void setMetalakeId(Long metalakeId) {
-    this.metalakeId = metalakeId;
   }
 
   public String getType() {
     return type;
   }
 
-  public void setType(String type) {
-    this.type = type;
-  }
-
   public String getProvider() {
     return provider;
-  }
-
-  public void setProvider(String provider) {
-    this.provider = provider;
   }
 
   public String getCatalogComment() {
     return catalogComment;
   }
 
-  public void setCatalogComment(String catalogComment) {
-    this.catalogComment = catalogComment;
-  }
-
   public String getProperties() {
     return properties;
-  }
-
-  public void setProperties(String properties) {
-    this.properties = properties;
   }
 
   public String getAuditInfo() {
     return auditInfo;
   }
 
-  public void setAuditInfo(String auditInfo) {
-    this.auditInfo = auditInfo;
+  public Long getCurrentVersion() {
+    return currentVersion;
+  }
+
+  public Long getLastVersion() {
+    return lastVersion;
+  }
+
+  public Long getDeletedAt() {
+    return deletedAt;
   }
 
   @Override
@@ -91,27 +73,33 @@ public class CatalogPO {
       return false;
     }
     CatalogPO catalogPO = (CatalogPO) o;
-    return Objects.equal(getId(), catalogPO.getId())
+    return Objects.equal(getCatalogId(), catalogPO.getCatalogId())
         && Objects.equal(getCatalogName(), catalogPO.getCatalogName())
         && Objects.equal(getMetalakeId(), catalogPO.getMetalakeId())
         && Objects.equal(getType(), catalogPO.getType())
         && Objects.equal(getProvider(), catalogPO.getProvider())
         && Objects.equal(getCatalogComment(), catalogPO.getCatalogComment())
         && Objects.equal(getProperties(), catalogPO.getProperties())
-        && Objects.equal(getAuditInfo(), catalogPO.getAuditInfo());
+        && Objects.equal(getAuditInfo(), catalogPO.getAuditInfo())
+        && Objects.equal(getCurrentVersion(), catalogPO.getCurrentVersion())
+        && Objects.equal(getLastVersion(), catalogPO.getLastVersion())
+        && Objects.equal(getDeletedAt(), catalogPO.getDeletedAt());
   }
 
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getId(),
+        getCatalogId(),
         getCatalogName(),
         getMetalakeId(),
         getType(),
         getProvider(),
         getCatalogComment(),
         getProperties(),
-        getAuditInfo());
+        getAuditInfo(),
+        getCurrentVersion(),
+        getLastVersion(),
+        getDeletedAt());
   }
 
   public static class Builder {
@@ -121,8 +109,8 @@ public class CatalogPO {
       metalakePO = new CatalogPO();
     }
 
-    public CatalogPO.Builder withId(Long id) {
-      metalakePO.id = id;
+    public CatalogPO.Builder withCatalogId(Long catalogId) {
+      metalakePO.catalogId = catalogId;
       return this;
     }
 
@@ -151,13 +139,28 @@ public class CatalogPO {
       return this;
     }
 
-    public CatalogPO.Builder withProperties(String properties) throws JsonProcessingException {
+    public CatalogPO.Builder withProperties(String properties) {
       metalakePO.properties = properties;
       return this;
     }
 
-    public CatalogPO.Builder withAuditInfo(String auditInfo) throws JsonProcessingException {
+    public CatalogPO.Builder withAuditInfo(String auditInfo) {
       metalakePO.auditInfo = auditInfo;
+      return this;
+    }
+
+    public CatalogPO.Builder withCurrentVersion(Long currentVersion) {
+      metalakePO.currentVersion = currentVersion;
+      return this;
+    }
+
+    public CatalogPO.Builder withLastVersion(Long lastVersion) {
+      metalakePO.lastVersion = lastVersion;
+      return this;
+    }
+
+    public CatalogPO.Builder withDeletedAt(Long deletedAt) {
+      metalakePO.deletedAt = deletedAt;
       return this;
     }
 
