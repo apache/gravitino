@@ -63,7 +63,7 @@ public class RangePartitionDTO implements PartitionDTO, RangePartition {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof RangePartitionDTO)) {
       return false;
     }
     RangePartitionDTO that = (RangePartitionDTO) o;

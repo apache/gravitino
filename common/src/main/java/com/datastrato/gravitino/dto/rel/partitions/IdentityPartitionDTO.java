@@ -131,7 +131,7 @@ public class IdentityPartitionDTO implements PartitionDTO, IdentityPartition {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof IdentityPartitionDTO)) {
       return false;
     }
     IdentityPartitionDTO that = (IdentityPartitionDTO) o;
