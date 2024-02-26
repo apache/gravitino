@@ -12,6 +12,7 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
@@ -52,6 +53,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
+
+  private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
+  private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
@@ -107,7 +111,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
       if (!store.exists(schemaIdent, Entity.EntityType.SCHEMA)) {
-        throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
+        throw new NoSuchSchemaException(SCHEMA_DOES_NOT_EXIST_MSG, schemaIdent);
       }
 
       List<FilesetEntity> filesets =
@@ -136,7 +140,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           .build();
 
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchFilesetException(exception, "Fileset %s does not exist", ident);
+      throw new NoSuchFilesetException(exception, FILESET_DOES_NOT_EXIST_MSG, ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
     }
@@ -163,7 +167,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       schemaEntity = store.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException(exception, "Schema %s does not exist", schemaIdent);
+      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, schemaIdent);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load schema " + schemaIdent, ioe);
     }
@@ -189,7 +193,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         StringUtils.isNotBlank(storageLocation)
             ? new Path(storageLocation)
             : new Path(schemaPath, ident.name());
+
     try {
+      // formalize the path to avoid path without scheme, uri, authority, etc.
+      filesetPath = formalizePath(filesetPath, hadoopConf);
       FileSystem fs = filesetPath.getFileSystem(hadoopConf);
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
@@ -250,7 +257,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchFilesetException, IllegalArgumentException {
     try {
       if (!store.exists(ident, Entity.EntityType.FILESET)) {
-        throw new NoSuchFilesetException("Fileset %s does not exist", ident);
+        throw new NoSuchFilesetException(FILESET_DOES_NOT_EXIST_MSG, ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
@@ -276,7 +283,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to update fileset " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
-      throw new NoSuchFilesetException(nsee, "Fileset %s does not exist", ident);
+      throw new NoSuchFilesetException(nsee, FILESET_DOES_NOT_EXIST_MSG, ident);
     } catch (AlreadyExistsException aee) {
       // This is happened when renaming a fileset to an existing fileset name.
       throw new RuntimeException(
@@ -402,7 +409,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           .build();
 
     } catch (NoSuchEntityException exception) {
-      throw new NoSuchSchemaException(exception, "Schema %s does not exist", ident);
+      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load schema " + ident, ioe);
     }
@@ -413,7 +420,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchSchemaException {
     try {
       if (!store.exists(ident, Entity.EntityType.SCHEMA)) {
-        throw new NoSuchSchemaException("Schema %s does not exist", ident);
+        throw new NoSuchSchemaException(SCHEMA_DOES_NOT_EXIST_MSG, ident);
       }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
@@ -437,7 +444,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to update schema " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
-      throw new NoSuchSchemaException(nsee, "Schema %s does not exist", ident);
+      throw new NoSuchSchemaException(nsee, SCHEMA_DOES_NOT_EXIST_MSG, ident);
     } catch (AlreadyExistsException aee) {
       throw new RuntimeException(
           "Schema with the same name "
@@ -508,7 +515,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private Map<String, String> addManagedFlagToProperties(Map<String, String> properties) {
     return ImmutableMap.<String, String>builder()
         .putAll(properties)
-        .put(HadoopSchemaPropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
+        .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
         .build();
   }
 
@@ -555,6 +562,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             ? Maps.newHashMap()
             : Maps.newHashMap(filesetEntity.properties());
     String newName = ident.name();
+    String newComment = filesetEntity.comment();
 
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
@@ -565,6 +573,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         props.remove(removeProperty.getProperty());
       } else if (change instanceof FilesetChange.RenameFileset) {
         newName = ((FilesetChange.RenameFileset) change).getNewName();
+      } else if (change instanceof FilesetChange.UpdateFilesetComment) {
+        newComment = ((FilesetChange.UpdateFilesetComment) change).getNewComment();
       } else {
         throw new IllegalArgumentException(
             "Unsupported fileset change: " + change.getClass().getSimpleName());
@@ -575,7 +585,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withName(newName)
         .withNamespace(ident.namespace())
         .withId(filesetEntity.id())
-        .withComment(filesetEntity.comment())
+        .withComment(newComment)
         .withFilesetType(filesetEntity.filesetType())
         .withStorageLocation(filesetEntity.storageLocation())
         .withProperties(props)
@@ -598,5 +608,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return Optional.ofNullable(schemaLocation)
         .map(Path::new)
         .orElse(catalogStorageLocation.map(p -> new Path(p, name)).orElse(null));
+  }
+
+  @VisibleForTesting
+  static Path formalizePath(Path path, Configuration configuration) throws IOException {
+    FileSystem defaultFs = FileSystem.get(configuration);
+    return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
 }

@@ -9,6 +9,8 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.types.Types.ByteType;
+import com.datastrato.gravitino.rel.types.Types.ShortType;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -81,23 +83,19 @@ public class TestConvertUtil extends TestBaseConvert {
 
   @Test
   public void testToPrimitiveType() {
+    ByteType byteType = ByteType.get();
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ConvertUtil.toIcebergType(
-                    true, com.datastrato.gravitino.rel.types.Types.ByteType.get()));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, byteType));
     Assertions.assertTrue(
         exception
             .getMessage()
             .contains("Iceberg do not support Byte and Short Type, use Integer instead"));
 
+    ShortType shortType = ShortType.get();
     exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ConvertUtil.toIcebergType(
-                    true, com.datastrato.gravitino.rel.types.Types.ShortType.get()));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, shortType));
     Assertions.assertTrue(
         exception
             .getMessage()

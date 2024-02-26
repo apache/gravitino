@@ -37,6 +37,21 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
+  void testStoragePath() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/a/b");
+    RocksDBKvBackend kvBackend = new RocksDBKvBackend();
+    String path = kvBackend.getStoragePath(config);
+    Assertions.assertEquals("/a/b", path);
+
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("");
+    kvBackend = new RocksDBKvBackend();
+    path = kvBackend.getStoragePath(config);
+    // We haven't set the GRAVITINO_HOME
+    Assertions.assertEquals("null/data/rocksdb", path);
+  }
+
+  @Test
   void testPutAndGet() throws IOException, RocksDBException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
@@ -107,7 +122,7 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  void testDeleteRange() throws IOException, RocksDBException {
+  void testDeleteRange() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
@@ -147,7 +162,55 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  KvBackend testScan() throws IOException, RocksDBException {
+  void testScanWithBrokenRocksDB() throws IOException {
+    KvBackend kvBackend = getKvBackEnd();
+    kvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abd".getBytes(StandardCharsets.UTF_8), "abd".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        false);
+    kvBackend.put(
+        "abeee".getBytes(StandardCharsets.UTF_8), "abeee".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acc".getBytes(StandardCharsets.UTF_8), "acc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acca".getBytes(StandardCharsets.UTF_8), "acca".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accb".getBytes(StandardCharsets.UTF_8), "accb".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accg".getBytes(StandardCharsets.UTF_8), "accg".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acf".getBytes(StandardCharsets.UTF_8), "acf".getBytes(StandardCharsets.UTF_8), false);
+
+    // More test case please refer to TestTransactionalKvBackend
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
+            .start("ab".getBytes(StandardCharsets.UTF_8))
+            .end("ac".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(false)
+            .endInclusive(false)
+            .build();
+
+    List<Pair<byte[], byte[]>> data = kvBackend.scan(kvRange);
+    Assertions.assertEquals(4, data.size());
+
+    RocksDBKvBackend rocksDBKvBackend = (RocksDBKvBackend) kvBackend;
+    RocksDB db = rocksDBKvBackend.getDb();
+    RocksDB spyDb = Mockito.spy(db);
+
+    Mockito.when(spyDb.newIterator()).thenThrow(new RuntimeException("Mock: RocksDB is broken"));
+    rocksDBKvBackend.setDb(spyDb);
+
+    Exception e =
+        Assertions.assertThrowsExactly(RuntimeException.class, () -> kvBackend.scan(kvRange));
+    Assertions.assertTrue(e.getMessage().contains("Mock: RocksDB is broken"));
+  }
+
+  @Test
+  void testScan() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
@@ -190,7 +253,6 @@ public class TestRocksDBKvBackend {
     kvBackend.put(
         "f".getBytes(StandardCharsets.UTF_8), "f".getBytes(StandardCharsets.UTF_8), false);
 
-    // More test case please refer to TestTransactionalKvBackend
     KvRange kvRange =
         new KvRange.KvRangeBuilder()
             .start("ab".getBytes(StandardCharsets.UTF_8))
@@ -205,13 +267,8 @@ public class TestRocksDBKvBackend {
     RocksDBKvBackend rocksDBKvBackend = (RocksDBKvBackend) kvBackend;
     RocksDB db = rocksDBKvBackend.getDb();
     RocksDB spyDb = Mockito.spy(db);
-    Mockito.doThrow(new RocksDBException("Mock: RocksDB is broken")).when(spyDb.newIterator());
-    rocksDBKvBackend.setDb(spyDb);
 
-    Exception e = Assertions.assertThrowsExactly(IOException.class, () -> kvBackend.scan(kvRange));
-    Assertions.assertTrue(e.getMessage().contains("Mock: RocksDB is broken"));
-
-    Mockito.doCallRealMethod().when(spyDb.newIterator());
-    return rocksDBKvBackend;
+    Mockito.when(spyDb.newIterator()).thenCallRealMethod();
+    Assertions.assertDoesNotThrow(() -> kvBackend.scan(kvRange));
   }
 }

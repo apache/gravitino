@@ -18,6 +18,7 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.datastrato.gravitino.integration.test.container.TrinoContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
@@ -1073,8 +1074,12 @@ public class TrinoConnectorIT extends AbstractIT {
     final String sql1 =
         String.format("drop schema \"%s.%s\".%s cascade", metalakeName, catalogName, schemaName);
     // Will fail because the iceberg catalog does not support cascade drop
+    TrinoContainer trinoContainer = containerSuite.getTrinoContainer();
     Assertions.assertThrows(
-        RuntimeException.class, () -> containerSuite.getTrinoContainer().executeUpdateSQL(sql1));
+        RuntimeException.class,
+        () -> {
+          trinoContainer.executeUpdateSQL(sql1);
+        });
 
     final String sql2 =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);

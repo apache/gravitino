@@ -133,12 +133,11 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     assertionsTableInfo(newName, tableComment, alterColumns, properties, indexes, load);
 
     // Detect unsupported properties
+    TableChange setProperty = TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC");
     GravitinoRuntimeException gravitinoRuntimeException =
         Assertions.assertThrows(
             GravitinoRuntimeException.class,
-            () ->
-                TABLE_OPERATIONS.alterTable(
-                    TEST_DB_NAME, newName, TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC")));
+            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, newName, setProperty));
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(), "Unknown storage engine 'ABC'"));
@@ -149,14 +148,11 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     assertionsTableInfo(newName, tableComment, columns, properties, indexes, load);
 
+    TableChange deleteColumn = TableChange.deleteColumn(new String[] {newColumn.name()}, false);
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                TABLE_OPERATIONS.alterTable(
-                    TEST_DB_NAME,
-                    newName,
-                    TableChange.deleteColumn(new String[] {newColumn.name()}, false)));
+            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, newName, deleteColumn));
     Assertions.assertEquals(
         "Delete column does not exist: " + newColumn.name(), illegalArgumentException.getMessage());
     Assertions.assertDoesNotThrow(
@@ -400,15 +396,12 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
 
     assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
 
+    TableChange updateColumn =
+        TableChange.updateColumnNullability(new String[] {col3.name()}, !col3.nullable());
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                TABLE_OPERATIONS.alterTable(
-                    TEST_DB_NAME,
-                    tableName,
-                    TableChange.updateColumnNullability(
-                        new String[] {col3.name()}, !col3.nullable())));
+            () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, updateColumn));
     Assertions.assertTrue(
         exception.getMessage().contains("with null default value cannot be changed to not null"));
   }
@@ -594,22 +587,27 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
       columns.add(
           new JdbcColumn.Builder().withName("col_1").withType(type).withNullable(false).build());
 
+      JdbcColumn[] jdbcCols = columns.toArray(new JdbcColumn[0]);
+      Map<String, String> emptyMap = Collections.emptyMap();
       IllegalArgumentException illegalArgumentException =
           Assertions.assertThrows(
               IllegalArgumentException.class,
-              () ->
-                  TABLE_OPERATIONS.create(
-                      TEST_DB_NAME,
-                      tableName,
-                      columns.toArray(new JdbcColumn[0]),
-                      tableComment,
-                      Collections.emptyMap(),
-                      null,
-                      Indexes.EMPTY_INDEXES));
+              () -> {
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    tableName,
+                    jdbcCols,
+                    tableComment,
+                    emptyMap,
+                    null,
+                    Indexes.EMPTY_INDEXES);
+              });
       Assertions.assertTrue(
           illegalArgumentException
               .getMessage()
-              .contains("Not a supported type: " + type.toString()));
+              .contains(
+                  String.format(
+                      "Couldn't convert Gravitino type %s to MySQL type", type.simpleString())));
     }
   }
 
@@ -796,20 +794,14 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
           .build()
     };
 
+    final Index[] primaryIndex =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 TABLE_OPERATIONS.create(
-                    TEST_DB_NAME,
-                    tableName,
-                    newColumns,
-                    comment,
-                    properties,
-                    null,
-                    new Index[] {
-                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})
-                    }));
+                    TEST_DB_NAME, tableName, newColumns, comment, properties, null, primaryIndex));
     Assertions.assertTrue(
         StringUtils.contains(
             exception.getMessage(),
