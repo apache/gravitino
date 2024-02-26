@@ -272,7 +272,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     FileSystemTestUtils.create(diffDeletePath, fs1);
     assertNotEquals(fs1, gravitinoFileSystem);
     assertThrows(
-        InvalidPathException.class, () -> gravitinoFileSystem.delete(diffDeletePath, true));
+        IllegalArgumentException.class, () -> gravitinoFileSystem.delete(diffDeletePath, true));
     fs1.delete(diffDeletePath, true);
 
     Path mockFilePath = new Path(hdfsPath.toString() + "/testDelete.txt");
