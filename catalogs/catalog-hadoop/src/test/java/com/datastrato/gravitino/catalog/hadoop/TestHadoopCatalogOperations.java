@@ -567,6 +567,29 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  @Test
+  public void testUpdateFilesetComment() throws IOException {
+    String schemaName = "schema26";
+    String comment = "comment26";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String name = "fileset26";
+    Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    FilesetChange change1 = FilesetChange.updateComment("comment26_new");
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(Maps.newHashMap());
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+      Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
+      Assertions.assertEquals(name, fileset1.name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+      Assertions.assertEquals("comment26_new", fileset1.comment());
+      Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
+    }
+  }
+
   private static Stream<Arguments> locationArguments() {
     return Stream.of(
         // Honor the catalog location
