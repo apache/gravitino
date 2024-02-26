@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.catalog.jdbc.doris;
 
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
@@ -12,6 +13,8 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
@@ -20,6 +23,14 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -191,88 +202,103 @@ public class CatalogDorisIT extends AbstractIT {
 
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(GRAVITINO_ENGINE_KEY, "InnoDB");
+    properties.put("replication_num", "1");
     return properties;
   }
 
+  private Distribution createDistribution() {
+    return Distributions.hash(32, NamedReference.field(DORIS_COL_NAME1));
+  }
+
   @Test
-  void testOperationDorisSchema() {
+  void testDorisSchemaOperation() {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
-    // list schema check.
+
+    // test list schemas
     NameIdentifier[] nameIdentifiers = schemas.listSchemas(namespace);
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
-    //    NameIdentifier[] mysqlNamespaces = mysqlService.listSchemas(namespace);
-    //    schemaNames =
-    //
-    // Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
-    //    Assertions.assertTrue(schemaNames.contains(schemaName));
-    //
-    //    // create schema check.
-    //    String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
-    //    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    //    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
-    //    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
-    //    Map<String, NameIdentifier> schemaMap =
-    //            Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v ->
-    // v));
-    //    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
-    //
-    //    mysqlNamespaces = mysqlService.listSchemas(namespace);
-    //    schemaNames =
-    //
-    // Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
-    //    Assertions.assertTrue(schemaNames.contains(testSchemaName));
-    //
-    //    Map<String, String> emptyMap = Collections.emptyMap();
-    //    Assertions.assertThrows(
-    //            SchemaAlreadyExistsException.class,
-    //            () -> {
-    //              schemas.createSchema(schemaIdent, schema_comment, emptyMap);
-    //            });
-    //
-    //    // drop schema check.
-    //    schemas.dropSchema(schemaIdent, false);
-    //    Assertions.assertThrows(NoSuchSchemaException.class, () ->
-    // schemas.loadSchema(schemaIdent));
-    //    Assertions.assertThrows(
-    //            NoSuchSchemaException.class, () -> mysqlService.loadSchema(schemaIdent));
-    //
-    //    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
-    //    schemaMap =
-    //            Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v ->
-    // v));
-    //    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    //    Assertions.assertFalse(
-    //            schemas.dropSchema(NameIdentifier.of(metalakeName, catalogName, "no-exits"),
-    // false));
-    //    TableCatalog tableCatalog = catalog.asTableCatalog();
-    //
-    //    // create failed check.
-    //    NameIdentifier table =
-    //            NameIdentifier.of(metalakeName, catalogName, testSchemaName, "test_table");
-    //    Assertions.assertThrows(
-    //            NoSuchSchemaException.class,
-    //            () ->
-    //                    tableCatalog.createTable(
-    //                            table,
-    //                            createColumns(),
-    //                            table_comment,
-    //                            createProperties(),
-    //                            null,
-    //                            Distributions.NONE,
-    //                            null));
-    //    // drop schema failed check.
-    //    Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
-    //    Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
-    //    Assertions.assertFalse(tableCatalog.dropTable(table));
-    //    mysqlNamespaces = mysqlService.listSchemas(Namespace.empty());
-    //    schemaNames =
-    //
-    // Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
-    //    Assertions.assertTrue(schemaNames.contains(schemaName));
+    // test create schema already exists
+    String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    Map<String, NameIdentifier> schemaMap =
+        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
+    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+
+    Assertions.assertThrows(
+        SchemaAlreadyExistsException.class,
+        () -> {
+          schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+        });
+
+    // test drop schema
+    Assertions.assertTrue(schemas.dropSchema(schemaIdent, false));
+
+    // check schema is deleted
+    // 1. check by load schema
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+
+    // 2. check by list schema
+    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    schemaMap =
+        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
+    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+
+    // test drop schema not exists
+    NameIdentifier notExistsSchemaIdent = NameIdentifier.of(metalakeName, catalogName, "no-exits");
+    Assertions.assertFalse(schemas.dropSchema(notExistsSchemaIdent, false));
+  }
+
+  @Test
+  void testDorisTableOperation() {
+    // create a table
+
+    NameIdentifier tableIdentifier =
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    ColumnDTO[] columns = createColumns();
+
+    Distribution distribution = createDistribution();
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+            tableCatalog.createTable(
+                    tableIdentifier,
+                    columns,
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    distribution,
+                    null);
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Map<String, String> resultProp = createdTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    // test load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(table_comment, loadTable.comment());
+    resultProp = loadTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], loadTable.columns()[i]);
+    }
   }
 }
