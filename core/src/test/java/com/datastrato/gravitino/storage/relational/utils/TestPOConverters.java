@@ -177,43 +177,6 @@ public class TestPOConverters {
     assertEquals("this is test2", updatePO.getCatalogComment());
   }
 
-  @Test
-  public void testToMetalakePO() throws JsonProcessingException {
-    BaseMetalake metalake = createMetalake(1L, "test", "this is test");
-
-    MetalakePO expectedMetalakePO = createMetalakePO(1L, "test", "this is test");
-
-    MetalakePO actualMetalakePO = POConverters.toMetalakePO(metalake);
-
-    // Assert
-    assertEquals(expectedMetalakePO.getMetalakeId(), actualMetalakePO.getMetalakeId());
-    assertEquals(expectedMetalakePO.getMetalakeName(), actualMetalakePO.getMetalakeName());
-    assertEquals(expectedMetalakePO.getMetalakeComment(), actualMetalakePO.getMetalakeComment());
-    assertEquals(expectedMetalakePO.getProperties(), actualMetalakePO.getProperties());
-    assertEquals(expectedMetalakePO.getAuditInfo(), actualMetalakePO.getAuditInfo());
-    assertEquals(expectedMetalakePO.getSchemaVersion(), actualMetalakePO.getSchemaVersion());
-  }
-
-  @Test
-  public void testToCatalogPO() throws JsonProcessingException {
-    CatalogEntity catalog =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
-
-    CatalogPO expectedCatalogPO = createCatalogPO(1L, "test", 1L, "this is test");
-
-    CatalogPO actualCatalogPO = POConverters.toCatalogPO(catalog, 1L);
-
-    // Assert
-    assertEquals(expectedCatalogPO.getCatalogId(), actualCatalogPO.getCatalogId());
-    assertEquals(expectedCatalogPO.getMetalakeId(), actualCatalogPO.getMetalakeId());
-    assertEquals(expectedCatalogPO.getCatalogName(), actualCatalogPO.getCatalogName());
-    assertEquals(expectedCatalogPO.getType(), actualCatalogPO.getType());
-    assertEquals(expectedCatalogPO.getProvider(), actualCatalogPO.getProvider());
-    assertEquals(expectedCatalogPO.getCatalogComment(), actualCatalogPO.getCatalogComment());
-    assertEquals(expectedCatalogPO.getProperties(), actualCatalogPO.getProperties());
-    assertEquals(expectedCatalogPO.getAuditInfo(), actualCatalogPO.getAuditInfo());
-  }
-
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();

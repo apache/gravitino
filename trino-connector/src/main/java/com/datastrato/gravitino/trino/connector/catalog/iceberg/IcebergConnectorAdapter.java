@@ -28,6 +28,7 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new IcebergCatalogPropertyConverter();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
@@ -42,6 +43,7 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     return config;
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new IcebergMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());

@@ -12,6 +12,14 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+/**
+ * A MyBatis Mapper for catalog meta operation SQLs.
+ *
+ * <p>This interface class is a specification defined by MyBatis. It requires this interface class
+ * to identify the corresponding SQLs for execution. We can write SQLs in an additional XML file, or
+ * write SQLs with annotations in this interface Mapper. See: <a
+ * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
+ */
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 

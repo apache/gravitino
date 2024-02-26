@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * The service class for catalog metadata. It provides the basic database operations for catalog.
+ */
 public class CatalogMetaService {
   private static final CatalogMetaService INSTANCE = new CatalogMetaService();
 
@@ -40,14 +43,16 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException("No such an entity: %s", identifier.namespace().toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, identifier.namespace().toString());
     }
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
             mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogPO == null) {
-      throw new NoSuchEntityException("No such entity: %s", identifier.toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, identifier.toString());
     }
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
@@ -59,7 +64,8 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException("No such an entity: %s", namespace.toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, namespace.toString());
     }
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
@@ -76,7 +82,7 @@ public class CatalogMetaService {
               mapper -> mapper.selectMetalakeIdMetaByName(catalogEntity.namespace().level(0)));
       if (metalakeId == null) {
         throw new NoSuchEntityException(
-            "No such an entity: %s", catalogEntity.namespace().toString());
+            NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, catalogEntity.namespace().toString());
       }
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
@@ -113,7 +119,8 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException("No such an entity: %s", identifier.namespace().toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
     CatalogPO oldCatalogPO =
@@ -121,7 +128,8 @@ public class CatalogMetaService {
             CatalogMetaMapper.class,
             mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
     if (oldCatalogPO == null) {
-      throw new NoSuchEntityException("No such an entity: %s", identifier.toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, identifier.toString());
     }
 
     CatalogEntity oldCatalogEntity =
@@ -156,7 +164,8 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException("No such an entity: %s", identifier.namespace().toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, identifier.namespace().toString());
     }
     Long catalogId =
         SessionUtils.getWithoutCommit(

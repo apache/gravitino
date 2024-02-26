@@ -15,7 +15,6 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,13 +25,12 @@ public class POConverters {
   private POConverters() {}
 
   /**
-   * Convert {@link BaseMetalake} to {@link MetalakePO}
+   * Initialize MetalakePO
    *
    * @param baseMetalake BaseMetalake object
-   * @return MetalakePO object from BaseMetalake object
+   * @return MetalakePO object with version initialized
    */
-  @VisibleForTesting
-  static MetalakePO toMetalakePO(BaseMetalake baseMetalake) {
+  public static MetalakePO initializeMetalakePOWithVersion(BaseMetalake baseMetalake) {
     try {
       return new MetalakePO.Builder()
           .withMetalakeId(baseMetalake.id())
@@ -42,31 +40,13 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.auditInfo()))
           .withSchemaVersion(
               JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.getVersion()))
+          .withCurrentVersion(1L)
+          .withLastVersion(1L)
+          .withDeletedAt(0L)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
-  }
-
-  /**
-   * Initialize MetalakePO
-   *
-   * @param baseMetalake BaseMetalake object
-   * @return MetalakePO object with version initialized
-   */
-  public static MetalakePO initializeMetalakePOWithVersion(BaseMetalake baseMetalake) {
-    MetalakePO metalakePO = toMetalakePO(baseMetalake);
-    return new MetalakePO.Builder()
-        .withMetalakeId(metalakePO.getMetalakeId())
-        .withMetalakeName(metalakePO.getMetalakeName())
-        .withMetalakeComment(metalakePO.getMetalakeComment())
-        .withProperties(metalakePO.getProperties())
-        .withAuditInfo(metalakePO.getAuditInfo())
-        .withSchemaVersion(metalakePO.getSchemaVersion())
-        .withCurrentVersion(1L)
-        .withLastVersion(1L)
-        .withDeletedAt(0L)
-        .build();
   }
 
   /**
@@ -78,21 +58,25 @@ public class POConverters {
    */
   public static MetalakePO updateMetalakePOWithVersion(
       MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
-    MetalakePO newMetalakePO = toMetalakePO(newMetalake);
     Long lastVersion = oldMetalakePO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
-    return new MetalakePO.Builder()
-        .withMetalakeId(newMetalakePO.getMetalakeId())
-        .withMetalakeName(newMetalakePO.getMetalakeName())
-        .withMetalakeComment(newMetalakePO.getMetalakeComment())
-        .withProperties(newMetalakePO.getProperties())
-        .withAuditInfo(newMetalakePO.getAuditInfo())
-        .withSchemaVersion(newMetalakePO.getSchemaVersion())
-        .withCurrentVersion(nextVersion)
-        .withLastVersion(nextVersion)
-        .withDeletedAt(0L)
-        .build();
+    try {
+      return new MetalakePO.Builder()
+          .withMetalakeId(newMetalake.id())
+          .withMetalakeName(newMetalake.name())
+          .withMetalakeComment(newMetalake.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newMetalake.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newMetalake.auditInfo()))
+          .withSchemaVersion(
+              JsonUtils.anyFieldMapper().writeValueAsString(newMetalake.getVersion()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
   }
 
   /**
@@ -131,14 +115,13 @@ public class POConverters {
   }
 
   /**
-   * Convert {@link CatalogEntity} to {@link CatalogPO}
+   * Initialize CatalogPO
    *
-   * @param catalogEntity CatalogEntity object to be converted
-   * @param metalakeId Metalake id to be associated with the catalog
-   * @return CatalogPO object from CatalogEntity object
+   * @param catalogEntity CatalogEntity object
+   * @return CatalogPO object with version initialized
    */
-  @VisibleForTesting
-  static CatalogPO toCatalogPO(CatalogEntity catalogEntity, Long metalakeId) {
+  public static CatalogPO initializeCatalogPOWithVersion(
+      CatalogEntity catalogEntity, Long metalakeId) {
     try {
       return new CatalogPO.Builder()
           .withCatalogId(catalogEntity.id())
@@ -150,34 +133,13 @@ public class POConverters {
           .withProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.getProperties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.auditInfo()))
+          .withCurrentVersion(1L)
+          .withLastVersion(1L)
+          .withDeletedAt(0L)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
-  }
-
-  /**
-   * Initialize CatalogPO
-   *
-   * @param catalogEntity CatalogEntity object
-   * @return CatalogPO object with version initialized
-   */
-  public static CatalogPO initializeCatalogPOWithVersion(
-      CatalogEntity catalogEntity, Long metalakeId) {
-    CatalogPO catalogPO = toCatalogPO(catalogEntity, metalakeId);
-    return new CatalogPO.Builder()
-        .withCatalogId(catalogPO.getCatalogId())
-        .withCatalogName(catalogPO.getCatalogName())
-        .withMetalakeId(metalakeId)
-        .withType(catalogPO.getType())
-        .withProvider(catalogPO.getProvider())
-        .withCatalogComment(catalogPO.getCatalogComment())
-        .withProperties(catalogPO.getProperties())
-        .withAuditInfo(catalogPO.getAuditInfo())
-        .withCurrentVersion(1L)
-        .withLastVersion(1L)
-        .withDeletedAt(0L)
-        .build();
   }
 
   /**
@@ -189,23 +151,26 @@ public class POConverters {
    */
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
-    CatalogPO newCatalogPO = toCatalogPO(newCatalog, metalakeId);
     Long lastVersion = oldCatalogPO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
-    return new CatalogPO.Builder()
-        .withCatalogId(newCatalogPO.getCatalogId())
-        .withCatalogName(newCatalogPO.getCatalogName())
-        .withMetalakeId(metalakeId)
-        .withType(newCatalogPO.getType())
-        .withProvider(newCatalogPO.getProvider())
-        .withCatalogComment(newCatalogPO.getCatalogComment())
-        .withProperties(newCatalogPO.getProperties())
-        .withAuditInfo(newCatalogPO.getAuditInfo())
-        .withCurrentVersion(nextVersion)
-        .withLastVersion(nextVersion)
-        .withDeletedAt(0L)
-        .build();
+    try {
+      return new CatalogPO.Builder()
+          .withCatalogId(newCatalog.id())
+          .withCatalogName(newCatalog.name())
+          .withMetalakeId(metalakeId)
+          .withType(newCatalog.getType().name())
+          .withProvider(newCatalog.getProvider())
+          .withCatalogComment(newCatalog.getComment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newCatalog.getProperties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newCatalog.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
   }
 
   /**
