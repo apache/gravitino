@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +81,6 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
    * @param schema
    * @return array of transforms for partition fields.
    */
-  @VisibleForTesting
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
     FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(schema.idToName());
     List<Transform> transforms = Lists.newArrayList();
