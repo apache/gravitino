@@ -45,7 +45,7 @@ public class JdbcIndexBean {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (!(o instanceof JdbcIndexBean)) return false;
     JdbcIndexBean that = (JdbcIndexBean) o;
     return order == that.order
         && indexType == that.indexType

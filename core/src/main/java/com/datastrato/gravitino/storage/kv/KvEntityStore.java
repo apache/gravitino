@@ -60,6 +60,9 @@ import org.slf4j.LoggerFactory;
  * interface
  */
 public class KvEntityStore implements EntityStore {
+
+  private static final String NO_SUCH_ENTITY_MSG = "No such entity:%s";
+
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
@@ -176,7 +179,7 @@ public class KvEntityStore implements EntityStore {
           byte[] key = entityKeyEncoder.encode(ident, entityType);
           byte[] value = transactionalKvBackend.get(key);
           if (value == null) {
-            throw new NoSuchEntityException("No such entity:%s", ident.toString());
+            throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
           }
 
           E e = serDe.deserialize(value, type);
@@ -271,12 +274,12 @@ public class KvEntityStore implements EntityStore {
             () -> {
               byte[] key = entityKeyEncoder.encode(ident, entityType, true);
               if (key == null) {
-                throw new NoSuchEntityException("No such entity:%s", ident.toString());
+                throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
               }
               return transactionalKvBackend.get(key);
             });
     if (value == null) {
-      throw new NoSuchEntityException("No such entity:%s", ident.toString());
+      throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
     }
     return serDe.deserialize(value, e);
   }

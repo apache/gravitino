@@ -112,7 +112,7 @@ public class ListPartitionDTO implements PartitionDTO, ListPartition {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof ListPartitionDTO)) {
       return false;
     }
     ListPartitionDTO that = (ListPartitionDTO) o;

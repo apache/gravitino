@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 /** Manages Metalakes within the Gravitino system. */
 public class MetalakeManager implements SupportsMetalakes {
 
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
   private static final Logger LOG = LoggerFactory.getLogger(MetalakeManager.class);
 
   private final EntityStore store;
@@ -75,7 +77,7 @@ public class MetalakeManager implements SupportsMetalakes {
       return store.get(ident, EntityType.METALAKE, BaseMetalake.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
-      throw new NoSuchMetalakeException("Metalake %s does not exist", ident);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
     } catch (IOException ioe) {
       LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
@@ -173,7 +175,7 @@ public class MetalakeManager implements SupportsMetalakes {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Metalake {} does not exist", ident, ne);
-      throw new NoSuchMetalakeException("Metalake %s does not exist", ident);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);

@@ -133,7 +133,7 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof SchemaEntity)) {
       return false;
     }
     SchemaEntity schema = (SchemaEntity) o;
