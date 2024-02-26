@@ -24,6 +24,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
@@ -38,6 +39,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     return config;
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new PostgreSQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
