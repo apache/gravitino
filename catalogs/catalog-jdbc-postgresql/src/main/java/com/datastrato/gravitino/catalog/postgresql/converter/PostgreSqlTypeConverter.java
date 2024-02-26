@@ -59,7 +59,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       case BYTEA:
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean);
+        return Types.UnparsedType.of(typeBean.getTypeName());
     }
   }
 
@@ -102,6 +102,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       return BYTEA;
     }
     throw new IllegalArgumentException(
-        String.format("Couldn't convert PostgreSQL type %s to Gravitino type", type.toString()));
+        String.format(
+            "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
   }
 }

@@ -1289,4 +1289,16 @@ public class CatalogMysqlIT extends AbstractIT {
               .anyMatch(n -> n.equals(tableName)));
     }
   }
+
+  @Test
+  void testUnparsedTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
+    mysqlService.executeQuery(
+        String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertEquals(Types.UnparsedType.of("BIT"), loadedTable.columns()[0].dataType());
+  }
 }
