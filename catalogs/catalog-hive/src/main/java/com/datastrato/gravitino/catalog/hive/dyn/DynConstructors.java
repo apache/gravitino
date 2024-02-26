@@ -29,6 +29,10 @@ import java.util.Map;
 
 // common/src/main/java/org/apache/iceberg/common/DynConstructors.java
 public class DynConstructors {
+
+  private static final String INVALID_CALL_TO_CONSTRUCTOR_MSG =
+      "Invalid call to constructor: target must be null";
+
   private DynConstructors() {}
 
   public static Builder builder() {
@@ -135,16 +139,14 @@ public class DynConstructors {
     @Override
     @SuppressWarnings("unchecked")
     public <R> R invoke(Object target, Object... args) {
-      Preconditions.checkArgument(
-          target == null, "Invalid call to constructor: target must be null");
+      Preconditions.checkArgument(target == null, INVALID_CALL_TO_CONSTRUCTOR_MSG);
       return (R) newInstance(args);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <R> R invokeChecked(Object target, Object... args) throws Exception {
-      Preconditions.checkArgument(
-          target == null, "Invalid call to constructor: target must be null");
+      Preconditions.checkArgument(target == null, INVALID_CALL_TO_CONSTRUCTOR_MSG);
       return (R) newInstanceChecked(args);
     }
 

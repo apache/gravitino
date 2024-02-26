@@ -179,4 +179,13 @@ public class TestTypes {
     Assertions.assertEquals("union<integer,string,boolean>", unionType.simpleString());
     Assertions.assertEquals(unionType, Types.UnionType.of(unionType.types()));
   }
+
+  @Test
+  public void testUnparsedType() {
+    Types.UnparsedType unparsedType = Types.UnparsedType.of("bit");
+    Assertions.assertEquals(Type.Name.UNPARSED, unparsedType.name());
+    Assertions.assertEquals("unparsed(bit)", unparsedType.simpleString());
+    Assertions.assertEquals("bit", unparsedType.unparsedType());
+    Assertions.assertEquals(unparsedType, Types.UnparsedType.of("bit"));
+  }
 }

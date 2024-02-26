@@ -44,6 +44,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
   }
 
   /** Transform trino ConnectorTableMetadata to gravitino table metadata */
+  @Override
   public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();

@@ -25,6 +25,7 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":catalogs:catalog-hadoop"))
   implementation(project(":clients:client-java"))
   implementation(project(":common"))
   implementation(project(":core"))
@@ -266,6 +267,26 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    // Get current project version
+    val version = project.version.toString()
+    println("Current project version: $version")
+    // Check whether this module has already built
+    val buildDir = project.buildDir
+    if (!buildDir.exists()) {
+      dependsOn(":trino-connector:jar")
+    } else {
+      // Check the version gravitino related jars in build equal to the current project version
+      val gravitinoJars = buildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+        val jarVersion = name.substringAfterLast("-").substringBeforeLast(".")
+        jarVersion != version
+      }
+
+      if (gravitinoJars != null && gravitinoJars.isNotEmpty()) {
+        delete(project(":trino-connector").buildDir)
+        dependsOn(":trino-connector:jar")
+      }
+    }
+
     doFirst {
       printDockerCheckInfo()
 
@@ -296,7 +317,7 @@ tasks.test {
 
       // Gravitino CI Docker image
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
-      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
+      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
 
       // Change poll image pause time from 30s to 60s
       environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")

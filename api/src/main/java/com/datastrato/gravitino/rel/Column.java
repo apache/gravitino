@@ -181,7 +181,7 @@ public interface Column {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ColumnImpl)) {
         return false;
       }
       ColumnImpl column = (ColumnImpl) o;
