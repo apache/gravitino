@@ -11,26 +11,31 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** GravitinoCatalogManager is used to sync catalogs from Gravitino server. */
+/** GravitinoCatalogManager is used to retrieve catalogs from Gravitino server. */
 public class GravitinoCatalogManager {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
-  private HashMap<String, Catalog> gravitinoCatalogs = new HashMap<>();
+  private Cache<String, Catalog> gravitinoCatalogs;
   private String metalakeName;
+  private GravitinoMetaLake metalake;
   private GravitinoClient gravitinoClient;
 
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
     this.metalakeName = metalakeName;
     this.gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+    this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
+    this.metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
   }
 
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
@@ -58,49 +63,34 @@ public class GravitinoCatalogManager {
   }
 
   public Catalog getGravitinoCatalogInfo(String name) {
-    return gravitinoCatalogs.get(name);
-  }
-
-  public Map<String, Catalog> getGravitinoCatalogs() {
-    return ImmutableMap.copyOf(gravitinoCatalogs);
+    try {
+      return gravitinoCatalogs.get(name, () -> loadCatalog(name));
+    } catch (ExecutionException e) {
+      LOG.error(String.format("Load catalog %s failed", name), e);
+      throw new RuntimeException(e);
+    }
   }
 
   public String getMetalakeName() {
     return metalakeName;
   }
 
-  public void loadCatalogsFromGravitino() {
-    GravitinoMetaLake metalake =
-        gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
-    loadCatalogs(metalake);
-  }
-
-  private void loadCatalogs(GravitinoMetaLake metalake) {
+  public Set<String> listCatalogs() {
     NameIdentifier[] catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
     LOG.info(
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
         Arrays.toString(catalogNames));
+    return Arrays.stream(catalogNames)
+        .map(identifier -> identifier.name())
+        .collect(Collectors.toSet());
+  }
 
-    Arrays.stream(catalogNames)
-        .forEach(
-            (NameIdentifier nameIdentifier) -> {
-              try {
-                String catalogName = nameIdentifier.name();
-                Catalog catalog = metalake.loadCatalog(nameIdentifier);
-                if (Type.RELATIONAL.equals(catalog.type())) {
-                  gravitinoCatalogs.put(catalogName, catalog);
-                  LOG.info(
-                      "Load catalog {} in metalake {} successfully.", catalogName, metalake.name());
-                }
-              } catch (Exception e) {
-                // the catalog maybe not used by SQL, delay the error to SQL analysis phase
-                LOG.warn(
-                    "Failed to load metalake {}'s catalog {}.",
-                    metalake.name(),
-                    nameIdentifier.name(),
-                    e);
-              }
-            });
+  private Catalog loadCatalog(String catalogName) {
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Preconditions.checkArgument(
+        Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
+    LOG.info("Load catalog {} from Gravitino successfully.", catalogName);
+    return catalog;
   }
 }

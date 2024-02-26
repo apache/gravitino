@@ -5,14 +5,13 @@
 
 package com.datastrato.gravitino.spark.plugin;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.spark.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.catalog.GravitinoCatalog;
 import com.datastrato.gravitino.spark.catalog.GravitinoCatalogManager;
-import com.datastrato.gravitino.spark.catalog.GravitinoHiveCatalog;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
@@ -45,8 +44,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
-    catalogManager.loadCatalogsFromGravitino();
-    registerGravitinoCatalogs(conf, catalogManager.getGravitinoCatalogs());
+    Set<String> catalogs = catalogManager.listCatalogs();
+    registerGravitinoCatalogs(conf, catalogs);
     registerSqlExtensions();
     return Collections.emptyMap();
   }
@@ -58,37 +57,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> catalogs) {
-    catalogs.forEach(
-        (catalogName, catalog) -> {
+  private void registerGravitinoCatalogs(SparkConf sparkConf, Set<String> catalogNames) {
+    catalogNames.forEach(
+        catalogName -> {
           String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
           Preconditions.checkArgument(
               sparkConf.contains(sparkCatalogConfigName) == false,
               catalogName + " is already registered to SparkCatalogManager");
-          String sparkCatalogClassName = getCatalogClassName(catalog.provider());
-          if (sparkCatalogClassName != null) {
-            sparkConf.set(sparkCatalogConfigName, sparkCatalogClassName);
-            LOG.info("Register {} catalog to Spark catalog manager", catalogName);
-          } else {
-            LOG.info(
-                "Skip register {} catalog, because {} is not supported",
-                catalogName,
-                catalog.provider());
-          }
+          sparkConf.set(sparkCatalogConfigName, GravitinoCatalog.class.getName());
+          LOG.info("Register {} catalog to Spark catalog manager", catalogName);
         });
-  }
-
-  private String getCatalogClassName(String provider) {
-    if (provider == null) {
-      return null;
-    }
-
-    switch (provider.toLowerCase(Locale.ROOT)) {
-      case "hive":
-        return GravitinoHiveCatalog.class.getName();
-      default:
-        return null;
-    }
   }
 
   // Todo inject Iceberg extensions

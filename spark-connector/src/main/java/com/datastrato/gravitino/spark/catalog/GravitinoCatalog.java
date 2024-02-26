@@ -12,11 +12,15 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.spark.GravitinoSparkConfig;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import javax.ws.rs.NotSupportedException;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -34,11 +38,11 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * BaseCatalog is the base class for the specific catalog like GravitinoHiveCatalog, it provides a
- * basic table and namespace interfaces. The advanced interfaces like view and function should be
- * provided by the specific catalog if necessary.
+ * GravitinoCatalog is the class registered to Spark CatalogManager, it's lazy load means Spark
+ * connector loads GravitinoCatalog when it's used. It will create different Spark Table for
+ * different Gravitino catalog.
  */
-public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
+public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   protected TableCatalog sparkCatalog;
   protected Catalog gravitinoCatalog;
 
@@ -46,15 +50,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   private String catalogName;
   private GravitinoCatalogManager gravitinoCatalogManager;
 
-  // Create a catalog specific table with different capabilities. Proxies schema and property
-  // to GravitinoTable while IO operations to internal catalog.
-  abstract Table createSparkTable(
-      Identifier identifier, com.datastrato.gravitino.rel.Table gravitinoTable);
-
-  // Create a internal catalog to do IO operations.
-  abstract TableCatalog createAndInitSparkCatalog(String name, CaseInsensitiveStringMap options);
-
-  public BaseCatalog() {
+  public GravitinoCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
@@ -104,8 +100,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
-    gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
-    sparkCatalog = createAndInitSparkCatalog(name, options);
+    this.gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    String provider = gravitinoCatalog.provider();
+    Preconditions.checkArgument(provider != null, name + " catalog provider is null");
+    sparkCatalog = createAndInitSparkCatalog(provider, name, options);
   }
 
   @Override
@@ -185,6 +183,36 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }
+  }
+
+  // Create a internal catalog to do IO operations.
+  private TableCatalog createAndInitSparkCatalog(
+      String provider, String name, CaseInsensitiveStringMap options) {
+    switch (provider.toLowerCase(Locale.ROOT)) {
+      case "hive":
+        return createAndInitHiveCatalog(name, options);
+      default:
+        throw new NotSupportedException("Not support catalog: " + name + ", provider: " + provider);
+    }
+  }
+
+  private TableCatalog createAndInitHiveCatalog(String name, CaseInsensitiveStringMap options) {
+    Preconditions.checkArgument(
+        gravitinoCatalog.properties() != null, "Hive Catalog properties should not be null");
+    String metastoreUri =
+        gravitinoCatalog.properties().get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
+    Preconditions.checkArgument(
+        StringUtils.isNoneBlank(metastoreUri),
+        "Couldn't get "
+            + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
+            + " from hive catalog properties");
+
+    TableCatalog hiveCatalog = new HiveTableCatalog();
+    HashMap all = new HashMap(options);
+    all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
+    hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
+
+    return hiveCatalog;
   }
 
   private void valiateNamespace(String[] namespace) {
