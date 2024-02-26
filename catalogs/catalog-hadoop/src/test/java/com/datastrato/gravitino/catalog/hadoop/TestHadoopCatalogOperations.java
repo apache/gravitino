@@ -590,6 +590,31 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  @Test
+  public void testStorageLocationMustBeDirectory() throws IOException {
+    String schemaName = "schema27";
+    String comment = "comment27";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    Path path = new Path(schemaPath);
+    FileSystem fs = path.getFileSystem(new Configuration());
+    boolean res = fs.mkdirs(path);
+    Assertions.assertTrue(res);
+
+    String location = schemaPath + "/fileset27.txt";
+    Path file = new Path(location);
+    boolean created = fs.createNewFile(file);
+    Assertions.assertTrue(created);
+    Assertions.assertTrue(fs.exists(file));
+
+    String name = "fileset27";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, location),
+        "The storage location of fileset should be a directory");
+  }
+
   private static Stream<Arguments> locationArguments() {
     return Stream.of(
         // Honor the catalog location

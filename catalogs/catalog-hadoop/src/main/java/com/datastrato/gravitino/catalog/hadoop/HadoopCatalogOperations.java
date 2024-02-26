@@ -206,6 +206,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
         LOG.info("Created fileset {} location {}", ident, filesetPath);
       } else {
+        if (!fs.isDirectory(filesetPath)) {
+          String errorMsg =
+              "The storage location (%s) of fileset %s should be a directory not a file.";
+          throw new IllegalArgumentException(String.format(errorMsg, filesetPath, ident));
+        }
         LOG.info("Fileset {} manages the existing location {}", ident, filesetPath);
       }
 

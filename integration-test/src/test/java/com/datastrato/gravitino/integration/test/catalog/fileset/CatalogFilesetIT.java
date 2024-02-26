@@ -509,6 +509,40 @@ public class CatalogFilesetIT extends AbstractIT {
     Assertions.assertEquals(0, newFileset.properties().size(), "properties should be removed");
   }
 
+  @Test
+  public void testStorageLocationMustBeDirectory() throws IOException {
+    // create fileset
+    String filesetName = "test_storage_location_must_be_directory";
+    String schemaPath = defaultBaseLocation();
+    hdfs.mkdirs(new Path(schemaPath));
+    String storageLocation = schemaPath + "/" + filesetName;
+
+    // create fileset with storage location that is a file
+    Path location = new Path(storageLocation);
+    try {
+      boolean created = hdfs.createNewFile(location);
+      Assertions.assertTrue(created, "storage location should be created");
+      Assertions.assertTrue(hdfs.exists(location), "storage location should be exists");
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              createFileset(
+                  filesetName,
+                  "comment",
+                  Fileset.Type.MANAGED,
+                  storageLocation,
+                  ImmutableMap.of("k1", "v1")),
+          "Should throw IllegalArgumentException when storage location is a file");
+    } finally {
+      try {
+        hdfs.delete(location, false);
+      } catch (IOException e) {
+        LOG.warn("Failed to delete file: {}", location, e);
+      }
+    }
+  }
+
   private Fileset createFileset(
       String filesetName,
       String comment,
