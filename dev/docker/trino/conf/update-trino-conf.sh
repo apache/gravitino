@@ -13,3 +13,10 @@ sed "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HO
 # Update `gravitino.metalake = GRAVITINO_METALAKE_NAME` in the `conf/catalog/gravitino.properties`
 sed "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" "${trino_conf_dir}/catalog/gravitino.properties.tmp" > "${trino_conf_dir}/catalog/gravitino.properties"
 rm "${trino_conf_dir}/catalog/gravitino.properties.tmp"
+
+# Check the number of Gravitino connector plugins present in the Trino plugin directory
+num_of_gravitino_connector=$(ls /usr/lib/trino/plugin/gravitino | grep gravitino-trino-connector-* | wc -l)
+if [[ "${num_of_gravitino_connector}" -ne 1 ]]; then
+  echo "Multiple versions of the Gravitino connector plugin found or none present."
+  exit 1
+fi
