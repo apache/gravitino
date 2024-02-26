@@ -40,7 +40,10 @@ public class ScriptRunner {
   private final boolean stopOnError;
   private final boolean autoCommit;
 
+  @SuppressWarnings("DefaultCharset")
   private final PrintWriter logWriter = new PrintWriter(System.out);
+
+  @SuppressWarnings("DefaultCharset")
   private final PrintWriter errorLogWriter = new PrintWriter(System.err);
 
   private String delimiter = DEFAULT_DELIMITER;

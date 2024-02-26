@@ -6,6 +6,7 @@ package com.datastrato.gravitino.integration.test.util;
 
 import com.datastrato.gravitino.client.OAuth2TokenProvider;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 public class OAuthMockDataProvider extends OAuth2TokenProvider {
 
@@ -15,7 +16,7 @@ public class OAuthMockDataProvider extends OAuth2TokenProvider {
 
   @Override
   protected String getAccessToken() {
-    return new String(token);
+    return new String(token, StandardCharsets.UTF_8);
   }
 
   public static OAuthMockDataProvider getInstance() {
