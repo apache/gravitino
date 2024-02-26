@@ -5,8 +5,10 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Iceberg column. */
+@EqualsAndHashCode(callSuper = true)
 public class IcebergColumn extends BaseColumn {
 
   private int id;

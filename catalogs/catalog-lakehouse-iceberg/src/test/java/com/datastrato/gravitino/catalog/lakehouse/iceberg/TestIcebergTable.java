@@ -463,16 +463,19 @@ public class TestIcebergTable {
     Column[] expected =
         new Column[] {
           new IcebergColumn.Builder()
+              .withId(2)
               .withName("col_2_new")
               .withType(Types.DateType.get())
               .withComment(ICEBERG_COMMENT)
               .build(),
           new IcebergColumn.Builder()
+              .withId(1)
               .withName("col_1")
               .withType(Types.IntegerType.get())
               .withComment(ICEBERG_COMMENT + "_new")
               .build(),
           new IcebergColumn.Builder()
+              .withId(3)
               .withName("col_3")
               .withType(Types.StringType.get())
               .withComment(null)
