@@ -42,7 +42,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   private static Type INT = Types.IntegerType.get();
 
   @Test
-  public void testOperationTable() {
+  void testOperationTable() {
     String tableName = GravitinoITUtils.genRandomName("op_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -211,7 +211,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  public void testCreateAllTypeTable() {
+  void testCreateAllTypeTable() {
     String tableName = GravitinoITUtils.genRandomName("type_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -313,7 +313,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  public void testCreateMultipleTable() throws SQLException {
+  void testCreateMultipleTable() throws SQLException {
     String testDbName = GravitinoITUtils.genRandomName("test_db_");
     try (Connection connection = DATA_SOURCE.getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE DATABASE " + testDbName);
@@ -411,7 +411,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  public void testCreateAutoIncrementTable() {
+  void testCreateAutoIncrementTable() {
     String tableName = GravitinoITUtils.genRandomName("increment_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -488,7 +488,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  public void testCreateIndexTable() {
+  void testCreateIndexTable() {
     String tableName = GravitinoITUtils.genRandomName("index_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();

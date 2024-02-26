@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestSimpleTokenProvider {
 
   @Test
-  public void testAuthentication() throws IOException {
+  void testAuthentication() throws IOException {
     try (AuthDataProvider provider = new SimpleTokenProvider()) {
       Assertions.assertTrue(provider.hasTokenData());
       String user = System.getenv("GRAVITINO_USER");

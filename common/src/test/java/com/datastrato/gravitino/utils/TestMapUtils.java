@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 public class TestMapUtils {
 
   @Test
-  public void testGetPrefixMap() {
+  void testGetPrefixMap() {
     Map configs = ImmutableMap.of("a.b", "", "a.c", "", "", "", "b.a", "");
 
     Assertions.assertEquals(ImmutableMap.of(), MapUtils.getPrefixMap(configs, "xx"));

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 public class TestTypes {
 
   @Test
-  public void testPrimitiveTypes() {
+  void testPrimitiveTypes() {
     Types.BooleanType booleanType = Types.BooleanType.get();
     Assertions.assertEquals(Type.Name.BOOLEAN, booleanType.name());
     // asset that the type is a singleton
@@ -138,7 +138,7 @@ public class TestTypes {
   }
 
   @Test
-  public void testComplexTypes() {
+  void testComplexTypes() {
     Types.StructType structType =
         Types.StructType.of(
             Types.StructType.Field.notNullField("id", Types.IntegerType.get()),

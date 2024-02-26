@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 public class TestMysqlDatabaseOperations extends TestMysqlAbstractIT {
 
   @Test
-  public void testBaseOperationDatabase() {
+  void testBaseOperationDatabase() {
     String databaseName = GravitinoITUtils.genRandomName("ct_db");
     Map<String, String> properties = new HashMap<>();
     // Mysql database creation does not support incoming comments.

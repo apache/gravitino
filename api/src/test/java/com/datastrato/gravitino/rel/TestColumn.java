@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestColumn {
   @Test
-  public void testColumn() {
+  void testColumn() {
     Column expectedColumn =
         Column.of("col_1", Types.ByteType.get(), null, true, false, Column.DEFAULT_VALUE_NOT_SET);
 
@@ -22,7 +22,7 @@ public class TestColumn {
   }
 
   @Test
-  public void testColumnException() {
+  void testColumnException() {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, () -> Column.of(null, null));
     Assertions.assertEquals("Column name cannot be null", exception.getMessage());

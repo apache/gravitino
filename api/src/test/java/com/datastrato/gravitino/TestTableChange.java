@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 public class TestTableChange {
 
   @Test
-  public void testRenameTable() {
+  void testRenameTable() {
     String newName = "New table name";
     RenameTable renameTable = (RenameTable) TableChange.rename(newName);
 
@@ -38,7 +38,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateComment() {
+  void testUpdateComment() {
     String newComment = "New comment";
     UpdateComment updateComment = (UpdateComment) TableChange.updateComment(newComment);
 
@@ -46,7 +46,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testSetProperty() {
+  void testSetProperty() {
     String property = "Jam";
     String value = "Marmalade";
     SetProperty setProperty = (SetProperty) TableChange.setProperty(property, value);
@@ -56,7 +56,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testColumnPosition() {
+  void testColumnPosition() {
     String column = "Name";
     ColumnPosition first = TableChange.ColumnPosition.first();
     ColumnPosition afterColumn = TableChange.ColumnPosition.after(column);
@@ -66,7 +66,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testAddColumn() {
+  void testAddColumn() {
     String[] fieldName = {"Name"};
     Type dataType = Types.StringType.get();
     String comment = "Person name";
@@ -79,7 +79,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testAddColumnWithPosition() {
+  void testAddColumnWithPosition() {
     String[] fieldName = {"Full Name", "First Name"};
     Type dataType = Types.StringType.get();
     String comment = "First or given name";
@@ -93,7 +93,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testAddColumnWithNullCommentAndPosition() {
+  void testAddColumnWithNullCommentAndPosition() {
     String[] fieldName = {"Middle Name"};
     Type dataType = Types.StringType.get();
     AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldName, dataType, null, null);
@@ -105,7 +105,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testRenameColumn() {
+  void testRenameColumn() {
     String[] fieldName = {"Last Name"};
     String newName = "Family Name";
     RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldName, newName);
@@ -115,7 +115,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testRenameNestedColumn() {
+  void testRenameNestedColumn() {
     String[] fieldName = {"Name", "First Name"};
     String newName = "Name.first";
     RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldName, newName);
@@ -125,7 +125,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateColumnPosition() {
+  void testUpdateColumnPosition() {
     String[] fieldName = {"First Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.first();
     UpdateColumnPosition updateColumnPosition =
@@ -136,7 +136,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateNestedColumnPosition() {
+  void testUpdateNestedColumnPosition() {
     String[] fieldName = {"Name", "Last Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.after("First Name");
     UpdateColumnPosition updateColumnPosition =
@@ -147,7 +147,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateColumnComment() {
+  void testUpdateColumnComment() {
     String[] fieldName = {"First Name"};
     String newComment = "First or given name";
     UpdateColumnComment updateColumnComment =
@@ -158,7 +158,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateNestedColumnComment() {
+  void testUpdateNestedColumnComment() {
     String[] fieldName = {"Name", "Last Name"};
     String newComment = "Last or family name";
     UpdateColumnComment updateColumnComment =
@@ -169,7 +169,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testDeleteColumn() {
+  void testDeleteColumn() {
     String[] fieldName = {"existing_column"};
     Boolean ifExists = true;
     DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldName, ifExists);
@@ -179,7 +179,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testDeleteNestedColumn() {
+  void testDeleteNestedColumn() {
     String[] fieldName = {"nested", "existing_column"};
     Boolean ifExists = false;
     DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldName, ifExists);
@@ -189,7 +189,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateColumnNullability() {
+  void testUpdateColumnNullability() {
     String[] fieldName = {"existing_column"};
     TableChange.UpdateColumnNullability updateColumnType =
         (TableChange.UpdateColumnNullability) TableChange.updateColumnNullability(fieldName, false);
@@ -199,7 +199,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateColumnType() {
+  void testUpdateColumnType() {
     String[] fieldName = {"existing_column"};
     Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =
@@ -210,7 +210,7 @@ public class TestTableChange {
   }
 
   @Test
-  public void testUpdateNestedColumnType() {
+  void testUpdateNestedColumnType() {
     String[] fieldName = {"nested", "existing_column"};
     Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =

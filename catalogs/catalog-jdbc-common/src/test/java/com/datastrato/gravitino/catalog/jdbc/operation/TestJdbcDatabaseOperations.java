@@ -71,7 +71,7 @@ public class TestJdbcDatabaseOperations {
   }
 
   @Test
-  public void testOperationDatabase() {
+  void testOperationDatabase() {
     String database1 = "test";
     String database2 = "test2";
     // creat database

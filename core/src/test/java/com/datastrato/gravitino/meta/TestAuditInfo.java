@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 public class TestAuditInfo {
 
   @Test
-  public void testAuditInfoField() {
+  void testAuditInfoField() {
     Instant now = Instant.now();
     String creator = "test";
     String lastModifier = "test1";
@@ -33,7 +33,7 @@ public class TestAuditInfo {
   }
 
   @Test
-  public void testAuditInfoValidate() {
+  void testAuditInfoValidate() {
     Instant now = Instant.now();
     String creator = "test";
     String lastModifier = "test1";

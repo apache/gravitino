@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 // hive-metastore/src/test/java/org/apache/iceberg/hive/TestCachedClientPool.java
 public class TestCachedClientPool extends MiniHiveMetastoreService {
   @Test
-  public void testClientPoolCleaner() throws InterruptedException {
+  void testClientPoolCleaner() throws InterruptedException {
     CachedClientPool clientPool = new CachedClientPool(1, hiveConf, 5000);
     HiveClientPool clientPool1 = clientPool.clientPool();
     HiveClientPool cachedClientPool =
@@ -48,7 +48,7 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCacheKey() throws Exception {
+  void testCacheKey() throws Exception {
     UserGroupInformation current = UserGroupInformation.getCurrentUser();
     UserGroupInformation foo1 = UserGroupInformation.createProxyUser("foo", current);
     UserGroupInformation foo2 = UserGroupInformation.createProxyUser("foo", current);

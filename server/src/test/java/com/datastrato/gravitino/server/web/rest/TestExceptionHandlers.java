@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 public class TestExceptionHandlers {
 
   @Test
-  public void testGetErrorMsg() {
+  void testGetErrorMsg() {
     Exception e1 = new Exception("test1");
     Exception e2 = new Exception("test2", e1);
     Exception e3 = new Exception(e1);

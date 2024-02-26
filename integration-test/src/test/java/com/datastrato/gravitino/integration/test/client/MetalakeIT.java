@@ -46,7 +46,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testListMetalake() {
+  void testListMetalake() {
     // no metalakes to start with
     GravitinoMetaLake[] metaLakes = client.listMetalakes();
     assertEquals(0, metaLakes.length);
@@ -71,7 +71,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testLoadMetalake() {
+  void testLoadMetalake() {
     // metalake exists
     client.createMetalake(
         NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
@@ -96,7 +96,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterMetalake() {
+  void testAlterMetalake() {
     String newName = GravitinoITUtils.genRandomName("newmetaname");
 
     client.createMetalake(
@@ -122,7 +122,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterNonExistantMetalake() {
+  void testAlterNonExistantMetalake() {
     String newName = GravitinoITUtils.genRandomName("newmetaname");
 
     client.createMetalake(
@@ -139,7 +139,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateMetalake() {
+  void testCreateMetalake() {
     GravitinoMetaLake metaLakeA =
         client.createMetalake(
             NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
@@ -159,7 +159,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testDropMetalakes() {
+  void testDropMetalakes() {
     GravitinoMetaLake metalakeA =
         client.createMetalake(
             NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());

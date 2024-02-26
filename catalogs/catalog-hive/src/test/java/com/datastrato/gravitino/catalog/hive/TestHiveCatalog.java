@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestHiveCatalog extends MiniHiveMetastoreService {
   @Test
-  public void testListDatabases() throws TException, InterruptedException {
+  void testListDatabases() throws TException, InterruptedException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 

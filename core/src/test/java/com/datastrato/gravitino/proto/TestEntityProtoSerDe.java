@@ -19,7 +19,7 @@ public class TestEntityProtoSerDe {
   private final EntitySerDe entitySerDe = EntitySerDeFactory.createEntitySerDe("proto");
 
   @Test
-  public void testAuditInfoSerDe() throws IOException {
+  void testAuditInfoSerDe() throws IOException {
     Instant now = Instant.now();
     String creator = "creator";
     String modifier = "modifier";
@@ -63,7 +63,7 @@ public class TestEntityProtoSerDe {
   }
 
   @Test
-  public void testEntitiesSerDe() throws IOException {
+  void testEntitiesSerDe() throws IOException {
     Instant now = Instant.now();
     String creator = "creator";
     SchemaVersion version = SchemaVersion.V_0_1;

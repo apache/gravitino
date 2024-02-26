@@ -523,7 +523,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterIcebergTable() {
+  void testAlterIcebergTable() {
     ColumnDTO[] columns = createColumns();
     Table table =
         catalog
@@ -824,7 +824,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testOperatorSchemeProperties() {
+  void testOperatorSchemeProperties() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreateSchemaCheck");
     Map<String, String> prop = Maps.newHashMap();
     prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
@@ -866,7 +866,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testTableDistribution() {
+  void testTableDistribution() {
     ColumnDTO[] columns = createColumns();
 
     NameIdentifier tableIdentifier =

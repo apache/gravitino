@@ -32,7 +32,7 @@ public class TestIcebergSchema {
       AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
   @Test
-  public void testCreateIcebergSchema() {
+  void testCreateIcebergSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testCreateIcebergSchema");
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
@@ -65,7 +65,7 @@ public class TestIcebergSchema {
   }
 
   @Test
-  public void testAlterSchema() {
+  void testAlterSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testAlterSchema");
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
@@ -104,7 +104,7 @@ public class TestIcebergSchema {
   }
 
   @Test
-  public void testDropSchema() {
+  void testDropSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testDropSchema");
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");

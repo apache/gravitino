@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestDynFields {
 
   @Test
-  public void testUnboundField() {
+  void testUnboundField() {
     TestObject testObject = new TestObject();
     testObject.setName("John");
     testObject.setAge(30);
@@ -32,7 +32,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testStaticField() {
+  void testStaticField() {
     try {
       DynFields.StaticField<String> staticField =
           DynFields.builder().impl(TestObject.class, "staticField").buildStaticChecked();
@@ -47,7 +47,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testBoundField() throws NoSuchFieldException {
+  void testBoundField() throws NoSuchFieldException {
     TestObject testObject = new TestObject();
     testObject.setName("John");
     testObject.setAge(30);
@@ -61,7 +61,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testBuildChecked() throws NoSuchFieldException {
+  void testBuildChecked() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     testObject.setName("John");
@@ -73,7 +73,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testBuild() {
+  void testBuild() {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     testObject.setName("John");
@@ -85,7 +85,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testBuildStatic() {
+  void testBuildStatic() {
     DynFields.Builder builder = DynFields.builder();
 
     DynFields.StaticField<String> staticField =
@@ -95,7 +95,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testDefaultAlwaysNull() throws NoSuchFieldException {
+  void testDefaultAlwaysNull() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     testObject.setName("John");
@@ -106,7 +106,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testImplWithStringNames() throws NoSuchFieldException {
+  void testImplWithStringNames() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     testObject.setName("John");
@@ -119,7 +119,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testBind() throws NoSuchFieldException {
+  void testBind() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     testObject.setName("John");
@@ -137,7 +137,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testHiddenImpByClassName() throws NoSuchFieldException {
+  void testHiddenImpByClassName() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
 
@@ -147,7 +147,7 @@ public class TestDynFields {
   }
 
   @Test
-  public void testHiddenImpByString() throws NoSuchFieldException {
+  void testHiddenImpByString() throws NoSuchFieldException {
     DynFields.Builder builder = DynFields.builder();
     TestObject testObject = new TestObject();
     String className = testObject.getClass().getName();

@@ -91,7 +91,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testUpdateComment() {
+  void testUpdateComment() {
     String comments = "new comment";
     TableChange updateComment = TableChange.updateComment(comments);
     LoadTableResponse loadTableResponse = updateTable(identifier, updateComment);
@@ -100,7 +100,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testSetAndRemoveProperty() {
+  void testSetAndRemoveProperty() {
     String testPropertyKey = "test_property_key";
     String testPropertyValue = "test_property_value";
     String testPropertyNewValue = "test_property_new_value";
@@ -144,14 +144,14 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testRenameTable() {
+  void testRenameTable() {
     TableChange renameTable = TableChange.rename("new_table_name");
     Assertions.assertThrowsExactly(
         RuntimeException.class, () -> updateTable(identifier, renameTable));
   }
 
   @Test
-  public void testAddColumn() {
+  void testAddColumn() {
     // add to after first column
     String addColumnNameAfter = "add_column_after";
     TableChange addColumn =
@@ -258,7 +258,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testDeleteColumn() {
+  void testDeleteColumn() {
     // delete normal column
     TableChange deleteColumn = TableChange.deleteColumn(firstField, true);
     LoadTableResponse loadTableResponse = updateTable(identifier, deleteColumn);
@@ -283,7 +283,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testUpdateColumnComment() {
+  void testUpdateColumnComment() {
     String newComment = "new comment";
     TableChange updateColumnComment = TableChange.updateColumnComment(firstField, newComment);
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnComment);
@@ -292,7 +292,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testUpdateColumnNullability() {
+  void testUpdateColumnNullability() {
     TableChange updateColumnNullability = TableChange.updateColumnNullability(firstField, true);
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnNullability);
     Assertions.assertTrue(loadTableResponse.tableMetadata().schema().columns().get(0).isOptional());
@@ -310,7 +310,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testUpdateColumnType() {
+  void testUpdateColumnType() {
     TableChange updateColumnType = TableChange.updateColumnType(thirdField, Types.LongType.get());
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnType);
     Assertions.assertEquals(
@@ -336,7 +336,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testRenameColumn() {
+  void testRenameColumn() {
     String newColumnName = "new_name";
     TableChange renameColumn = TableChange.renameColumn(firstField, newColumnName);
     LoadTableResponse loadTableResponse = updateTable(identifier, renameColumn);
@@ -368,7 +368,7 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
-  public void testUpdateColumnPosition() {
+  void testUpdateColumnPosition() {
     // test ColumnPosition.after
     TableChange updateColumnPosition =
         TableChange.updateColumnPosition(firstField, ColumnPosition.after(secondField[0]));

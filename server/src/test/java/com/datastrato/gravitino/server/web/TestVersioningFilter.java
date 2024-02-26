@@ -33,7 +33,7 @@ import org.mockito.ArgumentCaptor;
 public class TestVersioningFilter {
 
   @Test
-  public void testDoFilterWithSupportedVersion() throws ServletException, IOException {
+  void testDoFilterWithSupportedVersion() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -51,7 +51,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithUnsupportedVersion() throws ServletException, IOException {
+  void testDoFilterWithUnsupportedVersion() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -69,7 +69,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithNoVersionHeader() throws ServletException, IOException {
+  void testDoFilterWithNoVersionHeader() throws ServletException, IOException {
     // Arrange
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
@@ -93,7 +93,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithNoHeaders() throws ServletException, IOException {
+  void testDoFilterWithNoHeaders() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -115,7 +115,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithMultipleAcceptHeaders() throws ServletException, IOException {
+  void testDoFilterWithMultipleAcceptHeaders() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -138,7 +138,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithInvalidAcceptHeaderFormat() throws ServletException, IOException {
+  void testDoFilterWithInvalidAcceptHeaderFormat() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -159,7 +159,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithNullRequest() throws ServletException, IOException {
+  void testDoFilterWithNullRequest() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
@@ -168,7 +168,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithNullResponse() throws ServletException, IOException {
+  void testDoFilterWithNullResponse() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -177,7 +177,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithValidAndInvalidVersionHeaders() throws ServletException, IOException {
+  void testDoFilterWithValidAndInvalidVersionHeaders() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -198,7 +198,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testDoFilterWithMultipleVersions() throws ServletException, IOException {
+  void testDoFilterWithMultipleVersions() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -228,7 +228,7 @@ public class TestVersioningFilter {
   }
 
   @Test
-  public void testGetHeaderNames() {
+  void testGetHeaderNames() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     Enumeration<String> mockHeaderNames =
         new Vector<>(Arrays.asList("Header1", "Header2")).elements();

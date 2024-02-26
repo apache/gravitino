@@ -29,7 +29,7 @@ import org.testcontainers.shaded.com.google.common.collect.Maps;
 public class TestPostgreSqlSchemaOperations extends TestPostgreSqlAbstractIT {
 
   @Test
-  public void testBaseOperationSchema() {
+  void testBaseOperationSchema() {
     String databaseName = GravitinoITUtils.genRandomName("ct_db");
     Map<String, String> properties = new HashMap<>();
     // PostgreSql does not support filling in comments directly when creating a table.
@@ -50,7 +50,7 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  public void testCreateMultipleSchema() throws SQLException {
+  void testCreateMultipleSchema() throws SQLException {
     String testDbName = GravitinoITUtils.genRandomName("test_db_");
     try (Connection connection = DATA_SOURCE.getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE DATABASE " + testDbName);

@@ -34,7 +34,7 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testInitialize() throws IOException {
+  void testInitialize() throws IOException {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
@@ -44,7 +44,7 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testStartAndStop() throws RuntimeException, IOException {
+  void testStartAndStop() throws RuntimeException, IOException {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
@@ -55,7 +55,7 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testAddServletAndFilter() throws RuntimeException, IOException {
+  void testAddServletAndFilter() throws RuntimeException, IOException {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
@@ -73,12 +73,12 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testStopWithNullServer() {
+  void testStopWithNullServer() {
     assertDoesNotThrow(() -> jettyServer.stop());
   }
 
   @Test
-  public void testStartWithoutInitialise() throws InterruptedException {
+  void testStartWithoutInitialise() throws InterruptedException {
     assertThrows(RuntimeException.class, () -> jettyServer.start());
   }
 }

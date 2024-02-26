@@ -106,7 +106,7 @@ public class TestJdbcTableOperations {
   }
 
   @Test
-  public void testOperationTable() {
+  void testOperationTable() {
     String table1 = "table1";
     JdbcColumn[] columns = generateRandomColumn(1, 4);
     // Sqlite does not support the comment and default value attribute, so it is not set here

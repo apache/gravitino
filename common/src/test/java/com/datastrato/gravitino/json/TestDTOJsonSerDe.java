@@ -55,7 +55,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testAuditDTOJsonSerDe() throws Exception {
+  void testAuditDTOJsonSerDe() throws Exception {
     Instant now = Instant.now();
     String creator = "creator";
     String modifier = "modifier";
@@ -93,7 +93,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testMetalakeDTOSerDe() throws Exception {
+  void testMetalakeDTOSerDe() throws Exception {
     String name = "metalake";
     String comment = "comment";
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -139,7 +139,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testCatalogDTOSerDe() throws Exception {
+  void testCatalogDTOSerDe() throws Exception {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
@@ -171,7 +171,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testColumnDTOSerDe() throws Exception {
+  void testColumnDTOSerDe() throws Exception {
     String name = "column";
     Type type = Types.ByteType.get();
     String comment = "comment";
@@ -229,7 +229,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testTableDTOSerDe() throws Exception {
+  void testTableDTOSerDe() throws Exception {
     String name = "column";
     Type type = Types.ByteType.get();
     String comment = "comment";
@@ -280,7 +280,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testPartitioningDTOSerDe() throws Exception {
+  void testPartitioningDTOSerDe() throws Exception {
 
     String[] field1 = new String[] {"dt"};
     String[] field2 = new String[] {"city"};
@@ -352,7 +352,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testPartitioningDTOSerDeFail() throws Exception {
+  void testPartitioningDTOSerDeFail() throws Exception {
     // test `strategy` value null
     String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
     ObjectMapper map = JsonUtils.objectMapper();

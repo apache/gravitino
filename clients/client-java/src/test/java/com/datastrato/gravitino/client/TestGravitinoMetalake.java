@@ -53,7 +53,7 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testListCatalogs() throws JsonProcessingException {
+  void testListCatalogs() throws JsonProcessingException {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
     NameIdentifier ident1 = NameIdentifier.of(metalakeName, "mock");
@@ -89,7 +89,7 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testLoadCatalog() throws JsonProcessingException {
+  void testLoadCatalog() throws JsonProcessingException {
     String catalogName = "mock";
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
@@ -147,7 +147,7 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testCreateCatalog() throws JsonProcessingException {
+  void testCreateCatalog() throws JsonProcessingException {
     String catalogName = "mock";
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
@@ -234,7 +234,7 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testAlterCatalog() throws JsonProcessingException {
+  void testAlterCatalog() throws JsonProcessingException {
     String catalogName = "mock";
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
@@ -292,7 +292,7 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testDropCatalog() throws JsonProcessingException {
+  void testDropCatalog() throws JsonProcessingException {
     String catalogName = "mock";
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 

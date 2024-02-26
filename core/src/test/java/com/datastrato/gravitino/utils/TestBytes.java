@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestBytes {
 
   @Test
-  public void testWrapAndGet() {
+  void testWrapAndGet() {
     byte[] data = {0x01, 0x02, 0x03};
     Bytes bytes = Bytes.wrap(data);
 
@@ -22,7 +22,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testCompareTo() {
+  void testCompareTo() {
     byte[] data1 = {0x01, 0x02, 0x03};
     byte[] data2 = {0x01, 0x02, 0x03};
     byte[] data3 = {0x01, 0x02, 0x04};
@@ -43,7 +43,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testConcat() {
+  void testConcat() {
     byte[] first = {0x01, 0x02};
     byte[] second = {0x03, 0x04};
     byte[] expected = {0x01, 0x02, 0x03, 0x04};
@@ -53,7 +53,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testHashCode() {
+  void testHashCode() {
     byte[] data1 = {0x01, 0x02, 0x03};
     byte[] data2 = {0x01, 0x02, 0x03};
     Bytes bytes1 = new Bytes(data1);
@@ -63,7 +63,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testEquals() {
+  void testEquals() {
     byte[] data1 = {0x01, 0x02, 0x03};
     byte[] data2 = {0x01, 0x02, 0x03};
     Bytes bytes1 = new Bytes(data1);
@@ -73,7 +73,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testIncrement() {
+  void testIncrement() {
     byte[] data = {0x01, 0x01};
     byte[] expected = {0x01, 0x02};
     Bytes bytes = Bytes.increment(new Bytes(data));
@@ -82,7 +82,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testIncrementCarry() {
+  void testIncrementCarry() {
     byte[] data = {0x01, (byte) 0xFF};
     byte[] expected = {0x02, 0x00};
     Bytes bytes = Bytes.increment(new Bytes(data));
@@ -91,7 +91,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testToString() {
+  void testToString() {
     byte[] data = {0x01, 0x02, (byte) 0xAB};
     String expected = "\\x01\\x02\\xAB";
     Bytes bytes = new Bytes(data);
@@ -101,7 +101,7 @@ public class TestBytes {
   }
 
   @Test
-  public void testLexicographicByteArrayComparator() {
+  void testLexicographicByteArrayComparator() {
     byte[] data1 = {0x01, 0x02, 0x03};
     byte[] data2 = {0x01, 0x02, 0x04};
     byte[] data3 = {0x01, 0x02, 0x03, 0x00};

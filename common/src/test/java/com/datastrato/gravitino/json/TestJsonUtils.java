@@ -67,7 +67,7 @@ public class TestJsonUtils {
   }
 
   @Test
-  public void testTypeSerDe() throws Exception {
+  void testTypeSerDe() throws Exception {
     Type type = Types.BooleanType.get();
     String jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     String expected = "\"boolean\"";

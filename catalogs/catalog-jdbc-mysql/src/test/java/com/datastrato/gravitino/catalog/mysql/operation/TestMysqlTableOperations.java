@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 public class TestMysqlTableOperations {
 
   @Test
-  public void testAppendIndexesBuilder() {
+  void testAppendIndexesBuilder() {
     Index[] indexes =
         new Index[] {
           Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}}),

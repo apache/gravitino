@@ -82,7 +82,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testListPartitionNames() {
+  void testListPartitionNames() {
     String[] partitionNames = hiveTable.supportPartitions().listPartitionNames();
     // there maybe other partitions in the list, so we only check the added partition
     Assertions.assertTrue(
@@ -91,7 +91,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testListPartitions() {
+  void testListPartitions() {
     Partition[] partitions = hiveTable.supportPartitions().listPartitions();
     // there maybe other partitions in the list, so we only check the added partition
     Assertions.assertTrue(
@@ -99,9 +99,10 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testGetPartition() {
+  void testGetPartition() {
     SupportsPartitions partitions = hiveTable.supportPartitions();
     Partition partition = partitions.getPartition(existingPartition.name());
+
     Assertions.assertEquals(existingPartition, partition);
 
     NoSuchPartitionException exception =
@@ -116,7 +117,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAddPartition() {
+  void testAddPartition() {
     // add partition: city=1/dt=2020-01-01
     String[] fieldCity = new String[] {columns[1].name()};
     Literal<?> valueCity = Literals.byteLiteral((byte) 1);

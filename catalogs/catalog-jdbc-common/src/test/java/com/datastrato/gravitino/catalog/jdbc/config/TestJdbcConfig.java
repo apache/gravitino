@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcConfig {
 
   @Test
-  public void testCreateDataSourceConfig() {
+  void testCreateDataSourceConfig() {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
     Assertions.assertDoesNotThrow(() -> new JdbcConfig(properties));

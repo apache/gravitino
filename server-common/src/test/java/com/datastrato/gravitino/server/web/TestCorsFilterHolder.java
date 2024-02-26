@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestCorsFilterHolder {
 
   @Test
-  public void testCreateCorsFilterHolder() {
+  void testCreateCorsFilterHolder() {
     Config config = new Config() {};
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(config, "");
     FilterHolder filterHolder = CorsFilterHolder.create(jettyServerConfig);

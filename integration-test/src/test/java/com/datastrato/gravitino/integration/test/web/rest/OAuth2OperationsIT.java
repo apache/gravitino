@@ -56,7 +56,7 @@ public class OAuth2OperationsIT extends AbstractIT {
   }
 
   @Test
-  public void testAuthenticationApi() throws Exception {
+  void testAuthenticationApi() throws Exception {
     GravitinoVersion gravitinoVersion = client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());

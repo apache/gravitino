@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 public class TestResponseJsonSerDe {
 
   @Test
-  public void testBaseResponseSerDe() throws JsonProcessingException {
+  void testBaseResponseSerDe() throws JsonProcessingException {
     BaseResponse response = new BaseResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     BaseResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, BaseResponse.class);
@@ -36,7 +36,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testDropResponseSerDe() throws JsonProcessingException {
+  void testDropResponseSerDe() throws JsonProcessingException {
     DropResponse response = new DropResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     DropResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, DropResponse.class);
@@ -44,7 +44,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testEntityListResponseSerDe() throws JsonProcessingException {
+  void testEntityListResponseSerDe() throws JsonProcessingException {
     EntityListResponse response = new EntityListResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     EntityListResponse deserResponse =
@@ -53,7 +53,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testMetalakeResponseSerDe() throws JsonProcessingException {
+  void testMetalakeResponseSerDe() throws JsonProcessingException {
     MetalakeResponse response = new MetalakeResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     MetalakeResponse deserResponse =
@@ -62,7 +62,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testMetalakeListResponseSerDe() throws JsonProcessingException {
+  void testMetalakeListResponseSerDe() throws JsonProcessingException {
     MetalakeListResponse response = new MetalakeListResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     MetalakeListResponse deserResponse =
@@ -71,7 +71,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testCatalogResponseSerDe() throws JsonProcessingException {
+  void testCatalogResponseSerDe() throws JsonProcessingException {
     CatalogResponse response = new CatalogResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     CatalogResponse deserResponse =
@@ -80,7 +80,7 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testMetalakeResponseBuilderSerDe() throws JsonProcessingException {
+  void testMetalakeResponseBuilderSerDe() throws JsonProcessingException {
     MetalakeDTO metalake =
         new MetalakeDTO.Builder()
             .withName("metalake")

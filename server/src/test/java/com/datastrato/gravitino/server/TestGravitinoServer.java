@@ -69,7 +69,7 @@ public class TestGravitinoServer {
   }
 
   @Test
-  public void testInitialize() {
+  void testInitialize() {
     gravitinoServer.initialize();
   }
 
@@ -80,24 +80,24 @@ public class TestGravitinoServer {
   }
 
   @Test
-  public void testStartAndStop() throws Exception {
+  void testStartAndStop() throws Exception {
     gravitinoServer.initialize();
     gravitinoServer.start();
     gravitinoServer.stop();
   }
 
   @Test
-  public void testStartWithoutInitialise() throws Exception {
+  void testStartWithoutInitialise() throws Exception {
     assertThrows(RuntimeException.class, () -> gravitinoServer.start());
   }
 
   @Test
-  public void testStopBeforeStart() throws Exception {
+  void testStopBeforeStart() throws Exception {
     gravitinoServer.stop();
   }
 
   @Test
-  public void testInitializeWithLoadFromFileException() throws Exception {
+  void testInitializeWithLoadFromFileException() throws Exception {
     ServerConfig config = new ServerConfig();
 
     // TODO: Exception due to environment variable not set. Is this the right exception?

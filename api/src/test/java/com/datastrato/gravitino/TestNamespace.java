@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 public class TestNamespace {
 
   @Test
-  public void testEmptyNamespace() {
+  void testEmptyNamespace() {
     Namespace ns = Namespace.empty();
 
     Assertions.assertEquals(0, ns.length());
@@ -20,7 +20,7 @@ public class TestNamespace {
   }
 
   @Test
-  public void testCreateNamespace() {
+  void testCreateNamespace() {
     Namespace ns = Namespace.of("a", "b", "c");
 
     Assertions.assertEquals(3, ns.length());
@@ -35,7 +35,7 @@ public class TestNamespace {
   }
 
   @Test
-  public void testCheckNamespace() {
+  void testCheckNamespace() {
     Namespace a = Namespace.of("a");
     Namespace ab = Namespace.of("a", "b");
     Namespace abcd = Namespace.of("a", "b", "c", "d");

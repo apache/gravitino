@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 public class TestPartitions {
 
   @Test
-  public void testPartitions() {
+  void testPartitions() {
     Partition partition =
         Partitions.range("p0", Literals.NULL, Literals.integerLiteral(6), Maps.newHashMap());
     Assertions.assertEquals("p0", partition.name());

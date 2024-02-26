@@ -32,7 +32,7 @@ public class AuditIT extends AbstractIT {
   }
 
   @Test
-  public void testAuditMetalake() throws Exception {
+  void testAuditMetalake() throws Exception {
     String metalakeAuditName = GravitinoITUtils.genRandomName("metalakeAudit");
     String newName = GravitinoITUtils.genRandomName("newmetaname");
 

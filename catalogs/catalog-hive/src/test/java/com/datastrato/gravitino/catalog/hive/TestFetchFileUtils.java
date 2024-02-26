@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 public class TestFetchFileUtils {
 
   @Test
-  public void testLinkLocalFile() throws Exception {
+  void testLinkLocalFile() throws Exception {
 
     File srcFile = new File("test");
     File destFile = new File("dest");
@@ -27,7 +27,7 @@ public class TestFetchFileUtils {
   }
 
   @Test
-  public void testDownloadFromHTTP() throws Exception {
+  void testDownloadFromHTTP() throws Exception {
     File destFile = new File("dest");
     FetchFileUtils.fetchFileFromUri(
         "https://downloads.apache.org/hadoop/common/KEYS", destFile, 10, new Configuration());

@@ -79,52 +79,52 @@ public class TestHTTPClient {
   }
 
   @Test
-  public void testPostSuccess() throws Exception {
+  void testPostSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.POST, true, true);
   }
 
   @Test
-  public void testPostFailure() throws Exception {
+  void testPostFailure() throws Exception {
     testHttpMethodOnFailure(Method.POST, true, true);
   }
 
   @Test
-  public void testPutSuccess() throws Exception {
+  void testPutSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.PUT, true, true);
   }
 
   @Test
-  public void testPutFailure() throws Exception {
+  void testPutFailure() throws Exception {
     testHttpMethodOnFailure(Method.PUT, true, true);
   }
 
   @Test
-  public void testGetSuccess() throws Exception {
+  void testGetSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.GET, false, true);
   }
 
   @Test
-  public void testGetFailure() throws Exception {
+  void testGetFailure() throws Exception {
     testHttpMethodOnFailure(Method.GET, false, true);
   }
 
   @Test
-  public void testDeleteSuccess() throws Exception {
+  void testDeleteSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.DELETE, false, true);
   }
 
   @Test
-  public void testDeleteFailure() throws Exception {
+  void testDeleteFailure() throws Exception {
     testHttpMethodOnFailure(Method.DELETE, false, true);
   }
 
   @Test
-  public void testHeadSuccess() throws JsonProcessingException {
+  void testHeadSuccess() throws JsonProcessingException {
     testHttpMethodOnSuccess(Method.HEAD, false, false);
   }
 
   @Test
-  public void testHeadFailure() throws JsonProcessingException {
+  void testHeadFailure() throws JsonProcessingException {
     testHttpMethodOnFailure(Method.HEAD, false, false);
   }
 

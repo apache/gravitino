@@ -342,8 +342,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateHiveTableWithDistributionAndSortOrder()
-      throws TException, InterruptedException {
+  void testCreateHiveTableWithDistributionAndSortOrder() throws TException, InterruptedException {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
@@ -443,7 +442,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateHiveTable() throws TException, InterruptedException {
+  void testCreateHiveTable() throws TException, InterruptedException {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
@@ -497,7 +496,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testHiveTableProperties() throws TException, InterruptedException {
+  void testHiveTableProperties() throws TException, InterruptedException {
     ColumnDTO[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -572,7 +571,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testHiveSchemaProperties() throws TException, InterruptedException {
+  void testHiveSchemaProperties() throws TException, InterruptedException {
     // test LOCATION property
     NameIdentifier schemaIdent =
         NameIdentifier.of(metalakeName, catalogName, GravitinoITUtils.genRandomName(SCHEMA_PREFIX));
@@ -614,7 +613,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testCreatePartitionedHiveTable() throws TException, InterruptedException {
+  void testCreatePartitionedHiveTable() throws TException, InterruptedException {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
@@ -665,7 +664,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testListPartitionNames() throws TException, InterruptedException {
+  void testListPartitionNames() throws TException, InterruptedException {
     // test empty partitions
     ColumnDTO[] columns = createColumns();
     NameIdentifier nameIdentifier =
@@ -692,7 +691,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testListPartitions() throws TException, InterruptedException {
+  void testListPartitions() throws TException, InterruptedException {
     // test empty partitions
     ColumnDTO[] columns = createColumns();
     NameIdentifier nameIdentifier =
@@ -747,7 +746,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testGetPartition() throws TException, InterruptedException {
+  void testGetPartition() throws TException, InterruptedException {
     Table createdTable = preparePartitionedTable();
 
     String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
@@ -771,7 +770,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testAddPartition() throws TException, InterruptedException {
+  void testAddPartition() throws TException, InterruptedException {
     Table createdTable = preparePartitionedTable();
 
     // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
@@ -912,7 +911,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterHiveTable() throws TException, InterruptedException {
+  void testAlterHiveTable() throws TException, InterruptedException {
     ColumnDTO[] columns = createColumns();
     Table createdTable =
         catalog
@@ -1058,7 +1057,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testDropHiveTable() {
+  void testDropHiveTable() {
     catalog
         .asTableCatalog()
         .createTable(
@@ -1078,7 +1077,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterSchema() throws TException, InterruptedException {
+  void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -1277,7 +1276,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
+  void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1302,7 +1301,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
+  void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1329,7 +1328,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
+  void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1356,7 +1355,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
+  void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()

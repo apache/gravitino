@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 public class TestRequestJsonSerDe {
 
   @Test
-  public void testMetalakeCreateRequestSerDe() throws JsonProcessingException {
+  void testMetalakeCreateRequestSerDe() throws JsonProcessingException {
     MetalakeCreateRequest request =
         new MetalakeCreateRequest("metalake", "comment", ImmutableMap.of("key", "value"));
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
@@ -48,7 +48,7 @@ public class TestRequestJsonSerDe {
   }
 
   @Test
-  public void testMetalakeUpdateRequestSerDe() throws JsonProcessingException {
+  void testMetalakeUpdateRequestSerDe() throws JsonProcessingException {
     MetalakeUpdateRequest req = new MetalakeUpdateRequest.RenameMetalakeRequest("newMetalake");
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
     MetalakeUpdateRequest deserReq =
@@ -84,7 +84,7 @@ public class TestRequestJsonSerDe {
   }
 
   @Test
-  public void testCatalogCreateRequestSerDe() throws JsonProcessingException {
+  void testCatalogCreateRequestSerDe() throws JsonProcessingException {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
             "catalog", Catalog.Type.RELATIONAL, "hive", "comment", ImmutableMap.of("key", "value"));
@@ -117,7 +117,7 @@ public class TestRequestJsonSerDe {
   }
 
   @Test
-  public void testCatalogUpdateRequestSerDe() throws JsonProcessingException {
+  void testCatalogUpdateRequestSerDe() throws JsonProcessingException {
     CatalogUpdateRequest req = new CatalogUpdateRequest.RenameCatalogRequest("newCatalog");
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
     CatalogUpdateRequest deserReq =

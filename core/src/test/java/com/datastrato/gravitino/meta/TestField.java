@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 public class TestField {
 
   @Test
-  public void testFieldRequired() {
+  void testFieldRequired() {
     Field required = Field.required("test", String.class, "test");
     required.validate("test");
     Throwable exception =
@@ -20,14 +20,14 @@ public class TestField {
   }
 
   @Test
-  public void testFieldOptional() {
+  void testFieldOptional() {
     Field optional = Field.optional("test", String.class, "test");
     optional.validate("test");
     optional.validate(null);
   }
 
   @Test
-  public void testTypeUnmatched() {
+  void testTypeUnmatched() {
     Field required = Field.required("test", String.class, "test");
     Throwable exception =
         Assertions.assertThrows(IllegalArgumentException.class, () -> required.validate(1));

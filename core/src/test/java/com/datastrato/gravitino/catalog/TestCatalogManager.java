@@ -276,7 +276,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testCreateCatalog() {
+  void testCreateCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test1");
     Map<String, String> props = Maps.newHashMap();
 
@@ -337,7 +337,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testListCatalogs() {
+  void testListCatalogs() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test11");
     NameIdentifier ident1 = NameIdentifier.of("metalake", "test12");
     Map<String, String> props = ImmutableMap.of("provider", "test");
@@ -359,7 +359,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testLoadCatalog() {
+  void testLoadCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
     Map<String, String> props = ImmutableMap.of("provider", "test");
 
@@ -384,7 +384,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testAlterCatalog() {
+  void testAlterCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
@@ -429,7 +429,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testDropCatalog() {
+  void testDropCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";

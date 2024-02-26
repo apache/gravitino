@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestIcebergConfig {
   @Test
-  public void testLoadIcebergConfig() {
+  void testLoadIcebergConfig() {
     Map<String, String> properties =
         ImmutableMap.of(JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(), "1000");
 
@@ -28,7 +28,7 @@ public class TestIcebergConfig {
   }
 
   @Test
-  public void testIcebergHttpPort() {
+  void testIcebergHttpPort() {
     Map<String, String> properties = ImmutableMap.of();
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(icebergConfig);

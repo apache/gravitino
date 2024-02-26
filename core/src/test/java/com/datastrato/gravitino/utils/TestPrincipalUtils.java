@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 public class TestPrincipalUtils {
 
   @Test
-  public void testNormal() throws Exception {
+  void testNormal() throws Exception {
     UserPrincipal principal = new UserPrincipal("testNormal");
     PrincipalUtils.doAs(
         principal,
@@ -23,7 +23,7 @@ public class TestPrincipalUtils {
   }
 
   @Test
-  public void testThread() throws Exception {
+  void testThread() throws Exception {
     UserPrincipal principal = new UserPrincipal("testThread");
     PrincipalUtils.doAs(
         principal,

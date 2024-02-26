@@ -299,7 +299,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   @Test
-  public void testSql() throws Exception {
+  void testSql() throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 

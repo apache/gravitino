@@ -119,7 +119,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testOperateSchema() throws Exception {
+  void testOperateSchema() throws Exception {
     // create schema normally using user datastrato
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
@@ -152,7 +152,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testOperateTable() throws Exception {
+  void testOperateTable() throws Exception {
     // create table normally using user datastrato
     Column[] columns = createColumns();
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
@@ -211,7 +211,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testOperatePartition() throws Exception {
+  void testOperatePartition() throws Exception {
 
     // create schema
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);

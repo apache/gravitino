@@ -41,7 +41,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   private static Type INT = Types.IntegerType.get();
 
   @Test
-  public void testOperationTable() {
+  void testOperationTable() {
     String tableName = RandomUtils.nextInt(10000) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -170,7 +170,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testAlterTable() {
+  void testAlterTable() {
     String tableName = RandomUtils.nextInt(10000) + "_al_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -407,7 +407,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testCreateAndLoadTable() {
+  void testCreateAndLoadTable() {
     String tableName = RandomUtils.nextInt(10000) + "_cl_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -466,7 +466,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testCreateAllTypeTable() {
+  void testCreateAllTypeTable() {
     String tableName = GravitinoITUtils.genRandomName("type_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -564,7 +564,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testCreateNotSupportTypeTable() {
+  void testCreateNotSupportTypeTable() {
     String tableName = GravitinoITUtils.genRandomName("type_table_");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -612,7 +612,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testCreateMultipleTables() {
+  void testCreateMultipleTables() {
     String test_table_1 = "test_table_1";
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -660,7 +660,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testLoadTableDefaultProperties() {
+  void testLoadTableDefaultProperties() {
     String test_table_1 = GravitinoITUtils.genRandomName("properties_table_");
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -682,7 +682,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  public void testAutoIncrement() {
+  void testAutoIncrement() {
     String tableName = "test_increment_table_1";
     String comment = "test_comment";
     Map<String, String> properties =

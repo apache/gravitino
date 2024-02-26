@@ -123,7 +123,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndListSchemas() throws IOException {
+  void testCreateAndListSchemas() throws IOException {
     Namespace ns = Namespace.of(metalake, catalog);
 
     NameIdentifier schemaIdent = NameIdentifier.of(ns, "schema1");
@@ -189,7 +189,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndLoadSchema() throws IOException {
+  void testCreateAndLoadSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema11");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
@@ -234,7 +234,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndAlterSchema() throws IOException {
+  void testCreateAndAlterSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema21");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
@@ -307,7 +307,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndDropSchema() throws IOException {
+  void testCreateAndDropSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
@@ -323,7 +323,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndListTables() throws IOException {
+  void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
@@ -399,7 +399,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndLoadTable() throws IOException {
+  void testCreateAndLoadTable() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema51");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
@@ -452,7 +452,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndAlterTable() throws IOException {
+  void testCreateAndAlterTable() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema61");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
@@ -519,7 +519,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndDropTable() throws IOException {
+  void testCreateAndDropTable() throws IOException {
     NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema71", "table31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column[] columns =
@@ -540,7 +540,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndListFilesets() {
+  void testCreateAndListFilesets() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
@@ -575,7 +575,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndLoadFileset() {
+  void testCreateAndLoadFileset() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema91");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema91");
     dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
@@ -598,7 +598,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndAlterFileset() {
+  void testCreateAndAlterFileset() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema101");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
@@ -633,7 +633,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndDropFileset() {
+  void testCreateAndDropFileset() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema111");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     dispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
@@ -653,7 +653,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
-  public void testGetCatalogIdentifier() {
+  void testGetCatalogIdentifier() {
     CatalogOperationDispatcher dispatcher = new CatalogOperationDispatcher(null, null, null);
 
     NameIdentifier id1 = NameIdentifier.of("a");

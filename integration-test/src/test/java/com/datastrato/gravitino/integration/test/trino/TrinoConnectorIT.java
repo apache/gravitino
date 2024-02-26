@@ -157,7 +157,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  public void testShowSchemas() {
+  void testShowSchemas() {
     String sql =
         String.format(
             "SHOW SCHEMAS FROM \"%s.%s\" LIKE '%s'", metalakeName, catalogName, databaseName);
@@ -167,7 +167,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateTable() throws TException, InterruptedException {
+  void testCreateTable() throws TException, InterruptedException {
     String sql3 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
@@ -335,7 +335,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  public void testScenarioJoinTwoTable() throws TException, InterruptedException {
+  void testScenarioJoinTwoTable() throws TException, InterruptedException {
     testScenarioTable1();
     testScenarioTable2();
 

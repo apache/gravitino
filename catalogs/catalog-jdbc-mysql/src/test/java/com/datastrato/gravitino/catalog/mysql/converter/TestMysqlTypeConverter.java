@@ -31,7 +31,7 @@ public class TestMysqlTypeConverter {
   private static final String USER_DEFINED_TYPE = "user-defined";
 
   @Test
-  public void testToGravitinoType() {
+  void testToGravitinoType() {
     checkJdbcTypeToGravitinoType(Types.ByteType.get(), TINYINT, null, null);
     checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT, null, null);
     checkJdbcTypeToGravitinoType(Types.LongType.get(), BIGINT, null, null);
@@ -50,7 +50,7 @@ public class TestMysqlTypeConverter {
   }
 
   @Test
-  public void testFromGravitinoType() {
+  void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(TINYINT, Types.ByteType.get());
     checkGravitinoTypeToJdbcType(INT, Types.IntegerType.get());
     checkGravitinoTypeToJdbcType(BIGINT, Types.LongType.get());

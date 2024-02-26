@@ -41,7 +41,7 @@ public class TestTypeConverter {
   private static final String USER_DEFINED_TYPE = "user-defined";
 
   @Test
-  public void testTypeConverter() {
+  void testTypeConverter() {
     testConverter(BOOLEAN_TYPE_NAME);
     testConverter(TINYINT_TYPE_NAME);
     testConverter(SMALLINT_TYPE_NAME);

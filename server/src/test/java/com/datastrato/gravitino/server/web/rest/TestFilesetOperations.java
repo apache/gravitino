@@ -86,7 +86,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testListFileset() {
+  void testListFileset() {
     NameIdentifier fileset1 = NameIdentifier.of(metalake, catalog, schema, "fileset1");
     NameIdentifier fileset2 = NameIdentifier.of(metalake, catalog, schema, "fileset2");
 
@@ -194,7 +194,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateFileset() {
+  void testCreateFileset() {
     Fileset fileset =
         mockFileset(
             "fileset1",
@@ -285,7 +285,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testRenameFileset() {
+  void testRenameFileset() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     Fileset fileset =
         mockFileset(
@@ -298,7 +298,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testSetFilesetProperties() {
+  void testSetFilesetProperties() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.SetFilesetPropertiesRequest("k1", "k1");
     Fileset fileset =
         mockFileset(
@@ -311,7 +311,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveFilesetProperties() {
+  void testRemoveFilesetProperties() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RemoveFilesetPropertiesRequest("k1");
     Fileset fileset =
         mockFileset(
@@ -320,7 +320,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateFilesetComment() {
+  void testUpdateFilesetComment() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.UpdateFilesetCommentRequest("new comment");
     Fileset fileset =
         mockFileset(
@@ -329,7 +329,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testMultiUpdateRequest() {
+  void testMultiUpdateRequest() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     FilesetUpdateRequest req1 = new FilesetUpdateRequest.UpdateFilesetCommentRequest("new comment");
     FilesetUpdateRequest req2 = new FilesetUpdateRequest.SetFilesetPropertiesRequest("k1", "v1");
@@ -351,7 +351,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropFileset() {
+  void testDropFileset() {
     when(dispatcher.dropFileset(any())).thenReturn(true);
 
     Response resp =

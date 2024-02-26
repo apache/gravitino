@@ -75,7 +75,7 @@ public class KerberosOperationsIT extends AbstractIT {
   }
 
   @Test
-  public void testAuthenticationApi() throws Exception {
+  void testAuthenticationApi() throws Exception {
     GravitinoVersion gravitinoVersion = client.getVersion();
     client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());

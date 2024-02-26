@@ -46,7 +46,7 @@ public class TestOAuth2TokenProvider {
   }
 
   @Test
-  public void testProviderInitException() throws Exception {
+  void testProviderInitException() throws Exception {
     Builder tokenProvider1 = DefaultOAuth2TokenProvider.builder().withUri("test");
     Builder tokenProvider2 =
         DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx");
@@ -59,7 +59,7 @@ public class TestOAuth2TokenProvider {
   }
 
   @Test
-  public void testAuthenticationError() throws Exception {
+  void testAuthenticationError() throws Exception {
 
     HttpResponse mockResponse =
         HttpResponse.response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
@@ -84,7 +84,7 @@ public class TestOAuth2TokenProvider {
   }
 
   @Test
-  public void testAuthenticationNormal() throws Exception {
+  void testAuthenticationNormal() throws Exception {
     OAuth2TokenProvider.Builder builder =
         DefaultOAuth2TokenProvider.builder()
             .withUri(String.format("http://127.0.0.1:%d", PORT))

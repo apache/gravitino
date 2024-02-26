@@ -13,13 +13,13 @@ import org.junit.jupiter.api.Test;
 public class TestApiVersion {
 
   @Test
-  public void testLatestVersion() {
+  void testLatestVersion() {
     ApiVersion latest = ApiVersion.latestVersion();
     assertEquals(ApiVersion.V_1, latest);
   }
 
   @Test
-  public void testIsSupportedVersion() {
+  void testIsSupportedVersion() {
     assertTrue(ApiVersion.isSupportedVersion(1));
     assertFalse(ApiVersion.isSupportedVersion(2));
   }
