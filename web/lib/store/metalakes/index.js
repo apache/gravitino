@@ -43,7 +43,7 @@ export const createMetalake = createAsyncThunk('appMetalakes/createMetalake', as
   const [err, res] = await to(createMetalakeApi(data))
 
   if (err || !res) {
-    throw new Error(err)
+    return { err: true }
   }
 
   dispatch(fetchMetalakes())
@@ -67,7 +67,7 @@ export const updateMetalake = createAsyncThunk('appMetalakes/updateMetalake', as
   const [err, res] = await to(updateMetalakeApi({ name, data }))
 
   if (err || !res) {
-    throw new Error(err)
+    return { err: true }
   }
 
   dispatch(fetchMetalakes())
@@ -326,7 +326,7 @@ export const createCatalog = createAsyncThunk(
     dispatch(setTableLoading(false))
 
     if (err || !res) {
-      throw new Error(err)
+      return { err: true }
     }
 
     const { catalog: catalogItem } = res
@@ -356,7 +356,7 @@ export const updateCatalog = createAsyncThunk(
   async ({ metalake, catalog, data }, { dispatch }) => {
     const [err, res] = await to(updateCatalogApi({ metalake, catalog, data }))
     if (err || !res) {
-      throw new Error(err)
+      return { err: true }
     }
     dispatch(fetchCatalogs({ metalake, update: { catalog, newCatalog: res.catalog }, init: true }))
 
