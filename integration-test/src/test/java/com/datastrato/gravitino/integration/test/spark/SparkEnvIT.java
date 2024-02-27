@@ -45,7 +45,7 @@ public class SparkEnvIT extends SparkUtilIT {
   void startUp() {
     initHiveEnv();
     initGravitinoEnv();
-    initMetalakeCatalogs();
+    initMetalakeAndCatalogs();
     initSparkEnv();
     LOG.info(
         "Startup Spark env successfully, gravitino uri: {}, hive metastore uri: {}",
@@ -60,7 +60,7 @@ public class SparkEnvIT extends SparkUtilIT {
     }
   }
 
-  private void initMetalakeCatalogs() {
+  private void initMetalakeAndCatalogs() {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
