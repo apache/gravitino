@@ -41,8 +41,7 @@ public class GravitinoCatalogManager {
 
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
     Preconditions.checkState(
-        gravitinoCatalogManager == null,
-        "Should not create duplicate " + "GravitinoCatalogManager");
+        gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
     gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
     return gravitinoCatalogManager;
   }
@@ -51,12 +50,12 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(
         gravitinoCatalogManager != null, "GravitinoCatalogManager has not created yet");
     Preconditions.checkState(
-        gravitinoCatalogManager.isClosed == false, "GravitinoCatalogManager is already closed");
+        !gravitinoCatalogManager.isClosed, "GravitinoCatalogManager is already closed");
     return gravitinoCatalogManager;
   }
 
   public void close() {
-    Preconditions.checkState(isClosed == false, "Gravitino Catalog is already closed");
+    Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
     gravitinoClient.close();
   }
