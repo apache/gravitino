@@ -42,9 +42,6 @@ import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
 import axios from 'axios'
 import { useAuth as Auth } from '../../provider/session'
-import qs from 'qs'
-
-let isRefreshing = false
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -203,34 +200,6 @@ const transform: AxiosTransform = {
       return Promise.reject(error)
     }
 
-    if (response?.status === 401 && !originConfig._retry) {
-      originConfig._retry = true
-
-      if (!isRefreshing) {
-        isRefreshing = true
-
-        try {
-          refreshToken()
-            .then(res => {
-              const { access_token } = res
-              localStorage.setItem('accessToken', access_token)
-
-              return defHttp.request(originConfig)
-            })
-            .catch(err => {
-              console.error('refreshToken error =>', err)
-              localStorage.removeItem('accessToken')
-              window.location.href = '/ui/login'
-            })
-        } catch (err) {
-          console.error(err)
-        } finally {
-          isRefreshing = false
-          location.reload()
-        }
-      }
-    }
-
     try {
       if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
@@ -299,13 +268,6 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
       opt || {}
     )
   )
-}
-
-const refreshToken = () => {
-  const url = localStorage.getItem('oauthUrl')
-  const params = localStorage.getItem('authParams')
-
-  return defHttp.post({ url: `${url}?${qs.stringify(JSON.parse(params))}` }, { withToken: false }).then(res => res)
 }
 
 export const defHttp = createAxios()
