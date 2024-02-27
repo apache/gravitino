@@ -294,6 +294,7 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UseCorrectAssertInTests",
         "VarTypeName",
         "XorPower",
         "EqualsGetClass",
