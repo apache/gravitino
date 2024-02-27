@@ -153,16 +153,22 @@ const CreateMetalakeDialog = props => {
     }
 
     if (type === 'create') {
-      dispatch(createMetalake({ ...metalakeData }))
+      dispatch(createMetalake({ ...metalakeData })).then(res => {
+        if (!res.payload?.err) {
+          handleClose()
+        }
+      })
     } else {
       const reqData = { updates: genUpdates(cacheData, metalakeData) }
 
       if (reqData.updates.length !== 0) {
-        dispatch(updateMetalake({ name: cacheData.name, data: reqData }))
+        dispatch(updateMetalake({ name: cacheData.name, data: reqData })).then(res => {
+          if (!res.payload?.err) {
+            handleClose()
+          }
+        })
       }
     }
-
-    handleClose()
   }
 
   useEffect(() => {
