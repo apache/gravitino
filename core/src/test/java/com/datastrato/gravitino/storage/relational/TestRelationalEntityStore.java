@@ -363,6 +363,27 @@ public class TestRelationalEntityStore {
     assertEquals("this is test 2", updatedMetalake.comment());
     assertEquals(changedAuditInfo.creator(), updatedMetalake.auditInfo().creator());
 
+    BaseMetalake metalake3 = createMetalake(3L, "test_metalake3", "this is test 3");
+    entityStore.put(metalake3, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                metalake3.nameIdentifier(),
+                BaseMetalake.class,
+                Entity.EntityType.METALAKE,
+                m -> {
+                  BaseMetalake.Builder builder =
+                      new BaseMetalake.Builder()
+                          .withId(metalake3.id())
+                          .withName("test_metalake2")
+                          .withComment(metalake3.comment())
+                          .withProperties(new HashMap<>())
+                          .withAuditInfo((AuditInfo) m.auditInfo())
+                          .withVersion(m.getVersion());
+                  return builder.build();
+                }));
+
     // catalog
     CatalogEntity catalog =
         createCatalog(
@@ -415,6 +436,31 @@ public class TestRelationalEntityStore {
     assertEquals("test_catalog2", updatedCatalog.name());
     assertEquals("this is catalog test 2", updatedCatalog.getComment());
     assertEquals(changedAuditInfo.creator(), updatedCatalog.auditInfo().creator());
+
+    CatalogEntity catalog3 =
+        createCatalog(
+            3L, "test_catalog3", Namespace.ofCatalog("test_metalake2"), "this is catalog test 3");
+    entityStore.put(catalog3, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                catalog3.nameIdentifier(),
+                CatalogEntity.class,
+                Entity.EntityType.CATALOG,
+                c -> {
+                  CatalogEntity.Builder builder =
+                      CatalogEntity.builder()
+                          .withId(catalog3.id())
+                          .withName("test_catalog2")
+                          .withNamespace(Namespace.ofCatalog(updatedMetalake.name()))
+                          .withType(Catalog.Type.RELATIONAL)
+                          .withProvider("test")
+                          .withComment(catalog3.getComment())
+                          .withProperties(new HashMap<>())
+                          .withAuditInfo((AuditInfo) c.auditInfo());
+                  return builder.build();
+                }));
   }
 
   @Test
