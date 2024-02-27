@@ -46,18 +46,20 @@ public class MetalakeMetaService {
   }
 
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
+    NameIdentifier.checkMetalake(ident);
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (metalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
   }
 
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
     try {
+      NameIdentifier.checkMetalake(baseMetalake.nameIdentifier());
       SessionUtils.doWithCommit(
           MetalakeMetaMapper.class,
           mapper -> {
@@ -77,8 +79,7 @@ public class MetalakeMetaService {
         // SQL violates the constraints of `primary key` and `unique key`.
         // We simply think that the entity already exists at this time.
         throw new EntityAlreadyExistsException(
-            String.format(
-                "Metalake entity: %s already exists", baseMetalake.nameIdentifier().name()));
+            String.format("Metalake entity: %s already exists", baseMetalake.nameIdentifier()));
       }
       throw re;
     }
@@ -86,12 +87,13 @@ public class MetalakeMetaService {
 
   public <E extends Entity & HasIdentifier> BaseMetalake updateMetalake(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
+    NameIdentifier.checkMetalake(ident);
     MetalakePO oldMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (oldMetalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_AN_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
     }
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
@@ -116,6 +118,7 @@ public class MetalakeMetaService {
   }
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
+    NameIdentifier.checkMetalake(ident);
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));

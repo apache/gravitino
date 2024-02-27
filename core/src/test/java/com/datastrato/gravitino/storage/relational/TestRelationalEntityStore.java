@@ -47,9 +47,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -206,7 +208,10 @@ public class TestRelationalEntityStore {
     entityStore.put(metalake1, false);
     entityStore.put(metalake2, false);
     List<BaseMetalake> metalakes =
-        entityStore.list(metalake1.namespace(), BaseMetalake.class, Entity.EntityType.METALAKE);
+        entityStore.list(metalake1.namespace(), BaseMetalake.class, Entity.EntityType.METALAKE)
+            .stream()
+            .sorted(Comparator.comparing(BaseMetalake::id))
+            .collect(Collectors.toList());
     assertNotNull(metalakes);
     assertEquals(2, metalakes.size());
     assertTrue(checkMetalakeEquals(metalake1, metalakes.get(0)));
@@ -227,7 +232,10 @@ public class TestRelationalEntityStore {
     entityStore.put(catalog1, false);
     entityStore.put(catalog2, false);
     List<CatalogEntity> catalogEntities =
-        entityStore.list(catalog1.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG);
+        entityStore.list(catalog1.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG)
+            .stream()
+            .sorted(Comparator.comparing(CatalogEntity::id))
+            .collect(Collectors.toList());
     assertNotNull(catalogEntities);
     assertEquals(2, catalogEntities.size());
     assertTrue(checkCatalogEquals(catalog1, catalogEntities.get(0)));

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `schema_version` MEDIUMTEXT NOT NULL COMMENT 'metalake schema version info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'metalake current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'metalake last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 NULL COMMENT 'metalake deleted at',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metalake deleted at',
     PRIMARY KEY (`metalake_id`),
     UNIQUE KEY `uk_mn_del` (`metalake_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'metalake metadata';
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `catalog_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'catalog audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'catalog current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'catalog last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 NULL COMMENT 'catalog deleted at',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'catalog deleted at',
     PRIMARY KEY (`catalog_id`),
     UNIQUE KEY `uk_mid_cn_del` (`metalake_id`, `catalog_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'catalog metadata';
