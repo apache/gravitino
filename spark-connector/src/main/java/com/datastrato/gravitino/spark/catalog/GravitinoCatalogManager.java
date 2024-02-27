@@ -40,25 +40,23 @@ public class GravitinoCatalogManager {
   }
 
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
-    if (gravitinoCatalogManager != null) {
-      throw new RuntimeException("should not create duplicate GravitinoCatalogManager");
-    }
+    Preconditions.checkArgument(
+        gravitinoCatalogManager == null,
+        "Should not create duplicate " + "GravitinoCatalogManager");
     gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
     return gravitinoCatalogManager;
   }
 
   public static GravitinoCatalogManager get() {
-    if (gravitinoCatalogManager == null) {
-      throw new RuntimeException("GravitinoCatalogManager has not created yet");
-    }
-    if (gravitinoCatalogManager.isClosed) {
-      throw new RuntimeException("GravitinoCatalogManager " + "is already closed");
-    }
+    Preconditions.checkArgument(
+        gravitinoCatalogManager != null, "GravitinoCatalogManager has not created yet");
+    Preconditions.checkArgument(
+        gravitinoCatalogManager.isClosed == false, "GravitinoCatalogManager is already closed");
     return gravitinoCatalogManager;
   }
 
   public void close() {
-    Preconditions.checkArgument(isClosed == false);
+    Preconditions.checkArgument(isClosed == false, "Gravitino Catalog is already closed");
     isClosed = true;
     gravitinoClient.close();
   }

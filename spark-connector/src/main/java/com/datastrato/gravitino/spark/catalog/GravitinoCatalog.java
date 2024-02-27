@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
@@ -39,12 +40,16 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
  * GravitinoCatalog is the class registered to Spark CatalogManager, it's lazy loaded which means
- * Spark connector loads GravitinoCatalog when it's used. It will create different Spark Table for
- * different Gravitino catalog.
+ * Spark connector loads GravitinoCatalog when it's used. It will create different Spark Tables from
+ * different Gravitino catalogs.
  */
 public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
+  // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
+  // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
+  // Iceberg.
   protected TableCatalog sparkCatalog;
-  protected Catalog gravitinoCatalog;
+  // The Gravitino catalog client to do schema operations.
+  protected Catalog gravitinoCatalogClient;
 
   private String metalakeName;
   private String catalogName;
@@ -100,8 +105,8 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
-    this.gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
-    String provider = gravitinoCatalog.provider();
+    this.gravitinoCatalogClient = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(provider != null, name + " catalog provider is null");
     this.sparkCatalog = createAndInitSparkCatalog(provider, name, options);
   }
@@ -114,7 +119,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
     NameIdentifier[] schemas =
-        gravitinoCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+        gravitinoCatalogClient.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
     return Arrays.stream(schemas)
         .map(schema -> new String[] {schema.name()})
         .toArray(String[][]::new);
@@ -135,18 +140,16 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     valiateNamespace(namespace);
     try {
       Schema schema =
-          gravitinoCatalog
+          gravitinoCatalogClient
               .asSchemas()
               .loadSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]));
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
-        if (properties == null) {
-          properties = new HashMap<>();
-        } else {
-          properties = new HashMap<>(schema.properties());
-        }
-        properties.put(SupportsNamespaces.PROP_COMMENT, comment);
+        Map<String, String> propertiesWithComment =
+            new HashMap<>(Optional.ofNullable(properties).orElse(new HashMap<>()));
+        propertiesWithComment.put(SupportsNamespaces.PROP_COMMENT, comment);
+        return propertiesWithComment;
       }
       return properties;
     } catch (NoSuchSchemaException e) {
@@ -161,7 +164,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
-      gravitinoCatalog
+      gravitinoCatalogClient
           .asSchemas()
           .createSchema(
               NameIdentifier.of(metalakeName, catalogName, namespace[0]), comment, properties);
@@ -181,7 +184,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
     valiateNamespace(namespace);
     try {
-      return gravitinoCatalog
+      return gravitinoCatalogClient
           .asSchemas()
           .dropSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), cascade);
     } catch (NonEmptySchemaException e) {
@@ -189,21 +192,24 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
+  // Create specific Spark catalogs for different Gravitino catalog providers, mainly used to do IO
+  // operations.
   private TableCatalog createAndInitSparkCatalog(
       String provider, String name, CaseInsensitiveStringMap options) {
     switch (provider.toLowerCase(Locale.ROOT)) {
       case "hive":
-        return createAndInitHiveCatalog(name, options);
+        return createAndInitSparkHiveCatalog(name, options);
       default:
         throw new NotSupportedException("Not support catalog: " + name + ", provider: " + provider);
     }
   }
 
-  private TableCatalog createAndInitHiveCatalog(String name, CaseInsensitiveStringMap options) {
+  private TableCatalog createAndInitSparkHiveCatalog(
+      String name, CaseInsensitiveStringMap options) {
     Preconditions.checkArgument(
-        gravitinoCatalog.properties() != null, "Hive Catalog properties should not be null");
+        gravitinoCatalogClient.properties() != null, "Hive Catalog properties should not be null");
     String metastoreUri =
-        gravitinoCatalog.properties().get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
+        gravitinoCatalogClient.properties().get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
     Preconditions.checkArgument(
         StringUtils.isNoneBlank(metastoreUri),
         "Couldn't get "

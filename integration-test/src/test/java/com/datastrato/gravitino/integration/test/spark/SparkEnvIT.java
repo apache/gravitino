@@ -42,7 +42,7 @@ public class SparkEnvIT extends SparkUtilIT {
   }
 
   @BeforeAll
-  void startup() {
+  void startUp() {
     initHiveEnv();
     initGravitinoEnv();
     initMetalakeCatalogs();
