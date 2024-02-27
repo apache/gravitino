@@ -359,14 +359,14 @@ public class ErrorHandlers {
         switch (errorResponse.getType()) {
           case OAuth2ClientUtil.INVALID_CLIENT_ERROR:
             throw new UnauthorizedException(
-                    "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage());
+                "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage());
           case OAuth2ClientUtil.INVALID_REQUEST_ERROR:
           case OAuth2ClientUtil.INVALID_GRANT_ERROR:
           case OAuth2ClientUtil.UNAUTHORIZED_CLIENT_ERROR:
           case OAuth2ClientUtil.UNSUPPORTED_GRANT_TYPE_ERROR:
           case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
             throw new BadRequestException(
-                    "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
+                "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
           default:
             super.accept(errorResponse);
         }
