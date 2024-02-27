@@ -34,6 +34,7 @@ public class GravitinoCatalogManager {
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
     this.metalakeName = metalakeName;
     this.gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+    // Will not evict catalog by default
     this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
     this.metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
   }

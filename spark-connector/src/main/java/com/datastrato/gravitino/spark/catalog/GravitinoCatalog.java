@@ -38,8 +38,8 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * GravitinoCatalog is the class registered to Spark CatalogManager, it's lazy load means Spark
- * connector loads GravitinoCatalog when it's used. It will create different Spark Table for
+ * GravitinoCatalog is the class registered to Spark CatalogManager, it's lazy loaded which means
+ * Spark connector loads GravitinoCatalog when it's used. It will create different Spark Table for
  * different Gravitino catalog.
  */
 public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
@@ -103,7 +103,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     this.gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
     String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(provider != null, name + " catalog provider is null");
-    sparkCatalog = createAndInitSparkCatalog(provider, name, options);
+    this.sparkCatalog = createAndInitSparkCatalog(provider, name, options);
   }
 
   @Override
@@ -141,7 +141,11 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
-        properties = new HashMap<>(schema.properties());
+        if (properties == null) {
+          properties = new HashMap<>();
+        } else {
+          properties = new HashMap<>(schema.properties());
+        }
         properties.put(SupportsNamespaces.PROP_COMMENT, comment);
       }
       return properties;
@@ -185,7 +189,6 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
-  // Create a internal catalog to do IO operations.
   private TableCatalog createAndInitSparkCatalog(
       String provider, String name, CaseInsensitiveStringMap options) {
     switch (provider.toLowerCase(Locale.ROOT)) {
