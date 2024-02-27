@@ -85,6 +85,15 @@ public class TestTableOperations extends JerseyTest {
 
   private final String schema = "schema1";
 
+  //  @BeforeAll
+  //  public static void setup() {
+  //    Config config = mock(Config.class);
+  //    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+  //    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+  //    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+  //    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+  //  }
+
   @Override
   protected Application configure() {
     try {
