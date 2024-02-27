@@ -105,11 +105,26 @@ public class MetalakeMetaService {
         oldMetalakeEntity.id());
     MetalakePO newMetalakePO =
         POConverters.updateMetalakePOWithVersion(oldMetalakePO, newMetalakeEntity);
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              MetalakeMetaMapper.class,
+              mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
+    } catch (RuntimeException re) {
+      if (re.getCause() != null
+          && re.getCause().getCause() != null
+          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+        // TODO We should make more fine-grained exception judgments
+        // Usually throwing `SQLIntegrityConstraintViolationException` means that
+        // SQL violates the constraints of `primary key` and `unique key`.
+        // We simply think that the entity already exists at this time.
+        throw new EntityAlreadyExistsException(
+            String.format("Catalog entity: %s already exists", newMetalakeEntity.nameIdentifier()));
+      }
+      throw re;
+    }
 
-    Integer updateResult =
-        SessionUtils.doWithCommitAndFetchResult(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     if (updateResult > 0) {
       return newMetalakeEntity;
     } else {

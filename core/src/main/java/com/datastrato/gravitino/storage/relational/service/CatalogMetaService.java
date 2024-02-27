@@ -139,14 +139,28 @@ public class CatalogMetaService {
         "The updated catalog entity id: %s should be same with the catalog entity id before: %s",
         newEntity.id(),
         oldCatalogEntity.id());
-
-    Integer updateResult =
-        SessionUtils.doWithCommitAndFetchResult(
-            CatalogMetaMapper.class,
-            mapper ->
-                mapper.updateCatalogMeta(
-                    POConverters.updateCatalogPOWithVersion(oldCatalogPO, newEntity, metalakeId),
-                    oldCatalogPO));
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              CatalogMetaMapper.class,
+              mapper ->
+                  mapper.updateCatalogMeta(
+                      POConverters.updateCatalogPOWithVersion(oldCatalogPO, newEntity, metalakeId),
+                      oldCatalogPO));
+    } catch (RuntimeException re) {
+      if (re.getCause() != null
+          && re.getCause().getCause() != null
+          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+        // TODO We should make more fine-grained exception judgments
+        // Usually throwing `SQLIntegrityConstraintViolationException` means that
+        // SQL violates the constraints of `primary key` and `unique key`.
+        // We simply think that the entity already exists at this time.
+        throw new EntityAlreadyExistsException(
+            String.format("Catalog entity: %s already exists", newEntity.nameIdentifier()));
+      }
+      throw re;
+    }
 
     if (updateResult > 0) {
       return newEntity;
