@@ -296,7 +296,8 @@ subprojects {
         "UnusedCollectionModifiedInPlace",
         "VarTypeName",
         "XorPower",
-        "EqualsGetClass"
+        "EqualsGetClass",
+        "DefaultCharset"
       )
     }
   }
