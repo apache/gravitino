@@ -74,7 +74,7 @@ public interface Transform extends Expression {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof SingleFieldTransform)) {
         return false;
       }
       SingleFieldTransform that = (SingleFieldTransform) o;
