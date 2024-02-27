@@ -10,11 +10,6 @@
   </property>
 
   <property>
-    <name>dfs.datanode.address</name>
-    <value>0.0.0.0:50010</value>
-  </property>
-
-  <property>
     <name>dfs.permissions.superusergroup</name>
     <value>hdfs</value>
   </property>
@@ -85,5 +80,9 @@
   <property>
     <name>dfs.datanode.http.address</name>
     <value>0.0.0.0:579</value>
+  </property>
+  <property>
+    <name>ignore.secure.ports.for.testing</name>
+    <value>true</value>
   </property>
 </configuration>

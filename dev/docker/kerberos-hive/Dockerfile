@@ -60,6 +60,8 @@ COPY krb5.conf /etc/krb5.conf
 # set environment variables
 ENV JAVA_HOME=/usr/local/jdk
 ENV HIVE_HOME=/usr/local/hive
+ENV JSVC_HOME=/user/bin
+ENV HADOOP_SECURE_DN_USER=hdfs
 ENV HADOOP_HOME=/usr/local/hadoop
 ENV HADOOP_HEAPSIZE=128
 ENV HADOOP_INSTALL=${HADOOP_HOME}
@@ -118,8 +120,6 @@ ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
 ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
-# format HFS
-RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
 ################################################################################
 # install hive

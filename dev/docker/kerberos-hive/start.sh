@@ -10,24 +10,43 @@ service ssh start
 ssh-keyscan localhost > /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 
-FQDN="HADOOPPKRB"
-ADMIN="admin"
-PASS="Admin12!"
-KRB5_KTNAME=/etc/admin.keytab
 echo -e "${PASS}\n${PASS}" | kdb5_util create -s
-echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc ${ADMIN}/admin"
-echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc cli"
-echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc  server/${HOSTNAME}.${FQDN}"
-kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} cli"
-kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} server/${HOSTNAME}.${FQDN}"
-kadmin.local -q "xst -k /app/hadoop.keytab -norandkey server/${HOSTNAME}.${FQDN}"
-kadmin.local -q "xst -k /app/cli.keytab -norandkey cli"
 
 service krb5-kdc start
 service krb5-admin-server start
 
+FQDN="HADOOPKRB"
+ADMIN="admin"
+PASS="Admin12!"
+KRB5_KTNAME=/etc/admin.keytab
+
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc ${ADMIN}/admin"
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc cli"
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hdfs/${HOSTNAME}@${FQDN}"
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc HTTP/${HOSTNAME}@${FQDN}"
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hive/${HOSTNAME}@${FQDN}"
+
+kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} cli"
+kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hdfs/${HOSTNAME}@${FQDN}"
+kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} HTTP/${HOSTNAME}@${FQDN}"
+
+kadmin.local -q "xst -k /hdfs.keytab -norandkey hdfs/${HOSTNAME}@${FQDN}"
+kadmin.local -q "xst -k /hdfs.keytab -norandkey HTTP/${HOSTNAME}@${FQDN}"
+
+kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
+kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
+kadmin.local -q "xst -k /cli.keytab -norandkey cli"
+
+sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
+sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
+sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
+
+# format HFS
+${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
+
 # start hdfs
 ${HADOOP_HOME}/sbin/start-dfs.sh
+${HADOOP_HOME}/sbin/start-secure-dns.sh
 
 # start mysql and create databases/users for hive
 chown -R mysql:mysql /var/lib/mysql
