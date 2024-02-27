@@ -51,9 +51,9 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   // The Gravitino catalog client to do schema operations.
   protected Catalog gravitinoCatalogClient;
 
-  private String metalakeName;
+  private final String metalakeName;
   private String catalogName;
-  private GravitinoCatalogManager gravitinoCatalogManager;
+  private final GravitinoCatalogManager gravitinoCatalogManager;
 
   public GravitinoCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
@@ -137,7 +137,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public Map<String, String> loadNamespaceMetadata(String[] namespace)
       throws NoSuchNamespaceException {
-    valiateNamespace(namespace);
+    validateNamespace(namespace);
     try {
       Schema schema =
           gravitinoCatalogClient
@@ -160,7 +160,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void createNamespace(String[] namespace, Map<String, String> metadata)
       throws NamespaceAlreadyExistsException {
-    valiateNamespace(namespace);
+    validateNamespace(namespace);
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
@@ -182,7 +182,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public boolean dropNamespace(String[] namespace, boolean cascade)
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
-    valiateNamespace(namespace);
+    validateNamespace(namespace);
     try {
       return gravitinoCatalogClient
           .asSchemas()
@@ -217,14 +217,14 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
             + " from hive catalog properties");
 
     TableCatalog hiveCatalog = new HiveTableCatalog();
-    HashMap all = new HashMap(options);
+    HashMap<String, String> all = new HashMap(options);
     all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
 
     return hiveCatalog;
   }
 
-  private void valiateNamespace(String[] namespace) {
+  private void validateNamespace(String[] namespace) {
     Preconditions.checkArgument(
         namespace.length == 1,
         "Doesn't support multi level namespaces: " + String.join(".", namespace));

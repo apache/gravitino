@@ -26,10 +26,10 @@ public class GravitinoCatalogManager {
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
-  private Cache<String, Catalog> gravitinoCatalogs;
-  private String metalakeName;
-  private GravitinoMetaLake metalake;
-  private GravitinoClient gravitinoClient;
+  private final Cache<String, Catalog> gravitinoCatalogs;
+  private final String metalakeName;
+  private final GravitinoMetaLake metalake;
+  private final GravitinoClient gravitinoClient;
 
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
     this.metalakeName = metalakeName;

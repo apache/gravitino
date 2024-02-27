@@ -62,7 +62,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         catalogName -> {
           String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
           Preconditions.checkArgument(
-              sparkConf.contains(sparkCatalogConfigName) == false,
+              !sparkConf.contains(sparkCatalogConfigName),
               catalogName + " is already registered to SparkCatalogManager");
           sparkConf.set(sparkCatalogConfigName, GravitinoCatalog.class.getName());
           LOG.info("Register {} catalog to Spark catalog manager", catalogName);
