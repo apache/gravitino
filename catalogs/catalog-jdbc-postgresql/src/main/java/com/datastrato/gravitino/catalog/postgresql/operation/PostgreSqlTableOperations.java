@@ -143,17 +143,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
-      String fieldStr =
-          Arrays.stream(index.fieldNames())
-              .map(
-                  colNames -> {
-                    if (colNames.length > 1) {
-                      throw new IllegalArgumentException(
-                          "Index does not support complex fields in PostgreSQL");
-                    }
-                    return PG_QUOTE + colNames[0] + PG_QUOTE;
-                  })
-              .collect(Collectors.joining(", "));
+      String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",").append(NEW_LINE);
       switch (index.type()) {
         case PRIMARY_KEY:
@@ -172,6 +162,19 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("PostgreSQL doesn't support index : " + index.type());
       }
     }
+  }
+
+  private static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in PostgreSQL");
+              }
+              return PG_QUOTE + colNames[0] + PG_QUOTE;
+            })
+        .collect(Collectors.joining(", "));
   }
 
   private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
@@ -270,6 +273,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
 
         alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
+      } else if (change instanceof TableChange.AddIndex) {
+        alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
+      } else if (change instanceof TableChange.DeleteIndex) {
+        alterSql.add(deleteIndexDefinition(tableName, (TableChange.DeleteIndex) change));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -285,6 +292,63 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     String result = String.join("\n", alterSql);
     LOG.info("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);
     return result;
+  }
+
+  @VisibleForTesting
+  static String deleteIndexDefinition(String tableName, TableChange.DeleteIndex deleteIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder
+        .append("ALTER TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" DROP CONSTRAINT ")
+        .append(PG_QUOTE)
+        .append(deleteIndex.getName())
+        .append(PG_QUOTE)
+        .append(";\n");
+    if (deleteIndex.isIfExists()) {
+      sqlBuilder
+          .append("DROP INDEX IF EXISTS ")
+          .append(PG_QUOTE)
+          .append(deleteIndex.getName())
+          .append(PG_QUOTE)
+          .append(";");
+    } else {
+      sqlBuilder
+          .append("DROP INDEX ")
+          .append(PG_QUOTE)
+          .append(deleteIndex.getName())
+          .append(PG_QUOTE)
+          .append(";");
+    }
+    return sqlBuilder.toString();
+  }
+
+  @VisibleForTesting
+  static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder
+        .append("ALTER TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" ADD CONSTRAINT ")
+        .append(PG_QUOTE)
+        .append(addIndex.getName())
+        .append(PG_QUOTE);
+    switch (addIndex.getType()) {
+      case PRIMARY_KEY:
+        sqlBuilder.append(" PRIMARY KEY ");
+        break;
+      case UNIQUE_KEY:
+        sqlBuilder.append(" UNIQUE ");
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported index type: " + addIndex.getType());
+    }
+    sqlBuilder.append("(").append(getIndexFieldStr(addIndex.getFieldNames())).append(");");
+    return sqlBuilder.toString();
   }
 
   private String updateColumnNullabilityDefinition(
