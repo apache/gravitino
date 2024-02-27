@@ -190,7 +190,8 @@ class DTOConverters {
           addColumn.getDataType(),
           addColumn.getComment(),
           addColumn.getPosition(),
-          addColumn.isNullable());
+          addColumn.isNullable(),
+          addColumn.isAutoIncrement());
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -216,6 +217,9 @@ class DTOConverters {
     } else if (change instanceof TableChange.UpdateColumnNullability) {
       return new TableUpdateRequest.UpdateTableColumnNullabilityRequest(
           change.fieldName(), ((TableChange.UpdateColumnNullability) change).nullable());
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      return new TableUpdateRequest.UpdateColumnAutoIncrementRequest(
+          change.fieldName(), ((TableChange.UpdateColumnAutoIncrement) change).isAutoIncrement());
     } else {
       throw new IllegalArgumentException(
           "Unknown column change type: " + change.getClass().getSimpleName());

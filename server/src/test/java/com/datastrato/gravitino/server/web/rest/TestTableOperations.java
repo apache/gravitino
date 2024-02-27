@@ -549,6 +549,7 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.first(),
+            false,
             false);
     Column[] columns =
         new Column[] {
@@ -569,7 +570,8 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.after("col2"),
-            true);
+            true,
+            false);
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),
@@ -656,6 +658,19 @@ public class TestTableOperations extends JerseyTest {
   public void testDeleteTableIndex() {
     TableUpdateRequest.DeleteTableIndexRequest req =
         new TableUpdateRequest.DeleteTableIndexRequest("test", false);
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testUpdateColumnAutoIncrement() {
+    TableUpdateRequest.UpdateColumnAutoIncrementRequest req =
+        new TableUpdateRequest.UpdateColumnAutoIncrementRequest(new String[] {"test"}, false);
     Column[] columns =
         new Column[] {
           mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
