@@ -581,7 +581,9 @@ public interface TableChange {
     private final String column;
 
     private After(String column) {
-      assert column != null;
+      if (null == column) {
+        throw new IllegalArgumentException("column can not be null.");
+      }
       this.column = column;
     }
 
