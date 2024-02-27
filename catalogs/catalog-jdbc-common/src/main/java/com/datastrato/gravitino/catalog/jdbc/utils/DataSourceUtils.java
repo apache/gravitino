@@ -65,8 +65,12 @@ public class DataSourceUtils {
   public static void closeDataSource(DataSource dataSource) {
     if (null != dataSource) {
       try {
-        assert dataSource instanceof BasicDataSource;
-        ((BasicDataSource) dataSource).close();
+        if (dataSource instanceof BasicDataSource) {
+          ((BasicDataSource) dataSource).close();
+        } else {
+          throw new UnsupportedOperationException(
+              "close operation can only be called in BasicDataSource.");
+        }
       } catch (SQLException ignore) {
         // no op
       }

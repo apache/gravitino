@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,8 +179,10 @@ public class ProcessData {
     try {
       InputStream in = this.checkedProcess.getInputStream();
       InputStream inErrors = this.checkedProcess.getErrorStream();
-      BufferedReader inReader = new BufferedReader(new InputStreamReader(in));
-      BufferedReader inReaderErrors = new BufferedReader(new InputStreamReader(inErrors));
+      BufferedReader inReader =
+          new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+      BufferedReader inReaderErrors =
+          new BufferedReader(new InputStreamReader(inErrors, StandardCharsets.UTF_8));
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Started retrieving data from streams of attached process: {}", this.checkedProcess);
