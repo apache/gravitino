@@ -6,6 +6,8 @@ package com.datastrato.gravitino.dto.requests;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -54,7 +56,11 @@ import org.apache.commons.lang3.StringUtils;
       name = "updateColumnNullability"),
   @JsonSubTypes.Type(
       value = TableUpdateRequest.DeleteTableColumnRequest.class,
-      name = "deleteColumn")
+      name = "deleteColumn"),
+  @JsonSubTypes.Type(value = TableUpdateRequest.AddTableIndexRequest.class, name = "addTableIndex"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.DeleteTableIndexRequest.class,
+      name = "deleteTableIndex")
 })
 public interface TableUpdateRequest extends RESTRequest {
 
@@ -670,6 +676,93 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.deleteColumn(fieldName, ifExists);
+    }
+  }
+
+  /** Represents a request to add an index to a table. */
+  @EqualsAndHashCode
+  @ToString
+  class AddTableIndexRequest implements TableUpdateRequest {
+
+    @JsonProperty("index")
+    @JsonSerialize(using = JsonUtils.IndexSerializer.class)
+    @JsonDeserialize(using = JsonUtils.IndexDeserializer.class)
+    private Index index;
+
+    /** Default constructor for Jackson deserialization. */
+    public AddTableIndexRequest() {}
+
+    /**
+     * The constructor of the add table index request.
+     *
+     * @param type The type of the index
+     * @param name The name of the index
+     * @param fieldNames The field names under the table contained in the index.
+     */
+    public AddTableIndexRequest(Index.IndexType type, String name, String[][] fieldNames) {
+      this.index = Indexes.of(type, name, fieldNames);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkNotNull(index, "Index cannot be null");
+      Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+      Preconditions.checkArgument(
+          index.fieldNames() != null && index.fieldNames().length > 0,
+          "The index must be set with corresponding column names");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
+    }
+  }
+
+  /** Represents a request to delete an index from a table. */
+  @EqualsAndHashCode
+  @ToString
+  class DeleteTableIndexRequest implements TableUpdateRequest {
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("ifExists")
+    private Boolean ifExists;
+
+    /** Default constructor for Jackson deserialization. */
+    public DeleteTableIndexRequest() {}
+
+    /**
+     * The constructor of the delete table index request.
+     *
+     * @param name The name of the index
+     * @param ifExists Whether to delete the index if it exists
+     */
+    public DeleteTableIndexRequest(String name, Boolean ifExists) {
+      this.name = name;
+      this.ifExists = ifExists;
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkNotNull(name, "Index name cannot be null");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.deleteIndex(name, ifExists);
     }
   }
 }

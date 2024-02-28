@@ -20,6 +20,7 @@
 
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
 import java.util.Objects;
@@ -284,6 +285,30 @@ public interface TableChange {
     return new UpdateColumnNullability(fieldName, nullable);
   }
 
+  /**
+   * Create a TableChange for adding an index.
+   *
+   * @param type The type of the index.
+   * @param name The name of the index.
+   * @param fieldNames The field names of the index.
+   * @return A TableChange for the add index.
+   */
+  static TableChange addIndex(Index.IndexType type, String name, String[][] fieldNames) {
+    return new AddIndex(type, name, fieldNames);
+  }
+
+  /**
+   * Create a TableChange for deleting an index.
+   *
+   * @param name The name of the index to be dropped.
+   * @param ifExists If true, silence the error if column does not exist during drop. Otherwise, an
+   *     {@link IllegalArgumentException} will be thrown.
+   * @return A TableChange for the delete index.
+   */
+  static TableChange deleteIndex(String name, Boolean ifExists) {
+    return new DeleteIndex(name, ifExists);
+  }
+
   /** A TableChange to rename a table. */
   final class RenameTable implements TableChange {
     private final String newName;
@@ -526,6 +551,103 @@ public interface TableChange {
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
+    }
+  }
+
+  /**
+   * A TableChange to add an index. Add an index key based on the type and field name passed in as
+   * well as the name.
+   */
+  final class AddIndex implements TableChange {
+
+    private final Index.IndexType type;
+    private final String name;
+
+    private final String[][] fieldNames;
+
+    /**
+     * @param type The type of the index.
+     * @param name The name of the index.
+     * @param fieldNames The field names of the index.
+     */
+    public AddIndex(Index.IndexType type, String name, String[][] fieldNames) {
+      this.type = type;
+      this.name = name;
+      this.fieldNames = fieldNames;
+    }
+
+    /** @return The type of the index. */
+    public Index.IndexType getType() {
+      return type;
+    }
+
+    /** @return The name of the index. */
+    public String getName() {
+      return name;
+    }
+
+    /** @return The field names of the index. */
+    public String[][] getFieldNames() {
+      return fieldNames;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      AddIndex addIndex = (AddIndex) o;
+      return type == addIndex.type
+          && Objects.equals(name, addIndex.name)
+          && Arrays.deepEquals(fieldNames, addIndex.fieldNames);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(type, name);
+      result = 31 * result + Arrays.hashCode(fieldNames);
+      return result;
+    }
+  }
+
+  /**
+   * A TableChange to delete an index.
+   *
+   * <p>If the index does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class DeleteIndex implements TableChange {
+    private final String name;
+    private final boolean ifExists;
+
+    /**
+     * @param name name of the index.
+     * @param ifExists If true, silence the error if index does not exist during drop.
+     */
+    public DeleteIndex(String name, boolean ifExists) {
+      this.name = name;
+      this.ifExists = ifExists;
+    }
+
+    /** @return The name of the index to be deleted. */
+    public String getName() {
+      return name;
+    }
+
+    /** @return If true, silence the error if index does not exist during drop. */
+    public boolean isIfExists() {
+      return ifExists;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      DeleteIndex that = (DeleteIndex) o;
+      return Objects.equals(name, that.name) && Objects.equals(ifExists, that.ifExists);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, ifExists);
     }
   }
 
