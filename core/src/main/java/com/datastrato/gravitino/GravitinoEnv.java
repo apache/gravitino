@@ -58,6 +58,13 @@ public class GravitinoEnv {
     return InstanceHolder.INSTANCE;
   }
 
+  /**
+   * This method is used for testing purposes only to set the lock manager for test in package
+   * `com.datastrato.gravitino.server.web.rest`, as tree lock depends on the lock manager and we did
+   * not mock the lock manager in the test, so we need to set the lock manager for test.
+   *
+   * @param lockManager The lock manager to be set.
+   */
   @VisibleForTesting
   public void setLockManager(LockManager lockManager) {
     this.lockManager = lockManager;
