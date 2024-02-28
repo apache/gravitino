@@ -10,9 +10,12 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -191,12 +194,21 @@ public class CatalogMetaService {
                 SessionUtils.doWithoutCommit(
                     CatalogMetaMapper.class,
                     mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
             () -> {
               // TODO We will cascade delete the metadata of sub-resources under the catalog
             });
       } else {
-        // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
-        //  deletion is not allowed.
+        List<SchemaEntity> schemaEntities =
+            SchemaMetaService.getInstance()
+                .listSchemasByNamespace(Namespace.ofSchema(metalakeName, catalogName));
+        if (!schemaEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+        }
         SessionUtils.doWithCommit(
             CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
       }

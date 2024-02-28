@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 public class SchemaPO {
   private Long schemaId;
@@ -151,7 +152,19 @@ public class SchemaPO {
       return this;
     }
 
+    private void validate() {
+      Preconditions.checkArgument(schemaPO.schemaId != null, "Schema id is required");
+      Preconditions.checkArgument(schemaPO.schemaName != null, "Schema name is required");
+      Preconditions.checkArgument(schemaPO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(schemaPO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(schemaPO.auditInfo != null, "Audit info is required");
+      Preconditions.checkArgument(schemaPO.currentVersion != null, "Current version is required");
+      Preconditions.checkArgument(schemaPO.lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(schemaPO.deletedAt != null, "Deleted at is required");
+    }
+
     public SchemaPO build() {
+      validate();
       return schemaPO;
     }
   }

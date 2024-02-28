@@ -13,9 +13,11 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -70,6 +72,26 @@ public class TestPOConverters {
     assertEquals(
         expectedCatalog.getProperties().get("key"), convertedCatalog.getProperties().get("key"));
     assertEquals(expectedCatalog.auditInfo().creator(), convertedCatalog.auditInfo().creator());
+  }
+
+  @Test
+  public void testFromSchemaPO() throws JsonProcessingException {
+    SchemaPO schemaPO = createSchemaPO(1L, "test", 1L, 1L, "this is test");
+
+    SchemaEntity expectedSchema =
+        createSchema(
+            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+
+    SchemaEntity convertedSchema =
+        POConverters.fromSchemaPO(schemaPO, Namespace.ofSchema("test_metalake", "test_catalog"));
+
+    // Assert
+    assertEquals(expectedSchema.id(), convertedSchema.id());
+    assertEquals(expectedSchema.name(), convertedSchema.name());
+    assertEquals(expectedSchema.comment(), convertedSchema.comment());
+    assertEquals(expectedSchema.namespace(), convertedSchema.namespace());
+    assertEquals(expectedSchema.properties().get("key"), convertedSchema.properties().get("key"));
+    assertEquals(expectedSchema.auditInfo().creator(), convertedSchema.auditInfo().creator());
   }
 
   @Test
@@ -133,6 +155,37 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testFromSchemaPOs() throws JsonProcessingException {
+    SchemaPO schemaPO1 = createSchemaPO(1L, "test", 1L, 1L, "this is test");
+    SchemaPO schemaPO2 = createSchemaPO(2L, "test2", 1L, 1L, "this is test2");
+    List<SchemaPO> schemaPOs = new ArrayList<>(Arrays.asList(schemaPO1, schemaPO2));
+    List<SchemaEntity> convertedSchemas =
+        POConverters.fromSchemaPOs(schemaPOs, Namespace.ofSchema("test_metalake", "test_catalog"));
+
+    SchemaEntity expectedSchema1 =
+        createSchema(
+            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+    SchemaEntity expectedSchema2 =
+        createSchema(
+            2L, "test2", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
+    List<SchemaEntity> expectedSchemas =
+        new ArrayList<>(Arrays.asList(expectedSchema1, expectedSchema2));
+
+    // Assert
+    int index = 0;
+    for (SchemaEntity schema : convertedSchemas) {
+      assertEquals(expectedSchemas.get(index).id(), schema.id());
+      assertEquals(expectedSchemas.get(index).name(), schema.name());
+      assertEquals(expectedSchemas.get(index).comment(), schema.comment());
+      assertEquals(expectedSchemas.get(index).namespace(), schema.namespace());
+      assertEquals(
+          expectedSchemas.get(index).properties().get("key"), schema.properties().get("key"));
+      assertEquals(expectedSchemas.get(index).auditInfo().creator(), schema.auditInfo().creator());
+      index++;
+    }
+  }
+
+  @Test
   public void testInitMetalakePOVersion() {
     BaseMetalake metalake = createMetalake(1L, "test", "this is test");
     MetalakePO initPO = POConverters.initializeMetalakePOWithVersion(metalake);
@@ -146,6 +199,17 @@ public class TestPOConverters {
     CatalogEntity catalog =
         createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
     CatalogPO initPO = POConverters.initializeCatalogPOWithVersion(catalog, 1L);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+  }
+
+  @Test
+  public void testInitSchemaPOVersion() {
+    SchemaEntity schema =
+        createSchema(
+            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, 1L, 1L);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -177,6 +241,22 @@ public class TestPOConverters {
     assertEquals("this is test2", updatePO.getCatalogComment());
   }
 
+  @Test
+  public void testUpdateSchemaPOVersion() {
+    SchemaEntity schema =
+        createSchema(
+            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+    SchemaEntity updatedSchema =
+        createSchema(
+            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
+    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, 1L, 1L);
+    SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema, 1L, 1L);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+    assertEquals("this is test2", updatePO.getSchemaComment());
+  }
+
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
@@ -205,6 +285,9 @@ public class TestPOConverters {
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withSchemaVersion(JsonUtils.anyFieldMapper().writeValueAsString(SchemaVersion.V_0_1))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
         .build();
   }
 
@@ -241,6 +324,46 @@ public class TestPOConverters {
         .withCatalogComment(comment)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static SchemaEntity createSchema(
+      Long id, String name, Namespace namespace, String comment) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key", "value");
+    return new SchemaEntity.Builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static SchemaPO createSchemaPO(
+      Long id, String name, Long metalakeId, Long catalogId, String comment)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key", "value");
+    return new SchemaPO.Builder()
+        .withSchemaId(id)
+        .withSchemaName(name)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaComment(comment)
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
         .build();
   }
 }

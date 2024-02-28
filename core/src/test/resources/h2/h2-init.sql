@@ -18,8 +18,7 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
 ) ENGINE = InnoDB;
 
 
-CREATE TABLE IF NOT EXISTS `catalog_meta`
-(
+CREATE TABLE IF NOT EXISTS `catalog_meta` (
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `catalog_name` VARCHAR(128) NOT NULL COMMENT 'catalog name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -48,5 +47,6 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
     PRIMARY KEY (schema_id),
-    CONSTRAINT uk_mid_cid_sn_del UNIQUE (metalake_id, catalog_id, schema_name, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'schema metadata';
+    CONSTRAINT uk_mid_cid_sn_del UNIQUE (metalake_id, catalog_id, schema_name, deleted_at),
+    KEY idx_cid (catalog_id)
+) ENGINE=InnoDB;

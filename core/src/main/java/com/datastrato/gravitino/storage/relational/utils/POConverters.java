@@ -11,9 +11,11 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
@@ -107,11 +109,11 @@ public class POConverters {
   /**
    * Convert list of {@link MetalakePO} to list of {@link BaseMetalake}
    *
-   * @param metalakePOS list of MetalakePO objects
+   * @param metalakePOs list of MetalakePO objects
    * @return list of BaseMetalake objects from list of MetalakePO objects
    */
-  public static List<BaseMetalake> fromMetalakePOs(List<MetalakePO> metalakePOS) {
-    return metalakePOS.stream().map(POConverters::fromMetalakePO).collect(Collectors.toList());
+  public static List<BaseMetalake> fromMetalakePOs(List<MetalakePO> metalakePOs) {
+    return metalakePOs.stream().map(POConverters::fromMetalakePO).collect(Collectors.toList());
   }
 
   /**
@@ -200,16 +202,108 @@ public class POConverters {
   }
 
   /**
-   * Convert list of {@link MetalakePO} to list of {@link BaseMetalake}
+   * Convert list of {@link CatalogPO} to list of {@link CatalogEntity}
    *
-   * @param catalogPOS list of MetalakePO objects
-   * @param namespace Namespace object to be associated with the metalake
-   * @return list of BaseMetalake objects from list of MetalakePO objects
+   * @param catalogPOs list of CatalogPO objects
+   * @param namespace Namespace object to be associated with the catalog
+   * @return list of CatalogEntity objects from list of CatalogPO objects
    */
   public static List<CatalogEntity> fromCatalogPOs(
-      List<CatalogPO> catalogPOS, Namespace namespace) {
-    return catalogPOS.stream()
+      List<CatalogPO> catalogPOs, Namespace namespace) {
+    return catalogPOs.stream()
         .map(catalogPO -> POConverters.fromCatalogPO(catalogPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Initialize SchemaPO
+   *
+   * @param schemaEntity SchemaEntity object
+   * @return CatalogPO object with version initialized
+   */
+  public static SchemaPO initializeSchemaPOWithVersion(
+      SchemaEntity schemaEntity, Long metalakeId, Long catalogId) {
+    try {
+      return new SchemaPO.Builder()
+          .withSchemaId(schemaEntity.id())
+          .withSchemaName(schemaEntity.name())
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaComment(schemaEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.auditInfo()))
+          .withCurrentVersion(1L)
+          .withLastVersion(1L)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update SchemaPO version
+   *
+   * @param oldSchemaPO the old SchemaPO object
+   * @param newSchema the new SchemaEntity object
+   * @return SchemaPO object with updated version
+   */
+  public static SchemaPO updateSchemaPOWithVersion(
+      SchemaPO oldSchemaPO, SchemaEntity newSchema, Long metalakeId, Long catalogId) {
+    Long lastVersion = oldSchemaPO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return new SchemaPO.Builder()
+          .withSchemaId(newSchema.id())
+          .withSchemaName(newSchema.name())
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaComment(newSchema.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link SchemaPO} to {@link SchemaEntity}
+   *
+   * @param schemaPO SchemaPO object to be converted
+   * @param namespace Namespace object to be associated with the schema
+   * @return SchemaEntity object from SchemaPO object
+   */
+  public static SchemaEntity fromSchemaPO(SchemaPO schemaPO, Namespace namespace) {
+    try {
+      return new SchemaEntity.Builder()
+          .withId(schemaPO.getSchemaId())
+          .withName(schemaPO.getSchemaName())
+          .withNamespace(namespace)
+          .withComment(schemaPO.getSchemaComment())
+          .withProperties(JsonUtils.anyFieldMapper().readValue(schemaPO.getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(schemaPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert list of {@link SchemaPO} to list of {@link SchemaEntity}
+   *
+   * @param schemaPOs list of SchemaPO objects
+   * @param namespace Namespace object to be associated with the schema
+   * @return list of SchemaEntity objects from list of SchemaPO objects
+   */
+  public static List<SchemaEntity> fromSchemaPOs(List<SchemaPO> schemaPOs, Namespace namespace) {
+    return schemaPOs.stream()
+        .map(schemaPO -> POConverters.fromSchemaPO(schemaPO, namespace))
         .collect(Collectors.toList());
   }
 }
