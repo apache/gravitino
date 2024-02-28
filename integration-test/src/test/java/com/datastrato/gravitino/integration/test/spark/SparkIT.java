@@ -25,13 +25,13 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
-  public void testLoadCatalogs() {
+  void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(hiveCatalogName));
   }
 
   @Test
-  public void testCreateAndLoadSchema() {
+  void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
     sql("create database " + testDatabaseName);
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
@@ -58,7 +58,7 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
-  public void testDropSchema() {
+  void testDropSchema() {
     String testDatabaseName = "t_drop";
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));

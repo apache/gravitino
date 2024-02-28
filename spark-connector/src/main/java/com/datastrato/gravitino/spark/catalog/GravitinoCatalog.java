@@ -216,7 +216,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
             + " from hive catalog properties");
 
     TableCatalog hiveCatalog = new HiveTableCatalog();
-    HashMap<String, String> all = new HashMap(options);
+    HashMap<String, String> all = new HashMap<>(options);
     all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
 
