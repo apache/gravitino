@@ -566,6 +566,15 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testListSchema() {
+    NameIdentifier[] nameIdentifiers =
+        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    Set<String> schemaNames =
+        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    Assertions.assertTrue(schemaNames.contains("public"));
+  }
+
+  @Test
   public void testBackQuoteTable() {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.IntegerType.get(), "number", false, false, null);
