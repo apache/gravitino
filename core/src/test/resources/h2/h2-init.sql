@@ -48,5 +48,23 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
     PRIMARY KEY (schema_id),
     CONSTRAINT uk_cid_sn_del UNIQUE (catalog_id, schema_name, deleted_at),
-    KEY idx_mid (metalake_id)
+    -- Aliases are used here, and indexes with the same name in H2 can only be created once.
+    KEY idx_smid (metalake_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `table_meta` (
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
+    `table_name` VARCHAR(128) NOT NULL COMMENT 'table name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'table audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    PRIMARY KEY (table_id),
+    CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
+    -- Aliases are used here, and indexes with the same name in H2 can only be created once.
+    KEY idx_tmid (metalake_id),
+    KEY idx_tcid (catalog_id)
 ) ENGINE=InnoDB;

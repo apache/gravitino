@@ -13,9 +13,11 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
@@ -304,6 +306,94 @@ public class POConverters {
   public static List<SchemaEntity> fromSchemaPOs(List<SchemaPO> schemaPOs, Namespace namespace) {
     return schemaPOs.stream()
         .map(schemaPO -> POConverters.fromSchemaPO(schemaPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Initialize TablePO
+   *
+   * @param tableEntity TableEntity object
+   * @return TablePO object with version initialized
+   */
+  public static TablePO initializeTablePOWithVersion(
+      TableEntity tableEntity, Long metalakeId, Long catalogId, Long schemaId) {
+    try {
+      return new TablePO.Builder()
+          .withTableId(tableEntity.id())
+          .withTableName(tableEntity.name())
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaId(schemaId)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
+          .withCurrentVersion(1L)
+          .withLastVersion(1L)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update TablePO version
+   *
+   * @param oldTablePO the old TablePO object
+   * @param newTable the new TableEntity object
+   * @return TablePO object with updated version
+   */
+  public static TablePO updateTablePOWithVersion(
+      TablePO oldTablePO, TableEntity newTable, Long metalakeId, Long catalogId, Long schemaId) {
+    Long lastVersion = oldTablePO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return new TablePO.Builder()
+          .withTableId(newTable.id())
+          .withTableName(newTable.name())
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaId(schemaId)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link TablePO} to {@link TableEntity}
+   *
+   * @param tablePO TablePO object to be converted
+   * @param namespace Namespace object to be associated with the table
+   * @return TableEntity object from SchemaPO object
+   */
+  public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
+    try {
+      return new TableEntity.Builder()
+          .withId(tablePO.getTableId())
+          .withName(tablePO.getTableName())
+          .withNamespace(namespace)
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert list of {@link TablePO} to list of {@link TableEntity}
+   *
+   * @param tablePOs list of TablePO objects
+   * @param namespace Namespace object to be associated with the table
+   * @return list of TableEntity objects from list of SchemaPO objects
+   */
+  public static List<TableEntity> fromTablePOs(List<TablePO> tablePOs, Namespace namespace) {
+    return tablePOs.stream()
+        .map(tablePO -> POConverters.fromTablePO(tablePO, namespace))
         .collect(Collectors.toList());
   }
 }

@@ -48,3 +48,19 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     UNIQUE KEY `uk_cid_sn_del` (`catalog_id`, `schema_name`, `deleted_at`),
     KEY `idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'schema metadata';
+
+CREATE TABLE IF NOT EXISTS `table_meta` (
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
+    `table_name` VARCHAR(128) NOT NULL COMMENT 'table name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'table audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    PRIMARY KEY (`table_id`),
+    UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `table_name`, `deleted_at`),
+    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_cid` (`catalog_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';

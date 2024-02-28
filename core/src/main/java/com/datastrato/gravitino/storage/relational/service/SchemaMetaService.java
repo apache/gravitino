@@ -10,8 +10,13 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.SchemaEntity;
+import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -201,12 +206,21 @@ public class SchemaMetaService {
                 SessionUtils.doWithoutCommit(
                     SchemaMetaMapper.class,
                     mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TableMetaMapper.class,
+                    mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
             () -> {
               // TODO We will cascade delete the metadata of sub-resources under the schema
             });
       } else {
-        // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
-        //  deletion is not allowed.
+        List<TableEntity> tableEntities =
+            TableMetaService.getInstance()
+                .listTablesByNamespace(Namespace.ofTable(metalakeName, catalogName, schemaName));
+        if (!tableEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+        }
         SessionUtils.doWithCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId));
       }
