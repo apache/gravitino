@@ -10,14 +10,12 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
-import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
@@ -27,29 +25,28 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-/** The service class for schema metadata. It provides the basic database operations for schema. */
-public class SchemaMetaService {
-  private static final SchemaMetaService INSTANCE = new SchemaMetaService();
+/** The service class for table metadata. It provides the basic database operations for table. */
+public class TableMetaService {
+  private static final TableMetaService INSTANCE = new TableMetaService();
 
-  public static SchemaMetaService getInstance() {
+  public static TableMetaService getInstance() {
     return INSTANCE;
   }
 
-  private SchemaMetaService() {}
+  private TableMetaService() {}
 
-  public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkSchema(identifier);
+  public TableEntity getTableByIdentifier(NameIdentifier identifier) {
+    NameIdentifier.checkTable(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
+
     Long catalogId =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
@@ -57,38 +54,44 @@ public class SchemaMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.namespace().toString());
+          String.format("%s.%s", metalakeName, catalogName));
     }
 
-    SchemaPO schemaPO =
+    Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, identifier.name()));
-
-    if (schemaPO == null) {
+            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
+    if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
-    return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, identifier.name()));
+
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+    }
+
+    return POConverters.fromTablePO(tablePO, identifier.namespace());
   }
 
-  public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
-    Namespace.checkSchema(namespace);
+  public List<TableEntity> listTablesByNamespace(Namespace namespace) {
+    Namespace.checkTable(namespace);
     String metalakeName = namespace.level(0);
     String catalogName = namespace.level(1);
+    String schemaName = namespace.level(2);
+
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
+
     Long catalogId =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
@@ -96,50 +99,66 @@ public class SchemaMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespace.toString());
+          String.format("%s.%s", metalakeName, catalogName));
     }
-    List<SchemaPO> schemaPOs =
+
+    Long schemaId =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-    return POConverters.fromSchemaPOs(schemaPOs, namespace);
+            SchemaMetaMapper.class,
+            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
+    if (schemaId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, namespace.toString());
+    }
+
+    List<TablePO> tablePOs =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
+    return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
-  public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) {
+  public void insertTable(TableEntity tableEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkSchema(schemaEntity.nameIdentifier());
+      NameIdentifier.checkTable(tableEntity.nameIdentifier());
+      String metalakeName = tableEntity.namespace().level(0);
+      String catalogName = tableEntity.namespace().level(1);
+      String schemaName = tableEntity.namespace().level(2);
       Long metalakeId =
           SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.selectMetalakeIdMetaByName(schemaEntity.namespace().level(0)));
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
       if (metalakeId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            schemaEntity.namespace().level(0));
+        throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
       }
+
       Long catalogId =
           SessionUtils.getWithoutCommit(
               CatalogMetaMapper.class,
-              mapper ->
-                  mapper.selectCatalogIdByMetalakeIdAndName(
-                      metalakeId, schemaEntity.namespace().level(1)));
+              mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
       if (catalogId == null) {
         throw new NoSuchEntityException(
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
-            schemaEntity.namespace());
+            String.format("%s.%s", metalakeName, catalogName));
+      }
+
+      Long schemaId =
+          SessionUtils.getWithoutCommit(
+              SchemaMetaMapper.class,
+              mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
+      if (schemaId == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, tableEntity.namespace().toString());
       }
 
       SessionUtils.doWithCommit(
-          SchemaMetaMapper.class,
+          TableMetaMapper.class,
           mapper -> {
-            SchemaPO po =
-                POConverters.initializeSchemaPOWithVersion(schemaEntity, metalakeId, catalogId);
+            TablePO po =
+                POConverters.initializeTablePOWithVersion(
+                    tableEntity, metalakeId, catalogId, schemaId);
             if (overwrite) {
-              mapper.insertSchemaMetaOnDuplicateKeyUpdate(po);
+              mapper.insertTableMetaOnDuplicateKeyUpdate(po);
             } else {
-              mapper.insertSchemaMeta(po);
+              mapper.insertTableMeta(po);
             }
           });
     } catch (RuntimeException re) {
@@ -151,27 +170,25 @@ public class SchemaMetaService {
         // SQL violates the constraints of `primary key` and `unique key`.
         // We simply think that the entity already exists at this time.
         throw new EntityAlreadyExistsException(
-            String.format("Schema entity: %s already exists", schemaEntity.nameIdentifier()));
+            String.format("Table entity: %s already exists", tableEntity.nameIdentifier()));
       }
       throw re;
     }
   }
 
-  public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
+  public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifier.checkTable(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.name();
+    String schemaName = identifier.namespace().level(2);
+    String tableName = identifier.name();
 
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -181,38 +198,44 @@ public class SchemaMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.namespace().toString());
+          String.format("%s.%s", metalakeName, catalogName));
     }
 
-    SchemaPO oldSchemaPO =
+    Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
-    if (oldSchemaPO == null) {
+            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
+    if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
-    SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
-    SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
+    TablePO oldTablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
+    if (oldTablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+    }
+
+    TableEntity oldTableEntity = POConverters.fromTablePO(oldTablePO, identifier.namespace());
+    TableEntity newEntity = (TableEntity) updater.apply((E) oldTableEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldSchemaEntity.id(), newEntity.id()),
-        "The updated schema entity id: %s should be same with the schema entity id before: %s",
+        Objects.equals(oldTableEntity.id(), newEntity.id()),
+        "The updated table entity id: %s should be same with the table entity id before: %s",
         newEntity.id(),
-        oldSchemaEntity.id());
+        oldTableEntity.id());
     Integer updateResult;
     try {
       updateResult =
           SessionUtils.doWithCommitAndFetchResult(
-              SchemaMetaMapper.class,
+              TableMetaMapper.class,
               mapper ->
-                  mapper.updateSchemaMeta(
-                      POConverters.updateSchemaPOWithVersion(
-                          oldSchemaPO, newEntity, metalakeId, catalogId),
-                      oldSchemaPO));
+                  mapper.updateTableMeta(
+                      POConverters.updateTablePOWithVersion(
+                          oldTablePO, newEntity, metalakeId, catalogId, schemaId),
+                      oldTablePO));
     } catch (RuntimeException re) {
       if (re.getCause() != null
           && re.getCause().getCause() != null
@@ -222,7 +245,7 @@ public class SchemaMetaService {
         // SQL violates the constraints of `primary key` and `unique key`.
         // We simply think that the entity already exists at this time.
         throw new EntityAlreadyExistsException(
-            String.format("Schema entity: %s already exists", newEntity.nameIdentifier()));
+            String.format("Table entity: %s already exists", newEntity.nameIdentifier()));
       }
       throw re;
     }
@@ -234,19 +257,17 @@ public class SchemaMetaService {
     }
   }
 
-  public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
-    NameIdentifier.checkSchema(identifier);
+  public boolean deleteTable(NameIdentifier identifier, boolean cascade) {
+    NameIdentifier.checkTable(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.name();
+    String schemaName = identifier.namespace().level(2);
+    String tableName = identifier.name();
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -256,38 +277,36 @@ public class SchemaMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.namespace().toString());
+          String.format("%s.%s", metalakeName, catalogName));
     }
 
     Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-    if (schemaId != null) {
+    if (schemaId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+    }
+
+    Long tableId =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableIdBySchemaIdAndName(schemaId, tableName));
+    if (tableId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
             () ->
                 SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
+                    TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId)),
             () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the schema
+              // TODO We will cascade delete the metadata of sub-resources under the catalog
             });
       } else {
-        List<TableEntity> tableEntities =
-            TableMetaService.getInstance()
-                .listTablesByNamespace(Namespace.ofTable(metalakeName, catalogName, schemaName));
-        if (!tableEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
+        // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
+        //  deletion is not allowed.
         SessionUtils.doWithCommit(
-            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId));
+            TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
       }
     }
     return true;

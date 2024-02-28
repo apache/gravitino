@@ -16,6 +16,7 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -212,6 +213,10 @@ public class CatalogMetaService {
                 SessionUtils.doWithoutCommit(
                     SchemaMetaMapper.class,
                     mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TableMetaMapper.class,
+                    mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
             () -> {
               // TODO We will cascade delete the metadata of sub-resources under the catalog
             });
