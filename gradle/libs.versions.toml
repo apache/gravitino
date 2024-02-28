@@ -47,6 +47,7 @@ selenium = "3.141.59"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
 h2db = "1.4.200"
+kyuubi = "1.8.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
