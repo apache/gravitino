@@ -218,6 +218,7 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
+   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/spark/SparkUtilIT.java
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
