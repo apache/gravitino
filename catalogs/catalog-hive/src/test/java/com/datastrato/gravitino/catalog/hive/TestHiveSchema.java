@@ -15,6 +15,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -67,18 +68,19 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     String comment = "comment";
+    SupportsSchemas schemas = hiveCatalog.asSchemas();
 
-    Schema schema = hiveCatalog.asSchemas().createSchema(ident, comment, properties);
+    Schema schema = schemas.createSchema(ident, comment, properties);
     Assertions.assertEquals(ident.name(), schema.name());
     Assertions.assertEquals(comment, schema.comment());
     Assertions.assertEquals(properties, schema.properties());
 
-    Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
+    Assertions.assertTrue(schemas.schemaExists(ident));
 
-    NameIdentifier[] idents = hiveCatalog.asSchemas().listSchemas(ident.namespace());
+    NameIdentifier[] idents = schemas.listSchemas(ident.namespace());
     Assertions.assertTrue(Arrays.asList(idents).contains(ident));
 
-    Schema loadedSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Schema loadedSchema = schemas.loadSchema(ident);
     Assertions.assertEquals(schema.auditInfo().creator(), loadedSchema.auditInfo().creator());
     Assertions.assertNull(loadedSchema.auditInfo().createTime());
     Assertions.assertEquals("val1", loadedSchema.properties().get("key1"));
@@ -89,7 +91,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
             () -> {
-              hiveCatalog.asSchemas().createSchema(ident, comment, properties);
+              schemas.createSchema(ident, comment, properties);
             });
     Assertions.assertTrue(exception.getMessage().contains("already exists in Hive Metastore"));
   }

@@ -12,6 +12,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.tru
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -200,20 +201,19 @@ public class TestIcebergTable {
     // Compare sort and order
 
     // Test exception
+    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     Throwable exception =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableIdentifier,
-                        columns,
-                        ICEBERG_COMMENT,
-                        properties,
-                        new Transform[0],
-                        Distributions.NONE,
-                        sortOrders));
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    columns,
+                    ICEBERG_COMMENT,
+                    properties,
+                    new Transform[0],
+                    Distributions.NONE,
+                    sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
     IcebergColumn withDefaultValue =
@@ -224,20 +224,19 @@ public class TestIcebergTable {
             .withNullable(false)
             .withDefaultValue(Literals.NULL)
             .build();
+
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableIdentifier,
-                        new Column[] {withDefaultValue},
-                        ICEBERG_COMMENT,
-                        properties,
-                        EMPTY_TRANSFORM,
-                        Distributions.NONE,
-                        null));
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {withDefaultValue},
+                    ICEBERG_COMMENT,
+                    properties,
+                    EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    null));
     Assertions.assertTrue(
         exception.getMessage().contains("Iceberg does not support column default value"),
         "The exception message is: " + exception.getMessage());
@@ -293,54 +292,32 @@ public class TestIcebergTable {
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
 
     // Test exception
+    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
+    Transform[] partitions1 = new Transform[] {day(col2.name())};
     Throwable exception =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableIdentifier,
-                        columns,
-                        ICEBERG_COMMENT,
-                        properties,
-                        new Transform[] {day(col2.name())}));
+                tableCatalog.createTable(
+                    tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions1));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
+    String icebergName = icebergCatalog.name();
+    String schemaName = icebergSchema.name();
+    String randomName = genRandomName();
+    NameIdentifier id = NameIdentifier.of(META_LAKE_NAME, icebergName, schemaName, randomName);
+    Transform[] partitions2 = new Transform[] {identity(new String[] {col1.name(), col2.name()})};
     exception =
         Assertions.assertThrows(
             RuntimeException.class,
-            () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        NameIdentifier.of(
-                            META_LAKE_NAME,
-                            icebergCatalog.name(),
-                            icebergSchema.name(),
-                            genRandomName()),
-                        columns,
-                        ICEBERG_COMMENT,
-                        properties,
-                        new Transform[] {identity(new String[] {col1.name(), col2.name()})}));
+            () -> tableCatalog.createTable(id, columns, ICEBERG_COMMENT, properties, partitions2));
     Assertions.assertTrue(exception.getMessage().contains("Cannot find source column"));
 
+    Transform[] partitions3 = new Transform[] {identity("not_exist_field")};
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        NameIdentifier.of(
-                            META_LAKE_NAME,
-                            icebergCatalog.name(),
-                            icebergSchema.name(),
-                            genRandomName()),
-                        columns,
-                        ICEBERG_COMMENT,
-                        properties,
-                        new Transform[] {identity("not_exist_field")}));
+            () -> tableCatalog.createTable(id, columns, ICEBERG_COMMENT, properties, partitions3));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot find source column: not_exist_field"));
   }
@@ -387,9 +364,10 @@ public class TestIcebergTable {
   @Test
   public void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", icebergCatalog.name(), "not_exist_db");
+    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchSchemaException.class, () -> icebergCatalog.asTableCatalog().listTables(tableNs));
+            NoSuchSchemaException.class, () -> tableCatalog.listTables(tableNs));
     Assertions.assertTrue(exception.getMessage().contains("Schema (database) does not exist"));
   }
 
@@ -433,16 +411,13 @@ public class TestIcebergTable {
                 sortOrders);
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
 
+    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
+    TableChange update = TableChange.updateComment(ICEBERG_COMMENT + "_new");
+    TableChange rename = TableChange.rename("test_iceberg_table_new");
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                icebergCatalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateComment(ICEBERG_COMMENT + "_new"),
-                        TableChange.rename("test_iceberg_table_new")));
+            () -> tableCatalog.alterTable(tableIdentifier, update, rename));
     Assertions.assertTrue(
         exception.getMessage().contains("The operation to change the table name cannot"));
 
@@ -536,16 +511,17 @@ public class TestIcebergTable {
       map.put(IcebergTablePropertiesMetadata.SORT_ORDER, "test");
       map.put(IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS, "test");
       for (Map.Entry<String, String> entry : map.entrySet()) {
+        HashMap<String, String> properties =
+            new HashMap<String, String>() {
+              {
+                put(entry.getKey(), entry.getValue());
+              }
+            };
+        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              ops.tablePropertiesMetadata()
-                  .validatePropertyForCreate(
-                      new HashMap<String, String>() {
-                        {
-                          put(entry.getKey(), entry.getValue());
-                        }
-                      });
+              metadata.validatePropertyForCreate(properties);
             });
       }
 
@@ -553,15 +529,16 @@ public class TestIcebergTable {
       map.put("key1", "val1");
       map.put("key2", "val2");
       for (Map.Entry<String, String> entry : map.entrySet()) {
+        HashMap<String, String> properties =
+            new HashMap<String, String>() {
+              {
+                put(entry.getKey(), entry.getValue());
+              }
+            };
+        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
         Assertions.assertDoesNotThrow(
             () -> {
-              ops.tablePropertiesMetadata()
-                  .validatePropertyForCreate(
-                      new HashMap<String, String>() {
-                        {
-                          put(entry.getKey(), entry.getValue());
-                        }
-                      });
+              metadata.validatePropertyForCreate(properties);
             });
       }
     }

@@ -116,6 +116,10 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `struct`                    | `struct`            | 0.2.0         |
 | `uniontype`                 | `uniontype`         | 0.2.0         |
 
+:::info
+Since 0.5.0, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type from the Hive catalog.
+:::
+
 ### Table properties
 
 Table properties supply or set metadata for the underlying Hive tables.

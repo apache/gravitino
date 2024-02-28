@@ -123,7 +123,7 @@ public class TestTransactionIdGenerator {
             }
           });
     }
-    Thread.currentThread().sleep(100);
+    Thread.sleep(100);
     threadPoolExecutor.shutdown();
     threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
     LOGGER.info(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 2));

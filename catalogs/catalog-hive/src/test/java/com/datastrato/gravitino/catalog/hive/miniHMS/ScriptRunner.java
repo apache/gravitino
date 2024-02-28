@@ -18,10 +18,13 @@
  */
 package com.datastrato.gravitino.catalog.hive.miniHMS;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.LineNumberReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -40,8 +43,13 @@ public class ScriptRunner {
   private final boolean stopOnError;
   private final boolean autoCommit;
 
-  private final PrintWriter logWriter = new PrintWriter(System.out);
-  private final PrintWriter errorLogWriter = new PrintWriter(System.err);
+  private final PrintWriter logWriter =
+      new PrintWriter(
+          new BufferedWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8)));
+
+  private final PrintWriter errorLogWriter =
+      new PrintWriter(
+          new BufferedWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8)));
 
   private String delimiter = DEFAULT_DELIMITER;
   private boolean fullLineDelimiter = false;

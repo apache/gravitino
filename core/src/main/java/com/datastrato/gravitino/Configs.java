@@ -19,8 +19,14 @@ public interface Configs {
   String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
 
-  String DEFAULT_ENTITY_RELATIONAL_STORE = "MySQLBackend";
+  String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
+
+  String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY = "gravitino.entity.store.relational.jdbcUrl";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY = "gravitino.entity.store.relational.jdbcDriver";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY = "gravitino.entity.store.relational.jdbcUser";
+  String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
+      "gravitino.entity.store.relational.jdbcPassword";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
@@ -59,9 +65,45 @@ public interface Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE);
 
+  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_URL =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY)
+          .doc("Connection URL of `JDBCBackend`")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
+          .doc("Driver Name of `JDBCBackend`")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_USER =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY)
+          .doc("Username of `JDBCBackend`")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY)
+          .doc("Password of `JDBCBackend`")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
-          .doc("Directory path of `RocksDBKvBackend`")
+          .doc(
+              "The storage path for RocksDB storage implementation. It supports both absolute and"
+                  + " relative path, if the value is a relative path, the final path is "
+                  + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
+                  + "`${GRAVITINO_HOME}/data/rocksdb`")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);

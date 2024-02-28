@@ -532,13 +532,13 @@ public class TestLockManager {
 
     CompletionService<Integer> service = createCompletionService();
     int concurrentThreadCount = 1;
+    NameIdentifier abcd = NameIdentifier.of("a", "b", "c", "d");
     for (int i = 0; i < concurrentThreadCount; i++) {
       service.submit(
           () -> {
             for (int j = 0; j < 1000; j++) {
               Assertions.assertThrows(
-                  RuntimeException.class,
-                  () -> lockManager.createTreeLock(NameIdentifier.of("a", "b", "c", "d")));
+                  RuntimeException.class, () -> lockManager.createTreeLock(abcd));
             }
             return 0;
           });
@@ -595,6 +595,7 @@ public class TestLockManager {
               lock.lock(j % 2 == 0 ? LockType.READ : LockType.WRITE);
               try {
                 // Deliberately throw an exception here.
+                @SuppressWarnings("divzero")
                 int a = 1 / 0;
               } catch (Exception e) {
                 // Ignore

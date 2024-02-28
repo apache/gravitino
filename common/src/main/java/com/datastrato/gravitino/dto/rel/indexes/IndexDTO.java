@@ -61,7 +61,7 @@ public class IndexDTO implements Index {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (!(o instanceof IndexDTO)) return false;
     IndexDTO indexDTO = (IndexDTO) o;
 
     return indexType == indexDTO.indexType

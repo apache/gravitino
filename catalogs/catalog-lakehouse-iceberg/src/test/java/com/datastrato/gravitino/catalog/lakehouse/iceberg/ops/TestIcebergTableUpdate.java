@@ -126,7 +126,7 @@ public class TestIcebergTableUpdate {
     Assertions.assertFalse(
         loadTableResponse.tableMetadata().properties().containsKey(testPropertyKey));
 
-    icebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange setProperty1 = TableChange.setProperty(property, "test_v");
@@ -134,7 +134,7 @@ public class TestIcebergTableUpdate {
                   IllegalArgumentException.class, () -> updateTable(identifier, setProperty1));
             });
 
-    icebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange removeProperty1 = TableChange.removeProperty(property);
@@ -298,14 +298,12 @@ public class TestIcebergTableUpdate {
     Assertions.assertTrue(loadTableResponse.tableMetadata().schema().columns().get(0).isOptional());
 
     // update struct_int from optional to required
+    TableChange tableChange =
+        TableChange.updateColumnNullability(
+            new String[] {fourthField[0], "element", "struct_map"}, false);
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                updateTable(
-                    identifier,
-                    TableChange.updateColumnNullability(
-                        new String[] {fourthField[0], "element", "struct_map"}, false)));
+            IllegalArgumentException.class, () -> updateTable(identifier, tableChange));
     Assertions.assertEquals(
         "Cannot change column nullability: foo_struct.element.struct_map: optional -> required",
         exception.getMessage());

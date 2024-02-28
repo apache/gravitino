@@ -8,7 +8,16 @@ script_dir="$(dirname "${BASH_SOURCE-$0}")"
 script_dir="$(cd "${script_dir}">/dev/null; pwd)"
 # Build docker image for multi-arch
 # shellcheck disable=SC2089
-USAGE="Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest\nNotice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image."
+
+usage() {
+  cat << EOF
+Usage:
+
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino|doris] --image {image_name} --tag {tag_name} --latest
+
+Notice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image.
+EOF
+}
 
 # Get platform type
 if [[ "$1" == "--platform" ]]; then
@@ -18,7 +27,7 @@ if [[ "$1" == "--platform" ]]; then
     echo "INFO : platform type is ${platform_type}"
   else
     echo "ERROR : ${platform_type} is not a valid platform type"
-    echo ${USAGE}
+    usage
     exit 1
   fi
   shift
@@ -33,7 +42,7 @@ if [[ "$1" == "--type" ]]; then
   shift
 else
   echo "ERROR : must specify component type"
-  echo ${USAGE}
+  usage
   exit 1
 fi
 
@@ -44,7 +53,7 @@ if [[ "$1" == "--image" ]]; then
   shift
 else
   echo "ERROR : must specify image name"
-  echo ${USAGE}
+  usage
   exit 1
 fi
 
@@ -69,9 +78,12 @@ elif [ "${component_type}" == "trino" ]; then
   . ${script_dir}/trino/trino-dependency.sh
 elif [ "${component_type}" == "gravitino" ]; then
   . ${script_dir}/gravitino/gravitino-dependency.sh
+elif [ "${component_type}" == "doris" ]; then
+  . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
+  build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
-  echo ${USAGE}
+  usage
   exit 1
 fi
 

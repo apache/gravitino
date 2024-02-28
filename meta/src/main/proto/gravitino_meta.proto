@@ -44,7 +44,7 @@ message Metalake {
 message Catalog {
   enum Type {
     RELATIONAL = 0; // Catalog Type for Relational Data Structure, like db.table.
-    FILE = 1; // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file.
+    FILESET = 1; // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file.
     STREAM = 2; // Catalog Type for Streaming Data, like kafka://topic.
   }
 

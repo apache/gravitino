@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -142,7 +143,7 @@ public class MiniHiveMetastore {
 
     ClassLoader classLoader = ClassLoader.getSystemClassLoader();
     InputStream inputStream = classLoader.getResourceAsStream("hive-schema-3.1.0.derby.sql");
-    try (Reader reader = new InputStreamReader(inputStream)) {
+    try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
       scriptRunner.runScript(reader);
     }
   }

@@ -18,6 +18,7 @@ import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.base.Splitter;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -99,7 +100,7 @@ public class KerberosAuthenticator implements Authenticator {
       throw new UnauthorizedException("Empty token authorization header", AuthConstants.NEGOTIATE);
     }
 
-    String authData = new String(tokenData);
+    String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER)) {
       throw new UnauthorizedException(
