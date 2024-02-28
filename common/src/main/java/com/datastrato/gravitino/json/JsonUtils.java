@@ -39,6 +39,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -99,6 +101,8 @@ public class JsonUtils {
   private static final String LIST = "list";
   private static final String MAP = "map";
   private static final String UNION = "union";
+  private static final String UNPARSED = "unparsed";
+  private static final String UNPARSED_TYPE = "unparsedType";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -236,6 +240,33 @@ public class JsonUtils {
    */
   public static ObjectMapper objectMapper() {
     return ObjectMapperHolder.INSTANCE;
+  }
+
+  /**
+   * AnyFieldMapperHolder is a static inner class that holds the instance of ObjectMapper which can
+   * access any field of the object. This class utilizes the Initialization-on-demand holder idiom,
+   * which is a lazy-loaded singleton. This idiom takes advantage of the fact that inner classes are
+   * not loaded until they are referenced. It's a thread-safe and efficient way to implement a
+   * singleton as the instance is created when it's needed at the first time.
+   */
+  private static class AnyFieldMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .registerModule(new JavaTimeModule());
+  }
+
+  /**
+   * Get the shared AnyFieldMapper instance for JSON serialization/deserialization.
+   *
+   * @return The ObjectMapper instance.
+   */
+  public static ObjectMapper anyFieldMapper() {
+    return AnyFieldMapperHolder.INSTANCE;
   }
 
   /**
@@ -488,8 +519,11 @@ public class JsonUtils {
       case UNION:
         writeUnionType((Types.UnionType) dataType, gen);
         break;
+      case UNPARSED:
+        writeUnparsedType((Types.UnparsedType) dataType, gen);
+        break;
       default:
-        throw new IOException("Cannot serialize unknown type: " + dataType);
+        writeUnparsedType(dataType.simpleString(), gen);
     }
   }
 
@@ -510,9 +544,8 @@ public class JsonUtils {
           : fromPrimitiveTypeString(text);
     }
 
-    if (node.isObject() && node.get(TYPE) != null) {
-      JsonNode typeField = node.get(TYPE);
-      String type = typeField.asText();
+    if (node.isObject() && node.has(TYPE)) {
+      String type = node.get(TYPE).asText();
 
       if (STRUCT.equals(type)) {
         return readStructType(node);
@@ -528,6 +561,10 @@ public class JsonUtils {
 
       if (UNION.equals(type)) {
         return readUnionType(node);
+      }
+
+      if (UNPARSED.equals(type)) {
+        return readUnparsedType(node);
       }
     }
 
@@ -596,6 +633,18 @@ public class JsonUtils {
     if (field.comment() != null) {
       gen.writeStringField(STRUCT_FIELD_COMMENT, field.comment());
     }
+    gen.writeEndObject();
+  }
+
+  private static void writeUnparsedType(Types.UnparsedType unparsedType, JsonGenerator gen)
+      throws IOException {
+    writeUnparsedType(unparsedType.unparsedType(), gen);
+  }
+
+  private static void writeUnparsedType(String unparsedType, JsonGenerator gen) throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, UNPARSED);
+    gen.writeStringField(UNPARSED_TYPE, unparsedType);
     gen.writeEndObject();
   }
 
@@ -699,6 +748,13 @@ public class JsonUtils {
         node.has(STRUCT_FIELD_NULLABLE) ? node.get(STRUCT_FIELD_NULLABLE).asBoolean() : true;
     String comment = node.has(STRUCT_FIELD_COMMENT) ? getString(STRUCT_FIELD_COMMENT, node) : null;
     return Types.StructType.Field.of(name, type, nullable, comment);
+  }
+
+  private static Types.UnparsedType readUnparsedType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);
+
+    return Types.UnparsedType.of(node.get(UNPARSED_TYPE).asText());
   }
 
   // Nested classes for custom serialization and deserialization

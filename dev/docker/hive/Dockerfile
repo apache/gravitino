@@ -9,6 +9,7 @@ LABEL maintainer="support@datastrato.com"
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
 ARG JDBC_DIVER_PACKAGE_NAME
+ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
 
@@ -37,7 +38,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   openssh-server \
   wget \
   sudo \
-  openjdk-8-jdk
+  openjdk-8-jdk \
+  mysql-server \
+  && rm -rf /var/lib/apt/lists/*
 
 #################################################################################
 ## setup ssh
@@ -122,7 +125,6 @@ ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 ENV MYSQL_PWD=ds123
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
 RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
-RUN apt-get install -y mysql-server
 
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql

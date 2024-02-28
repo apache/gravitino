@@ -65,10 +65,11 @@ public interface RelationalBackend extends Closeable {
    * @param entityType The type of the entity.
    * @return The entity after updating.
    * @throws NoSuchEntityException If the entity is not exist.
+   * @throws IOException If the entity is failed to update.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException;
+      throws IOException, NoSuchEntityException;
 
   /**
    * Retrieves the entity associated with the identifier and the entity type.

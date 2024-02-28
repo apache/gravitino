@@ -59,11 +59,11 @@ RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then \
     fi
 
 
-
-# Use ARGs to update trino conf and start Trino server
-ARG GRAVITINO_HOST_IP
-ARG GRAVITINO_HOST_PORT
-ARG GRAVITINO_METALAKE_NAME
-ARG HIVE_HOST_IP
+# The following ENV are needed to update configuration file before starting Trino server, you need to
+# pass these ENV variables to the container when starting it like `docker run --env GRAVITINO_HOST_IP=xxx --env GRAVITINO_HOST_PORT=xxxx`
+#ENV GRAVITINO_HOST_IP
+#ENV GRAVITINO_HOST_PORT
+#ENV GRAVITINO_METALAKE_NAME
+#ENV HADOOP_USER_NAME
 
 ENTRYPOINT ["/bin/bash", "-c", "/etc/trino/update-trino-conf.sh && /usr/lib/trino/bin/run-trino"]

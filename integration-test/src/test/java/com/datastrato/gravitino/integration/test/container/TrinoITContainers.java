@@ -10,7 +10,6 @@ import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.logging.log4j.util.Strings;
-import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ContainerLaunchException;
@@ -48,7 +47,7 @@ public class TrinoITContainers implements AutoCloseable {
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED, env);
-    Log.info("Command {} output:\n{}", command, output);
+    LOG.info("Command {} output:\n{}", command, output);
 
     resolveServerAddress();
   }
@@ -58,7 +57,7 @@ public class TrinoITContainers implements AutoCloseable {
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
-    Log.info("Command {} output:\n{}", command, output);
+    LOG.info("Command {} output:\n{}", command, output);
 
     // expect the output to be like:
     // trino:10.20.30.21
@@ -107,7 +106,7 @@ public class TrinoITContainers implements AutoCloseable {
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
-    Log.info("Command {} output:\n{}", command, output);
+    LOG.info("Command {} output:\n{}", command, output);
   }
 
   public String getTrinoUri() {

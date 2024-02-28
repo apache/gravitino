@@ -147,6 +147,15 @@ class DTOConverters {
     } else if (change instanceof TableChange.ColumnChange) {
       return toColumnUpdateRequest((TableChange.ColumnChange) change);
 
+    } else if (change instanceof TableChange.AddIndex) {
+      return new TableUpdateRequest.AddTableIndexRequest(
+          ((TableChange.AddIndex) change).getType(),
+          ((TableChange.AddIndex) change).getName(),
+          ((TableChange.AddIndex) change).getFieldNames());
+    } else if (change instanceof TableChange.DeleteIndex) {
+      return new TableUpdateRequest.DeleteTableIndexRequest(
+          ((TableChange.DeleteIndex) change).getName(),
+          ((TableChange.DeleteIndex) change).isIfExists());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());

@@ -294,8 +294,11 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UseCorrectAssertInTests",
         "VarTypeName",
-        "XorPower"
+        "XorPower",
+        "EqualsGetClass",
+        "DefaultCharset"
       )
     }
   }

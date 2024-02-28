@@ -47,6 +47,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   public static final String COMMENT = "COMMENT";
   public static final String SPACE = " ";
 
+  public static final String MODIFY_COLUMN = "MODIFY COLUMN ";
+  public static final String AFTER = "AFTER ";
+
   protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
 
   protected DataSource dataSource;

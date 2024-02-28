@@ -5,8 +5,10 @@
 package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Jdbc column. */
+@EqualsAndHashCode(callSuper = true)
 public class JdbcColumn extends BaseColumn {
 
   private JdbcColumn() {}

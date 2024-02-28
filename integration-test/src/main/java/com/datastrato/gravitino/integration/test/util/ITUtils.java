@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class ITUtils {
       for (String key : props.stringPropertyNames()) {
         String value = props.getProperty(key);
         // Use customized write functions to avoid escaping `:` into `\:`.
-        outputStream.write((key + " = " + value + "\n").getBytes());
+        outputStream.write((key + " = " + value + "\n").getBytes(StandardCharsets.UTF_8));
       }
     }
   }

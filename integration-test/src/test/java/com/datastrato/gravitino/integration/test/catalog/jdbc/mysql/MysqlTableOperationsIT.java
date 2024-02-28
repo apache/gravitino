@@ -605,7 +605,9 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
       Assertions.assertTrue(
           illegalArgumentException
               .getMessage()
-              .contains("Not a supported type: " + type.toString()));
+              .contains(
+                  String.format(
+                      "Couldn't convert Gravitino type %s to MySQL type", type.simpleString())));
     }
   }
 

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import org.apache.commons.lang3.StringUtils;
@@ -63,5 +64,37 @@ public class TestPostgreSqlTableOperations {
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in PostgreSQL"));
+  }
+
+  @Test
+  public void testOperationIndexDefinition() {
+    String tableName = "t1";
+    // Test add index definition success.
+    TableChange.AddIndex addIndex =
+        new TableChange.AddIndex(
+            Index.IndexType.PRIMARY_KEY, "test_pk", new String[][] {{"col_1"}});
+    String result = PostgreSqlTableOperations.addIndexDefinition(tableName, addIndex);
+    Assertions.assertEquals(
+        "ALTER TABLE \"t1\" ADD CONSTRAINT \"test_pk\" PRIMARY KEY (\"col_1\");", result);
+
+    addIndex =
+        new TableChange.AddIndex(
+            Index.IndexType.UNIQUE_KEY, "test_uk", new String[][] {{"col_1"}, {"col_2"}});
+    result = PostgreSqlTableOperations.addIndexDefinition(tableName, addIndex);
+    Assertions.assertEquals(
+        "ALTER TABLE \"t1\" ADD CONSTRAINT \"test_uk\" UNIQUE (\"col_1\", \"col_2\");", result);
+
+    // Test delete index definition.
+    TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("test_pk", false);
+    result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
+    Assertions.assertEquals(
+        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_pk\";\n" + "DROP INDEX \"test_pk\";", result);
+
+    deleteIndex = new TableChange.DeleteIndex("test_2_pk", true);
+    result = PostgreSqlTableOperations.deleteIndexDefinition(tableName, deleteIndex);
+    Assertions.assertEquals(
+        "ALTER TABLE \"t1\" DROP CONSTRAINT \"test_2_pk\";\n"
+            + "DROP INDEX IF EXISTS \"test_2_pk\";",
+        result);
   }
 }

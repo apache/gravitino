@@ -18,7 +18,7 @@ public class TestSimpleTokenProvider {
     try (AuthDataProvider provider = new SimpleTokenProvider()) {
       Assertions.assertTrue(provider.hasTokenData());
       String user = System.getenv("GRAVITINO_USER");
-      String token = new String(provider.getTokenData());
+      String token = new String(provider.getTokenData(), StandardCharsets.UTF_8);
       Assertions.assertTrue(token.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER));
       String tokenString =
           new String(
@@ -26,7 +26,8 @@ public class TestSimpleTokenProvider {
                   .decode(
                       token
                           .substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length())
-                          .getBytes(StandardCharsets.UTF_8)));
+                          .getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
       if (user != null) {
         Assertions.assertEquals(user + ":dummy", tokenString);
       } else {

@@ -30,6 +30,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new HiveCatalogPropertyConverter();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
@@ -69,6 +70,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     return propertyMetadata.getSchemaPropertyMetadata();
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new HiveMetadataAdapter(
