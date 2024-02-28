@@ -127,11 +127,10 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public String[][] listNamespaces(String[] namespace) throws NoSuchNamespaceException {
-    if (namespace.length == 0) {
-      return listNamespaces();
-    }
-    throw new NotSupportedException(
+    Preconditions.checkArgument(
+        namespace.length == 0,
         "Doesn't support listing namespaces with " + String.join(".", namespace));
+    return listNamespaces();
   }
 
   @Override
@@ -211,7 +210,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     String metastoreUri =
         gravitinoCatalogClient.properties().get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
     Preconditions.checkArgument(
-        StringUtils.isNoneBlank(metastoreUri),
+        StringUtils.isNotBlank(metastoreUri),
         "Couldn't get "
             + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
             + " from hive catalog properties");

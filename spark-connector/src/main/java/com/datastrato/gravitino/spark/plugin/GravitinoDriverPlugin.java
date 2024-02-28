@@ -35,11 +35,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI);
     String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
     Preconditions.checkArgument(
-        StringUtils.isNoneBlank(gravitinoUri),
+        StringUtils.isNotBlank(gravitinoUri),
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri));
     Preconditions.checkArgument(
-        StringUtils.isNoneBlank(metalake),
+        StringUtils.isNotBlank(metalake),
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
