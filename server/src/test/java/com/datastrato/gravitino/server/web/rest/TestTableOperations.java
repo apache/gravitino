@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -766,7 +767,7 @@ public class TestTableOperations extends JerseyTest {
   private void testAlterTableRequest(TableUpdateRequest req, Table updatedTable) {
     TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(req));
 
-    when(dispatcher.alterTable(any(), any())).thenReturn(updatedTable);
+    when(dispatcher.alterTable(any(), eq(req.tableChange()))).thenReturn(updatedTable);
 
     Response resp =
         target(tablePath(metalake, catalog, schema) + "table1")

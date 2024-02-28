@@ -598,7 +598,7 @@ public interface TableChange {
       AddIndex addIndex = (AddIndex) o;
       return type == addIndex.type
           && Objects.equals(name, addIndex.name)
-          && Arrays.equals(fieldNames, addIndex.fieldNames);
+          && Arrays.deepEquals(fieldNames, addIndex.fieldNames);
     }
 
     @Override
