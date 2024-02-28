@@ -21,6 +21,7 @@ const TableHeader = props => {
       <Box className={'twc-flex twc-items-center twc-flex-1 twc-h-full'} id='filter-panel' />
       <TextField size='small' value={value} placeholder='Query Name' onChange={e => handleFilter(e.target.value)} />
       <Button
+        id='createMetalakeBtn'
         className={'twc-ml-2'}
         variant='contained'
         color='primary'

@@ -223,6 +223,7 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
+                      id='metalakeNameField'
                       label='Name'
                       onChange={onChange}
                       placeholder=''
@@ -245,6 +246,7 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
+                      id='metalakeCommentField'
                       label='Comment'
                       multiline
                       rows={2}
@@ -257,7 +259,7 @@ const CreateMetalakeDialog = props => {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} id='properties'>
               <Typography className={'twc-mb-2'} variant='body2'>
                 Properties
               </Typography>
@@ -315,7 +317,7 @@ const CreateMetalakeDialog = props => {
           </Grid>
         </DialogContent>
         <DialogActions className={' twc-px-5 md:twc-px-15 twc-pb-5 md:twc-pb-[12.5 0.25 rem]'}>
-          <Button variant='contained' type='submit'>
+          <Button variant='contained' type='submit' id='submitHandleMetalake'>
             {typeText === 'Edit' ? 'Update' : typeText}
           </Button>
           <Button variant='outlined' className={'twc-ml-1'} onClick={handleClose} type='reset'>
