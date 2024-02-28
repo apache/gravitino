@@ -22,6 +22,8 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -739,9 +741,7 @@ public interface TableChange {
     private final String column;
 
     private After(String column) {
-      if (null == column) {
-        throw new IllegalArgumentException("column can not be null.");
-      }
+      Preconditions.checkArgument(!Strings.isNullOrEmpty(column), "Column cannot be null");
       this.column = column;
     }
 

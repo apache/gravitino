@@ -173,20 +173,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     // For external fileset, the storageLocation must be set.
-    if (type == Fileset.Type.EXTERNAL && StringUtils.isBlank(storageLocation)) {
-      throw new IllegalArgumentException(
-          "Storage location must be set for external fileset " + ident);
-    }
+    Preconditions.checkArgument(
+        type != Fileset.Type.EXTERNAL || StringUtils.isNoneBlank(storageLocation),
+        "Storage location must be set for external fileset " + ident);
 
     // Either catalog property "location", or schema property "location", or storageLocation must be
     // set for managed fileset.
     Path schemaPath = getSchemaPath(schemaIdent.name(), schemaEntity.properties());
-    if (schemaPath == null && StringUtils.isBlank(storageLocation)) {
-      throw new IllegalArgumentException(
-          "Storage location must be set for fileset "
-              + ident
-              + " when it's catalog and schema location are not set");
-    }
+    Preconditions.checkArgument(
+        schemaPath != null || StringUtils.isNoneBlank(storageLocation),
+        "Storage location must be set for fileset "
+            + ident
+            + " when it's catalog and schema location are not set");
 
     // The specified storageLocation will take precedence over the calculated one.
     Path filesetPath =
