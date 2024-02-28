@@ -15,6 +15,8 @@ import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -76,8 +78,7 @@ public class MetalakeMetaService {
           });
     } catch (RuntimeException re) {
       if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
         // TODO We should make more fine-grained exception judgments
         // Usually throwing `SQLIntegrityConstraintViolationException` means that
         // SQL violates the constraints of `primary key` and `unique key`.
@@ -119,8 +120,7 @@ public class MetalakeMetaService {
               mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     } catch (RuntimeException re) {
       if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
         // TODO We should make more fine-grained exception judgments
         // Usually throwing `SQLIntegrityConstraintViolationException` means that
         // SQL violates the constraints of `primary key` and `unique key`.
@@ -162,9 +162,14 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
-            () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the metalake
-            });
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()

@@ -10,12 +10,13 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
-import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
@@ -25,18 +26,21 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-/** The service class for table metadata. It provides the basic database operations for table. */
-public class TableMetaService {
-  private static final TableMetaService INSTANCE = new TableMetaService();
+/**
+ * The service class for fileset metadata and version info. It provides the basic database
+ * operations for fileset and version info.
+ */
+public class FilesetMetaService {
+  private static final FilesetMetaService INSTANCE = new FilesetMetaService();
 
-  public static TableMetaService getInstance() {
+  public static FilesetMetaService getInstance() {
     return INSTANCE;
   }
 
-  private TableMetaService() {}
+  private FilesetMetaService() {}
 
-  public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+  public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
+    NameIdentifier.checkFileset(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
@@ -44,10 +48,7 @@ public class TableMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -57,7 +58,6 @@ public class TableMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -67,28 +67,24 @@ public class TableMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
-    TablePO tablePO =
+    FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, identifier.name()));
+            FilesetMetaMapper.class,
+            mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, identifier.name()));
 
-    if (tablePO == null) {
+    if (filesetPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
     }
 
-    return POConverters.fromTablePO(tablePO, identifier.namespace());
+    return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
   }
 
-  public List<TableEntity> listTablesByNamespace(Namespace namespace) {
-    Namespace.checkTable(namespace);
+  public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
+    Namespace.checkFileset(namespace);
     String metalakeName = namespace.level(0);
     String catalogName = namespace.level(1);
     String schemaName = namespace.level(2);
@@ -97,10 +93,7 @@ public class TableMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -110,7 +103,6 @@ public class TableMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -120,31 +112,26 @@ public class TableMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          namespace.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, namespace.toString());
     }
 
-    List<TablePO> tablePOs =
+    List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
-    return POConverters.fromTablePOs(tablePOs, namespace);
+            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
+    return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
-  public void insertTable(TableEntity tableEntity, boolean overwrite) {
+  public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkTable(tableEntity.nameIdentifier());
-      String metalakeName = tableEntity.namespace().level(0);
-      String catalogName = tableEntity.namespace().level(1);
-      String schemaName = tableEntity.namespace().level(2);
+      NameIdentifier.checkFileset(filesetEntity.nameIdentifier());
+      String metalakeName = filesetEntity.namespace().level(0);
+      String catalogName = filesetEntity.namespace().level(1);
+      String schemaName = filesetEntity.namespace().level(2);
       Long metalakeId =
           SessionUtils.getWithoutCommit(
               MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
       if (metalakeId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
+        throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
       }
 
       Long catalogId =
@@ -154,7 +141,6 @@ public class TableMetaService {
       if (catalogId == null) {
         throw new NoSuchEntityException(
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
             String.format("%s.%s", metalakeName, catalogName));
       }
 
@@ -164,23 +150,35 @@ public class TableMetaService {
               mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
       if (schemaId == null) {
         throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            tableEntity.namespace().toString());
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, filesetEntity.namespace().toString());
       }
 
-      SessionUtils.doWithCommit(
-          TableMetaMapper.class,
-          mapper -> {
-            TablePO po =
-                POConverters.initializeTablePOWithVersion(
-                    tableEntity, metalakeId, catalogId, schemaId);
-            if (overwrite) {
-              mapper.insertTableMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertTableMeta(po);
-            }
-          });
+      FilesetPO po =
+          POConverters.initializeFilesetPOWithVersion(
+              filesetEntity, metalakeId, catalogId, schemaId);
+
+      // insert both fileset meta table and version table
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertFilesetMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertFilesetMeta(po);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertFilesetVersionOnDuplicateKeyUpdate(po.getFilesetVersionPO());
+                    } else {
+                      mapper.insertFilesetVersion(po.getFilesetVersionPO());
+                    }
+                  }));
     } catch (RuntimeException re) {
       if (re.getCause() != null
           && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
@@ -189,28 +187,25 @@ public class TableMetaService {
         // SQL violates the constraints of `primary key` and `unique key`.
         // We simply think that the entity already exists at this time.
         throw new EntityAlreadyExistsException(
-            String.format("Table entity: %s already exists", tableEntity.nameIdentifier()));
+            String.format("Fileset entity: %s already exists", filesetEntity.nameIdentifier()));
       }
       throw re;
     }
   }
 
-  public <E extends Entity & HasIdentifier> TableEntity updateTable(
+  public <E extends Entity & HasIdentifier> FilesetEntity updateFileset(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifier.checkFileset(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String tableName = identifier.name();
+    String filesetName = identifier.name();
 
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -220,7 +215,6 @@ public class TableMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -230,39 +224,62 @@ public class TableMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
-    TablePO oldTablePO =
+    FilesetPO oldFilesetPO =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-    if (oldTablePO == null) {
+            FilesetMetaMapper.class,
+            mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, filesetName));
+    if (oldFilesetPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
     }
 
-    TableEntity oldTableEntity = POConverters.fromTablePO(oldTablePO, identifier.namespace());
-    TableEntity newEntity = (TableEntity) updater.apply((E) oldTableEntity);
+    FilesetEntity oldFilesetEntity =
+        POConverters.fromFilesetPO(oldFilesetPO, identifier.namespace());
+    FilesetEntity newEntity = (FilesetEntity) updater.apply((E) oldFilesetEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldTableEntity.id(), newEntity.id()),
-        "The updated table entity id: %s should be same with the table entity id before: %s",
+        Objects.equals(oldFilesetEntity.id(), newEntity.id()),
+        "The updated fileset entity id: %s should be same with the table entity id before: %s",
         newEntity.id(),
-        oldTableEntity.id());
+        oldFilesetEntity.id());
     Integer updateResult;
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              TableMetaMapper.class,
-              mapper ->
-                  mapper.updateTableMeta(
-                      POConverters.updateTablePOWithVersion(
-                          oldTablePO, newEntity, metalakeId, catalogId, schemaId),
-                      oldTablePO));
+      boolean checkNeedUpdateVersion =
+          POConverters.checkFilesetVersionNeedUpdate(
+              oldFilesetPO.getFilesetVersionPO(),
+              newEntity,
+              metalakeId,
+              catalogId,
+              schemaId,
+              oldFilesetPO.getFilesetId());
+      FilesetPO newFilesetPO =
+          POConverters.updateFilesetPOWithVersion(
+              oldFilesetPO, newEntity, metalakeId, catalogId, schemaId, checkNeedUpdateVersion);
+      if (checkNeedUpdateVersion) {
+        // These operations are guaranteed to be atomic by the transaction. If version info is
+        // inserted successfully and the uniqueness is guaranteed by `fileset_id + version +
+        // deleted_at`, it means that no other transaction has been inserted (if a uniqueness
+        // conflict occurs, the transaction will be rolled back), then we can consider that the
+        // fileset meta update is successful
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.insertFilesetVersion(newFilesetPO.getFilesetVersionPO())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
+        // we set the updateResult to 1 to indicate that the update is successful
+        updateResult = 1;
+      } else {
+        updateResult =
+            SessionUtils.doWithCommitAndFetchResult(
+                FilesetMetaMapper.class,
+                mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+      }
     } catch (RuntimeException re) {
       if (re.getCause() != null
           && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
@@ -283,20 +300,17 @@ public class TableMetaService {
     }
   }
 
-  public boolean deleteTable(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+  public boolean deleteFileset(NameIdentifier identifier) {
+    NameIdentifier.checkFileset(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String tableName = identifier.name();
+    String filesetName = identifier.name();
     Long metalakeId =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
+      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
     }
 
     Long catalogId =
@@ -306,7 +320,6 @@ public class TableMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -316,23 +329,24 @@ public class TableMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
     }
 
-    Long tableId =
+    Long filesetId =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableIdBySchemaIdAndName(schemaId, tableName));
-    if (tableId != null) {
+            FilesetMetaMapper.class,
+            mapper -> mapper.selectFilesetIdBySchemaIdAndName(schemaId, filesetName));
+    if (filesetId != null) {
+      // We should delete meta and version info
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId)),
-          () -> {
-            // TODO We will delete the sub-resources under the table
-          });
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
     }
     return true;
   }

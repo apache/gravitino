@@ -11,9 +11,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -144,8 +147,7 @@ public class SchemaMetaService {
           });
     } catch (RuntimeException re) {
       if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
         // TODO We should make more fine-grained exception judgments
         // Usually throwing `SQLIntegrityConstraintViolationException` means that
         // SQL violates the constraints of `primary key` and `unique key`.
@@ -215,8 +217,7 @@ public class SchemaMetaService {
                       oldSchemaPO));
     } catch (RuntimeException re) {
       if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
         // TODO We should make more fine-grained exception judgments
         // Usually throwing `SQLIntegrityConstraintViolationException` means that
         // SQL violates the constraints of `primary key` and `unique key`.
@@ -275,14 +276,27 @@ public class SchemaMetaService {
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
-            () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the schema
-            });
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
                 .listTablesByNamespace(Namespace.ofTable(metalakeName, catalogName, schemaName));
         if (!tableEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+        }
+        List<FilesetEntity> filesetEntities =
+            FilesetMetaService.getInstance()
+                .listFilesetsByNamespace(
+                    Namespace.ofFileset(metalakeName, catalogName, schemaName));
+        if (!filesetEntities.isEmpty()) {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", identifier);
         }

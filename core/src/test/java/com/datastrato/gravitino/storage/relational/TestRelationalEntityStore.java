@@ -28,9 +28,11 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -306,6 +308,70 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  public void testFilesetPutAndGet() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L,
+            "test_schema",
+            Namespace.ofSchema(metalake.name(), catalog.name()),
+            "this is schema test");
+    entityStore.put(schema, false);
+
+    FilesetEntity filesetEntity =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test",
+            "hdfs://localhost/test");
+    entityStore.put(filesetEntity, false);
+
+    FilesetEntity insertedFileset =
+        entityStore.get(
+            filesetEntity.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class);
+    assertNotNull(insertedFileset);
+    assertTrue(checkFilesetEquals(filesetEntity, insertedFileset));
+
+    // overwrite false
+    FilesetEntity duplicateFileset =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test",
+            "hdfs://localhost/test");
+    assertThrows(
+        EntityAlreadyExistsException.class, () -> entityStore.put(duplicateFileset, false));
+
+    // overwrite true
+    FilesetEntity overwrittenFileset =
+        createFileset(
+            1L,
+            "test_fileset1",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test1",
+            "hdfs://localhost/test1");
+    entityStore.put(overwrittenFileset, true);
+    FilesetEntity insertedFileset1 =
+        entityStore.get(
+            overwrittenFileset.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class);
+
+    assertEquals(
+        1,
+        entityStore
+            .list(insertedFileset1.namespace(), FilesetEntity.class, Entity.EntityType.FILESET)
+            .size());
+    checkFilesetEquals(overwrittenFileset, insertedFileset1);
+  }
+
+  @Test
   public void testMetalakePutAndList() throws IOException {
     BaseMetalake metalake1 = createMetalake(1L, "test_metalake1", "this is test 1");
     BaseMetalake metalake2 = createMetalake(2L, "test_metalake2", "this is test 2");
@@ -413,7 +479,7 @@ public class TestRelationalEntityStore {
             1L, "test_table1", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
     TableEntity table2 =
         createTable(
-            2L, "test_schema2", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+            2L, "test_table2", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
 
     List<TableEntity> beforeTableList =
         entityStore.list(table1.namespace(), TableEntity.class, Entity.EntityType.TABLE);
@@ -430,6 +496,53 @@ public class TestRelationalEntityStore {
     assertEquals(2, tableEntities.size());
     assertTrue(checkTableEquals(table1, tableEntities.get(0)));
     assertTrue(checkTableEquals(table2, tableEntities.get(1)));
+  }
+
+  @Test
+  public void testFilesetPutAndList() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test 1");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    FilesetEntity fileset1 =
+        createFileset(
+            1L,
+            "test_filese1",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset 1",
+            "hdfs://localhost/test1");
+    FilesetEntity fileset2 =
+        createFileset(
+            2L,
+            "test_filese2",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset 2",
+            "hdfs://localhost/test2");
+
+    List<FilesetEntity> beforeFilesetList =
+        entityStore.list(fileset1.namespace(), FilesetEntity.class, Entity.EntityType.FILESET);
+    assertNotNull(beforeFilesetList);
+    assertEquals(0, beforeFilesetList.size());
+
+    entityStore.put(fileset1, false);
+    entityStore.put(fileset2, false);
+    List<FilesetEntity> filesetEntities =
+        entityStore.list(fileset1.namespace(), FilesetEntity.class, Entity.EntityType.FILESET)
+            .stream()
+            .sorted(Comparator.comparing(FilesetEntity::id))
+            .collect(Collectors.toList());
+    assertNotNull(filesetEntities);
+    assertEquals(2, filesetEntities.size());
+    assertTrue(checkFilesetEquals(fileset1, filesetEntities.get(0)));
+    assertTrue(checkFilesetEquals(fileset2, filesetEntities.get(1)));
   }
 
   @Test
@@ -474,6 +587,15 @@ public class TestRelationalEntityStore {
             Namespace.ofTable(metalake1.name(), subCatalog.name(), subSchema.name()));
     entityStore.put(subTable, false);
 
+    FilesetEntity subFileset =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake1.name(), subCatalog.name(), subSchema.name()),
+            "test cascade deleted",
+            "hdfs://localhost/test");
+    entityStore.put(subFileset, false);
+
     // cascade is false
     assertThrows(
         NonEmptyEntityException.class,
@@ -485,6 +607,7 @@ public class TestRelationalEntityStore {
     assertFalse(entityStore.exists(subCatalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(entityStore.exists(subSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
     assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
+    assertFalse(entityStore.exists(subFileset.nameIdentifier(), Entity.EntityType.FILESET));
   }
 
   @Test
@@ -530,6 +653,15 @@ public class TestRelationalEntityStore {
             Namespace.ofTable(metalake.name(), catalog1.name(), subSchema.name()));
     entityStore.put(subTable, false);
 
+    FilesetEntity subFileset =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog1.name(), subSchema.name()),
+            "test cascade deleted",
+            "hdfs://localhost/test");
+    entityStore.put(subFileset, false);
+
     // cascade is false
     assertThrows(
         NonEmptyEntityException.class,
@@ -540,6 +672,7 @@ public class TestRelationalEntityStore {
     assertFalse(entityStore.exists(catalog1.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(entityStore.exists(subSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
     assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
+    assertFalse(entityStore.exists(subFileset.nameIdentifier(), Entity.EntityType.FILESET));
   }
 
   @Test
@@ -582,6 +715,15 @@ public class TestRelationalEntityStore {
             1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema1.name()));
     entityStore.put(subTable, false);
 
+    FilesetEntity subFileset =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema1.name()),
+            "test cascade deleted",
+            "hdfs://localhost/test");
+    entityStore.put(subFileset, false);
+
     // cascade is false
     assertThrows(
         NonEmptyEntityException.class,
@@ -591,10 +733,11 @@ public class TestRelationalEntityStore {
     entityStore.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, true);
     assertFalse(entityStore.exists(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
     assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
+    assertFalse(entityStore.exists(subFileset.nameIdentifier(), Entity.EntityType.FILESET));
   }
 
   @Test
-  public void testTablePutAndDelete() throws IOException, InterruptedException {
+  public void testTablePutAndDelete() throws IOException {
     BaseMetalake metalake = createMetalake(3L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
 
@@ -619,19 +762,40 @@ public class TestRelationalEntityStore {
     assertThrows(
         NoSuchEntityException.class,
         () -> entityStore.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class));
+  }
 
-    // sleep 1s to make delete_at seconds differently
-    Thread.sleep(1000);
+  @Test
+  public void testFilesetPutAndDelete() throws IOException, InterruptedException {
+    BaseMetalake metalake = createMetalake(3L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
 
-    // test cascade delete
-    TableEntity table1 =
-        createTable(
-            3L, "test_table1", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
-    entityStore.put(table1, false);
+    CatalogEntity catalog =
+        createCatalog(2L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
 
-    // cascade is true
-    entityStore.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true);
-    assertFalse(entityStore.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    SchemaEntity schema =
+        createSchema(
+            2L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    FilesetEntity fileset =
+        createFileset(
+            2L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test",
+            "hdfs://localhost/test");
+    entityStore.put(fileset, false);
+
+    assertNotNull(
+        entityStore.get(fileset.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class));
+    entityStore.delete(fileset.nameIdentifier(), Entity.EntityType.FILESET, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            entityStore.get(
+                fileset.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class));
   }
 
   @Test
@@ -987,6 +1151,153 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  public void testFilesetPutAndUpdate() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is catalog test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L,
+            "test_schema",
+            Namespace.ofSchema(metalake.name(), catalog.name()),
+            "this is schema test");
+    entityStore.put(schema, false);
+
+    FilesetEntity fileset =
+        createFileset(
+            1L,
+            "test_fileset",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test",
+            "hdfs://localhost/test");
+    entityStore.put(fileset, false);
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            entityStore.update(
+                fileset.nameIdentifier(),
+                FilesetEntity.class,
+                Entity.EntityType.FILESET,
+                f -> {
+                  FilesetEntity.Builder builder =
+                      new FilesetEntity.Builder()
+                          // Change the id, which is not allowed
+                          .withId(2L)
+                          .withName("test_fileset2")
+                          .withNamespace(
+                              Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()))
+                          .withComment(f.comment())
+                          .withProperties(f.properties())
+                          .withStorageLocation(f.storageLocation())
+                          .withFilesetType(f.filesetType())
+                          .withAuditInfo(f.auditInfo());
+                  return builder.build();
+                }));
+
+    AuditInfo changedAuditInfo =
+        AuditInfo.builder().withCreator("changed_creator").withCreateTime(Instant.now()).build();
+    // update version fields and normal fields
+    FilesetEntity updatedFileset =
+        entityStore.update(
+            fileset.nameIdentifier(),
+            FilesetEntity.class,
+            Entity.EntityType.FILESET,
+            f -> {
+              FilesetEntity.Builder builder =
+                  new FilesetEntity.Builder()
+                      .withId(f.id())
+                      .withName("test_fileset2")
+                      .withNamespace(
+                          Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()))
+                      .withFilesetType(f.filesetType())
+                      .withComment("this is fileset test 2")
+                      .withStorageLocation("hdfs://localhost/test2")
+                      .withProperties(f.properties())
+                      .withAuditInfo(changedAuditInfo);
+              return builder.build();
+            });
+
+    FilesetEntity storedFileset =
+        entityStore.get(
+            updatedFileset.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class);
+
+    assertEquals(fileset.id(), storedFileset.id());
+    assertEquals("test_fileset2", storedFileset.name());
+    assertEquals(changedAuditInfo.creator(), storedFileset.auditInfo().creator());
+    assertEquals("this is fileset test 2", storedFileset.comment());
+    assertEquals("hdfs://localhost/test2", storedFileset.storageLocation());
+
+    FilesetEntity fileset3 =
+        createFileset(
+            3L,
+            "test_fileset3",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is fileset test 3",
+            "hdfs://localhost/test3");
+    entityStore.put(fileset3, false);
+
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                fileset3.nameIdentifier(),
+                FilesetEntity.class,
+                Entity.EntityType.FILESET,
+                f -> {
+                  FilesetEntity.Builder builder =
+                      new FilesetEntity.Builder()
+                          .withId(fileset3.id())
+                          // fileset name already exists
+                          .withName("test_fileset2")
+                          .withNamespace(
+                              Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()))
+                          .withFilesetType(f.filesetType())
+                          .withStorageLocation(f.storageLocation())
+                          .withComment(f.comment())
+                          .withProperties(f.properties())
+                          .withAuditInfo(f.auditInfo());
+                  return builder.build();
+                }));
+
+    // only update normal fields
+    FilesetEntity updatedFileset2 =
+        entityStore.update(
+            fileset3.nameIdentifier(),
+            FilesetEntity.class,
+            Entity.EntityType.FILESET,
+            f -> {
+              FilesetEntity.Builder builder =
+                  new FilesetEntity.Builder()
+                      .withId(f.id())
+                      .withName("test_fileset4")
+                      .withNamespace(
+                          Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()))
+                      .withFilesetType(f.filesetType())
+                      .withComment(f.comment())
+                      .withStorageLocation(f.storageLocation())
+                      .withProperties(f.properties())
+                      .withAuditInfo(changedAuditInfo);
+              return builder.build();
+            });
+
+    FilesetEntity storedFileset2 =
+        entityStore.get(
+            updatedFileset2.nameIdentifier(), Entity.EntityType.FILESET, FilesetEntity.class);
+
+    assertEquals(fileset3.id(), storedFileset2.id());
+    assertEquals("test_fileset4", storedFileset2.name());
+    assertEquals(changedAuditInfo.creator(), storedFileset2.auditInfo().creator());
+    assertEquals(fileset3.comment(), storedFileset2.comment());
+    assertEquals(fileset3.storageLocation(), storedFileset2.storageLocation());
+  }
+
+  @Test
   public void testMetalakePutAndExists() throws IOException {
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
@@ -1042,6 +1353,32 @@ public class TestRelationalEntityStore {
     entityStore.put(table, false);
 
     assertTrue(entityStore.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
+  public void testFilesetPutAndExists() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    FilesetEntity fileset =
+        createFileset(
+            1L,
+            "test_table",
+            Namespace.ofFileset(metalake.name(), catalog.name(), schema.name()),
+            "this is test",
+            "hdfs://localhost/test");
+    entityStore.put(fileset, false);
+
+    assertTrue(entityStore.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
@@ -1132,6 +1469,34 @@ public class TestRelationalEntityStore {
   private static boolean checkTableEquals(TableEntity expected, TableEntity actual) {
     return expected.id().equals(actual.id())
         && expected.name().equals(actual.name())
+        && expected.namespace().equals(actual.namespace())
+        && expected.auditInfo().equals(actual.auditInfo());
+  }
+
+  private static FilesetEntity createFileset(
+      Long id, String name, Namespace namespace, String comment, String location) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    return new FilesetEntity.Builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withFilesetType(Fileset.Type.MANAGED)
+        .withComment(comment)
+        .withAuditInfo(auditInfo)
+        .withStorageLocation(location)
+        .withProperties(new HashMap<>())
+        .build();
+  }
+
+  private static boolean checkFilesetEquals(FilesetEntity expected, FilesetEntity actual) {
+    return expected.id().equals(actual.id())
+        && expected.name().equals(actual.name())
+        && expected.filesetType() == actual.filesetType()
+        && expected.comment().equals(actual.comment())
+        && expected.storageLocation().equals(actual.storageLocation())
+        && expected.properties() != null
+        && expected.properties().equals(actual.properties())
         && expected.namespace().equals(actual.namespace())
         && expected.auditInfo().equals(actual.auditInfo());
   }

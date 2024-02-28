@@ -34,7 +34,7 @@ public class SessionUtils {
         SqlSessions.commitAndCloseSqlSession();
       } catch (Throwable t) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
+        throw t;
       }
     }
   }
@@ -58,7 +58,7 @@ public class SessionUtils {
         return result;
       } catch (Throwable t) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
+        throw t;
       }
     }
   }
@@ -76,7 +76,7 @@ public class SessionUtils {
       T mapper = SqlSessions.getMapper(mapperClazz);
       consumer.accept(mapper);
     } catch (Throwable t) {
-      throw new RuntimeException(t);
+      throw t;
     }
   }
 
@@ -96,7 +96,7 @@ public class SessionUtils {
         T mapper = SqlSessions.getMapper(mapperClazz);
         return func.apply(mapper);
       } catch (Throwable t) {
-        throw new RuntimeException(t);
+        throw t;
       } finally {
         SqlSessions.closeSqlSession();
       }
@@ -116,7 +116,7 @@ public class SessionUtils {
         SqlSessions.commitAndCloseSqlSession();
       } catch (Throwable t) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw new RuntimeException(t);
+        throw t;
       }
     }
   }
