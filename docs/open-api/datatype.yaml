@@ -14,6 +14,7 @@ components:
         - $ref: "#/components/schemas/ListType"
         - $ref: "#/components/schemas/MapType"
         - $ref: "#/components/schemas/UnionType"
+        - $ref: "#/components/schemas/UnparsedType"
 
     PrimitiveType:
       type: string
@@ -163,3 +164,23 @@ components:
           type: string
           description: The comment of the struct field
           nullable: true
+
+    UnparsedType:
+      type: object
+      required:
+        - type
+        - unparsedType
+      properties:
+        type:
+          type: string
+          enum:
+            - "unparsed"
+        unparsedType:
+          type: string
+          description: The unparsed type
+      example: {
+        "type": "unparsed",
+        "unparsedType": [
+          "user-defined"
+        ]
+      }

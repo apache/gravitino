@@ -8,6 +8,7 @@ package com.datastrato.gravitino.server.auth;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
@@ -30,7 +31,7 @@ class SimpleAuthenticator implements Authenticator {
     if (tokenData == null) {
       return ANONYMOUS_PRINCIPAL;
     }
-    String authData = new String(tokenData);
+    String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)) {
       return ANONYMOUS_PRINCIPAL;
     }
@@ -42,7 +43,8 @@ class SimpleAuthenticator implements Authenticator {
       return ANONYMOUS_PRINCIPAL;
     }
     try {
-      String[] userInformation = new String(Base64.getDecoder().decode(credential)).split(":");
+      String[] userInformation =
+          new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8).split(":");
       if (userInformation.length != 2) {
         return ANONYMOUS_PRINCIPAL;
       }

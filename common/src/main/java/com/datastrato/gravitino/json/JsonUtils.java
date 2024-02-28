@@ -39,6 +39,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -238,6 +240,33 @@ public class JsonUtils {
    */
   public static ObjectMapper objectMapper() {
     return ObjectMapperHolder.INSTANCE;
+  }
+
+  /**
+   * AnyFieldMapperHolder is a static inner class that holds the instance of ObjectMapper which can
+   * access any field of the object. This class utilizes the Initialization-on-demand holder idiom,
+   * which is a lazy-loaded singleton. This idiom takes advantage of the fact that inner classes are
+   * not loaded until they are referenced. It's a thread-safe and efficient way to implement a
+   * singleton as the instance is created when it's needed at the first time.
+   */
+  private static class AnyFieldMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .registerModule(new JavaTimeModule());
+  }
+
+  /**
+   * Get the shared AnyFieldMapper instance for JSON serialization/deserialization.
+   *
+   * @return The ObjectMapper instance.
+   */
+  public static ObjectMapper anyFieldMapper() {
+    return AnyFieldMapperHolder.INSTANCE;
   }
 
   /**

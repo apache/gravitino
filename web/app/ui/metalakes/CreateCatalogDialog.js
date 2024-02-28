@@ -252,16 +252,22 @@ const CreateCatalogDialog = props => {
         }
 
         if (type === 'create') {
-          dispatch(createCatalog({ data: catalogData, metalake }))
+          dispatch(createCatalog({ data: catalogData, metalake })).then(res => {
+            if (!res.payload?.err) {
+              handleClose()
+            }
+          })
         } else {
           const reqData = { updates: genUpdates(cacheData, catalogData) }
 
           if (reqData.updates.length !== 0) {
-            dispatch(updateCatalog({ metalake, catalog: cacheData.name, data: reqData }))
+            dispatch(updateCatalog({ metalake, catalog: cacheData.name, data: reqData })).then(res => {
+              if (!res.payload?.err) {
+                handleClose()
+              }
+            })
           }
         }
-
-        handleClose()
       })
       .catch(err => {
         console.error('valid error', err)

@@ -19,6 +19,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Date;
 import org.apache.hc.core5.http.HttpStatus;
@@ -134,6 +135,6 @@ public class TestOAuth2TokenProvider {
     Assertions.assertNotEquals(accessToken, oldAccessToken);
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
-        new String(provider.getTokenData()));
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
   }
 }

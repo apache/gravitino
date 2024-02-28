@@ -27,7 +27,8 @@ final class SimpleTokenProvider implements AuthDataProvider {
     this.token =
         (AuthConstants.AUTHORIZATION_BASIC_HEADER
                 + new String(
-                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8))))
+                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
+                    StandardCharsets.UTF_8))
             .getBytes(StandardCharsets.UTF_8);
   }
 
