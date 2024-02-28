@@ -16,32 +16,25 @@ const MetalakePage = () => {
 
   const [routeParams, setRouteParams] = useState({})
 
-  const getParamsLens = () => {
-    let lens = []
-    searchParams.forEach(v => {
-      lens.push(v)
-    })
-
-    return lens
-  }
+  const parameterSize = [...searchParams.keys()].length
 
   const getProps = () => {
-    if (getParamsLens().length === 1 && searchParams.get('metalake')) {
+    if (parameterSize === 1 && searchParams.get('metalake')) {
       return {
         page: 'metalakes',
         title: 'Catalogs'
       }
-    } else if (getParamsLens().length === 2 && searchParams.has('catalog')) {
+    } else if (parameterSize === 2 && searchParams.has('catalog')) {
       return {
         page: 'catalogs',
         title: 'Schemas'
       }
-    } else if (getParamsLens().length === 3 && searchParams.has('schema')) {
+    } else if (parameterSize === 3 && searchParams.has('schema')) {
       return {
         page: 'schemas',
         title: 'Tables'
       }
-    } else if (getParamsLens().length === 4 && searchParams.has('table')) {
+    } else if (parameterSize === 4 && searchParams.has('table')) {
       return {
         page: 'tables',
         title: 'Columns'
