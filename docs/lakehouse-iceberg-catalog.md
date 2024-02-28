@@ -215,6 +215,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
 ### Table properties

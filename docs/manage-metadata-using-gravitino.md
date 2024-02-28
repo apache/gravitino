@@ -609,8 +609,8 @@ You can create a table by sending a `POST` request to the `/api/metalakes/{metal
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "exmaple_table",
-  "comment": "This is an exmaple table",
+  "name": "example_table",
+  "comment": "This is an example table",
   "columns": [
     {
       "name": "id",
@@ -756,7 +756,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "catalog", "schema", "exmaple_table"),
+  NameIdentifier.of("metalake", "catalog", "schema", "example_table"),
   new Column[] {
     Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
@@ -768,7 +768,7 @@ tableCatalog.createTable(
       ), "info column comment", true, false, null),
     Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
   },
-  "This is an exmaple table",
+  "This is an example table",
   tablePropertiesMap,
   new Transform[] {Transforms.identity("id")},
   Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
@@ -822,6 +822,32 @@ The following types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
 
 The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+
+##### Unparsed type
+
+Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
+The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+
+<Tabs>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "user-defined"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "user-defined"
+String unparsedValue = ((UnparsedType) type).unparsedType();
+```
+
+  </TabItem>
+</Tabs>
 
 #### Table column default value
 
@@ -906,7 +932,8 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 
 ### Alter a table
