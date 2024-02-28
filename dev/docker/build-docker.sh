@@ -9,6 +9,11 @@ script_dir="$(cd "${script_dir}">/dev/null; pwd)"
 # Build docker image for multi-arch
 # shellcheck disable=SC2089
 
+# free disk space
+if [ "${GITHUB_ACTIONS}" = "true" ]; then
+  sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/hostedtoolcache/CodeQL
+fi
+
 usage() {
   cat << EOF
 Usage:
