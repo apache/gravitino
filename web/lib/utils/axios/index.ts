@@ -146,8 +146,8 @@ const transform: AxiosTransform = {
           config.params = params
         } else {
           // ** If no data is provided for non-GET requests, the params will be treated as data
-          config.data = params
-          config.params = undefined
+          // config.data = params
+          // config.params = undefined
         }
         if (joinParamsToUrl) {
           config.url = setObjToUrlParams(config.url as string, Object.assign({}, config.params, config.data))
@@ -190,8 +190,8 @@ const transform: AxiosTransform = {
    * @description: Error Response Handling
    */
   responseInterceptorsCatch: (axiosInstance: AxiosInstance, error: any) => {
-    const { response, code, message, config } = error || {}
-    const errorMessageMode = config?.requestOptions?.errorMessageMode || 'none'
+    const { response, code, message, config: originConfig } = error || {}
+    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
     const msg: string = response?.data?.error?.message ?? response?.data?.message ?? ''
     const err: string = error?.toString?.() ?? ''
     let errMessage = ''
@@ -224,8 +224,8 @@ const transform: AxiosTransform = {
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = config.requestOptions.retryRequest
-    config.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const { isOpenRetry } = originConfig.requestOptions.retryRequest
+    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }
