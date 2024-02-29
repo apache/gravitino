@@ -14,21 +14,14 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.partitions.IdentityPartition;
-import com.datastrato.gravitino.rel.partitions.ListPartition;
-import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -438,90 +431,5 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expected, IndexDTO.class),
         objectMapper.readValue(jsonValue, IndexDTO.class));
-  }
-
-  @Test
-  void testFromDTOPartitionDTOWhenIdentityPartitionDTOToPartition() {
-
-    // given
-    String[] field1 = {"dt"};
-    String[] field2 = {"country"};
-    LiteralDTO literal1 =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
-    LiteralDTO literal2 =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
-    String[][] fieldNames = {field1, field2};
-    LiteralDTO[] values = {literal1, literal2};
-
-    Map<String, String> properties = Collections.singletonMap("key", "value");
-    PartitionDTO identityPartitionDTO =
-        IdentityPartitionDTO.builder()
-            .withFieldNames(fieldNames)
-            .withName("IdentityPartition")
-            .withValues(values)
-            .withProperties(properties)
-            .build();
-    // when
-    IdentityPartition identityPartition =
-        (IdentityPartition) DTOConverters.fromDTO(identityPartitionDTO);
-
-    // then
-    Assertions.assertTrue(Arrays.equals(fieldNames, identityPartition.fieldNames()));
-    Assertions.assertEquals("IdentityPartition", identityPartition.name());
-    Assertions.assertTrue(Arrays.equals(values, identityPartition.values()));
-    Assertions.assertEquals(properties, identityPartition.properties());
-  }
-
-  @Test
-  void testFromDTOPartitionDTOWhenRangePartitionDTOToPartition() {
-
-    // given
-    LiteralDTO lower =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
-    LiteralDTO upper =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
-
-    Map<String, String> properties = Collections.singletonMap("key", "value");
-    PartitionDTO rangePartitionDTO =
-        RangePartitionDTO.builder()
-            .withName("RangePartition")
-            .withLower(lower)
-            .withProperties(properties)
-            .withUpper(upper)
-            .build();
-    // when
-    RangePartition rangePartition = (RangePartition) DTOConverters.fromDTO(rangePartitionDTO);
-
-    // then
-    Assertions.assertEquals("RangePartition", rangePartition.name());
-    Assertions.assertEquals(lower, rangePartition.lower());
-    Assertions.assertEquals(upper, rangePartition.upper());
-    Assertions.assertEquals(properties, rangePartition.properties());
-  }
-
-  @Test
-  void testFromDTOPartitionDTOWhenListPartitionDTOToPartition() {
-
-    // given
-    LiteralDTO literal1 =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
-    LiteralDTO literal2 =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
-
-    Map<String, String> properties = Collections.singletonMap("key", "value");
-    LiteralDTO[][] literalDTOS = {new LiteralDTO[] {literal1}, new LiteralDTO[] {literal2}};
-    ListPartitionDTO listPartitionDTO =
-        ListPartitionDTO.builder()
-            .withName("ListPartition")
-            .withLists(literalDTOS)
-            .withProperties(properties)
-            .build();
-    // when
-    ListPartition listPartition = (ListPartition) DTOConverters.fromDTO(listPartitionDTO);
-
-    // then
-    Assertions.assertEquals("ListPartition", listPartition.name());
-    Assertions.assertTrue(Arrays.equals(literalDTOS, listPartition.lists()));
-    Assertions.assertEquals(properties, listPartition.properties());
   }
 }
