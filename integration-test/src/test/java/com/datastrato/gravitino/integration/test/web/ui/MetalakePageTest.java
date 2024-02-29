@@ -30,4 +30,17 @@ public class MetalakePageTest extends AbstractWebIT {
       Assertions.fail("create metalake failed");
     }
   }
+
+  @Test
+  public void testViewMetalakeDetails() {
+    metalakePage.viewMetalakeAction();
+
+    boolean status = metalakePage.verifyIsShowDetails();
+
+    if (status) {
+      LOG.info("view metalake details successful");
+    } else {
+      Assertions.fail("view metalake details failed");
+    }
+  }
 }

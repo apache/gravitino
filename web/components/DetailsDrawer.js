@@ -68,6 +68,7 @@ const DetailsDrawer = props => {
 
   return (
     <Drawer
+      data-refer='metalake-details-drawer'
       open={openDrawer}
       anchor='right'
       variant='temporary'
@@ -91,7 +92,12 @@ const DetailsDrawer = props => {
         }}
       >
         <Typography variant='h6'>Details</Typography>
-        <IconButton size='small' onClick={handleClose} sx={{ color: 'text.primary' }}>
+        <IconButton
+          size='small'
+          data-refer='close-metalake-details-btn'
+          onClick={handleClose}
+          sx={{ color: 'text.primary' }}
+        >
           <Icon icon='bx:x' fontSize={20} />
         </IconButton>
       </Box>
