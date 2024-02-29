@@ -10,12 +10,14 @@ service ssh start
 ssh-keyscan localhost > /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 
+# init the Kerberos database
 echo -e "${PASS}\n${PASS}" | kdb5_util create -s
 
+# start Kerberos related service
 service krb5-kdc start
 service krb5-admin-server start
-cd /
-python -m SimpleHTTPServer &
+
+# create Kerberos principal and keytab files
 FQDN="HADOOPKRB"
 ADMIN="admin"
 PASS="Admin12!"
@@ -37,6 +39,7 @@ kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /cli.keytab -norandkey cli"
 
+# Update the configuration file
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
