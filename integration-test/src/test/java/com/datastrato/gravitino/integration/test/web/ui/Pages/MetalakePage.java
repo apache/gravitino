@@ -7,13 +7,11 @@ package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.openqa.selenium.WebDriver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.ui.Select;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MetalakePage {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
