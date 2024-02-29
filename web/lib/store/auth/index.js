@@ -19,11 +19,14 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   let authType = null
   const [err, res] = await to(getAuthConfigsApi())
 
-  if (!err && res) {
-    oauthUrl = `${res['gravitino.authenticator.oauth.serverUri']}${res['gravitino.authenticator.oauth.tokenPath']}`
-
-    authType = res['gravitino.authenticator']
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  oauthUrl = `${res['gravitino.authenticator.oauth.serverUri']}${res['gravitino.authenticator.oauth.tokenPath']}`
+  authType = res['gravitino.authenticator']
+
+  localStorage.setItem('oauthUrl', oauthUrl)
 
   return { oauthUrl, authType }
 })
@@ -58,7 +61,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
     throw new Error(err)
   }
 
-  const { access_token, expires_in } = res?.data
+  const { access_token, expires_in } = res
 
   localStorage.setItem('accessToken', access_token)
   localStorage.setItem('expiredIn', expires_in)
@@ -70,6 +73,15 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   router.push('/')
 
   return { token: access_token, expired: expires_in }
+})
+
+export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('authParams')
+  dispatch(setAuthToken(''))
+  await router.push('/ui/login')
+
+  return { token: null }
 })
 
 export const setIntervalId = createAsyncThunk('auth/setIntervalId', async (expiredIn, { dispatch }) => {
