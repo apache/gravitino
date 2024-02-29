@@ -810,6 +810,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           } else if (change instanceof TableChange.UpdateColumnType) {
             doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
 
+          } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+            throw new IllegalArgumentException(
+                "Hive does not support altering column auto increment");
           } else {
             throw new IllegalArgumentException(
                 "Unsupported column change type: " + change.getClass().getSimpleName());
@@ -931,6 +934,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
     int targetPosition;
+    if (change.isAutoIncrement()) {
+      throw new IllegalArgumentException("Hive catalog does not support auto-increment column");
+    }
     if (change.getPosition() instanceof TableChange.Default) {
       // add to the end by default
       targetPosition = cols.size();
