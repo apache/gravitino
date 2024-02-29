@@ -5,12 +5,15 @@
 package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.rel.Column;
@@ -253,6 +256,26 @@ public class AbstractIT {
           }
         }
       }
+    }
+  }
+
+  protected static void assertColumn(Column expected, Column actual) {
+    if (!(actual instanceof ColumnDTO)) {
+      actual = toDTO(actual);
+    }
+    if (!(expected instanceof ColumnDTO)) {
+      expected = toDTO(expected);
+    }
+
+    Assertions.assertEquals(expected.name(), actual.name());
+    Assertions.assertEquals(expected.dataType(), actual.dataType());
+    Assertions.assertEquals(expected.nullable(), actual.nullable());
+    Assertions.assertEquals(expected.comment(), actual.comment());
+    Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
+    if (expected.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET) && expected.nullable()) {
+      Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
+    } else {
+      Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
     }
   }
 }

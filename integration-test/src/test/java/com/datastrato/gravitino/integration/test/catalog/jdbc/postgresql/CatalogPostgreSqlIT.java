@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
 import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
-import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
