@@ -48,7 +48,8 @@ const LoginPage = () => {
 
   const onSubmit = async data => {
     dispatch(loginAction({ params: data, router }))
-    reset()
+
+    reset({ ...data })
   }
 
   const onError = errors => {

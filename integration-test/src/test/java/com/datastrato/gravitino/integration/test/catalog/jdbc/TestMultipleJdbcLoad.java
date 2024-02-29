@@ -122,7 +122,8 @@ public class TestMultipleJdbcLoad extends AbstractIT {
         postgreSqlCatalog
             .asSchemas()
             .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
-    Assertions.assertEquals(0, nameIdentifiers.length);
+    Assertions.assertEquals(1, nameIdentifiers.length);
+    Assertions.assertEquals("public", nameIdentifiers[0].name());
 
     String schemaName = GravitinoITUtils.genRandomName("it_schema");
     mysqlCatalog

@@ -14,10 +14,12 @@ import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
@@ -25,8 +27,10 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.BufferedReader;
@@ -43,9 +47,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -130,6 +136,7 @@ public class TestRelationalEntityStore {
 
   @Test
   public void testPutAndGet() throws IOException {
+    // metalake
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
     BaseMetalake insertedMetalake =
@@ -153,10 +160,44 @@ public class TestRelationalEntityStore {
         entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE).size());
     assertEquals("test_metalake2", insertedMetalake1.name());
     assertEquals("this is test2", insertedMetalake1.comment());
+
+    // catalog
+    CatalogEntity catalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog("test_metalake2"), "this is catalog test");
+    entityStore.put(catalog, false);
+    CatalogEntity insertedCatalog =
+        entityStore.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class);
+    assertNotNull(insertedCatalog);
+    assertTrue(checkCatalogEquals(catalog, insertedCatalog));
+
+    // overwrite false
+    CatalogEntity duplicateCatalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog("test_metalake2"), "this is catalog test");
+    assertThrows(
+        EntityAlreadyExistsException.class, () -> entityStore.put(duplicateCatalog, false));
+
+    // overwrite true
+    CatalogEntity overittenCatalog =
+        createCatalog(
+            1L, "test_catalog1", Namespace.ofCatalog("test_metalake2"), "this is catalog test1");
+    entityStore.put(overittenCatalog, true);
+    CatalogEntity insertedCatalog1 =
+        entityStore.get(
+            overittenCatalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class);
+    assertEquals(
+        1,
+        entityStore
+            .list(overittenCatalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG)
+            .size());
+    assertEquals("test_catalog1", insertedCatalog1.name());
+    assertEquals("this is catalog test1", insertedCatalog1.getComment());
   }
 
   @Test
   public void testPutAndList() throws IOException {
+    // metalake
     BaseMetalake metalake1 = createMetalake(1L, "test_metalake1", "this is test 1");
     BaseMetalake metalake2 = createMetalake(2L, "test_metalake2", "this is test 2");
     List<BaseMetalake> beforePutList =
@@ -167,27 +208,112 @@ public class TestRelationalEntityStore {
     entityStore.put(metalake1, false);
     entityStore.put(metalake2, false);
     List<BaseMetalake> metalakes =
-        entityStore.list(metalake1.namespace(), BaseMetalake.class, Entity.EntityType.METALAKE);
+        entityStore.list(metalake1.namespace(), BaseMetalake.class, Entity.EntityType.METALAKE)
+            .stream()
+            .sorted(Comparator.comparing(BaseMetalake::id))
+            .collect(Collectors.toList());
     assertNotNull(metalakes);
     assertEquals(2, metalakes.size());
     assertTrue(checkMetalakeEquals(metalake1, metalakes.get(0)));
     assertTrue(checkMetalakeEquals(metalake2, metalakes.get(1)));
+
+    // catalog
+    CatalogEntity catalog1 =
+        createCatalog(
+            1L, "test_catalog1", Namespace.ofCatalog(metalake1.name()), "this is catalog 1");
+    CatalogEntity catalog2 =
+        createCatalog(
+            2L, "test_catalog2", Namespace.ofCatalog(metalake1.name()), "this is catalog 2");
+    List<CatalogEntity> beforeCatalogList =
+        entityStore.list(catalog1.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG);
+    assertNotNull(beforeCatalogList);
+    assertEquals(0, beforeCatalogList.size());
+
+    entityStore.put(catalog1, false);
+    entityStore.put(catalog2, false);
+    List<CatalogEntity> catalogEntities =
+        entityStore.list(catalog1.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG)
+            .stream()
+            .sorted(Comparator.comparing(CatalogEntity::id))
+            .collect(Collectors.toList());
+    assertNotNull(catalogEntities);
+    assertEquals(2, catalogEntities.size());
+    assertTrue(checkCatalogEquals(catalog1, catalogEntities.get(0)));
+    assertTrue(checkCatalogEquals(catalog2, catalogEntities.get(1)));
   }
 
   @Test
-  public void testPutAndDelete() throws IOException {
+  public void testPutAndDelete() throws IOException, InterruptedException {
+    // metalake
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
+    assertNotNull(
+        entityStore.get(metalake.nameIdentifier(), Entity.EntityType.METALAKE, BaseMetalake.class));
     entityStore.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
     assertThrows(
         NoSuchEntityException.class,
         () ->
             entityStore.get(
                 metalake.nameIdentifier(), Entity.EntityType.METALAKE, BaseMetalake.class));
+
+    // sleep 1s to make delete_at seconds differently
+    Thread.sleep(1000);
+
+    // test cascade delete
+    BaseMetalake metalake1 = createMetalake(2L, "test_metalake", "this is test");
+    entityStore.put(metalake1, false);
+    CatalogEntity subCatalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog(metalake1.name()), "test cascade deleted");
+    entityStore.put(subCatalog, false);
+
+    // cascade is false
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> entityStore.delete(metalake1.nameIdentifier(), Entity.EntityType.METALAKE, false));
+
+    // cascade is true
+    entityStore.delete(metalake1.nameIdentifier(), Entity.EntityType.METALAKE, true);
+    assertFalse(entityStore.exists(metalake1.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertFalse(entityStore.exists(subCatalog.nameIdentifier(), Entity.EntityType.CATALOG));
+
+    // catalog
+    BaseMetalake metalake2 = createMetalake(3L, "test_metalake", "this is test");
+    entityStore.put(metalake2, false);
+    CatalogEntity catalog =
+        createCatalog(2L, "test_catalog", Namespace.ofCatalog("test_metalake"), "this is test");
+    entityStore.put(catalog, false);
+    assertNotNull(
+        entityStore.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class));
+    entityStore.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, false);
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            entityStore.get(
+                catalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class));
+
+    // sleep 1s to make delete_at seconds differently
+    Thread.sleep(1000);
+
+    // test cascade delete
+    CatalogEntity catalog1 =
+        createCatalog(
+            3L, "test_catalog1", Namespace.ofCatalog(metalake2.name()), "test cascade deleted");
+    entityStore.put(catalog1, false);
+
+    // cascade is false
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> entityStore.delete(metalake2.nameIdentifier(), Entity.EntityType.METALAKE, false));
+
+    // cascade is true
+    entityStore.delete(catalog1.nameIdentifier(), Entity.EntityType.CATALOG, true);
+    assertFalse(entityStore.exists(catalog1.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
   @Test
   public void testPutAndUpdate() throws IOException {
+    // metalake
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
 
@@ -236,6 +362,119 @@ public class TestRelationalEntityStore {
     assertEquals("test_metalake2", updatedMetalake.name());
     assertEquals("this is test 2", updatedMetalake.comment());
     assertEquals(changedAuditInfo.creator(), updatedMetalake.auditInfo().creator());
+
+    BaseMetalake metalake3 = createMetalake(3L, "test_metalake3", "this is test 3");
+    entityStore.put(metalake3, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                metalake3.nameIdentifier(),
+                BaseMetalake.class,
+                Entity.EntityType.METALAKE,
+                m -> {
+                  BaseMetalake.Builder builder =
+                      new BaseMetalake.Builder()
+                          .withId(metalake3.id())
+                          .withName("test_metalake2")
+                          .withComment(metalake3.comment())
+                          .withProperties(new HashMap<>())
+                          .withAuditInfo((AuditInfo) m.auditInfo())
+                          .withVersion(m.getVersion());
+                  return builder.build();
+                }));
+
+    // catalog
+    CatalogEntity catalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog("test_metalake2"), "this is catalog test");
+    entityStore.put(catalog, false);
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            entityStore.update(
+                catalog.nameIdentifier(),
+                CatalogEntity.class,
+                Entity.EntityType.CATALOG,
+                c -> {
+                  CatalogEntity.Builder builder =
+                      CatalogEntity.builder()
+                          // Change the id, which is not allowed
+                          .withId(2L)
+                          .withName("test_catalog2")
+                          .withNamespace(Namespace.ofCatalog(updatedMetalake.name()))
+                          .withType(Catalog.Type.RELATIONAL)
+                          .withProvider("test")
+                          .withComment("this is catalog test 2")
+                          .withProperties(new HashMap<>())
+                          .withAuditInfo((AuditInfo) c.auditInfo());
+                  return builder.build();
+                }));
+
+    CatalogEntity updatedCatalog =
+        entityStore.update(
+            catalog.nameIdentifier(),
+            CatalogEntity.class,
+            Entity.EntityType.CATALOG,
+            c -> {
+              CatalogEntity.Builder builder =
+                  CatalogEntity.builder()
+                      .withId(c.id())
+                      .withName("test_catalog2")
+                      .withNamespace(Namespace.ofCatalog(updatedMetalake.name()))
+                      .withType(Catalog.Type.RELATIONAL)
+                      .withProvider("test")
+                      .withComment("this is catalog test 2")
+                      .withProperties(new HashMap<>())
+                      .withAuditInfo(changedAuditInfo);
+              return builder.build();
+            });
+    CatalogEntity storedCatalog =
+        entityStore.get(
+            updatedCatalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class);
+    assertEquals(catalog.id(), storedCatalog.id());
+    assertEquals("test_catalog2", updatedCatalog.name());
+    assertEquals("this is catalog test 2", updatedCatalog.getComment());
+    assertEquals(changedAuditInfo.creator(), updatedCatalog.auditInfo().creator());
+
+    CatalogEntity catalog3 =
+        createCatalog(
+            3L, "test_catalog3", Namespace.ofCatalog("test_metalake2"), "this is catalog test 3");
+    entityStore.put(catalog3, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                catalog3.nameIdentifier(),
+                CatalogEntity.class,
+                Entity.EntityType.CATALOG,
+                c -> {
+                  CatalogEntity.Builder builder =
+                      CatalogEntity.builder()
+                          .withId(catalog3.id())
+                          .withName("test_catalog2")
+                          .withNamespace(Namespace.ofCatalog(updatedMetalake.name()))
+                          .withType(Catalog.Type.RELATIONAL)
+                          .withProvider("test")
+                          .withComment(catalog3.getComment())
+                          .withProperties(new HashMap<>())
+                          .withAuditInfo((AuditInfo) c.auditInfo());
+                  return builder.build();
+                }));
+  }
+
+  @Test
+  public void testPutAndExists() throws IOException, InterruptedException {
+    // metalake
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+    assertTrue(entityStore.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+
+    // catalog
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog("test_metalake"), "this is test");
+    entityStore.put(catalog, false);
+    assertTrue(entityStore.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
@@ -258,6 +497,33 @@ public class TestRelationalEntityStore {
         && expected.properties().equals(actual.properties())
         && expected.auditInfo().equals(actual.auditInfo())
         && expected.getVersion().equals(actual.getVersion());
+  }
+
+  private static CatalogEntity createCatalog(
+      Long id, String name, Namespace namespace, String comment) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    return CatalogEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withType(Catalog.Type.RELATIONAL)
+        .withProvider("test")
+        .withComment(comment)
+        .withProperties(new HashMap<>())
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static boolean checkCatalogEquals(CatalogEntity expected, CatalogEntity actual) {
+    return expected.id().equals(actual.id())
+        && expected.name().equals(actual.name())
+        && expected.namespace().equals(actual.namespace())
+        && expected.getType().equals(actual.getType())
+        && expected.getProvider().equals(actual.getProvider())
+        && expected.getProperties() != null
+        && expected.getProperties().equals(actual.getProperties())
+        && expected.auditInfo().equals(actual.auditInfo());
   }
 
   private static void truncateAllTables() {
