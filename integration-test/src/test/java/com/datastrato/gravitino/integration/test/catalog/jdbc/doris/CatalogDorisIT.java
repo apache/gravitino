@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.doris;
 
-import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
 
 import com.datastrato.gravitino.Catalog;
@@ -28,8 +27,6 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
@@ -143,7 +140,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     String jdbcUrl =
         String.format(
-            "jdbc:mysql://%s:%d/",
+            "jdbc:mysql://%s:%d/?useInformationSchema=true",
             dorisContainer.getContainerIpAddress(), DorisContainer.FE_MYSQL_PORT);
 
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
@@ -194,7 +191,7 @@ public class CatalogDorisIT extends AbstractIT {
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName(DORIS_COL_NAME3)
-            .withDataType(Types.StringType.get())
+            .withDataType(Types.VarCharType.of(10))
             .withComment("col_3_comment")
             .build();
     return new ColumnDTO[] {col1, col2, col3};
@@ -202,7 +199,7 @@ public class CatalogDorisIT extends AbstractIT {
 
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("replication_num", "1");
+    properties.put("replication_allocation", "tag.location.default: 1");
     return properties;
   }
 
@@ -255,11 +252,10 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   @Test
-  void testDorisTableOperation() {
+  void testCreateAndLoadDorisTable() {
     // create a table
-
     NameIdentifier tableIdentifier =
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     ColumnDTO[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -267,14 +263,14 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
-            tableCatalog.createTable(
-                    tableIdentifier,
-                    columns,
-                    table_comment,
-                    properties,
-                    Transforms.EMPTY_TRANSFORM,
-                    distribution,
-                    null);
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            distribution,
+            null);
     Assertions.assertEquals(createdTable.name(), tableName);
     Map<String, String> resultProp = createdTable.properties();
     for (Map.Entry<String, String> entry : properties.entrySet()) {

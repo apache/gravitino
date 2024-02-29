@@ -51,6 +51,7 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
       case VARCHAR:
         return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case STRING:
+      case TEXT:
         return Types.StringType.get();
       default:
         throw new IllegalArgumentException("Not a supported type: " + typeBean);

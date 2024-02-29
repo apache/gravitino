@@ -14,8 +14,11 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
@@ -69,9 +72,11 @@ public class DorisTableOperations extends JdbcTableOperations {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       com.datastrato.gravitino.rel.indexes.Index[] indexes) {
 
     validateIncrementCol(columns);
+    validateDistribution(distribution, columns);
 
     StringBuilder sqlBuilder = new StringBuilder();
 
@@ -102,8 +107,24 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
     }
 
+    // Add distribution info
+    if (distribution.strategy() == Strategy.HASH) {
+      sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
+      sqlBuilder.append(
+          Arrays.stream(distribution.expressions())
+              .map(column -> BACK_QUOTE + column.toString() + BACK_QUOTE)
+              .collect(Collectors.joining(", ")));
+      sqlBuilder.append(")");
+    } else if (distribution.strategy() == Strategy.EVEN) {
+      sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY ").append("RANDOM");
+    }
+
+    if (distribution.number() != 0) {
+      sqlBuilder.append(" BUCKETS ").append(distribution.number());
+    }
+
     // Add table properties
-    sqlBuilder.append(DorisUtils.generatePropertiesSql(properties));
+    sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
 
     // Add Partition Info
     if (partitioning != null && partitioning.length > 0) {
@@ -151,6 +172,26 @@ public class DorisTableOperations extends JdbcTableOperations {
         });
   }
 
+  private static void validateDistribution(Distribution distribution, JdbcColumn[] columns) {
+    Preconditions.checkArgument(null != distribution, "Doris must set distribution");
+
+    Preconditions.checkArgument(
+        Strategy.HASH == distribution.strategy() || Strategy.EVEN == distribution.strategy(),
+        "Doris only supports HASH or EVEN distribution strategy");
+
+    if (distribution.strategy() == Strategy.HASH) {
+      // Check if the distribution column exists
+      Arrays.stream(distribution.expressions())
+          .forEach(
+              expression -> {
+                Preconditions.checkArgument(
+                    Arrays.stream(columns)
+                        .anyMatch(column -> column.name().equalsIgnoreCase(expression.toString())),
+                    "Distribution column " + expression + " does not exist in the table columns");
+              });
+    }
+  }
+
   @VisibleForTesting
   static void appendIndexesSql(
       com.datastrato.gravitino.rel.indexes.Index[] indexes, StringBuilder sqlBuilder) {
@@ -171,6 +212,11 @@ public class DorisTableOperations extends JdbcTableOperations {
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(indexSql);
+  }
+
+  @Override
+  protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
+    return "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT"));
   }
 
   @Override
@@ -196,6 +242,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     return Collections.unmodifiableMap(DorisUtils.extractPropertiesFromSql(createTableSql));
+  }
+
+  @Override
+  protected JdbcTable.Builder getBasicJdbcTableInfo(ResultSet table) throws SQLException {
+    return new JdbcTable.Builder()
+        .withName(table.getString("TABLE_NAME"))
+        .withComment(table.getString("REMARKS"))
+        .withAuditInfo(AuditInfo.EMPTY);
   }
 
   @Override

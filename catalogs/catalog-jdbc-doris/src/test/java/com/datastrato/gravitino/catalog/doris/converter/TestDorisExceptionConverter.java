@@ -12,7 +12,8 @@ public class TestDorisExceptionConverter {
   public void testGetErrorCodeFromMessage() {
     String msg =
         "errCode = 2, detailMessage = Can't create database 'default_cluster:test_schema'; database exists";
-    Assertions.assertEquals(DorisExceptionConverter.CODE_DATABASE_EXISTS,
-            DorisExceptionConverter.getErrorCodeFromMessage(msg));
+    Assertions.assertEquals(
+        DorisExceptionConverter.CODE_DATABASE_EXISTS,
+        DorisExceptionConverter.getErrorCodeFromMessage(msg));
   }
 }

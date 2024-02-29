@@ -619,7 +619,6 @@ tasks {
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig"
-      // TODO. add fileset catalog to the distribution when ready.
     )
   }
 
