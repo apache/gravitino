@@ -34,7 +34,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
             {
               add("pg_toast");
               add("pg_catalog");
-              add("public");
               add("information_schema");
             }
           });
