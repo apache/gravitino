@@ -31,19 +31,16 @@ public interface SchemaMetaMapper {
           + " deleted_at as deletedAt"
           + " FROM "
           + TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND catalog_id = #{catalogId} AND deleted_at = 0")
-  List<SchemaPO> listSchemaPOsByMetalakeIdAndCatalogId(
-      @Param("metalakeId") Long metalakeId, @Param("catalogId") Long catalogId);
+          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
+  List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
   @Select(
       "SELECT schema_id as schemaId FROM "
           + TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND catalog_id = #{catalogId}"
-          + " AND schema_name = #{schemaName} AND deleted_at = 0")
-  Long selectSchemaIdByMetalakeIdAndCatalogIdAndName(
-      @Param("metalakeId") Long metalakeId,
-      @Param("catalogId") Long catalogId,
-      @Param("schemaName") String name);
+          + " WHERE catalog_id = #{catalogId} AND schema_name = #{schemaName}"
+          + " AND deleted_at = 0")
+  Long selectSchemaIdByCatalogIdAndName(
+      @Param("catalogId") Long catalogId, @Param("schemaName") String name);
 
   @Select(
       "SELECT schema_id as schemaId, schema_name as schemaName,"
@@ -53,12 +50,9 @@ public interface SchemaMetaMapper {
           + " deleted_at as deletedAt"
           + " FROM "
           + TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND catalog_id = #{catalogId}"
-          + " AND schema_name = #{schemaName} AND deleted_at = 0")
-  SchemaPO selectSchemaMetaByMetalakeIdAndCatalogIdAndName(
-      @Param("metalakeId") Long metalakeId,
-      @Param("catalogId") Long catalogId,
-      @Param("schemaName") String name);
+          + " WHERE catalog_id = #{catalogId} AND schema_name = #{schemaName} AND deleted_at = 0")
+  SchemaPO selectSchemaMetaByCatalogIdAndName(
+      @Param("catalogId") Long catalogId, @Param("schemaName") String name);
 
   @Insert(
       "INSERT INTO "

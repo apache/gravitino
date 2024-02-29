@@ -47,6 +47,6 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
     PRIMARY KEY (schema_id),
-    CONSTRAINT uk_mid_cid_sn_del UNIQUE (metalake_id, catalog_id, schema_name, deleted_at),
-    KEY idx_cid (catalog_id)
+    CONSTRAINT uk_cid_sn_del UNIQUE (catalog_id, schema_name, deleted_at),
+    KEY idx_mid (metalake_id)
 ) ENGINE=InnoDB;
