@@ -437,6 +437,8 @@ tasks.rat {
     // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "dev/docker/**/*.conf",
+    "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/licenses/*.txt",
     "**/licenses/*.md",

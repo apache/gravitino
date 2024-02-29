@@ -14,7 +14,8 @@ echo -e "${PASS}\n${PASS}" | kdb5_util create -s
 
 service krb5-kdc start
 service krb5-admin-server start
-
+cd /
+python -m SimpleHTTPServer &
 FQDN="HADOOPKRB"
 ADMIN="admin"
 PASS="Admin12!"
@@ -25,7 +26,6 @@ echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc cli"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hdfs/${HOSTNAME}@${FQDN}"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc HTTP/${HOSTNAME}@${FQDN}"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hive/${HOSTNAME}@${FQDN}"
-
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} cli"
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hdfs/${HOSTNAME}@${FQDN}"
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} HTTP/${HOSTNAME}@${FQDN}"
