@@ -267,27 +267,26 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    // Get current project version
-    val version = project.version.toString()
-    println("Current project version: $version")
-    // Check whether this module has already built
-    val buildDir = project.buildDir
-    if (!buildDir.exists()) {
-      dependsOn(":trino-connector:jar")
-    } else {
-      // Check the version gravitino related jars in build equal to the current project version
-      val gravitinoJars = buildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
-        val jarVersion = name.substringAfterLast("-").substringBeforeLast(".")
-        jarVersion != version
-      }
-
-      if (gravitinoJars != null && gravitinoJars.isNotEmpty()) {
-        delete(project(":trino-connector").buildDir)
-        dependsOn(":trino-connector:jar")
-      }
-    }
-
     doFirst {
+      // Get current project version
+      val version = project.version.toString()
+      println("Current project version: $version")
+
+      // Check whether this module has already built
+      val trinoConnectorBuildDir = project(":trino-connector").buildDir
+      if (trinoConnectorBuildDir.exists()) {
+        // Check the version gravitino related jars in build equal to the current project version
+        val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+          val name = it.name
+          !name.endsWith(version + ".jar")
+        }
+
+        if (invalidGravitinoJars!!.isNotEmpty()) {
+          println("Found invalid gravitino jars in build/libs: ${invalidGravitinoJars.joinToString(", ") { it.name }}")
+          throw GradleException("Please clean the project and rebuild the project.")
+        }
+      }
+
       printDockerCheckInfo()
 
       copy {

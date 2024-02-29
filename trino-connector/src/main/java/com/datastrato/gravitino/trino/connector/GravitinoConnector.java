@@ -133,7 +133,8 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public ConnectorAccessControl getAccessControl() {
-    return null;
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getAccessControl();
   }
 
   @Override
