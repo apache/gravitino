@@ -42,7 +42,10 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
     Long catalogId =
         SessionUtils.getWithoutCommit(
@@ -50,7 +53,9 @@ public class SchemaMetaService {
             mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     SchemaPO schemaPO =
@@ -60,7 +65,9 @@ public class SchemaMetaService {
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.toString());
     }
 
     return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
@@ -74,7 +81,10 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
     Long catalogId =
         SessionUtils.getWithoutCommit(
@@ -82,7 +92,9 @@ public class SchemaMetaService {
             mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, namespace.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.toString());
     }
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -99,7 +111,9 @@ public class SchemaMetaService {
               mapper -> mapper.selectMetalakeIdMetaByName(schemaEntity.namespace().level(0)));
       if (metalakeId == null) {
         throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, schemaEntity.namespace().level(0));
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            schemaEntity.namespace().level(0));
       }
       Long catalogId =
           SessionUtils.getWithoutCommit(
@@ -109,7 +123,9 @@ public class SchemaMetaService {
                       metalakeId, schemaEntity.namespace().level(1)));
       if (catalogId == null) {
         throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, schemaEntity.namespace());
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.CATALOG.name().toLowerCase(),
+            schemaEntity.namespace());
       }
 
       SessionUtils.doWithCommit(
@@ -149,7 +165,10 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -158,7 +177,9 @@ public class SchemaMetaService {
             mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     SchemaPO oldSchemaPO =
@@ -167,7 +188,9 @@ public class SchemaMetaService {
             mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
     if (oldSchemaPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.toString());
     }
 
     SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
@@ -217,7 +240,10 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -226,7 +252,9 @@ public class SchemaMetaService {
             mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     Long schemaId =
@@ -241,7 +269,7 @@ public class SchemaMetaService {
                     SchemaMetaMapper.class,
                     mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
             () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the catalog
+              // TODO We will cascade delete the metadata of sub-resources under the schema
             });
       } else {
         // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,

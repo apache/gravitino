@@ -47,7 +47,9 @@ public class CatalogMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          identifier.namespace().toString());
     }
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
@@ -55,7 +57,9 @@ public class CatalogMetaService {
             mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
     if (catalogPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.toString());
     }
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
@@ -68,7 +72,9 @@ public class CatalogMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, namespace.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          namespace.toString());
     }
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
@@ -85,7 +91,9 @@ public class CatalogMetaService {
               mapper -> mapper.selectMetalakeIdMetaByName(catalogEntity.namespace().level(0)));
       if (metalakeId == null) {
         throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, catalogEntity.namespace().toString());
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            catalogEntity.namespace().toString());
       }
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
@@ -122,7 +130,9 @@ public class CatalogMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     CatalogPO oldCatalogPO =
@@ -131,7 +141,9 @@ public class CatalogMetaService {
             mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
     if (oldCatalogPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.toString());
     }
 
     CatalogEntity oldCatalogEntity =
@@ -181,7 +193,9 @@ public class CatalogMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          identifier.namespace().toString());
     }
     Long catalogId =
         SessionUtils.getWithoutCommit(

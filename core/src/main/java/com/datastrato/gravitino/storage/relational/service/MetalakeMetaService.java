@@ -53,7 +53,9 @@ public class MetalakeMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (metalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
   }
@@ -94,7 +96,9 @@ public class MetalakeMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (oldMetalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
