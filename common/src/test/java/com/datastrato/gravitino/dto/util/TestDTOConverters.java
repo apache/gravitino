@@ -12,7 +12,10 @@ import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.partitions.*;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,8 +47,9 @@ public class TestDTOConverters {
             .withProperties(properties)
             .build();
     // when
-    IdentityPartition identityPartition =
-        (IdentityPartition) DTOConverters.fromDTO(identityPartitionDTO);
+    com.datastrato.gravitino.rel.partitions.IdentityPartition identityPartition =
+        (com.datastrato.gravitino.rel.partitions.IdentityPartition)
+            DTOConverters.fromDTO(identityPartitionDTO);
 
     // then
     Assertions.assertTrue(Arrays.equals(fieldNames, identityPartition.fieldNames()));
