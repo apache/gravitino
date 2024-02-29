@@ -196,6 +196,10 @@ components:
           type: string
           description: The type of the fileset
           nullable: true
+        comment:
+          type: string
+          description: The comment of the fileset
+          nullable: true
         storageLocation:
           type: string
           description: The location of the fileset
