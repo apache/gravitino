@@ -150,7 +150,7 @@ const TableView = props => {
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowDetails({ row, type: 'catalog' })}
           >
-            <ViewIcon />
+            <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
           <IconButton

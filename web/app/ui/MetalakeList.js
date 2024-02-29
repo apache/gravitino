@@ -187,7 +187,7 @@ const MetalakeList = () => {
           key='details'
           label='Details'
           title='Details'
-          icon={<ViewIcon />}
+          icon={<ViewIcon viewBox='0 0 24 22' />}
           onClick={handleShowDetails(row)}
           sx={{
             '& svg': {
