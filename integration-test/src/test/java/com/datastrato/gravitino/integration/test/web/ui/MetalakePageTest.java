@@ -21,5 +21,13 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   public void testCreateMetalake() {
     metalakePage.createMetalakeAction();
+
+    boolean status = metalakePage.verifyIsCreatedMetalake();
+
+    if (status) {
+      LOG.info("create metalake successful");
+    } else {
+      Assertions.fail("create metalake failed");
+    }
   }
 }

@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.util.Objects;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -28,6 +29,15 @@ public class MetalakePage {
 
   @FindBy(xpath = "//*[@id='submitHandleMetalake']")
   public WebElement submitHandleMetalakeBtn;
+
+  @FindBy(xpath = "//div[@data-id='test']")
+  public WebElement createdMetalakeRow;
+
+  @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']")
+  public WebElement createdMetalakeLink;
+
+  @FindBy(xpath = "//button[data-refer='view-metalake-test']")
+  public WebElement viewMetalakeBtn;
 
   public MetalakePage(WebDriver driver) {
     MetalakePage.driver = driver;
@@ -52,6 +62,19 @@ public class MetalakePage {
   public void clickSubmitBtn() {
     LOG.info("click submit button");
     this.submitHandleMetalakeBtn.click();
+  }
+
+  public boolean verifyIsCreatedMetalake() {
+    try {
+      createdMetalakeRow.isDisplayed();
+      createdMetalakeLink.isDisplayed();
+
+      return Objects.equals(createdMetalakeLink.getText(), "test");
+    } catch (Exception e) {
+      LOG.error(String.valueOf(e));
+
+      return false;
+    }
   }
 
   public void createMetalakeAction() {
