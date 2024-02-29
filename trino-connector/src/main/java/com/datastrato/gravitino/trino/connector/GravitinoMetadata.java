@@ -168,7 +168,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
     }
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    return internalMetadata.getColumnMetadata(session, gravitinoTableHandle, columnHandle);
+    return internalMetadata.getColumnMetadata(session, gravitinoTableHandle.getInternalTableHandle(), columnHandle);
   }
 
   @Override
