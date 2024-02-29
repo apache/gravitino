@@ -12,6 +12,7 @@ import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.partitions.*;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.Collections;
