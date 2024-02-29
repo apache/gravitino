@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.server.web.rest.TestTableOperations.mockColumn;
 import static com.datastrato.gravitino.server.web.rest.TestTableOperations.mockTable;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,6 +14,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
@@ -22,6 +27,7 @@ import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
@@ -47,7 +53,9 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestPartitionOperations extends JerseyTest {
 
@@ -83,6 +91,15 @@ public class TestPartitionOperations extends JerseyTest {
   private final String catalog = "catalog1";
   private final String schema = "schema1";
   private final String table = "table1";
+
+  @BeforeAll
+  public static void setup() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+  }
 
   @Override
   protected Application configure() {

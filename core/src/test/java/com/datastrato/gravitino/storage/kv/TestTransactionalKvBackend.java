@@ -39,6 +39,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("DefaultCharset")
 class TestTransactionalKvBackend {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);

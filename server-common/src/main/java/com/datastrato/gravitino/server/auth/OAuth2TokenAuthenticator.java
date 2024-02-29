@@ -20,6 +20,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.Principal;
@@ -48,7 +49,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
     if (tokenData == null) {
       throw new UnauthorizedException("Empty token authorization header");
     }
-    String authData = new String(tokenData);
+    String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER)) {
       throw new UnauthorizedException("Invalid token authorization header");

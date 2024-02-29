@@ -20,6 +20,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -170,17 +171,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
-      String fieldStr =
-          Arrays.stream(index.fieldNames())
-              .map(
-                  colNames -> {
-                    if (colNames.length > 1) {
-                      throw new IllegalArgumentException(
-                          "Index does not support complex fields in MySQL");
-                    }
-                    return BACK_QUOTE + colNames[0] + BACK_QUOTE;
-                  })
-              .collect(Collectors.joining(", "));
+      String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",\n");
       switch (index.type()) {
         case PRIMARY_KEY:
@@ -202,6 +193,19 @@ public class MysqlTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
       }
     }
+  }
+
+  private static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in MySQL");
+              }
+              return BACK_QUOTE + colNames[0] + BACK_QUOTE;
+            })
+        .collect(Collectors.joining(", "));
   }
 
   @Override
@@ -319,6 +323,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+      } else if (change instanceof TableChange.AddIndex) {
+        alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
+      } else if (change instanceof TableChange.DeleteIndex) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -355,6 +364,18 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  @VisibleForTesting
+  static String deleteIndexDefinition(
+      JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
+    if (deleteIndex.isIfExists()) {
+      if (Arrays.stream(lazyLoadTable.index())
+          .anyMatch(index -> index.name().equals(deleteIndex.getName()))) {
+        throw new IllegalArgumentException("Index does not exist");
+      }
+    }
+    return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
+  }
+
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
     validateUpdateColumnNullable(change, table);
@@ -374,6 +395,33 @@ public class MysqlTableOperations extends JdbcTableOperations {
         + col
         + BACK_QUOTE
         + appendColumnDefinition(updateColumn, new StringBuilder());
+  }
+
+  @VisibleForTesting
+  static String addIndexDefinition(TableChange.AddIndex addIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder.append("ADD ");
+    switch (addIndex.getType()) {
+      case PRIMARY_KEY:
+        if (null != addIndex.getName()
+            && !StringUtils.equalsIgnoreCase(
+                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+          throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
+        }
+        sqlBuilder.append("PRIMARY KEY ");
+        break;
+      case UNIQUE_KEY:
+        sqlBuilder
+            .append("UNIQUE INDEX ")
+            .append(BACK_QUOTE)
+            .append(addIndex.getName())
+            .append(BACK_QUOTE);
+        break;
+      default:
+        break;
+    }
+    sqlBuilder.append(" (").append(getIndexFieldStr(addIndex.getFieldNames())).append(")");
+    return sqlBuilder.toString();
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {

@@ -58,7 +58,6 @@ public class ConvertUtil {
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
     return new IcebergColumn.Builder()
-        .withId(nestedField.fieldId())
         .withName(nestedField.name())
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())

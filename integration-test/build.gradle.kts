@@ -31,6 +31,7 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":server"))
   implementation(project(":server-common"))
+  implementation(project(":spark-connector"))
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)

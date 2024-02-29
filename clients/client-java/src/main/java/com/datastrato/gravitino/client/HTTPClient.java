@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -333,7 +334,8 @@ public class HTTPClient implements RESTClient {
     }
     if (authDataProvider != null) {
       request.setHeader(
-          AuthConstants.HTTP_HEADER_AUTHORIZATION, new String(authDataProvider.getTokenData()));
+          AuthConstants.HTTP_HEADER_AUTHORIZATION,
+          new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
     }
 
     try (CloseableHttpResponse response = httpClient.execute(request)) {
