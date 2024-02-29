@@ -15,9 +15,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a Column DTO (Data Transfer Object). */
 @EqualsAndHashCode
@@ -230,7 +230,7 @@ public class ColumnDTO implements Column {
    */
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(name()), "Column name cannot be null or empty");
+        StringUtils.isNotEmpty(name()), "Column name cannot be null or empty");
     Preconditions.checkArgument(dataType() != null, "Column data type cannot be null.");
     Preconditions.checkArgument(
         nullable()
