@@ -18,29 +18,31 @@ public class CommonMetaService {
 
   private CommonMetaService() {}
 
-  public Long getParentIdByNamespace(Namespace namespace) {
+  public Long getParentEntityIdByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
-        "Parent namespace should not be empty and length should be less and equal than 3");
-    Long parentId = null;
+        "Namespace should not be empty and length should be less and equal than 3");
+    Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);
       switch (level) {
         case 0:
-          parentId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
+          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
           continue;
         case 1:
-          parentId =
-              CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(parentId, name);
+          parentEntityId =
+              CatalogMetaService.getInstance()
+                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
           continue;
         case 2:
-          parentId = SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentId, name);
+          parentEntityId =
+              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
           break;
       }
     }
-    Preconditions.checkArgument(
-        parentId != null && parentId > 0,
-        "Parent id should not be null and should be greater than 0.");
-    return parentId;
+    Preconditions.checkState(
+        parentEntityId != null && parentEntityId > 0,
+        "Parent entity id should not be null and should be greater than 0.");
+    return parentEntityId;
   }
 }

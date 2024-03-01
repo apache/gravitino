@@ -65,7 +65,8 @@ public class SchemaMetaService {
     NameIdentifier.checkSchema(identifier);
     String schemaName = identifier.name();
 
-    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
+    Long catalogId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     SchemaPO schemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
@@ -75,7 +76,7 @@ public class SchemaMetaService {
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     Namespace.checkSchema(namespace);
 
-    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(namespace);
+    Long catalogId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -160,7 +161,8 @@ public class SchemaMetaService {
     NameIdentifier.checkSchema(identifier);
 
     String schemaName = identifier.name();
-    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
+    Long catalogId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
     Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
     if (schemaId != null) {

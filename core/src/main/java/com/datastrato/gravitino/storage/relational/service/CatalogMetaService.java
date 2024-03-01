@@ -71,7 +71,7 @@ public class CatalogMetaService {
     String catalogName = identifier.name();
 
     Long metalakeId =
-        CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     CatalogPO catalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
@@ -81,7 +81,7 @@ public class CatalogMetaService {
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     Namespace.checkCatalog(namespace);
 
-    Long metalakeId = CommonMetaService.getInstance().getParentIdByNamespace(namespace);
+    Long metalakeId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
@@ -95,7 +95,7 @@ public class CatalogMetaService {
       NameIdentifier.checkCatalog(catalogEntity.nameIdentifier());
 
       Long metalakeId =
-          CommonMetaService.getInstance().getParentIdByNamespace(catalogEntity.namespace());
+          CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
 
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
@@ -120,7 +120,7 @@ public class CatalogMetaService {
 
     String catalogName = identifier.name();
     Long metalakeId =
-        CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     CatalogPO oldCatalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
@@ -160,7 +160,7 @@ public class CatalogMetaService {
 
     String catalogName = identifier.name();
     Long metalakeId =
-        CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
 
