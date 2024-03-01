@@ -122,6 +122,7 @@ public class TestTableUpdatesRequest {
             Types.StringType.get(),
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
+            false,
             false);
     String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
     String expected =
@@ -135,7 +136,8 @@ public class TestTableUpdatesRequest {
             + "  \"position\": {\n"
             + "    \"after\": \"afterColumn\"\n"
             + "  },\n"
-            + "  \"nullable\": false\n"
+            + "  \"nullable\": false,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -157,7 +159,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default nullability\",\n"
             + "  \"position\": \"first\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -183,7 +186,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default position\",\n"
             + "  \"position\": \"default\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));

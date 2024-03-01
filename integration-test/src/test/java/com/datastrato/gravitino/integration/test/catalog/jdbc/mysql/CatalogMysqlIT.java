@@ -1382,4 +1382,91 @@ public class CatalogMysqlIT extends AbstractIT {
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
+
+  @Test
+  void testAddColumnAutoIncrement() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", false, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    String tableName = "auto_increment_table";
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // Test add auto increment ,but not insert index. will failed.
+    RuntimeException runtimeException =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.addColumn(
+                        new String[] {"col_6"},
+                        Types.LongType.get(),
+                        "id",
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            runtimeException.getMessage(),
+            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
+
+    // Test add auto increment success.
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_6"},
+            Types.LongType.get(),
+            "id",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            true),
+        TableChange.addIndex(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col_6"}}));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
+    Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+
+    // Test the auto-increment property of modified fields
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, false));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+
+    // Add the auto-increment attribute to the field
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, true));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+  }
 }
