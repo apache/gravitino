@@ -370,7 +370,11 @@ public class TestPOConverters {
             "this is test",
             "hdfs://localhost/test",
             new HashMap<>());
-    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, 1L, 1L, 1L);
+    FilesetPO.Builder builder = new FilesetPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    builder.withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -474,15 +478,17 @@ public class TestPOConverters {
             "hdfs://localhost/test",
             properties);
 
-    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, 1L, 1L, 1L);
+    FilesetPO.Builder builder = new FilesetPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    builder.withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
     // map has updated
     boolean checkNeedUpdate1 =
-        POConverters.checkFilesetVersionNeedUpdate(
-            initPO.getFilesetVersionPO(), updatedFileset, 1L, 1L, 1L, 1L);
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset);
     FilesetPO updatePO1 =
-        POConverters.updateFilesetPOWithVersion(
-            initPO, updatedFileset, 1L, 1L, 1L, checkNeedUpdate1);
+        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, checkNeedUpdate1);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -498,11 +504,9 @@ public class TestPOConverters {
 
     // will not update version, but update the fileset name
     boolean checkNeedUpdate2 =
-        POConverters.checkFilesetVersionNeedUpdate(
-            initPO.getFilesetVersionPO(), updatedFileset1, 1L, 1L, 1L, 1L);
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset1);
     FilesetPO updatePO2 =
-        POConverters.updateFilesetPOWithVersion(
-            initPO, updatedFileset1, 1L, 1L, 1L, checkNeedUpdate2);
+        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, checkNeedUpdate2);
     assertEquals(
         filesetEntity.storageLocation(), updatePO2.getFilesetVersionPO().getStorageLocation());
     assertEquals(1, updatePO2.getCurrentVersion());

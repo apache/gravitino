@@ -164,6 +164,21 @@ public class FilesetPO {
       return this;
     }
 
+    public Long getFilesetMetalakeId() {
+      Preconditions.checkState(filesetPO.getMetalakeId() != null, "Metalake id is null");
+      return filesetPO.getMetalakeId();
+    }
+
+    public Long getFilesetCatalogId() {
+      Preconditions.checkState(filesetPO.getCatalogId() != null, "Catalog id is null");
+      return filesetPO.getCatalogId();
+    }
+
+    public Long getFilesetSchemaId() {
+      Preconditions.checkState(filesetPO.getSchemaId() != null, "Schema id is null");
+      return filesetPO.getSchemaId();
+    }
+
     private void validate() {
       Preconditions.checkArgument(filesetPO.filesetId != null, "Fileset id is required");
       Preconditions.checkArgument(filesetPO.filesetName != null, "Fileset name is required");

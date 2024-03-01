@@ -195,7 +195,10 @@ public class SchemaMetaService {
         List<FilesetEntity> filesetEntities =
             FilesetMetaService.getInstance()
                 .listFilesetsByNamespace(
-                    Namespace.ofFileset(metalakeName, catalogName, schemaName));
+                    Namespace.ofFileset(
+                        identifier.namespace().level(0),
+                        identifier.namespace().level(1),
+                        schemaName));
         if (!filesetEntities.isEmpty()) {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", identifier);

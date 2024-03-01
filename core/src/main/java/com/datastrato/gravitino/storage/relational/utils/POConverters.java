@@ -401,13 +401,13 @@ public class POConverters {
    * @return FilesetPO object with version initialized
    */
   public static FilesetPO initializeFilesetPOWithVersion(
-      FilesetEntity filesetEntity, Long metalakeId, Long catalogId, Long schemaId) {
+      FilesetEntity filesetEntity, FilesetPO.Builder builder) {
     try {
       FilesetVersionPO filesetVersionPO =
           new FilesetVersionPO.Builder()
-              .withMetalakeId(metalakeId)
-              .withCatalogId(catalogId)
-              .withSchemaId(schemaId)
+              .withMetalakeId(builder.getFilesetMetalakeId())
+              .withCatalogId(builder.getFilesetCatalogId())
+              .withSchemaId(builder.getFilesetSchemaId())
               .withFilesetId(filesetEntity.id())
               .withVersion(1L)
               .withFilesetComment(filesetEntity.comment())
@@ -416,12 +416,9 @@ public class POConverters {
                   JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.properties()))
               .withDeletedAt(0L)
               .build();
-      return new FilesetPO.Builder()
+      return builder
           .withFilesetId(filesetEntity.id())
           .withFilesetName(filesetEntity.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
-          .withSchemaId(schemaId)
           .withType(filesetEntity.filesetType().name())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.auditInfo()))
           .withCurrentVersion(1L)
@@ -442,12 +439,7 @@ public class POConverters {
    * @return FilesetPO object with updated version
    */
   public static FilesetPO updateFilesetPOWithVersion(
-      FilesetPO oldFilesetPO,
-      FilesetEntity newFileset,
-      Long metalakeId,
-      Long catalogId,
-      Long schemaId,
-      boolean needUpdateVersion) {
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, boolean needUpdateVersion) {
     try {
       Long lastVersion = oldFilesetPO.getLastVersion();
       Long currentVersion;
@@ -458,9 +450,9 @@ public class POConverters {
         currentVersion = lastVersion;
         newFilesetVersionPO =
             new FilesetVersionPO.Builder()
-                .withMetalakeId(metalakeId)
-                .withCatalogId(catalogId)
-                .withSchemaId(schemaId)
+                .withMetalakeId(oldFilesetPO.getMetalakeId())
+                .withCatalogId(oldFilesetPO.getCatalogId())
+                .withSchemaId(oldFilesetPO.getSchemaId())
                 .withFilesetId(newFileset.id())
                 .withVersion(currentVersion)
                 .withFilesetComment(newFileset.comment())
@@ -476,9 +468,9 @@ public class POConverters {
       return new FilesetPO.Builder()
           .withFilesetId(newFileset.id())
           .withFilesetName(newFileset.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
-          .withSchemaId(schemaId)
+          .withMetalakeId(oldFilesetPO.getMetalakeId())
+          .withCatalogId(oldFilesetPO.getCatalogId())
+          .withSchemaId(oldFilesetPO.getSchemaId())
           .withType(newFileset.filesetType().name())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
           .withCurrentVersion(currentVersion)
@@ -492,18 +484,9 @@ public class POConverters {
   }
 
   public static boolean checkFilesetVersionNeedUpdate(
-      FilesetVersionPO oldFilesetVersionPO,
-      FilesetEntity newFileset,
-      Long metalakeId,
-      Long catalogId,
-      Long schemaId,
-      Long filesetId) {
+      FilesetVersionPO oldFilesetVersionPO, FilesetEntity newFileset) {
     if (!oldFilesetVersionPO.getFilesetComment().equals(newFileset.comment())
-        || !oldFilesetVersionPO.getStorageLocation().equals(newFileset.storageLocation())
-        || !oldFilesetVersionPO.getMetalakeId().equals(metalakeId)
-        || !oldFilesetVersionPO.getCatalogId().equals(catalogId)
-        || !oldFilesetVersionPO.getSchemaId().equals(schemaId)
-        || !oldFilesetVersionPO.getFilesetId().equals(filesetId)) {
+        || !oldFilesetVersionPO.getStorageLocation().equals(newFileset.storageLocation())) {
       return true;
     }
 
