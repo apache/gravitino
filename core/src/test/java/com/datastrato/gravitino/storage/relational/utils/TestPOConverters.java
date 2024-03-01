@@ -209,7 +209,10 @@ public class TestPOConverters {
     SchemaEntity schema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
-    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, 1L, 1L);
+    SchemaPO.Builder builder = new SchemaPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -249,8 +252,11 @@ public class TestPOConverters {
     SchemaEntity updatedSchema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
-    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, 1L, 1L);
-    SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema, 1L, 1L);
+    SchemaPO.Builder builder = new SchemaPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
+    SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
