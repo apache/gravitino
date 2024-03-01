@@ -39,6 +39,8 @@ kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /cli.keytab -norandkey cli"
 
+echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
+
 # Update the configuration file
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
