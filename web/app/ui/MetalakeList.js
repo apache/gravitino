@@ -9,6 +9,11 @@ import Link from 'next/link'
 
 import { Box, Grid, Card, Typography, Portal, Tooltip } from '@mui/material'
 import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import {
+  VisibilityOutlined as ViewIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlined as DeleteIcon
+} from '@mui/icons-material'
 
 import Icon from '@/components/Icon'
 
@@ -182,7 +187,7 @@ const MetalakeList = () => {
           key='details'
           label='Details'
           title='Details'
-          icon={<Icon icon='bx:show-alt' />}
+          icon={<ViewIcon viewBox='0 0 24 22' />}
           onClick={handleShowDetails(row)}
           sx={{
             '& svg': {
@@ -194,7 +199,7 @@ const MetalakeList = () => {
           key='edit'
           label='Edit'
           title='Edit'
-          icon={<Icon icon='mdi:square-edit-outline' />}
+          icon={<EditIcon />}
           onClick={handleShowEditDialog(row)}
           sx={{
             '& svg': {
@@ -204,7 +209,7 @@ const MetalakeList = () => {
         />,
         <GridActionsCellItem
           key='delete'
-          icon={<Icon icon='mdi:delete-outline' />}
+          icon={<DeleteIcon />}
           label='Delete'
           title='Delete'
           onClick={handleDeleteMetalake(row.name)}
