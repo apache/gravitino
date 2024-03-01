@@ -13,10 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.filesystem.hadoop.utils.FileSystemTestUtils;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -181,7 +181,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     assertTrue(hadoopFileSystem.exists(mockFilePath));
     FileStatus mockFileStatus = hadoopFileSystem.getFileStatus(mockFilePath);
     byte[] mockInputContent = FileSystemTestUtils.read(mockFilePath, hadoopFileSystem);
-    assertEquals(new String(mockInputContent), "Hello, World!");
+    assertEquals(new String(mockInputContent, StandardCharsets.UTF_8), "Hello, World!");
     assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
     hadoopFileSystem.delete(mockFilePath, true);
 
@@ -190,10 +190,12 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
     FileStatus gravitinoFileStatus = gravitinoFileSystem.getFileStatus(gravitinoFilePath);
     byte[] gravitinoInputContent = FileSystemTestUtils.read(gravitinoFilePath, gravitinoFileSystem);
-    assertEquals(new String(gravitinoInputContent), "Hello, World!");
+    assertEquals(new String(gravitinoInputContent, StandardCharsets.UTF_8), "Hello, World!");
     gravitinoFileSystem.delete(gravitinoFilePath, true);
 
-    assertEquals(new String(mockInputContent), new String(gravitinoInputContent));
+    assertEquals(
+        new String(mockInputContent, StandardCharsets.UTF_8),
+        new String(gravitinoInputContent, StandardCharsets.UTF_8));
     assertEquals(
         mockFileStatus.getPath().toString(),
         gravitinoFileStatus

@@ -9,11 +9,11 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FileSystem;
 
-public class FilesetInstance {
+public class FilesetMeta {
   private Fileset fileset;
   private FileSystem fileSystem;
 
-  private FilesetInstance(Fileset fileset, FileSystem fileSystem) {
+  private FilesetMeta(Fileset fileset, FileSystem fileSystem) {
     this.fileset = fileset;
     this.fileSystem = fileSystem;
   }
@@ -31,10 +31,10 @@ public class FilesetInstance {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof FilesetInstance)) {
+    if (!(o instanceof FilesetMeta)) {
       return false;
     }
-    FilesetInstance that = (FilesetInstance) o;
+    FilesetMeta that = (FilesetMeta) o;
     return Objects.equal(getFileset(), that.getFileset())
         && Objects.equal(getFileSystem(), that.getFileSystem());
   }
@@ -45,12 +45,12 @@ public class FilesetInstance {
   }
 
   /**
-   * Creates a new builder for constructing a FilesetInstance.
+   * Creates a new builder for constructing a FilesetMeta.
    *
-   * @return A new instance of the Builder class for constructing a FilesetInstance.
+   * @return A new instance of the Builder class for constructing a FilesetMeta.
    */
-  public static FilesetInstance.Builder builder() {
-    return new FilesetInstance.Builder();
+  public static FilesetMeta.Builder builder() {
+    return new FilesetMeta.Builder();
   }
 
   public static class Builder {
@@ -69,10 +69,10 @@ public class FilesetInstance {
       return this;
     }
 
-    public FilesetInstance build() {
+    public FilesetMeta build() {
       Preconditions.checkArgument(
           fileset != null && fileSystem != null, "Fileset and FileSystem must be set");
-      return new FilesetInstance(fileset, fileSystem);
+      return new FilesetMeta(fileset, fileSystem);
     }
   }
 }
