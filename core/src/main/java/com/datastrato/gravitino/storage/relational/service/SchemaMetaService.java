@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -13,11 +12,11 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -115,16 +114,8 @@ public class SchemaMetaService {
             }
           });
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Schema entity: %s already exists", schemaEntity.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.SCHEMA, schemaEntity.nameIdentifier().toString());
       throw re;
     }
   }
@@ -162,16 +153,8 @@ public class SchemaMetaService {
                           oldSchemaPO, newEntity, metalakeId, catalogId),
                       oldSchemaPO));
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Schema entity: %s already exists", newEntity.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.SCHEMA, newEntity.nameIdentifier().toString());
       throw re;
     }
 
