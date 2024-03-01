@@ -22,6 +22,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenAuthenticator {
 
   @Test
