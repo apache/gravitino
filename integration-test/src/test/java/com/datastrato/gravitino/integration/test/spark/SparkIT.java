@@ -37,6 +37,7 @@ public class SparkIT extends SparkEnvIT {
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s";
   private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s VALUES (%s)";
 
+  // To generate test data for write&read table.
   private static final Map<String, String> typeConstant =
       ImmutableMap.of(
           TINYINT_TYPE_NAME,
@@ -49,10 +50,12 @@ public class SparkIT extends SparkEnvIT {
           "'gravitino_it_test'");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
-  // data to tables in default database. The main reason is default database location is in
+  // data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
   // not real HDFS address. The location of tables created under default database is like
-  // hdfs://localhost:9000/xxx which couldn't read write data from SparkIT.
+  // hdfs://localhost:9000/xxx which couldn't read write data from SparkIT. Will use default
+  // database
+  // after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() {
     sql("use " + hiveCatalogName);
@@ -142,6 +145,7 @@ public class SparkIT extends SparkEnvIT {
   }
 
   // Create simple tables without advanced features like comment, property, partition, bucket.
+  // To check whether create and load operation with default.
   @Test
   void testCreateSimpleTable() {
     String tableName = "simpleTable";
@@ -255,7 +259,7 @@ public class SparkIT extends SparkEnvIT {
     String table2 = "list2";
     createSimpleTable(table1);
     createSimpleTable(table2);
-    Set<String> tables = getTables();
+    Set<String> tables = getTableNames();
     Assertions.assertTrue(tables.contains(table1));
     Assertions.assertTrue(tables.contains(table2));
 
@@ -266,7 +270,7 @@ public class SparkIT extends SparkEnvIT {
     createDatabaseIfNotExists(database);
     createSimpleTable(String.join(".", database, table3));
     createSimpleTable(String.join(".", database, table4));
-    tables = getTables(database);
+    tables = getTableNames(database);
 
     Assertions.assertTrue(tables.contains(table3));
     Assertions.assertTrue(tables.contains(table4));

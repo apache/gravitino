@@ -48,12 +48,12 @@ public abstract class SparkUtilIT extends AbstractIT {
     return convertToStringSet(sql("SHOW DATABASES"), 0);
   }
 
-  protected Set<String> getTables() {
+  protected Set<String> getTableNames() {
     // the first column is namespace, the second column is table name
     return convertToStringSet(sql("SHOW TABLES"), 1);
   }
 
-  protected Set<String> getTables(String database) {
+  protected Set<String> getTableNames(String database) {
     return convertToStringSet(sql("SHOW TABLES in " + database), 1);
   }
 
@@ -61,7 +61,8 @@ public abstract class SparkUtilIT extends AbstractIT {
     sql("DROP DATABASE IF EXISTS " + database);
   }
 
-  // Specify Location explicitly because will add data read&write check for tables.
+  // Specify Location explicitly because the default location is local HDFS, Spark will expand the
+  // location to HDFS.
   protected void createDatabaseIfNotExists(String database) {
     sql(
         String.format(

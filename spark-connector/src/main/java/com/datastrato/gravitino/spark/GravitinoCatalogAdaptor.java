@@ -13,7 +13,7 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * GravitinoCatalogAdaptor providers a unified interface for different catalogs to adapt to
+ * GravitinoCatalogAdaptor provides a unified interface for different catalogs to adapt to
  * GravitinoCatalog.
  */
 public interface GravitinoCatalogAdaptor {
