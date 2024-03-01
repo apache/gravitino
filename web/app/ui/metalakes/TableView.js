@@ -9,6 +9,12 @@ import Link from 'next/link'
 
 import { Box, Typography, IconButton } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
+import {
+  VisibilityOutlined as ViewIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlined as DeleteIcon
+} from '@mui/icons-material'
+
 import Icon from '@/components/Icon'
 
 import ColumnTypeChip from '@/components/ColumnTypeChip'
@@ -144,7 +150,7 @@ const TableView = props => {
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowDetails({ row, type: 'catalog' })}
           >
-            <Icon icon='bx:show-alt' />
+            <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
           <IconButton
@@ -153,7 +159,7 @@ const TableView = props => {
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowEditDialog({ row, type: 'catalog' })}
           >
-            <Icon icon='mdi:square-edit-outline' />
+            <EditIcon />
           </IconButton>
 
           <IconButton
@@ -162,7 +168,7 @@ const TableView = props => {
             sx={{ color: theme => theme.palette.error.light }}
             onClick={() => handleDelete({ name: row.name, type: 'catalog' })}
           >
-            <Icon icon='mdi:delete-outline' />
+            <DeleteIcon />
           </IconButton>
         </>
       )
