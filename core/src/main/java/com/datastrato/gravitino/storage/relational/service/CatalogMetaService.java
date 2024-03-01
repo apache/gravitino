@@ -71,10 +71,10 @@ public class CatalogMetaService {
 
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
     NameIdentifier.checkCatalog(identifier);
-    String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long metalakeId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     CatalogPO catalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
@@ -83,9 +83,8 @@ public class CatalogMetaService {
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     Namespace.checkCatalog(namespace);
-    String metalakeName = namespace.level(0);
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long metalakeId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
@@ -99,7 +98,7 @@ public class CatalogMetaService {
       NameIdentifier.checkCatalog(catalogEntity.nameIdentifier());
 
       Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(catalogEntity.namespace().level(0));
+          CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
 
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
@@ -121,9 +120,10 @@ public class CatalogMetaService {
   public <E extends Entity & HasIdentifier> CatalogEntity updateCatalog(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifier.checkCatalog(identifier);
-    String metalakeName = identifier.namespace().level(0);
+
     String catalogName = identifier.name();
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long metalakeId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     CatalogPO oldCatalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
@@ -160,10 +160,11 @@ public class CatalogMetaService {
 
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifier.checkCatalog(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.name();
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    String catalogName = identifier.name();
+    Long metalakeId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+
     Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -190,7 +191,8 @@ public class CatalogMetaService {
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
-              .listSchemasByNamespace(Namespace.ofSchema(metalakeName, catalogName));
+              .listSchemasByNamespace(
+                  Namespace.ofSchema(identifier.namespace().level(0), catalogName));
       if (!schemaEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);

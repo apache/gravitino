@@ -63,15 +63,9 @@ public class TableMetaService {
 
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
     NameIdentifier.checkTable(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
 
@@ -80,15 +74,8 @@ public class TableMetaService {
 
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     Namespace.checkTable(namespace);
-    String metalakeName = namespace.level(0);
-    String catalogName = namespace.level(1);
-    String schemaName = namespace.level(2);
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
-    Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
@@ -100,22 +87,14 @@ public class TableMetaService {
   public void insertTable(TableEntity tableEntity, boolean overwrite) {
     try {
       NameIdentifier.checkTable(tableEntity.nameIdentifier());
-      String metalakeName = tableEntity.namespace().level(0);
-      String catalogName = tableEntity.namespace().level(1);
-      String schemaName = tableEntity.namespace().level(2);
 
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-      Long catalogId =
-          CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
-      Long schemaId =
-          SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+      TablePO.Builder builder = new TablePO.Builder();
+      fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       SessionUtils.doWithCommit(
           TableMetaMapper.class,
           mapper -> {
-            TablePO po =
-                POConverters.initializeTablePOWithVersion(
-                    tableEntity, metalakeId, catalogId, schemaId);
+            TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
             if (overwrite) {
               mapper.insertTableMetaOnDuplicateKeyUpdate(po);
             } else {
@@ -132,16 +111,11 @@ public class TableMetaService {
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifier.checkTable(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
+
     String tableName = identifier.name();
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     TablePO oldTablePO = getTablePOBySchemaIdAndName(schemaId, tableName);
     TableEntity oldTableEntity = POConverters.fromTablePO(oldTablePO, identifier.namespace());
@@ -159,9 +133,7 @@ public class TableMetaService {
               TableMetaMapper.class,
               mapper ->
                   mapper.updateTableMeta(
-                      POConverters.updateTablePOWithVersion(
-                          oldTablePO, newEntity, metalakeId, catalogId, schemaId),
-                      oldTablePO));
+                      POConverters.updateTablePOWithVersion(oldTablePO, newEntity), oldTablePO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLConstraintException(
           re, Entity.EntityType.TABLE, newEntity.nameIdentifier().toString());
@@ -177,21 +149,42 @@ public class TableMetaService {
 
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifier.checkTable(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
+
     String tableName = identifier.name();
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     Long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
     SessionUtils.doWithCommit(
         TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
 
     return true;
+  }
+
+  private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
+    Namespace.checkTable(namespace);
+    Long parentEntityId = null;
+    for (int level = 0; level < namespace.levels().length; level++) {
+      String name = namespace.level(level);
+      switch (level) {
+        case 0:
+          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
+          builder.withMetalakeId(parentEntityId);
+          continue;
+        case 1:
+          parentEntityId =
+              CatalogMetaService.getInstance()
+                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
+          builder.withCatalogId(parentEntityId);
+          continue;
+        case 2:
+          parentEntityId =
+              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
+          builder.withSchemaId(parentEntityId);
+          break;
+      }
+    }
   }
 }
