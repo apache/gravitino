@@ -135,9 +135,7 @@ public class MetalakeMetaService {
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifier.checkMetalake(ident);
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));
+    Long metalakeId = getMetalakeIdByName(ident.name());
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(

@@ -63,14 +63,9 @@ public class SchemaMetaService {
 
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
     NameIdentifier.checkSchema(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.name();
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
 
     SchemaPO schemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
@@ -79,12 +74,8 @@ public class SchemaMetaService {
 
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     Namespace.checkSchema(namespace);
-    String metalakeName = namespace.level(0);
-    String catalogName = namespace.level(1);
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(namespace);
 
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -167,14 +158,9 @@ public class SchemaMetaService {
 
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifier.checkSchema(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
+
     String schemaName = identifier.name();
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-
-    Long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
-
+    Long catalogId = CommonMetaService.getInstance().getParentIdByNamespace(identifier.namespace());
     Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
     if (schemaId != null) {
