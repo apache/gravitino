@@ -540,8 +540,8 @@ public class DTOConverters {
         RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
         return Partitions.range(
             rangePartitionDTO.name(),
-            rangePartitionDTO.lower(),
             rangePartitionDTO.upper(),
+            rangePartitionDTO.lower(),
             rangePartitionDTO.properties());
       case LIST:
         ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
