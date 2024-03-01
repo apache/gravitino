@@ -134,7 +134,7 @@ public class JDBCBackend implements RelationalBackend {
       case SCHEMA:
         return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
       case TABLE:
-        return TableMetaService.getInstance().deleteTable(ident, cascade);
+        return TableMetaService.getInstance().deleteTable(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
