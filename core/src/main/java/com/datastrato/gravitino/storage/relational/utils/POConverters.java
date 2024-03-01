@@ -224,13 +224,11 @@ public class POConverters {
    * @return CatalogPO object with version initialized
    */
   public static SchemaPO initializeSchemaPOWithVersion(
-      SchemaEntity schemaEntity, Long metalakeId, Long catalogId) {
+      SchemaEntity schemaEntity, SchemaPO.Builder builder) {
     try {
-      return new SchemaPO.Builder()
+      return builder
           .withSchemaId(schemaEntity.id())
           .withSchemaName(schemaEntity.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
           .withSchemaComment(schemaEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.auditInfo()))
@@ -250,17 +248,16 @@ public class POConverters {
    * @param newSchema the new SchemaEntity object
    * @return SchemaPO object with updated version
    */
-  public static SchemaPO updateSchemaPOWithVersion(
-      SchemaPO oldSchemaPO, SchemaEntity newSchema, Long metalakeId, Long catalogId) {
+  public static SchemaPO updateSchemaPOWithVersion(SchemaPO oldSchemaPO, SchemaEntity newSchema) {
     Long lastVersion = oldSchemaPO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
       return new SchemaPO.Builder()
-          .withSchemaId(newSchema.id())
+          .withSchemaId(oldSchemaPO.getSchemaId())
           .withSchemaName(newSchema.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
+          .withMetalakeId(oldSchemaPO.getMetalakeId())
+          .withCatalogId(oldSchemaPO.getCatalogId())
           .withSchemaComment(newSchema.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.auditInfo()))
