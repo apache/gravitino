@@ -48,7 +48,10 @@ public class FilesetMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -58,6 +61,7 @@ public class FilesetMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -67,7 +71,9 @@ public class FilesetMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     FilesetPO filesetPO =
@@ -77,7 +83,9 @@ public class FilesetMetaService {
 
     if (filesetPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          identifier.toString());
     }
 
     return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
@@ -93,7 +101,10 @@ public class FilesetMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -103,6 +114,7 @@ public class FilesetMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -112,7 +124,9 @@ public class FilesetMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, namespace.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespace.toString());
     }
 
     List<FilesetPO> filesetPOs =
@@ -131,7 +145,10 @@ public class FilesetMetaService {
           SessionUtils.getWithoutCommit(
               MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
       if (metalakeId == null) {
-        throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
       }
 
       Long catalogId =
@@ -141,6 +158,7 @@ public class FilesetMetaService {
       if (catalogId == null) {
         throw new NoSuchEntityException(
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.CATALOG.name().toLowerCase(),
             String.format("%s.%s", metalakeName, catalogName));
       }
 
@@ -150,7 +168,9 @@ public class FilesetMetaService {
               mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
       if (schemaId == null) {
         throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, filesetEntity.namespace().toString());
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.SCHEMA.name().toLowerCase(),
+            filesetEntity.namespace().toString());
       }
 
       FilesetPO po =
@@ -205,7 +225,10 @@ public class FilesetMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -215,6 +238,7 @@ public class FilesetMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -224,7 +248,9 @@ public class FilesetMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     FilesetPO oldFilesetPO =
@@ -233,7 +259,9 @@ public class FilesetMetaService {
             mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, filesetName));
     if (oldFilesetPO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          identifier.toString());
     }
 
     FilesetEntity oldFilesetEntity =
@@ -310,7 +338,10 @@ public class FilesetMetaService {
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
     if (metalakeId == null) {
-      throw new NoSuchEntityException(NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, metalakeName);
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
     }
 
     Long catalogId =
@@ -320,6 +351,7 @@ public class FilesetMetaService {
     if (catalogId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
           String.format("%s.%s", metalakeName, catalogName));
     }
 
@@ -329,7 +361,9 @@ public class FilesetMetaService {
             mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
     if (schemaId == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, identifier.namespace().toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.namespace().toString());
     }
 
     Long filesetId =
