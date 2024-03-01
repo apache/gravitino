@@ -11,11 +11,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.FilesetEntity;
-import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
-import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -39,54 +36,35 @@ public class FilesetMetaService {
 
   private FilesetMetaService() {}
 
-  public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkFileset(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
-
-    Long catalogId =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-    if (catalogId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          String.format("%s.%s", metalakeName, catalogName));
-    }
-
-    Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
-
+  public FilesetPO getFilesetPOBySchemaIdAndName(Long schemaId, String filesetName) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class,
-            mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, identifier.name()));
+            mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, filesetName));
 
     if (filesetPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.FILESET.name().toLowerCase(),
-          identifier.toString());
+          filesetName);
     }
+    return filesetPO;
+  }
+
+  public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
+    NameIdentifier.checkFileset(identifier);
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String filesetName = identifier.name();
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long catalogId =
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long schemaId =
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+
+    FilesetPO filesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
 
     return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
   }
@@ -97,41 +75,16 @@ public class FilesetMetaService {
     String catalogName = namespace.level(1);
     String schemaName = namespace.level(2);
 
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
-
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long catalogId =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-    if (catalogId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          String.format("%s.%s", metalakeName, catalogName));
-    }
-
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          namespace.toString());
-    }
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
     List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
+
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
@@ -141,37 +94,12 @@ public class FilesetMetaService {
       String metalakeName = filesetEntity.namespace().level(0);
       String catalogName = filesetEntity.namespace().level(1);
       String schemaName = filesetEntity.namespace().level(2);
-      Long metalakeId =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-      if (metalakeId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
 
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
       Long catalogId =
-          SessionUtils.getWithoutCommit(
-              CatalogMetaMapper.class,
-              mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-      if (catalogId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
-            String.format("%s.%s", metalakeName, catalogName));
-      }
-
+          CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
       Long schemaId =
-          SessionUtils.getWithoutCommit(
-              SchemaMetaMapper.class,
-              mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-      if (schemaId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            filesetEntity.namespace().toString());
-      }
+          SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
       FilesetPO po =
           POConverters.initializeFilesetPOWithVersion(
@@ -221,49 +149,13 @@ public class FilesetMetaService {
     String schemaName = identifier.namespace().level(2);
     String filesetName = identifier.name();
 
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
-
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long catalogId =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-    if (catalogId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          String.format("%s.%s", metalakeName, catalogName));
-    }
-
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
     Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
-    FilesetPO oldFilesetPO =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class,
-            mapper -> mapper.selectFilesetMetaBySchemaIdAndName(schemaId, filesetName));
-    if (oldFilesetPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.FILESET.name().toLowerCase(),
-          identifier.toString());
-    }
-
+    FilesetPO oldFilesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
     FilesetEntity oldFilesetEntity =
         POConverters.fromFilesetPO(oldFilesetPO, identifier.namespace());
     FilesetEntity newEntity = (FilesetEntity) updater.apply((E) oldFilesetEntity);
@@ -272,6 +164,7 @@ public class FilesetMetaService {
         "The updated fileset entity id: %s should be same with the table entity id before: %s",
         newEntity.id(),
         oldFilesetEntity.id());
+
     Integer updateResult;
     try {
       boolean checkNeedUpdateVersion =
@@ -334,54 +227,30 @@ public class FilesetMetaService {
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
     String filesetName = identifier.name();
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
 
     Long catalogId =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-    if (catalogId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          String.format("%s.%s", metalakeName, catalogName));
-    }
+        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
 
     Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
     Long filesetId =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class,
             mapper -> mapper.selectFilesetIdBySchemaIdAndName(schemaId, filesetName));
-    if (filesetId != null) {
-      // We should delete meta and version info
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetVersionMapper.class,
-                  mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
-    }
+
+    // We should delete meta and version info
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetVersionMapper.class,
+                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
+
     return true;
   }
 }
