@@ -14,7 +14,6 @@ import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -38,63 +37,68 @@ public class CatalogMetaService {
 
   private CatalogMetaService() {}
 
-  public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkCatalog(identifier);
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.name();
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
+  public CatalogPO getCatalogPOByMetalakeIdAndName(Long metalakeId, String catalogName) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
             mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
+
     if (catalogPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.toString());
+          catalogName);
     }
+    return catalogPO;
+  }
+
+  public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
+    Long catalogId =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
+
+    if (catalogId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          catalogName);
+    }
+    return catalogId;
+  }
+
+  public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
+    NameIdentifier.checkCatalog(identifier);
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.name();
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+
+    CatalogPO catalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
+
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     Namespace.checkCatalog(namespace);
     String metalakeName = namespace.level(0);
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          namespace.toString());
-    }
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
 
   public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) {
     try {
       NameIdentifier.checkCatalog(catalogEntity.nameIdentifier());
+
       Long metalakeId =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.selectMetalakeIdMetaByName(catalogEntity.namespace().level(0)));
-      if (metalakeId == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            catalogEntity.namespace().toString());
-      }
+          MetalakeMetaService.getInstance().getMetalakeIdByName(catalogEntity.namespace().level(0));
+
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
           mapper -> {
@@ -125,26 +129,9 @@ public class CatalogMetaService {
     NameIdentifier.checkCatalog(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
 
-    CatalogPO oldCatalogPO =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
-    if (oldCatalogPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.toString());
-    }
+    CatalogPO oldCatalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
     CatalogEntity oldCatalogEntity =
         POConverters.fromCatalogPO(oldCatalogPO, identifier.namespace());
@@ -154,6 +141,7 @@ public class CatalogMetaService {
         "The updated catalog entity id: %s should be same with the catalog entity id before: %s",
         newEntity.id(),
         oldCatalogEntity.id());
+
     Integer updateResult;
     try {
       updateResult =
@@ -188,45 +176,35 @@ public class CatalogMetaService {
     NameIdentifier.checkCatalog(identifier);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          identifier.namespace().toString());
-    }
-    Long catalogId =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogIdByMetalakeIdAndName(metalakeId, catalogName));
-    if (catalogId != null) {
-      if (cascade) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    CatalogMetaMapper.class,
-                    mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
-            () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the catalog
-            });
-      } else {
-        List<SchemaEntity> schemaEntities =
-            SchemaMetaService.getInstance()
-                .listSchemasByNamespace(Namespace.ofSchema(metalakeName, catalogName));
-        if (!schemaEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
-        SessionUtils.doWithCommit(
-            CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+
+    Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+
+    if (cascade) {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
+          () -> {
+            // TODO We will cascade delete the metadata of sub-resources under the catalog
+          });
+    } else {
+      List<SchemaEntity> schemaEntities =
+          SchemaMetaService.getInstance()
+              .listSchemasByNamespace(Namespace.ofSchema(metalakeName, catalogName));
+      if (!schemaEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
+      SessionUtils.doWithCommit(
+          CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
     }
+
     return true;
   }
 }

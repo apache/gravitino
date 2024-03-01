@@ -46,6 +46,19 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
+  public Long getMetalakeIdByName(String metalakeName) {
+    Long metalakeId =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
+    if (metalakeId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
+    }
+    return metalakeId;
+  }
+
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
     NameIdentifier.checkMetalake(ident);
     MetalakePO metalakePO =
