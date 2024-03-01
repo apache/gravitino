@@ -13,8 +13,6 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
-import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;

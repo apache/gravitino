@@ -15,7 +15,6 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
