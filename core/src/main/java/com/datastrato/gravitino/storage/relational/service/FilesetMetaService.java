@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -14,11 +13,11 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
+import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -128,15 +127,8 @@ public class FilesetMetaService {
                     }
                   }));
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Fileset entity: %s already exists", filesetEntity.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
       throw re;
     }
   }
@@ -202,15 +194,8 @@ public class FilesetMetaService {
                 mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
       }
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Table entity: %s already exists", newEntity.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
       throw re;
     }
 
