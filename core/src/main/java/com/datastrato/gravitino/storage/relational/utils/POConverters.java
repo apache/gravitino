@@ -313,14 +313,11 @@ public class POConverters {
    * @return TablePO object with version initialized
    */
   public static TablePO initializeTablePOWithVersion(
-      TableEntity tableEntity, Long metalakeId, Long catalogId, Long schemaId) {
+      TableEntity tableEntity, TablePO.Builder builder) {
     try {
-      return new TablePO.Builder()
+      return builder
           .withTableId(tableEntity.id())
           .withTableName(tableEntity.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
-          .withSchemaId(schemaId)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
           .withCurrentVersion(1L)
           .withLastVersion(1L)
@@ -338,18 +335,17 @@ public class POConverters {
    * @param newTable the new TableEntity object
    * @return TablePO object with updated version
    */
-  public static TablePO updateTablePOWithVersion(
-      TablePO oldTablePO, TableEntity newTable, Long metalakeId, Long catalogId, Long schemaId) {
+  public static TablePO updateTablePOWithVersion(TablePO oldTablePO, TableEntity newTable) {
     Long lastVersion = oldTablePO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
       return new TablePO.Builder()
-          .withTableId(newTable.id())
+          .withTableId(oldTablePO.getTableId())
           .withTableName(newTable.name())
-          .withMetalakeId(metalakeId)
-          .withCatalogId(catalogId)
-          .withSchemaId(schemaId)
+          .withMetalakeId(oldTablePO.getMetalakeId())
+          .withCatalogId(oldTablePO.getCatalogId())
+          .withSchemaId(oldTablePO.getSchemaId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)

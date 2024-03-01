@@ -175,7 +175,11 @@ public class SchemaMetaService {
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
-                .listTablesByNamespace(Namespace.ofTable(metalakeName, catalogName, schemaName));
+                .listTablesByNamespace(
+                    Namespace.ofTable(
+                        identifier.namespace().level(0),
+                        identifier.namespace().level(1),
+                        schemaName));
         if (!tableEntities.isEmpty()) {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", identifier);
