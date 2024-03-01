@@ -12,6 +12,7 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.List;
@@ -51,37 +52,33 @@ public class LockManager {
 
   private void initParameters(Config config) {
     long maxNodesInMemory = config.get(TREE_LOCK_MAX_NODE_IN_MEMORY);
-    if (maxNodesInMemory <= 0) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The maximum number of tree lock nodes '%d' should be greater than 0",
-              maxNodesInMemory));
-    }
+    Preconditions.checkArgument(
+        maxNodesInMemory > 0,
+        String.format(
+            "The maximum number of tree lock nodes '%d' should be greater than 0",
+            maxNodesInMemory));
 
     long minNodesInMemory = config.get(TREE_LOCK_MIN_NODE_IN_MEMORY);
-    if (minNodesInMemory <= 0) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The minimum number of tree lock nodes '%d' should be greater than 0",
-              minNodesInMemory));
-    }
+    Preconditions.checkArgument(
+        minNodesInMemory > 0,
+        String.format(
+            "The minimum number of tree lock nodes '%d' should be greater than 0",
+            minNodesInMemory));
 
-    if (maxNodesInMemory <= minNodesInMemory) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The maximum number of tree lock nodes '%d' should be greater than the minimum number of tree lock nodes '%d'",
-              maxNodesInMemory, minNodesInMemory));
-    }
+    Preconditions.checkArgument(
+        maxNodesInMemory > minNodesInMemory,
+        String.format(
+            "The maximum number of tree lock nodes '%d' should be greater than the minimum number of tree lock nodes '%d'",
+            maxNodesInMemory, minNodesInMemory));
     this.maxTreeNodeInMemory = maxNodesInMemory;
     this.minTreeNodeInMemory = minNodesInMemory;
 
     long cleanIntervalInSecs = config.get(TREE_LOCK_CLEAN_INTERVAL);
-    if (cleanIntervalInSecs <= 0) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The interval in seconds to clean up the stale tree lock nodes '%d' should be greater than 0",
-              cleanIntervalInSecs));
-    }
+    Preconditions.checkArgument(
+        cleanIntervalInSecs > 0,
+        String.format(
+            "The interval in seconds to clean up the stale tree lock nodes '%d' should be greater than 0",
+            cleanIntervalInSecs));
 
     this.cleanTreeNodeIntervalInSecs = cleanIntervalInSecs;
   }

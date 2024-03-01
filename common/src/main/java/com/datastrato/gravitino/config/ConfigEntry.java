@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.config;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -127,11 +128,10 @@ public class ConfigEntry<T> {
   public ConfigEntry<T> checkValue(Function<T, Boolean> checkValueFunc, String errorMsg) {
     setValidator(
         value -> {
-          if (!checkValueFunc.apply(value)) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "%s in %s is invalid. %s", stringConverter.apply(value), key, errorMsg));
-          }
+          Preconditions.checkArgument(
+              checkValueFunc.apply(value),
+              String.format(
+                  "%s in %s is invalid. %s", stringConverter.apply(value), key, errorMsg));
         });
     return this;
   }

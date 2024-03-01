@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a Column DTO (Data Transfer Object). */
 @EqualsAndHashCode
@@ -228,17 +229,13 @@ public class ColumnDTO implements Column {
    *     non-nullable with a null default value, this method will throw an IllegalArgumentException.
    */
   public void validate() throws IllegalArgumentException {
-    if (name() == null || name().isEmpty()) {
-      throw new IllegalArgumentException("Column name cannot be null or empty.");
-    }
-    if (dataType() == null) {
-      throw new IllegalArgumentException("Column data type cannot be null.");
-    }
-    if (!nullable()
-        && defaultValue() instanceof LiteralDTO
-        && ((LiteralDTO) defaultValue()).dataType().equals(Types.NullType.get())) {
-      throw new IllegalArgumentException(
-          "Column cannot be non-nullable with a null default value: " + name());
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotEmpty(name()), "Column name cannot be null or empty");
+    Preconditions.checkArgument(dataType() != null, "Column data type cannot be null.");
+    Preconditions.checkArgument(
+        nullable()
+            || !(defaultValue() instanceof LiteralDTO)
+            || !((LiteralDTO) defaultValue()).dataType().equals(Types.NullType.get()),
+        "Column cannot be non-nullable with a null default value: " + name());
   }
 }

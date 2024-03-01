@@ -176,11 +176,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append(",\n");
       switch (index.type()) {
         case PRIMARY_KEY:
-          if (null != index.name()
-              && !StringUtils.equalsIgnoreCase(
-                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-            throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-          }
+          Preconditions.checkArgument(
+              null == index.name()
+                  || StringUtils.equalsIgnoreCase(
+                      index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME),
+              "Primary key name must be PRIMARY in MySQL");
           sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case UNIQUE_KEY:
@@ -200,10 +200,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return Arrays.stream(fieldNames)
         .map(
             colNames -> {
-              if (colNames.length > 1) {
-                throw new IllegalArgumentException(
-                    "Index does not support complex fields in MySQL");
-              }
+              Preconditions.checkArgument(
+                  colNames.length <= 1, "Index does not support complex fields in MySQL");
               return BACK_QUOTE + colNames[0] + BACK_QUOTE;
             })
         .collect(Collectors.joining(", "));
@@ -282,14 +280,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
     List<String> alterSql = new ArrayList<>();
     for (int i = 0; i < changes.length; i++) {
       TableChange change = changes[i];
+      Preconditions.checkArgument(
+          !(change instanceof TableChange.RemoveProperty), "Remove property is not supported yet");
       if (change instanceof TableChange.UpdateComment) {
         updateComment = (TableChange.UpdateComment) change;
       } else if (change instanceof TableChange.SetProperty) {
         // The set attribute needs to be added at the end.
         setProperties.add(((TableChange.SetProperty) change));
-      } else if (change instanceof TableChange.RemoveProperty) {
-        // mysql does not support deleting table attributes, it can be replaced by Set Property
-        throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -402,10 +399,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
     if (deleteIndex.isIfExists()) {
-      if (Arrays.stream(lazyLoadTable.index())
-          .anyMatch(index -> index.name().equals(deleteIndex.getName()))) {
-        throw new IllegalArgumentException("Index does not exist");
-      }
+      Preconditions.checkArgument(
+          Arrays.stream(lazyLoadTable.index())
+              .noneMatch(index -> index.name().equals(deleteIndex.getName())),
+          "Index does not exist");
     }
     return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
   }
@@ -437,11 +434,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
     sqlBuilder.append("ADD ");
     switch (addIndex.getType()) {
       case PRIMARY_KEY:
-        if (null != addIndex.getName()
-            && !StringUtils.equalsIgnoreCase(
-                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
-          throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
-        }
+        Preconditions.checkArgument(
+            null == addIndex.getName()
+                || StringUtils.equalsIgnoreCase(
+                    addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME),
+            "Primary key name must be PRIMARY in MySQL");
         sqlBuilder.append("PRIMARY KEY ");
         break;
       case UNIQUE_KEY:
@@ -537,10 +534,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
           .append(BACK_QUOTE)
           .append(afterPosition.getColumn())
           .append(BACK_QUOTE);
-    } else if (addColumn.getPosition() instanceof TableChange.Default) {
-      // do nothing, follow the default behavior of mysql
     } else {
-      throw new IllegalArgumentException("Invalid column position.");
+      Preconditions.checkArgument(
+          addColumn.getPosition() instanceof TableChange.Default, "Invalid column position.");
     }
     return columnDefinition.toString();
   }
@@ -613,11 +609,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       colExists = false;
     }
     if (!colExists) {
-      if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
-        return "";
-      } else {
-        throw new IllegalArgumentException("Delete column does not exist: " + col);
-      }
+      Preconditions.checkArgument(
+          BooleanUtils.isTrue(deleteColumn.getIfExists()), "Delete column does not exist: " + col);
+      return "";
     }
     return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
   }

@@ -78,12 +78,10 @@ public class IcebergTableOpsHelper {
       UpdateSchema icebergUpdateSchema, DeleteColumn deleteColumn, Schema icebergTableSchema) {
     NestedField deleteField = icebergTableSchema.findField(DOT.join(deleteColumn.fieldName()));
     if (deleteField == null) {
-      if (deleteColumn.getIfExists()) {
-        return;
-      } else {
-        throw new IllegalArgumentException(
-            "delete column not exists: " + DOT.join(deleteColumn.fieldName()));
-      }
+      Preconditions.checkArgument(
+          deleteColumn.getIfExists(),
+          "Delete column not exists: " + DOT.join(deleteColumn.fieldName()));
+      return;
     }
     icebergUpdateSchema.deleteColumn(DOT.join(deleteColumn.fieldName()));
   }
