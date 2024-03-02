@@ -54,8 +54,7 @@ public class SparkIT extends SparkEnvIT {
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
   // not real HDFS address. The location of tables created under default database is like
   // hdfs://localhost:9000/xxx which couldn't read write data from SparkIT. Will use default
-  // database
-  // after spark connector support Alter database xx set location command.
+  // database after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() {
     sql("use " + hiveCatalogName);
