@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.google.common.base.Preconditions;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -22,10 +23,9 @@ public class OperationsProxy<T> implements InvocationHandler {
   }
 
   public static <T> T createProxy(T ops, ProxyPlugin plugin) {
-    if (!(ops instanceof CatalogOperations) && !(ops instanceof TableOperations)) {
-      throw new IllegalArgumentException(
-          "Method only supports the type of CatalogOperations or TableOperations");
-    }
+    Preconditions.checkArgument(
+        ops instanceof CatalogOperations || ops instanceof TableOperations,
+        "Method only supports the type of CatalogOperations or TableOperations");
     if (ops instanceof CatalogOperations) {
       plugin.bindCatalogOperation((CatalogOperations) ops);
     }

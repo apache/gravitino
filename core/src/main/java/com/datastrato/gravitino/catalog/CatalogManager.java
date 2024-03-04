@@ -612,13 +612,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .map(CatalogProvider::getClass)
             .collect(Collectors.toList());
 
-    if (providers.isEmpty()) {
-      throw new IllegalArgumentException("No catalog provider found for: " + provider);
-    } else if (providers.size() > 1) {
-      throw new IllegalArgumentException("Multiple catalog providers found for: " + provider);
-    } else {
-      return Iterables.getOnlyElement(providers);
-    }
+    Preconditions.checkArgument(!providers.isEmpty(), "No catalog provider found for: " + provider);
+    Preconditions.checkArgument(
+        providers.size() == 1, "Multiple catalog providers found for: " + provider);
+    return Iterables.getOnlyElement(providers);
   }
 
   private CatalogEntity.Builder updateEntity(

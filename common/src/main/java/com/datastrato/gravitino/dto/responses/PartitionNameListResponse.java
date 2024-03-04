@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
@@ -45,8 +46,6 @@ public class PartitionNameListResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    if (partitionNames == null) {
-      throw new IllegalArgumentException("partition names must not be null");
-    }
+    Preconditions.checkArgument(partitionNames != null, "Partition names must not be null");
   }
 }

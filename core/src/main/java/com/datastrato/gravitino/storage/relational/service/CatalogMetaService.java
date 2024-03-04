@@ -166,6 +166,7 @@ public class CatalogMetaService {
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
           () ->

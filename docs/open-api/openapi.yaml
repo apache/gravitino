@@ -68,6 +68,12 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions/{partition}:
     $ref: "./partitions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D~1partitions~1%7Bpartition%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets:
+    $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
+    $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D"
+
 components:
 
   schemas:
@@ -242,6 +248,14 @@ components:
       name: table
       in: path
       description: The name of the table
+      required: true
+      schema:
+        type: string
+
+    fileset:
+      name: fileset
+      in: path
+      description: The name of the fileset
       required: true
       schema:
         type: string
