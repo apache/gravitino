@@ -185,9 +185,9 @@ public class IcebergTable extends BaseTable {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
       }
       String provider = icebergTable.properties.get(PROP_PROVIDER);
-      Preconditions.checkArgument(
-          provider == null || DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider),
-          "Unsupported format in USING: " + provider);
+      if (provider != null && !DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider)) {
+        throw new IllegalArgumentException("Unsupported format in USING: " + provider);
+      }
       return icebergTable;
     }
   }

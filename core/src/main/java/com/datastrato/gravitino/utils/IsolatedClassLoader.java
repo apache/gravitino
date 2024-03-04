@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.utils;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.File;
@@ -100,9 +99,10 @@ public class IsolatedClassLoader implements Closeable {
     List<URL> classPathContents = Lists.newArrayList();
     for (String path : libAndResourcesPaths) {
       File folder = new File(path);
-      Preconditions.checkArgument(
-          folder.exists() && folder.isDirectory() && folder.canRead() && folder.canExecute(),
-          String.format("Invalid package path: %s in %s", path, libAndResourcesPaths));
+      if (!folder.exists() || !folder.isDirectory() || !folder.canRead() || !folder.canExecute()) {
+        throw new IllegalArgumentException(
+            String.format("Invalid package path: %s in %s", path, libAndResourcesPaths));
+      }
 
       // Add all the jar under the folder to classpath.
       Arrays.stream(folder.listFiles())
