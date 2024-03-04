@@ -24,11 +24,11 @@ PASS="Admin12!"
 KRB5_KTNAME=/etc/admin.keytab
 
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc ${ADMIN}/admin"
-echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc cli"
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc cli@${FQDN}"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hdfs/${HOSTNAME}@${FQDN}"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc HTTP/${HOSTNAME}@${FQDN}"
 echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc hive/${HOSTNAME}@${FQDN}"
-kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} cli"
+kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} cli@${FQDN}"
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hdfs/${HOSTNAME}@${FQDN}"
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} HTTP/${HOSTNAME}@${FQDN}"
 
@@ -37,7 +37,7 @@ kadmin.local -q "xst -k /hdfs.keytab -norandkey HTTP/${HOSTNAME}@${FQDN}"
 
 kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
-kadmin.local -q "xst -k /cli.keytab -norandkey cli"
+kadmin.local -q "xst -k /cli.keytab -norandkey cli@${FQDN}"
 
 echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
 
