@@ -50,6 +50,21 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
+  public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
+    Long filesetId =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper -> mapper.selectFilesetIdBySchemaIdAndName(schemaId, filesetName));
+
+    if (filesetId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          filesetName);
+    }
+    return filesetId;
+  }
+
   public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
     NameIdentifier.checkFileset(identifier);
 
@@ -182,10 +197,7 @@ public class FilesetMetaService {
     Long schemaId =
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
-    Long filesetId =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class,
-            mapper -> mapper.selectFilesetIdBySchemaIdAndName(schemaId, filesetName));
+    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
