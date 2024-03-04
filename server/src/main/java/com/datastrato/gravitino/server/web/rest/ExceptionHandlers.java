@@ -221,6 +221,7 @@ public class ExceptionHandlers {
           String.format(FILESET_MSG_TEMPLATE, formatted, op.name(), schema, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
+
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
@@ -240,8 +241,6 @@ public class ExceptionHandlers {
   static class BaseExceptionHandler extends ExceptionHandler {
 
     private static final String EXCEPTION_KEYWORD = "Exception: ";
-
-    private static final ExceptionHandler INSTANCE = new BaseExceptionHandler();
 
     private static final String BASE_MSG_TEMPLATE =
         "Failed to operate object%s operation [%s]%s, reason [%s]";

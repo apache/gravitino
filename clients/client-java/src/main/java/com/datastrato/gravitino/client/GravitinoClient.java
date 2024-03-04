@@ -42,8 +42,6 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
-  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
-
   private final RESTClient restClient;
 
   private static final String API_METALAKES_LIST_PATH = "api/metalakes";
