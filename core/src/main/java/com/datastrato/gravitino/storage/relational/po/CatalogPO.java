@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 public class CatalogPO {
   private Long catalogId;
@@ -164,7 +165,20 @@ public class CatalogPO {
       return this;
     }
 
+    private void validate() {
+      Preconditions.checkArgument(metalakePO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(metalakePO.catalogName != null, "Catalog name is required");
+      Preconditions.checkArgument(metalakePO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(metalakePO.type != null, "Catalog type is required");
+      Preconditions.checkArgument(metalakePO.provider != null, "Catalog provider is required");
+      Preconditions.checkArgument(metalakePO.auditInfo != null, "Audit info is required");
+      Preconditions.checkArgument(metalakePO.currentVersion != null, "Current version is required");
+      Preconditions.checkArgument(metalakePO.lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(metalakePO.deletedAt != null, "Deleted at is required");
+    }
+
     public CatalogPO build() {
+      validate();
       return metalakePO;
     }
   }

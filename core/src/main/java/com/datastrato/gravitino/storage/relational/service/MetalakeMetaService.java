@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -16,12 +15,13 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -45,6 +45,19 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
+  public Long getMetalakeIdByName(String metalakeName) {
+    Long metalakeId =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
+    if (metalakeId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
+    }
+    return metalakeId;
+  }
+
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
     NameIdentifier.checkMetalake(ident);
     MetalakePO metalakePO =
@@ -52,7 +65,9 @@ public class MetalakeMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (metalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
   }
@@ -71,16 +86,8 @@ public class MetalakeMetaService {
             }
           });
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Metalake entity: %s already exists", baseMetalake.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.METALAKE, baseMetalake.nameIdentifier().toString());
       throw re;
     }
   }
@@ -93,7 +100,9 @@ public class MetalakeMetaService {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (oldMetalakePO == null) {
       throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, ident.toString());
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
@@ -112,16 +121,8 @@ public class MetalakeMetaService {
               MetalakeMetaMapper.class,
               mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format("Catalog entity: %s already exists", newMetalakeEntity.nameIdentifier()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
       throw re;
     }
 
@@ -134,9 +135,7 @@ public class MetalakeMetaService {
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifier.checkMetalake(ident);
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));
+    Long metalakeId = getMetalakeIdByName(ident.name());
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
@@ -148,6 +147,10 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     CatalogMetaMapper.class,
                     mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
             () -> {
               // TODO We will cascade delete the metadata of sub-resources under the metalake
             });
