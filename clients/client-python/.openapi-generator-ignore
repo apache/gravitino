@@ -1,0 +1,3 @@
+clients/client-python/**/__init__.py
+clients/client-python/**/gravitino_client.py
+clients/client-python/pygravitino/tests/**

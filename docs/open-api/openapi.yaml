@@ -132,6 +132,23 @@ components:
           type: string
           description: The name of the entity
 
+    Version:
+      type: object
+      description: A version object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          description: The version of the entity
+        compileDate:
+          type: string
+          format: date-time
+          description: The date and time the entity was compiled
+        gitCommit:
+          type: string
+          description: The git commit hash of the entity
+
   responses:
 
     EntityListResponse:

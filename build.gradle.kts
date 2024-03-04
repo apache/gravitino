@@ -172,8 +172,7 @@ openApiGenerate {
   generateModelDocumentation.set(false)
   generateApiTests.set(false)
   generateModelTests.set(false)
-  packageName.set("com.datastrato.gravitino.client")
-  cleanupOutput.set(true)
+  packageName.set("pygravitino")
 
   globalProperties.set(
     mapOf(

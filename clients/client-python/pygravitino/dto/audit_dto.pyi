@@ -20,7 +20,7 @@ import uuid  # noqa: F401
 
 import frozendict  # noqa: F401
 
-from com.datastrato.gravitino.client import schemas  # noqa: F401
+from pygravitino import schemas  # noqa: F401
 
 
 class AuditDto(

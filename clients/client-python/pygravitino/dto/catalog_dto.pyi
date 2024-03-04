@@ -20,7 +20,7 @@ import uuid  # noqa: F401
 
 import frozendict  # noqa: F401
 
-from com.datastrato.gravitino.client import schemas  # noqa: F401
+from pygravitino import schemas  # noqa: F401
 
 
 class CatalogDto(
@@ -51,14 +51,6 @@ class CatalogDto(
                 schemas.EnumBase,
                 schemas.StrSchema
             ):
-            
-            
-                class MetaOapg:
-                    enum_value_to_name = {
-                        "relational": "RELATIONAL",
-                        "file": "FILE",
-                        "stream": "STREAM",
-                    }
                 
                 @schemas.classproperty
                 def RELATIONAL(cls):
@@ -77,15 +69,6 @@ class CatalogDto(
                 schemas.EnumBase,
                 schemas.StrSchema
             ):
-            
-            
-                class MetaOapg:
-                    enum_value_to_name = {
-                        "hive": "HIVE",
-                        "lakehouse-iceberg": "LAKEHOUSEICEBERG",
-                        "jdbc-mysql": "JDBCMYSQL",
-                        "jdbc-postgresql": "JDBCPOSTGRESQL",
-                    }
                 
                 @schemas.classproperty
                 def HIVE(cls):
