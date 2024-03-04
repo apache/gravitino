@@ -104,6 +104,7 @@ public class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
 
     properties = propertiesConverter.toSparkTableProperties(properties);
 
+    // Spark will retrieve comment from properties.
     String comment = gravitinoTable.comment();
     if (comment != null) {
       properties.put(ConnectorConstants.COMMENT, comment);

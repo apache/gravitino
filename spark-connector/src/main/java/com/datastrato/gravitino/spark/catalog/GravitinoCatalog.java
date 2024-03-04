@@ -14,6 +14,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.spark.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.ConnectorConstants;
 import com.datastrato.gravitino.spark.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.PropertiesConverter;
@@ -119,7 +120,8 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
     Map<String, String> gravitinoProperties =
         propertiesConverter.toGravitinoTableProperties(properties);
-    String comment = gravitinoProperties.remove("comment");
+    // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
+    String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
     try {
       com.datastrato.gravitino.rel.Table table =
