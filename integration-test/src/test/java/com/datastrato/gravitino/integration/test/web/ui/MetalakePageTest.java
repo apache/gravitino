@@ -7,8 +7,12 @@ package com.datastrato.gravitino.integration.test.web.ui;
 import com.datastrato.gravitino.integration.test.web.ui.Pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage(driver);
 
@@ -19,6 +23,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Order(1)
   public void testCreateMetalake() {
     metalakePage.createMetalakeAction();
 
@@ -32,6 +37,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Order(2)
   public void testViewMetalakeDetails() {
     metalakePage.viewMetalakeAction();
 
@@ -41,6 +47,36 @@ public class MetalakePageTest extends AbstractWebIT {
       LOG.info("view metalake details successful");
     } else {
       Assertions.fail("view metalake details failed");
+    }
+  }
+
+  @Test
+  @Order(3)
+  public void testEditMetalake() {
+    metalakePage.editMetalakeAction();
+
+    boolean status = metalakePage.verifyIsEditedMetalake();
+
+    if (status) {
+      LOG.info("edit metalake successful");
+    } else {
+      Assertions.fail("edit metalake failed");
+    }
+  }
+
+  @Test
+  @Order(4)
+  public void testDeleteMetalake() {
+    metalakePage.deleteMetalakeAction();
+
+    boolean status = metalakePage.verifyIsDeletedMetalake();
+
+    LOG.info(String.valueOf(status));
+
+    if (status) {
+      LOG.info("delete metalake successful");
+    } else {
+      Assertions.fail("delete metalake failed");
     }
   }
 }

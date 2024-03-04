@@ -27,7 +27,12 @@ const ConfirmDeleteDialog = props => {
         </Box>
       </DialogContent>
       <DialogActions className={'twc-justify-center twc-px-5 twc-pb-8'}>
-        <Button variant='contained' className={'twc-mr-2'} onClick={() => handleConfirmDeleteSubmit()}>
+        <Button
+          variant='contained'
+          data-refer='confirm-delete'
+          className={'twc-mr-2'}
+          onClick={() => handleConfirmDeleteSubmit()}
+        >
           Delete
         </Button>
         <Button variant='outlined' color='secondary' onClick={() => handleClose()}>

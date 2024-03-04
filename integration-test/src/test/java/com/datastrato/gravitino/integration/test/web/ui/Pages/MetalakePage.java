@@ -31,14 +31,32 @@ public class MetalakePage {
   @FindBy(xpath = "//*[@id='submitHandleMetalake']")
   public WebElement submitHandleMetalakeBtn;
 
+  @FindBy(xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]")
+  public WebElement noMetalakeRows;
+
   @FindBy(xpath = "//div[@data-id='test']")
   public WebElement createdMetalakeRow;
+
+  @FindBy(xpath = "//div[@data-id='test_edited']")
+  public WebElement editedMetalakeRow;
 
   @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']")
   public WebElement createdMetalakeLink;
 
+  @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test_edited']")
+  public WebElement editedMetalakeLink;
+
   @FindBy(xpath = "//button[@data-refer='view-metalake-test']")
   public WebElement viewMetalakeBtn;
+
+  @FindBy(xpath = "//button[@data-refer='edit-metalake-test']")
+  public WebElement editMetalakeBtn;
+
+  @FindBy(xpath = "//button[@data-refer='delete-metalake-test_edited']")
+  public WebElement deleteMetalakeBtn;
+
+  @FindBy(xpath = "//button[@data-refer='confirm-delete']")
+  public WebElement confirmDeleteBtn;
 
   @FindBy(xpath = "//div[@data-refer='metalake-details-drawer']")
   public WebElement metalakeDetailsDrawer;
@@ -76,12 +94,32 @@ public class MetalakePage {
     this.closeMetalakeDetailsBtn.click();
   }
 
+  public void clickDeleteMetalakeBtn() {
+    LOG.info("click delete metalake button");
+    this.deleteMetalakeBtn.click();
+  }
+
+  public void clickConfirmDeleteBtn() {
+    LOG.info("click confirm delete button");
+    this.confirmDeleteBtn.click();
+  }
+
   public boolean verifyIsCreatedMetalake() {
     try {
       createdMetalakeRow.isDisplayed();
       createdMetalakeLink.isDisplayed();
 
       return Objects.equals(createdMetalakeLink.getText(), "test");
+    } catch (Exception e) {
+      LOG.error(String.valueOf(e));
+
+      return false;
+    }
+  }
+
+  public boolean verifyIsEditedMetalake() {
+    try {
+      return Objects.equals(editedMetalakeLink.getText(), "test_edited");
     } catch (Exception e) {
       LOG.error(String.valueOf(e));
 
@@ -106,13 +144,22 @@ public class MetalakePage {
     }
   }
 
+  public boolean verifyIsDeletedMetalake() {
+    return Objects.equals(noMetalakeRows.getText(), "No rows");
+  }
+
   public void clickViewMetalakeBtn() {
     LOG.info("click view metalake details button");
     this.viewMetalakeBtn.click();
   }
 
+  public void clickEditMetalakeBtn() {
+    LOG.info("click edit metalake button");
+    this.editMetalakeBtn.click();
+  }
+
   public void createMetalakeAction() {
-    LOG.info("test create metalake action stared");
+    LOG.info("test create metalake action started");
     clickCreateBtn();
     enterNameField("test");
     enterCommentField("test");
@@ -120,8 +167,21 @@ public class MetalakePage {
   }
 
   public void viewMetalakeAction() {
-    LOG.info("test view metalake action stared");
+    LOG.info("test view metalake action started");
     clickViewMetalakeBtn();
     driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
+  }
+
+  public void editMetalakeAction() {
+    LOG.info("test edit metalake action started");
+    clickEditMetalakeBtn();
+    enterNameField("_edited");
+    clickSubmitBtn();
+  }
+
+  public void deleteMetalakeAction() {
+    LOG.info("test delete metalake action started");
+    clickDeleteMetalakeBtn();
+    clickConfirmDeleteBtn();
   }
 }

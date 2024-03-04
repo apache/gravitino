@@ -242,7 +242,6 @@ const MetalakeList = () => {
           <DataGrid
             disableColumnSelector
             disableDensitySelector
-            slots={{ toolbar: TableToolbar }}
             slotProps={{
               toolbar: {
                 printOptions: { disableToolbarButton: true },

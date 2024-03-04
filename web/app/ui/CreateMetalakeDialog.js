@@ -208,7 +208,7 @@ const CreateMetalakeDialog = props => {
             <Icon icon='bx:x' />
           </IconButton>
           <Box className={'twc-mb-8 twc-text-center'}>
-            <Typography className={'twc-mb-3'} variant='h5'>
+            <Typography className={'twc-mb-3'} variant='h5' data-refer='handle-metalake-title'>
               {typeText} Metalake
             </Typography>
           </Box>
