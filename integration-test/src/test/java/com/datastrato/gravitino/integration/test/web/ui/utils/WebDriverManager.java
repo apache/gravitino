@@ -9,7 +9,6 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,31 +26,19 @@ public class WebDriverManager {
     driver.get(url);
 
     // wait for webpage load compiled.
-    long start = System.currentTimeMillis();
-    boolean loaded = false;
-    while (System.currentTimeMillis() - start < 60 * 1000) {
-      try {
-        (new WebDriverWait(driver, 10))
-            .until(
-                new ExpectedCondition<Boolean>() {
-                  @Override
-                  public Boolean apply(WebDriver d) {
-                    String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();
-                    String projectVersion = System.getenv("PROJECT_VERSION");
-                    return projectVersion.equalsIgnoreCase(gravitinoVersion);
-                  }
-                });
-        loaded = true;
-        break;
-      } catch (TimeoutException e) {
-        LOG.info("Exception in WebDriverManager while WebDriverWait ", e);
-        driver.navigate().to(url);
-      }
+    try {
+      (new WebDriverWait(driver, AbstractWebIT.MAX_IMPLICIT_WAIT))
+          .until(
+              d -> {
+                String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();
+                String projectVersion = System.getenv("PROJECT_VERSION");
+                return projectVersion.equalsIgnoreCase(gravitinoVersion);
+              });
+    } catch (TimeoutException e) {
+      LOG.info("Exception in WebDriverManager while WebDriverWait ", e);
+      throw new RuntimeException(e);
     }
 
-    if (!loaded) {
-      throw new RuntimeException("Webpage not loaded in 60 seconds.");
-    }
     Dimension d = new Dimension(1440, 1080);
     driver.manage().window().setSize(d);
 

@@ -67,7 +67,7 @@ public class TestEntity {
   public void testCatalog() {
     String catalogComment = "testComment";
     CatalogEntity testCatalog =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(catalogId)
             .withName(catalogName)
             .withComment(catalogComment)

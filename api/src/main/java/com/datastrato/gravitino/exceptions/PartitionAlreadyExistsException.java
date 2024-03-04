@@ -4,14 +4,33 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** Exception thrown when a partition with specified name already exists. */
 public class PartitionAlreadyExistsException extends AlreadyExistsException {
 
-  public PartitionAlreadyExistsException(String message) {
-    super(message);
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public PartitionAlreadyExistsException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
-  public PartitionAlreadyExistsException(String message, Throwable cause) {
-    super(message, cause);
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public PartitionAlreadyExistsException(
+      Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

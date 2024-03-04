@@ -14,68 +14,68 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
 
+  compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
+
+  annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
-  compileOnly(libs.immutables.value)
-  annotationProcessor(libs.immutables.value)
-
   implementation(libs.hive2.metastore) {
-    exclude("org.apache.hbase")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
     exclude("co.cask.tephra")
-    exclude("org.apache.avro")
-    exclude("org.apache.zookeeper")
-    exclude("org.apache.logging.log4j")
+    exclude("com.github.joshelser")
+    exclude("com.google.code.findbugs", "jsr305")
     exclude("com.google.code.findbugs", "sr305")
+    exclude("com.tdunning", "json")
+    exclude("com.zaxxer", "HikariCP")
+    exclude("io.dropwizard.metricss")
+    exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.avro")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.hbase")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.zookeeper")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("com.tdunning", "json")
-    exclude("javax.transaction", "transaction-api")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("org.apache.curator")
-    exclude("com.github.joshelser")
-    exclude("io.dropwizard.metricss")
-    exclude("org.slf4j")
     exclude("org.openjdk.jol")
+    exclude("org.slf4j")
   }
 
   implementation(libs.hive2.exec) {
     artifact {
       classifier = "core"
     }
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.avro")
-    exclude("org.apache.zookeeper")
+    exclude("com.google.code.findbugs", "jsr305")
     exclude("com.google.protobuf")
+    exclude("org.apache.avro")
     exclude("org.apache.calcite")
     exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.zookeeper")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.curator")
+    exclude("org.openjdk.jol")
     exclude("org.pentaho")
     exclude("org.slf4j")
-    exclude("org.openjdk.jol")
   }
 
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
+  implementation(libs.caffeine)
+  implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
-
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
+  }
   implementation(libs.slf4j.api)
-  implementation(libs.guava)
-  implementation(libs.caffeine)
 
   testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {

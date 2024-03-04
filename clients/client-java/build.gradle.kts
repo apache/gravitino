@@ -31,11 +31,12 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
   testImplementation(libs.bundles.jwt)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.build {

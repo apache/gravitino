@@ -7,13 +7,18 @@ import { useEffect, useCallback, useState, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Grid, Card, IconButton, Typography, Portal, Tooltip } from '@mui/material'
-import { DataGrid, GridToolbar } from '@mui/x-data-grid'
+import { Box, Grid, Card, Typography, Portal, Tooltip } from '@mui/material'
+import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import {
+  VisibilityOutlined as ViewIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlined as DeleteIcon
+} from '@mui/icons-material'
 
 import Icon from '@/components/Icon'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } from '@/lib/store/metalakes'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake, resetTree } from '@/lib/store/metalakes'
 
 import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
@@ -26,7 +31,7 @@ function TableToolbar(props) {
     <>
       <Fragment>
         <Portal container={() => document.getElementById('filter-panel')}>
-          <Box className={`twc-flex twc-w-full twc-justify-between twc-hidden`}>
+          <Box className={`twc-flex twc-w-full twc-justify-between`}>
             <GridToolbar {...props} />
           </Box>
         </Portal>
@@ -49,7 +54,7 @@ const MetalakeList = () => {
   const [openConfirmDelete, setOpenConfirmDelete] = useState(false)
   const [confirmCacheData, setConfirmCacheData] = useState(null)
 
-  const handleDeleteMetalake = name => {
+  const handleDeleteMetalake = name => () => {
     setOpenConfirmDelete(true)
     setConfirmCacheData(name)
   }
@@ -66,7 +71,7 @@ const MetalakeList = () => {
     setConfirmCacheData(null)
   }
 
-  const handleShowEditDialog = data => {
+  const handleShowEditDialog = data => () => {
     setDialogType('update')
     setOpenDialog(true)
     setDialogData(data)
@@ -76,9 +81,13 @@ const MetalakeList = () => {
     setValue(val)
   }, [])
 
-  const handleShowDetails = row => {
+  const handleShowDetails = row => () => {
     setDrawerData(row)
     setOpenDrawer(true)
+  }
+
+  const handleClickLink = () => {
+    dispatch(resetTree())
   }
 
   useEffect(() => {
@@ -104,6 +113,7 @@ const MetalakeList = () => {
       minWidth: 230,
       disableColumnMenu: true,
       filterable: true,
+      type: 'string',
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -116,6 +126,7 @@ const MetalakeList = () => {
                 noWrap
                 component={Link}
                 href={`/ui/metalakes?metalake=${name}`}
+                onClick={() => handleClickLink()}
                 sx={{
                   fontWeight: 500,
                   color: 'primary.main',
@@ -137,8 +148,10 @@ const MetalakeList = () => {
       flex: 0.15,
       minWidth: 150,
       disableColumnMenu: true,
+      type: 'string',
       field: 'createdBy',
-      headerName: 'Created By',
+      valueGetter: params => `${params.row.audit?.creator}`,
+      headerName: 'Created by',
       renderCell: ({ row }) => {
         return (
           <Typography noWrap sx={{ color: 'text.secondary' }}>
@@ -151,12 +164,13 @@ const MetalakeList = () => {
       flex: 0.15,
       minWidth: 150,
       disableColumnMenu: true,
-      valueGetter: params => `${params.row.audit?.createTime}`,
+      type: 'dateTime',
       field: 'createdAt',
-      headerName: 'Created At',
+      valueGetter: params => new Date(params.row.audit?.createTime),
+      headerName: 'Created at',
       renderCell: ({ row }) => {
         return (
-          <Typography noWrap sx={{ color: 'text.secondary' }}>
+          <Typography title={row.audit?.createTime} noWrap sx={{ color: 'text.secondary' }}>
             {formatToDateTime(row.audit?.createTime)}
           </Typography>
         )
@@ -165,40 +179,48 @@ const MetalakeList = () => {
     {
       flex: 0.1,
       minWidth: 90,
-      sortable: false,
-      disableColumnMenu: true,
-      field: 'actions',
+      type: 'actions',
       headerName: 'Actions',
-      renderCell: ({ row }) => (
-        <>
-          <IconButton
-            title='Details'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowDetails(row)}
-          >
-            <Icon icon='bx:show-alt' />
-          </IconButton>
-
-          <IconButton
-            title='Edit'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowEditDialog(row)}
-          >
-            <Icon icon='mdi:square-edit-outline' />
-          </IconButton>
-
-          <IconButton
-            title='Delete'
-            size='small'
-            sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDeleteMetalake(row.name)}
-          >
-            <Icon icon='mdi:delete-outline' />
-          </IconButton>
-        </>
-      )
+      field: 'actions',
+      getActions: ({ row }) => [
+        <GridActionsCellItem
+          key='details'
+          label='Details'
+          title='Details'
+          icon={<ViewIcon viewBox='0 0 24 22' />}
+          onClick={handleShowDetails(row)}
+          sx={{
+            '& svg': {
+              fontSize: '24px'
+            }
+          }}
+        />,
+        <GridActionsCellItem
+          key='edit'
+          label='Edit'
+          title='Edit'
+          icon={<EditIcon />}
+          onClick={handleShowEditDialog(row)}
+          sx={{
+            '& svg': {
+              fontSize: '24px'
+            }
+          }}
+        />,
+        <GridActionsCellItem
+          key='delete'
+          icon={<DeleteIcon />}
+          label='Delete'
+          title='Delete'
+          onClick={handleDeleteMetalake(row.name)}
+          sx={{
+            '& svg': {
+              fontSize: '24px',
+              color: theme => theme.palette.error.light
+            }
+          }}
+        />
+      ]
     }
   ]
 
@@ -233,6 +255,8 @@ const MetalakeList = () => {
             rows={store.filteredMetalakes}
             columns={columns}
             disableRowSelectionOnClick
+            onCellClick={(params, event) => event.stopPropagation()}
+            onRowClick={(params, event) => event.stopPropagation()}
             pageSizeOptions={[10, 25, 50]}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}

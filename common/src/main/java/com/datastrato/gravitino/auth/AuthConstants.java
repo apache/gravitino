@@ -5,20 +5,36 @@
 
 package com.datastrato.gravitino.auth;
 
-public interface AuthConstants {
-  String HTTP_HEADER_AUTHORIZATION = "Authorization";
+/** Constants used for authentication. */
+public final class AuthConstants {
+  private AuthConstants() {}
 
-  String AUTHORIZATION_BEARER_HEADER = "Bearer ";
+  /** The HTTP header used to pass the authentication token. */
+  public static final String HTTP_HEADER_AUTHORIZATION = "Authorization";
 
-  String AUTHORIZATION_BASIC_HEADER = "Basic ";
+  /** The name of BEARER header used to pass the authentication token. */
+  public static final String AUTHORIZATION_BEARER_HEADER = "Bearer ";
 
-  String NEGOTIATE = "Negotiate";
-  String AUTHORIZATION_NEGOTIATE_HEADER = NEGOTIATE + " ";
+  /** The name of BASIC header used to pass the authentication token. */
+  public static final String AUTHORIZATION_BASIC_HEADER = "Basic ";
 
-  String HTTP_CHALLENGE_HEADER = "WWW-Authenticate";
+  /** The name of NEGOTIATE. */
+  public static final String NEGOTIATE = "Negotiate";
 
-  String ANONYMOUS_USER = "anonymous";
+  /** The value of NEGOTIATE header used to pass the authentication token. */
+  public static final String AUTHORIZATION_NEGOTIATE_HEADER = NEGOTIATE + " ";
 
-  // Refer to the style of `AuthenticationFilter#AuthenticatedRoleAttributeName` of Apache Pulsar
-  String AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME = AuthConstants.class.getName() + "-principal";
+  /** The HTTP header used to pass the authentication token. */
+  public static final String HTTP_CHALLENGE_HEADER = "WWW-Authenticate";
+
+  /** The default username used for anonymous access. */
+  public static final String ANONYMOUS_USER = "anonymous";
+
+  /**
+   * The default name of the attribute that stores the authenticated principal in the request.
+   *
+   * <p>Refer to the style of `AuthenticationFilter#AuthenticatedRoleAttributeName` of Apache Pulsar
+   */
+  public static final String AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME =
+      AuthConstants.class.getName() + "-principal";
 }

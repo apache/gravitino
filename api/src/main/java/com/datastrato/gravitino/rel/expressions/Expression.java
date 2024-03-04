@@ -25,6 +25,11 @@ import java.util.Set;
 
 /** Base class of the public logical expression API. */
 public interface Expression {
+
+  /**
+   * `EMPTY_EXPRESSION` is only used as an input when the default `children` method builds the
+   * result.
+   */
   Expression[] EMPTY_EXPRESSION = new Expression[0];
 
   /**

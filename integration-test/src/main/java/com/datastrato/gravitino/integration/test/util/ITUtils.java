@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -21,6 +22,10 @@ public class ITUtils {
     return String.join(File.separator, dirs);
   }
 
+  public static String[] splitPath(String path) {
+    return path.split(File.separator);
+  }
+
   public static void rewriteConfigFile(
       String configTempFileName, String configFileName, Map<String, String> configMap)
       throws IOException {
@@ -32,8 +37,10 @@ public class ITUtils {
       for (String key : props.stringPropertyNames()) {
         String value = props.getProperty(key);
         // Use customized write functions to avoid escaping `:` into `\:`.
-        outputStream.write((key + " = " + value + "\n").getBytes());
+        outputStream.write((key + " = " + value + "\n").getBytes(StandardCharsets.UTF_8));
       }
     }
   }
+
+  private ITUtils() {}
 }

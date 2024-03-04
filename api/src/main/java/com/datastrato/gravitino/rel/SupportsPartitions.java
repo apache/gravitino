@@ -8,6 +8,7 @@ import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.partitions.Partition;
 
+/** Interface for tables that support partitions. */
 public interface SupportsPartitions {
 
   /**

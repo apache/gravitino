@@ -223,7 +223,7 @@ public class HiveTable extends BaseTable {
     return parameters;
   }
 
-  private List<FieldSchema> buildPartitionKeys() {
+  public List<FieldSchema> buildPartitionKeys() {
     return Arrays.stream(partitioning)
         .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName()))
         .collect(Collectors.toList());
@@ -378,6 +378,7 @@ public class HiveTable extends BaseTable {
       hiveTable.schemaName = schemaName;
       hiveTable.clientPool = clientPool;
       hiveTable.sd = sd;
+      hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters
       if (comment != null) {

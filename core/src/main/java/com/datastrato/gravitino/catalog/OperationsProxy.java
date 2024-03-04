@@ -22,8 +22,12 @@ public class OperationsProxy<T> implements InvocationHandler {
   }
 
   public static <T> T createProxy(T ops, ProxyPlugin plugin) {
-    if (!(ops instanceof CatalogOperations)) {
-      throw new IllegalArgumentException("Method only supports the type of CatalogOperations");
+    if (!(ops instanceof CatalogOperations) && !(ops instanceof TableOperations)) {
+      throw new IllegalArgumentException(
+          "Method only supports the type of CatalogOperations or TableOperations");
+    }
+    if (ops instanceof CatalogOperations) {
+      plugin.bindCatalogOperation((CatalogOperations) ops);
     }
     return createProxyInternal(ops, plugin, ops.getClass().getInterfaces());
   }

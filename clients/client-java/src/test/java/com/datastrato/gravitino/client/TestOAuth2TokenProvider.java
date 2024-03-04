@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider.Builder;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
@@ -18,6 +19,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Date;
 import org.apache.hc.core5.http.HttpStatus;
@@ -29,6 +31,7 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpResponse;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenProvider {
 
   private static final int PORT = 1082;
@@ -46,21 +49,15 @@ public class TestOAuth2TokenProvider {
 
   @Test
   public void testProviderInitException() throws Exception {
+    Builder tokenProvider1 = DefaultOAuth2TokenProvider.builder().withUri("test");
+    Builder tokenProvider2 =
+        DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx");
+    Builder tokenProvider3 =
+        DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").withScope("test");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DefaultOAuth2TokenProvider.builder().withUri("test").build());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").build());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            DefaultOAuth2TokenProvider.builder()
-                .withUri("test")
-                .withCredential("xx")
-                .withScope("test")
-                .build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider1.build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider2.build());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider3.build());
   }
 
   @Test
@@ -139,6 +136,6 @@ public class TestOAuth2TokenProvider {
     Assertions.assertNotEquals(accessToken, oldAccessToken);
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
-        new String(provider.getTokenData()));
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
   }
 }

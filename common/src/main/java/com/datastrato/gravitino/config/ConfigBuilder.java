@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
+/** Builder class for creating configuration entries. */
 public class ConfigBuilder {
 
   private String key;

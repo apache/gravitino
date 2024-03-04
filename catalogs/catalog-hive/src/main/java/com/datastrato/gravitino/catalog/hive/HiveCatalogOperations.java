@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -17,6 +18,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -43,15 +45,24 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -62,6 +73,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -71,6 +83,7 @@ import org.slf4j.LoggerFactory;
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
   @VisibleForTesting CachedClientPool clientPool;
 
@@ -84,11 +97,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
+  private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private String kerberosRealm;
+  private ProxyPlugin proxyPlugin;
+
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(
+          METASTORE_URIS,
+          ConfVars.METASTOREURIS.varname,
+          PRINCIPAL,
+          ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -135,9 +156,88 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
+    UserGroupInformation.setConfiguration(hadoopConf);
+
+    initKerberosIfNecessary(conf, hadoopConf);
 
     this.clientPool =
         new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+  }
+
+  private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
+    if (UserGroupInformation.AuthenticationMethod.KERBEROS
+        == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
+      try {
+        File keytabsDir = new File("keytabs");
+        if (!keytabsDir.exists()) {
+          // Ignore the return value, because there exists many Hive catalog operations making
+          // this directory.
+          keytabsDir.mkdir();
+        }
+
+        // The id of entity is a random unique id.
+        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
+        keytabFile.deleteOnExit();
+        if (keytabFile.exists() && !keytabFile.delete()) {
+          throw new IllegalStateException(
+              String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+        }
+
+        String keytabUri =
+            (String)
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
+        Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
+        // TODO: Support to download the file from Kerberos HDFS
+        Preconditions.checkArgument(
+            !keytabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
+
+        int fetchKeytabFileTimeout =
+            (int)
+                catalogPropertiesMetadata.getOrDefault(
+                    conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
+
+        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+
+        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
+
+        String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
+        @SuppressWarnings("null")
+        List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
+        Preconditions.checkArgument(
+            principalComponents.size() == 2, "The principal has the wrong format");
+        this.kerberosRealm = principalComponents.get(1);
+
+        checkTgtExecutor =
+            new ScheduledThreadPoolExecutor(
+                1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
+
+        UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
+
+        UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
+
+        int checkInterval =
+            (int)
+                catalogPropertiesMetadata.getOrDefault(
+                    conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+
+        checkTgtExecutor.scheduleAtFixedRate(
+            () -> {
+              try {
+                kerberosLoginUgi.checkTGTAndReloginFromKeytab();
+              } catch (Throwable throwable) {
+                LOG.error("Fail to refresh ugi token: ", throwable);
+              }
+            },
+            checkInterval,
+            checkInterval,
+            TimeUnit.SECONDS);
+
+      } catch (IOException ioe) {
+        throw new UncheckedIOException(ioe);
+      }
+    }
   }
 
   @VisibleForTesting
@@ -156,6 +256,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (clientPool != null) {
       clientPool.close();
       clientPool = null;
+    }
+
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdown();
+      checkTgtExecutor = null;
+    }
+
+    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
+    if (keytabFile.exists() && !keytabFile.delete()) {
+      LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
     }
   }
 
@@ -228,9 +338,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (AlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
-          String.format(
-              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) '%s' already exists in Hive Metastore", ident.name());
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -259,9 +367,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException | UnknownDBException e) {
       throw new NoSuchSchemaException(
-          String.format(
-              "Hive schema (database) does not exist: %s in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) does not exist: %s in Hive Metastore", ident.name());
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -287,10 +393,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // load the database parameters
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
       Map<String, String> properties = HiveSchema.buildSchemaProperties(database);
-      LOG.debug(
-          "Loaded properties for Hive schema (database) {} found {}",
-          ident.name(),
-          properties.keySet());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Loaded properties for Hive schema (database) {} found {}",
+            ident.name(),
+            properties.keySet());
+      }
 
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetProperty) {
@@ -320,8 +428,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(
-          String.format("Hive schema (database) %s does not exist in Hive Metastore", ident.name()),
-          e);
+          e, "Hive schema (database) %s does not exist in Hive Metastore", ident.name());
 
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
@@ -353,9 +460,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (InvalidOperationException e) {
       throw new NonEmptySchemaException(
-          String.format(
-              "Hive schema (database) %s is not empty. One or more tables exist.", ident.name()),
-          e);
+          e, "Hive schema (database) %s is not empty. One or more tables exist.", ident.name());
 
     } catch (NoSuchObjectException e) {
       LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
@@ -381,7 +486,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     if (!schemaExists(schemaIdent)) {
-      throw new NoSuchSchemaException("Schema (database) does not exist " + namespace);
+      throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
     }
 
     try {
@@ -405,7 +510,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                   .toArray(NameIdentifier[]::new));
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(
-          "Schema (database) does not exist " + namespace + " in Hive Metastore");
+          "Schema (database) does not exist %s in Hive Metastore", namespace);
 
     } catch (TException e) {
       throw new RuntimeException(
@@ -426,7 +531,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
-    HiveTable hiveTable = HiveTable.fromHiveTable(table).withClientPool(clientPool).build();
+    HiveTable hiveTable =
+        HiveTable.fromHiveTable(table)
+            .withProxyPlugin(proxyPlugin)
+            .withClientPool(clientPool)
+            .build();
 
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
@@ -442,7 +551,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
-          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
+          e, "Hive table does not exist: %s in Hive Metastore", tableIdent.name());
 
     } catch (InterruptedException | TException e) {
       throw new RuntimeException(
@@ -595,7 +704,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
-        throw new NoSuchSchemaException("Hive Schema (database) does not exist " + schemaIdent);
+        throw new NoSuchSchemaException("Hive Schema (database) does not exist: %s ", schemaIdent);
       }
 
       HiveTable hiveTable =
@@ -608,6 +717,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
+              .withProxyPlugin(proxyPlugin)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -625,7 +735,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return hiveTable;
 
     } catch (AlreadyExistsException e) {
-      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name(), e);
+      throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
@@ -700,6 +810,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           } else if (change instanceof TableChange.UpdateColumnType) {
             doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
 
+          } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+            throw new IllegalArgumentException(
+                "Hive does not support altering column auto increment");
           } else {
             throw new IllegalArgumentException(
                 "Unsupported column change type: " + change.getClass().getSimpleName());
@@ -718,7 +831,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return HiveTable.fromHiveTable(alteredHiveTable).withClientPool(clientPool).build();
+      return HiveTable.fromHiveTable(alteredHiveTable)
+          .withProxyPlugin(proxyPlugin)
+          .withClientPool(clientPool)
+          .build();
 
     } catch (TException | InterruptedException e) {
       if (e.getMessage() != null
@@ -818,6 +934,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
     int targetPosition;
+    if (change.isAutoIncrement()) {
+      throw new IllegalArgumentException("Hive catalog does not support auto-increment column");
+    }
     if (change.getPosition() instanceof TableChange.Default) {
       // add to the end by default
       targetPosition = cols.size();
@@ -969,8 +1088,28 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive catalog does not support fileset properties metadata");
   }
 
+  CachedClientPool getClientPool() {
+    return clientPool;
+  }
+
+  HiveConf getHiveConf() {
+    return hiveConf;
+  }
+
   private boolean isExternalTable(NameIdentifier tableIdent) {
     org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
     return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
+  }
+
+  private static ThreadFactory getThreadFactory(String factoryName) {
+    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  }
+
+  public String getKerberosRealm() {
+    return kerberosRealm;
+  }
+
+  void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {
+    this.proxyPlugin = hiveProxyPlugin;
   }
 }

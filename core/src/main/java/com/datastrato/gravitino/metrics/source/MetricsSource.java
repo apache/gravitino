@@ -25,7 +25,7 @@ public abstract class MetricsSource {
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
 
-  public MetricsSource(String name) {
+  protected MetricsSource(String name) {
     this.metricsSourceName = name;
     metricRegistry = new MetricRegistry();
   }

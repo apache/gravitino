@@ -10,17 +10,17 @@ import com.datastrato.gravitino.rel.types.Types;
 
 public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
 
-  private static final String BOOL = "bool";
-  private static final String INT_2 = "int2";
-  private static final String INT_4 = "int4";
-  private static final String INT_8 = "int8";
-  private static final String FLOAT_4 = "float4";
-  private static final String FLOAT_8 = "float8";
+  static final String BOOL = "bool";
+  static final String INT_2 = "int2";
+  static final String INT_4 = "int4";
+  static final String INT_8 = "int8";
+  static final String FLOAT_4 = "float4";
+  static final String FLOAT_8 = "float8";
 
-  private static final String TIMESTAMP_TZ = "timestamptz";
-  private static final String NUMERIC = "numeric";
-  private static final String BPCHAR = "bpchar";
-  private static final String BYTEA = "bytea";
+  static final String TIMESTAMP_TZ = "timestamptz";
+  static final String NUMERIC = "numeric";
+  static final String BPCHAR = "bpchar";
+  static final String BYTEA = "bytea";
 
   @Override
   public Type toGravitinoType(JdbcTypeBean typeBean) {
@@ -59,7 +59,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       case BYTEA:
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean);
+        return Types.UnparsedType.of(typeBean.getTypeName());
     }
   }
 
@@ -102,6 +102,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       return BYTEA;
     }
     throw new IllegalArgumentException(
-        String.format("Couldn't convert PostgreSQL type %s to Gravitino type", type.toString()));
+        String.format(
+            "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
   }
 }

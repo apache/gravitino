@@ -11,11 +11,12 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
+  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":core"))
   implementation(libs.slf4j.api)
 }
 
@@ -25,8 +26,8 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   dependencies {
-    exclude("org.*")
     exclude("javax.*")
+    exclude("org.*")
   }
 
   exclude("**/package-info.class")

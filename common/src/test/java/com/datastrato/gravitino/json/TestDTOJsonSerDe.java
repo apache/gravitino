@@ -28,6 +28,7 @@ import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableMap;
@@ -354,10 +355,10 @@ public class TestDTOJsonSerDe {
   public void testPartitioningDTOSerDeFail() throws Exception {
     // test `strategy` value null
     String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
+    ObjectMapper map = JsonUtils.objectMapper();
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JsonUtils.objectMapper().readValue(wrongJson1, Partitioning.class));
+            IllegalArgumentException.class, () -> map.readValue(wrongJson1, Partitioning.class));
     Assertions.assertTrue(
         illegalArgumentException
             .getMessage()
@@ -367,16 +368,14 @@ public class TestDTOJsonSerDe {
     String wrongJson2 = "{\"strategy\": \"day\",\"fieldName\":[]}";
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JsonUtils.objectMapper().readValue(wrongJson2, Partitioning.class));
+            IllegalArgumentException.class, () -> map.readValue(wrongJson2, Partitioning.class));
     Assertions.assertTrue(exception.getMessage().contains("fieldName cannot be null or empty"));
 
     // test invalid `strategy` value
     String wrongJson6 = "{\"strategy\": \"my_strategy\"}";
     exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> JsonUtils.objectMapper().readValue(wrongJson6, Partitioning.class));
+            IllegalArgumentException.class, () -> map.readValue(wrongJson6, Partitioning.class));
     Assertions.assertTrue(exception.getMessage().contains("Invalid partitioning strategy"));
   }
 }

@@ -11,22 +11,23 @@ plugins {
 dependencies {
   implementation(project(":api"))
 
-  implementation(libs.jackson.databind)
+  implementation(libs.bundles.log4j)
+  implementation(libs.commons.collections4)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.guava)
-  implementation(libs.bundles.log4j)
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.collections4)
+  implementation(libs.jackson.databind)
   implementation(libs.protobuf.java)
 
-  compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
+  compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

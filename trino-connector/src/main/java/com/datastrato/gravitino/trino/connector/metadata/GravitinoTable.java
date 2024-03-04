@@ -92,13 +92,14 @@ public class GravitinoTable {
   public Column[] getRawColumns() {
     Column[] gravitinoColumns = new Column[columns.size()];
     for (int i = 0; i < columns.size(); i++) {
+      GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
           Column.of(
-              columns.get(i).getName(),
-              columns.get(i).getType(),
-              columns.get(i).getComment(),
-              columns.get(i).isNullable(),
-              false,
+              column.getName(),
+              column.getType(),
+              column.getComment(),
+              column.isNullable(),
+              column.isAutoIncrement(),
               null);
     }
     return gravitinoColumns;

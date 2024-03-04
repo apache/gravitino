@@ -4,7 +4,6 @@
  */
 
 import { defHttp } from '@/lib/utils/axios'
-import qs from 'qs'
 
 export const getAuthConfigsApi = () => {
   return defHttp.get({
@@ -13,7 +12,11 @@ export const getAuthConfigsApi = () => {
 }
 
 export const loginApi = (url, params) => {
-  return defHttp.post({
-    url: `${url}?${qs.stringify(params)}`
-  })
+  return defHttp.post(
+    {
+      url,
+      params
+    },
+    { withToken: false }
+  )
 }

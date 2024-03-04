@@ -4,12 +4,14 @@
  */
 package com.datastrato.gravitino.config;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -132,6 +134,46 @@ public class ConfigEntry<T> {
           }
         });
     return this;
+  }
+
+  /**
+   * Split the string to a list, then map each string element to its converted form.
+   *
+   * @param str The string form of the value list from the conf entry.
+   * @param converter The orignal ConfigEntry valueConverter.
+   * @return The list of converted type.
+   */
+  public List<T> strToSeq(String str, Function<String, T> converter) {
+    List<String> strList = Arrays.asList(str.split(","));
+    List<T> valList = strList.stream().map(converter).collect(Collectors.toList());
+
+    return valList;
+  }
+
+  /**
+   * Reduce the values then join them as a string.
+   *
+   * @param seq The sequence of the value list from the conf entry.
+   * @param converter The orignal ConfigEntry stringConverter.
+   * @return The converted string.
+   */
+  public String seqToStr(List<T> seq, Function<T, String> converter) {
+    List<String> valList = seq.stream().map(converter).collect(Collectors.toList());
+    String str = String.join(",", valList);
+    return str;
+  }
+
+  /**
+   * Converts the configuration value to value list.
+   *
+   * @return The ConfigEntry instance.
+   */
+  public ConfigEntry<List<T>> toSequence() {
+    ConfigEntry<List<T>> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    conf.setValueConverter((String str) -> strToSeq(str, valueConverter));
+    conf.setStringConverter((List<T> val) -> seqToStr(val, stringConverter));
+    return conf;
   }
 
   /**

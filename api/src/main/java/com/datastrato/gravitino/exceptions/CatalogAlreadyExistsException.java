@@ -4,14 +4,32 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** An exception thrown when a resource already exists. */
 public class CatalogAlreadyExistsException extends AlreadyExistsException {
 
-  public CatalogAlreadyExistsException(String message) {
-    super(message);
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public CatalogAlreadyExistsException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
-  public CatalogAlreadyExistsException(String message, Throwable cause) {
-    super(message, cause);
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public CatalogAlreadyExistsException(Throwable cause, String message, Object... args) {
+    super(cause, message, args);
   }
 }

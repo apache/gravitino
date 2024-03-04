@@ -43,3 +43,9 @@ export const updateMetalakeApi = ({ name, data }) => {
     data
   })
 }
+
+export const getMetalakeDataApi = url => {
+  return defHttp.get({
+    url: `/api${url}`
+  })
+}

@@ -4,10 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -16,6 +19,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -25,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -35,6 +40,15 @@ import org.apache.commons.lang3.StringUtils;
 public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   public static final String PG_QUOTE = "\"";
+  public static final String NEW_LINE = "\n";
+  public static final String ALTER_TABLE = "ALTER TABLE ";
+  public static final String ALTER_COLUMN = "ALTER COLUMN ";
+  public static final String IS = " IS '";
+  public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
+  public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
+
+  private static final String POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
+      "PostgreSQL does not support nested column names.";
 
   private String database;
 
@@ -43,8 +57,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
+    super.initialize(
+        dataSource, exceptionMapper, jdbcTypeConverter, jdbcColumnDefaultValueConverter, conf);
     database = new JdbcConfig(conf).getJdbcDatabase();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
@@ -64,20 +80,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in PostgreSQL");
     }
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (\n");
+    sqlBuilder
+        .append("CREATE TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" (")
+        .append(NEW_LINE);
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    \"").append(column.name()).append(PG_QUOTE);
+      sqlBuilder.append("    ").append(PG_QUOTE).append(column.name()).append(PG_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
-        sqlBuilder.append(",\n");
+        sqlBuilder.append(",").append(NEW_LINE);
       }
     }
-    sqlBuilder.append("\n)");
+    appendIndexesSql(indexes, sqlBuilder);
+    sqlBuilder.append(NEW_LINE).append(")");
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 will add properties
@@ -89,9 +112,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder
-          .append("\nCOMMENT ON TABLE ")
+          .append(NEW_LINE)
+          .append(TABLE_COMMENT)
           .append(tableName)
-          .append(" IS '")
+          .append(IS)
           .append(comment)
           .append("';");
     }
@@ -100,11 +124,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .forEach(
             jdbcColumn ->
                 sqlBuilder
-                    .append("\nCOMMENT ON COLUMN ")
+                    .append(NEW_LINE)
+                    .append(COLUMN_COMMENT)
                     .append(tableName)
                     .append(".")
                     .append(jdbcColumn.name())
-                    .append(" IS '")
+                    .append(IS)
                     .append(jdbcColumn.comment())
                     .append("';"));
 
@@ -115,7 +140,44 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  @VisibleForTesting
+  static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    for (Index index : indexes) {
+      String fieldStr = getIndexFieldStr(index.fieldNames());
+      sqlBuilder.append(",").append(NEW_LINE);
+      switch (index.type()) {
+        case PRIMARY_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          if (StringUtils.isNotEmpty(index.name())) {
+            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+          }
+          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          break;
+        default:
+          throw new IllegalArgumentException("PostgreSQL doesn't support index : " + index.type());
+      }
+    }
+  }
+
+  private static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in PostgreSQL");
+              }
+              return PG_QUOTE + colNames[0] + PG_QUOTE;
+            })
+        .collect(Collectors.joining(", "));
+  }
+
+  private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
     sqlBuilder
         .append(SPACE)
@@ -140,22 +202,22 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    // TODO: uncomment this once we support column default values.
-    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    // }
-
-    return sqlBuilder;
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
+    }
   }
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "ALTER TABLE " + oldTableName + " RENAME TO " + newTableName;
+    return ALTER_TABLE + PG_QUOTE + oldTableName + PG_QUOTE + " RENAME TO " + newTableName;
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    return "DROP TABLE " + PG_QUOTE + tableName + PG_QUOTE;
   }
 
   @Override
@@ -204,9 +266,21 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
+        TableChange.UpdateColumnNullability updateColumnNullability =
+            (TableChange.UpdateColumnNullability) change;
+
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
+
+        alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
+      } else if (change instanceof TableChange.AddIndex) {
+        alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
+      } else if (change instanceof TableChange.DeleteIndex) {
+        alterSql.add(deleteIndexDefinition(tableName, (TableChange.DeleteIndex) change));
+      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         alterSql.add(
-            updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, tableName));
+            updateColumnAutoIncrementDefinition(
+                (TableChange.UpdateColumnAutoIncrement) change, tableName));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -224,16 +298,106 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  @VisibleForTesting
+  static String updateColumnAutoIncrementDefinition(
+      TableChange.UpdateColumnAutoIncrement change, String tableName) {
+    if (change.fieldName().length > 1) {
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String fieldName = change.fieldName()[0];
+    String action =
+        change.isAutoIncrement() ? "ADD GENERATED BY DEFAULT AS IDENTITY" : "DROP IDENTITY";
+
+    return String.format(
+        "ALTER TABLE %s %s %s %s;",
+        PG_QUOTE + tableName + PG_QUOTE, ALTER_COLUMN, PG_QUOTE + fieldName + PG_QUOTE, action);
+  }
+
+  @VisibleForTesting
+  static String deleteIndexDefinition(String tableName, TableChange.DeleteIndex deleteIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder
+        .append("ALTER TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" DROP CONSTRAINT ")
+        .append(PG_QUOTE)
+        .append(deleteIndex.getName())
+        .append(PG_QUOTE)
+        .append(";\n");
+    if (deleteIndex.isIfExists()) {
+      sqlBuilder
+          .append("DROP INDEX IF EXISTS ")
+          .append(PG_QUOTE)
+          .append(deleteIndex.getName())
+          .append(PG_QUOTE)
+          .append(";");
+    } else {
+      sqlBuilder
+          .append("DROP INDEX ")
+          .append(PG_QUOTE)
+          .append(deleteIndex.getName())
+          .append(PG_QUOTE)
+          .append(";");
+    }
+    return sqlBuilder.toString();
+  }
+
+  @VisibleForTesting
+  static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder
+        .append("ALTER TABLE ")
+        .append(PG_QUOTE)
+        .append(tableName)
+        .append(PG_QUOTE)
+        .append(" ADD CONSTRAINT ")
+        .append(PG_QUOTE)
+        .append(addIndex.getName())
+        .append(PG_QUOTE);
+    switch (addIndex.getType()) {
+      case PRIMARY_KEY:
+        sqlBuilder.append(" PRIMARY KEY ");
+        break;
+      case UNIQUE_KEY:
+        sqlBuilder.append(" UNIQUE ");
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported index type: " + addIndex.getType());
+    }
+    sqlBuilder.append("(").append(getIndexFieldStr(addIndex.getFieldNames())).append(");");
+    return sqlBuilder.toString();
+  }
+
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability updateColumnNullability, String tableName) {
     if (updateColumnNullability.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnNullability.fieldName()[0];
     if (updateColumnNullability.nullable()) {
-      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " DROP NOT NULL;";
+      return ALTER_TABLE
+          + PG_QUOTE
+          + tableName
+          + PG_QUOTE
+          + " "
+          + ALTER_COLUMN
+          + PG_QUOTE
+          + col
+          + PG_QUOTE
+          + " DROP NOT NULL;";
     } else {
-      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " SET NOT NULL;";
+      return ALTER_TABLE
+          + PG_QUOTE
+          + tableName
+          + PG_QUOTE
+          + " "
+          + ALTER_COLUMN
+          + PG_QUOTE
+          + col
+          + PG_QUOTE
+          + " SET NOT NULL;";
     }
   }
 
@@ -249,13 +413,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         }
       }
     }
-    return "COMMENT ON TABLE " + jdbcTable.name() + " IS '" + newComment + "';";
+    return TABLE_COMMENT + PG_QUOTE + jdbcTable.name() + PG_QUOTE + IS + newComment + "';";
   }
 
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable table) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists =
@@ -267,13 +431,21 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "ALTER TABLE " + table.name() + " DROP COLUMN " + deleteColumn.fieldName()[0] + ";";
+    return ALTER_TABLE
+        + PG_QUOTE
+        + table.name()
+        + PG_QUOTE
+        + " DROP COLUMN "
+        + PG_QUOTE
+        + deleteColumn.fieldName()[0]
+        + PG_QUOTE
+        + ";";
   }
 
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column =
@@ -283,17 +455,25 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                 .findFirst()
                 .orElse(null);
     if (null == column) {
-      throw new NoSuchColumnException("Column " + col + " does not exist.");
+      throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder = new StringBuilder("ALTER TABLE " + jdbcTable.name());
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
     sqlBuilder
         .append("\n")
-        .append("ALTER COLUMN ")
+        .append(ALTER_COLUMN)
+        .append(PG_QUOTE)
         .append(col)
+        .append(PG_QUOTE)
         .append(" SET DATA TYPE ")
         .append(typeConverter.fromGravitinoType(updateColumnType.getNewDataType()));
     if (!column.nullable()) {
-      sqlBuilder.append(",\n").append("ALTER COLUMN ").append(col).append(" SET NOT NULL");
+      sqlBuilder
+          .append(",\n")
+          .append(ALTER_COLUMN)
+          .append(PG_QUOTE)
+          .append(col)
+          .append(PG_QUOTE)
+          .append(" SET NOT NULL");
     }
     return sqlBuilder.append(";").toString();
   }
@@ -301,20 +481,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private String renameColumnFieldDefinition(
       TableChange.RenameColumn renameColumn, String tableName) {
     if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
-    return "ALTER TABLE "
+    return ALTER_TABLE
         + tableName
         + " RENAME COLUMN "
+        + PG_QUOTE
         + renameColumn.fieldName()[0]
+        + PG_QUOTE
         + SPACE
         + "TO"
         + SPACE
+        + PG_QUOTE
         + renameColumn.getNewName()
+        + PG_QUOTE
         + ";";
   }
 
-  private JdbcTable getOrCreateTable(
+  public JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadTable) {
     if (null == lazyLoadTable) {
       return load(databaseName, tableName);
@@ -325,21 +509,34 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   private List<String> addColumnFieldDefinition(
       TableChange.AddColumn addColumn, JdbcTable lazyLoadTable) {
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     List<String> result = new ArrayList<>();
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
-        .append("ALTER TABLE ")
+        .append(ALTER_TABLE)
         .append(lazyLoadTable.name())
         .append(SPACE)
         .append("ADD COLUMN ")
+        .append(PG_QUOTE)
         .append(col)
+        .append(PG_QUOTE)
         .append(SPACE)
         .append(typeConverter.fromGravitinoType(addColumn.getDataType()))
         .append(SPACE);
+
+    if (addColumn.isAutoIncrement()) {
+      if (!Types.allowAutoIncrement(addColumn.getDataType())) {
+        throw new IllegalArgumentException(
+            "Unsupported auto-increment , column: "
+                + Arrays.toString(addColumn.getFieldName())
+                + ", type: "
+                + addColumn.getDataType());
+      }
+      columnDefinition.append("GENERATED BY DEFAULT AS IDENTITY ");
+    }
 
     // Add NOT NULL if the column is marked as such
     if (!addColumn.isNullable()) {
@@ -356,11 +553,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       result.add(
-          "COMMENT ON COLUMN "
+          COLUMN_COMMENT
+              + PG_QUOTE
               + lazyLoadTable.name()
+              + PG_QUOTE
               + "."
+              + PG_QUOTE
               + col
-              + " IS '"
+              + PG_QUOTE
+              + IS
               + addColumn.getComment()
               + "';");
     }
@@ -371,10 +572,32 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       TableChange.UpdateColumnComment updateColumnComment, String tableName) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnComment.fieldName()[0];
-    return "COMMENT ON COLUMN " + tableName + "." + col + " IS '" + newComment + "';";
+    return COLUMN_COMMENT
+        + PG_QUOTE
+        + tableName
+        + PG_QUOTE
+        + "."
+        + PG_QUOTE
+        + col
+        + PG_QUOTE
+        + IS
+        + newComment
+        + "';";
+  }
+
+  @Override
+  protected ResultSet getIndexInfo(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getIndexInfo(database, schemaName, tableName, false, false);
+  }
+
+  @Override
+  protected ResultSet getPrimaryKeys(String schemaName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    return metaData.getPrimaryKeys(database, schemaName, tableName);
   }
 
   @Override

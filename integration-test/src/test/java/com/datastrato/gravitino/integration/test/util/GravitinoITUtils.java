@@ -34,9 +34,9 @@ public class GravitinoITUtils {
   }
 
   public static void sleep(long millis, boolean logOutput) {
-    if (logOutput) {
-      LOG.info("Starting sleeping for " + millis + " milliseconds ...");
-      LOG.info("Caller: " + Thread.currentThread().getStackTrace()[2]);
+    if (logOutput && LOG.isInfoEnabled()) {
+      LOG.info("Starting sleeping for {} milliseconds ...", millis);
+      LOG.info("Caller: {}", Thread.currentThread().getStackTrace()[2]);
     }
     try {
       Thread.sleep(millis);

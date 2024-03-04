@@ -31,8 +31,8 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
-    Assertions.assertEquals(response.defaults().size(), 0);
-    Assertions.assertEquals(response.overrides().size(), 0);
+    Assertions.assertEquals(0, response.defaults().size());
+    Assertions.assertEquals(0, response.overrides().size());
   }
 
   @ParameterizedTest

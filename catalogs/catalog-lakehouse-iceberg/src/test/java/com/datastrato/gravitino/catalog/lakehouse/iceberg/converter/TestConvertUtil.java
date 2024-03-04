@@ -9,6 +9,8 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.types.Types.ByteType;
+import com.datastrato.gravitino.rel.types.Types.ShortType;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -81,23 +83,19 @@ public class TestConvertUtil extends TestBaseConvert {
 
   @Test
   public void testToPrimitiveType() {
+    ByteType byteType = ByteType.get();
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ConvertUtil.toIcebergType(
-                    true, com.datastrato.gravitino.rel.types.Types.ByteType.get()));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, byteType));
     Assertions.assertTrue(
         exception
             .getMessage()
             .contains("Iceberg do not support Byte and Short Type, use Integer instead"));
 
+    ShortType shortType = ShortType.get();
     exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                ConvertUtil.toIcebergType(
-                    true, com.datastrato.gravitino.rel.types.Types.ShortType.get()));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, shortType));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -150,13 +148,13 @@ public class TestConvertUtil extends TestBaseConvert {
         ConvertUtil.toIcebergType(
             true, com.datastrato.gravitino.rel.types.Types.DecimalType.of(9, 2));
     Assertions.assertTrue(decimalType instanceof Types.DecimalType);
-    Assertions.assertEquals(((Types.DecimalType) decimalType).precision(), 9);
-    Assertions.assertEquals(((Types.DecimalType) decimalType).scale(), 2);
+    Assertions.assertEquals(9, ((Types.DecimalType) decimalType).precision());
+    Assertions.assertEquals(2, ((Types.DecimalType) decimalType).scale());
 
     Type fixedCharType =
         ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.FixedType.of(9));
     Assertions.assertTrue(fixedCharType instanceof Types.FixedType);
-    Assertions.assertEquals(((Types.FixedType) fixedCharType).length(), 9);
+    Assertions.assertEquals(9, ((Types.FixedType) fixedCharType).length());
 
     com.datastrato.gravitino.rel.types.Type mapType =
         com.datastrato.gravitino.rel.types.Types.MapType.of(
@@ -219,15 +217,15 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         decimalType instanceof com.datastrato.gravitino.rel.types.Types.DecimalType);
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).precision(), 9);
+        9, ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).precision());
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).scale(), 2);
+        2, ((com.datastrato.gravitino.rel.types.Types.DecimalType) decimalType).scale());
 
     com.datastrato.gravitino.rel.types.Type fixedType =
         ConvertUtil.formIcebergType(Types.FixedType.ofLength(2));
     Assertions.assertTrue(fixedType instanceof com.datastrato.gravitino.rel.types.Types.FixedType);
     Assertions.assertEquals(
-        ((com.datastrato.gravitino.rel.types.Types.FixedType) fixedType).length(), 2);
+        2, ((com.datastrato.gravitino.rel.types.Types.FixedType) fixedType).length());
 
     Types.MapType mapType =
         Types.MapType.ofOptional(1, 2, Types.StringType.get(), Types.IntegerType.get());
@@ -249,6 +247,101 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         ((com.datastrato.gravitino.rel.types.Types.ListType) gravitinoListType).elementType()
             instanceof com.datastrato.gravitino.rel.types.Types.StringType);
+
+    Types.StructType structTypeInside =
+        Types.StructType.of(
+            Types.NestedField.optional(
+                2, "integer_type_inside", Types.IntegerType.get(), "integer type"),
+            Types.NestedField.optional(
+                3, "string_type_inside", Types.StringType.get(), "string type"));
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.NestedField.optional(0, "integer_type", Types.IntegerType.get(), "integer type"),
+            Types.NestedField.optional(1, "struct_type", structTypeInside, "struct type inside"));
+    com.datastrato.gravitino.rel.types.Type gravitinoStructType =
+        ConvertUtil.formIcebergType(structType);
+    // check for type
+    Assertions.assertTrue(
+        (gravitinoStructType) instanceof com.datastrato.gravitino.rel.types.Types.StructType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                .fields()[0].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.IntegerType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                    ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                        .fields()[1].type())
+                .fields()[0].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.IntegerType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                    ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                        .fields()[1].type())
+                .fields()[1].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.StringType);
+    // check for name
+    Assertions.assertEquals(
+        structType.fields().get(0).name(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[0].name());
+    Assertions.assertEquals(
+        structType.fields().get(1).name(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[1].name());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(0).name(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[0].name());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(1).name(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[1].name());
+    // check for comment
+    Assertions.assertEquals(
+        structType.fields().get(0).doc(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[0].comment());
+    Assertions.assertEquals(
+        structType.fields().get(1).doc(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[1].comment());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(0).doc(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[0].comment());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(1).doc(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[1].comment());
+    // check for nullable
+    Assertions.assertEquals(
+        structType.fields().get(0).isOptional(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[0].nullable());
+    Assertions.assertEquals(
+        structType.fields().get(1).isOptional(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+            .fields()[1].nullable());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(0).isOptional(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[0].nullable());
+    Assertions.assertEquals(
+        structTypeInside.fields().get(1).isOptional(),
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                    .fields()[1].type())
+            .fields()[1].nullable());
   }
 
   @Test

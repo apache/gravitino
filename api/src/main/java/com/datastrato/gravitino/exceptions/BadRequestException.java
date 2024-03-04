@@ -4,13 +4,32 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** An exception thrown when the request is invalid. */
 public class BadRequestException extends GravitinoRuntimeException {
-  public BadRequestException(String message) {
-    super(message);
+
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public BadRequestException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
-  public BadRequestException(String message, Throwable cause) {
-    super(message, cause);
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public BadRequestException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

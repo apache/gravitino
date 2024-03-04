@@ -5,6 +5,14 @@
 
 # Gravitino Web UI
 
+> **ℹ️ Tips**
+>
+> Under normal circumstances, you only need to visit [http://localhost:8090](http://localhost:8090) if you're just using the web UI to manage the Gravitino.
+>
+> You don't need to start the web development mode. If you need to modify the web part of the code, you can refer to the following document content for development and testing.
+
+---
+
 > **⚠️ Important**
 >
 > Before running commands, you must ensure that you are in the front-end directory `gravitino/web`. If not, run `cd web` first.
@@ -24,7 +32,7 @@
 
 > **TIP**
 >
-> You should use the Pnpm package manager.
+> You should use the `pnpm` package manager.
 >
 > **Requirements**
 >
@@ -75,34 +83,15 @@ pnpm format
 
 ## Self-hosting deployment
 
-### Node.js server
-
-You can deploy Next.js to any hosting provider that supports Node.js. Make sure your `package.json` has the `build` and `start` scripts:
-
-```json
-{
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  }
-}
-```
-
-`pnpm build` builds the production application in the `.next` folder. After building, `pnpm start` starts a Node.js server that supports hybrid pages, serving both statically generated and server-side rendered pages.
-
-```bash
-pnpm build
-pnpm start
-```
-
 ### Static HTML export
 
-The command `next export` allows you to export your app to static HTML, which runs standalone without the need for a Node.js server.
+```bash
+pnpm dist
+```
 
-`next export` will generate a `dist` directory, producing content for any static hosting service.
+The command `pnpm dist` allows you to export your app to static HTML, which runs standalone without the need for a Node.js server.
 
-The command `pnpm dist` copies the files within the 'dist' directory to the root directory of the static server.
+`pnpm dist` will generate a `dist` directory, producing content for any static hosting service.
 
 ## Docker
 
@@ -123,7 +112,7 @@ docker run -it -p 3000:3000 -v ${PWD}:/web -w /web --name gravitino-web node:20-
 docker run -p 3000:3000 -v ${PWD}:/web --name gravitino-web node:20-slim /bin/bash -c "pnpm install && pnpm dist"
 ```
 
-This command runs `pnpm install` to install the dependencies specified in the `package.json` file and then runs `pnpm export` to export a static version of the application.
+This command runs `pnpm install` to install the dependencies specified in the `package.json` file and then runs `pnpm dist` to export a static version of the application.
 The exported files are saved to the `dist` directory inside the container, and mounted in the `dist` directory in the current directory of the host machine.
 This means that the exported files are accessible on the host machine after running the command.
 

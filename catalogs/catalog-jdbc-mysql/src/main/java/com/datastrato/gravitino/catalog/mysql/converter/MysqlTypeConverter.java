@@ -11,15 +11,16 @@ import com.datastrato.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter<String> {
 
-  private static final String TINYINT = "tinyint";
-  private static final String SMALLINT = "smallint";
-  private static final String INT = "int";
-  private static final String BIGINT = "bigint";
-  private static final String FLOAT = "float";
-  private static final String DOUBLE = "double";
-  private static final String DECIMAL = "decimal";
-  private static final String CHAR = "char";
-  private static final String BINARY = "binary";
+  static final String TINYINT = "tinyint";
+  static final String SMALLINT = "smallint";
+  static final String INT = "int";
+  static final String BIGINT = "bigint";
+  static final String FLOAT = "float";
+  static final String DOUBLE = "double";
+  static final String DECIMAL = "decimal";
+  static final String CHAR = "char";
+  static final String BINARY = "binary";
+  static final String DATETIME = "datetime";
 
   @Override
   public Type toGravitinoType(JdbcTypeBean typeBean) {
@@ -54,7 +55,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
       case BINARY:
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean.getTypeName());
+        return Types.UnparsedType.of(typeBean.getTypeName());
     }
   }
 
@@ -89,6 +90,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
     } else if (type instanceof Types.BinaryType) {
       return type.simpleString();
     }
-    throw new IllegalArgumentException("Not a supported type: " + type.toString());
+    throw new IllegalArgumentException(
+        String.format("Couldn't convert Gravitino type %s to MySQL type", type.simpleString()));
   }
 }

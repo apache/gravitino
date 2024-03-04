@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.rel.partitions;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -29,9 +28,6 @@ public class Partitions {
 
   /**
    * Creates a list partition.
-   *
-   * <p>Each list in the lists must have the same length. The values in each list must correspond to
-   * the field definitions in the {@link Transforms.ListTransform#fieldNames()}.
    *
    * @param name The name of the partition.
    * @param lists The values of the list partition.
@@ -86,11 +82,13 @@ public class Partitions {
     }
 
     /** @return The upper bound of the partition. */
+    @Override
     public Literal<?> upper() {
       return upper;
     }
 
     /** @return The lower bound of the partition. */
+    @Override
     public Literal<?> lower() {
       return lower;
     }
@@ -110,7 +108,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof RangePartitionImpl)) {
         return false;
       }
       RangePartitionImpl that = (RangePartitionImpl) o;
@@ -140,6 +138,7 @@ public class Partitions {
     }
 
     /** @return The values of the list partition. */
+    @Override
     public Literal<?>[][] lists() {
       return lists;
     }
@@ -159,7 +158,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ListPartitionImpl)) {
         return false;
       }
       ListPartitionImpl that = (ListPartitionImpl) o;
@@ -192,11 +191,13 @@ public class Partitions {
     }
 
     /** @return The field names of the identity partition. */
+    @Override
     public String[][] fieldNames() {
       return fieldNames;
     }
 
     /** @return The values of the identity partition. */
+    @Override
     public Literal<?>[] values() {
       return values;
     }
@@ -216,7 +217,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof IdentityPartitionImpl)) {
         return false;
       }
       IdentityPartitionImpl that = (IdentityPartitionImpl) o;
@@ -234,4 +235,6 @@ public class Partitions {
       return result;
     }
   }
+
+  private Partitions() {}
 }

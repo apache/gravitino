@@ -8,10 +8,12 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.KerberosUtils;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.security.auth.kerberos.KerberosTicket;
@@ -64,11 +66,11 @@ public final class KerberosTokenProvider implements AuthDataProvider {
   }
 
   private byte[] getTokenInternal() throws Exception {
-
-    String[] principalComponents = clientPrincipal.split("@");
+    @SuppressWarnings("null")
+    List<String> principalComponents = Splitter.on('@').splitToList(clientPrincipal);
     // Gravitino server's principal must start with HTTP. This restriction follows
     // the style of Apache Hadoop.
-    String serverPrincipal = "HTTP/" + host + "@" + principalComponents[1];
+    String serverPrincipal = "HTTP/" + host + "@" + principalComponents.get(1);
 
     synchronized (this) {
       if (loginContext == null) {
@@ -111,6 +113,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         });
   }
 
+  @SuppressWarnings("JavaUtilDate")
   private boolean isLoginTicketExpired() {
     Set<KerberosTicket> tickets =
         loginContext.getSubject().getPrivateCredentials(KerberosTicket.class);
@@ -147,6 +150,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     return new Builder();
   }
 
+  /** Builder class for configuring and creating instances of KerberosTokenProvider. */
   public static class Builder {
     private String clientPrincipal;
     private File keyTabFile;
@@ -178,6 +182,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
      *
      * @return The built KerberosTokenProvider instance.
      */
+    @SuppressWarnings("null")
     public KerberosTokenProvider build() {
       KerberosTokenProvider provider = new KerberosTokenProvider();
 
@@ -185,7 +190,8 @@ public final class KerberosTokenProvider implements AuthDataProvider {
           StringUtils.isNotBlank(clientPrincipal),
           "KerberosTokenProvider must set clientPrincipal");
       Preconditions.checkArgument(
-          clientPrincipal.split("@").length == 2, "Principal has the wrong format");
+          Splitter.on('@').splitToList(clientPrincipal).size() == 2,
+          "Principal has the wrong format");
       provider.clientPrincipal = clientPrincipal;
 
       if (keyTabFile != null) {

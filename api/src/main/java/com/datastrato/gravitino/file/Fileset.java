@@ -25,10 +25,18 @@ public interface Fileset extends Auditable {
 
   /** An enum representing the type of the fileset object. */
   enum Type {
-    MANAGED, // Fileset is managed by Gravitino. When specified, the data will be deleted when the
-    // fileset object is deleted.
-    EXTERNAL // Fileset is not managed by Gravitino. When specified, the data will not be deleted
-    // when the fileset object is deleted.
+
+    /**
+     * Fileset is managed by Gravitino. When specified, the data will be deleted when the fileset
+     * object is deleted
+     */
+    MANAGED,
+
+    /**
+     * Fileset is not managed by Gravitino. When specified, the data will not be deleted when the
+     * fileset object is deleted
+     */
+    EXTERNAL
   }
 
   /** @return Name of the fileset object. */

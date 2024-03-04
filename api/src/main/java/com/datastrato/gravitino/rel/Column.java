@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.types.Type;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -22,7 +23,17 @@ import java.util.Objects;
  */
 public interface Column {
 
+  /**
+   * A default value that indicates the default value is not set. This is used in {@link
+   * #defaultValue()}.
+   */
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+
+  /**
+   * A default value that indicates the default value will be set to the current timestamp. This is
+   * used in {@link #defaultValue()}.
+   */
+  Expression DEFAULT_VALUE_OF_CURRENT_TIMESTAMP = FunctionExpression.of("current_timestamp");
 
   /** @return The name of this column. */
   String name();
@@ -109,6 +120,7 @@ public interface Column {
         defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue);
   }
 
+  /** The implementation of {@link Column} for users to use API. */
   class ColumnImpl implements Column {
     private String name;
     private Type dataType;
@@ -169,7 +181,7 @@ public interface Column {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ColumnImpl)) {
         return false;
       }
       ColumnImpl column = (ColumnImpl) o;

@@ -14,30 +14,69 @@ public interface Type {
 
   /** The root type name of this type. */
   enum Name {
+    /** The boolean type. */
     BOOLEAN,
+    /** The byte type. */
     BYTE,
+    /** The short type. */
     SHORT,
+    /** The integer type. */
     INTEGER,
+    /** The long type. */
     LONG,
+    /** The float type. */
     FLOAT,
+    /** The double type. */
     DOUBLE,
+    /** The decimal type. */
     DECIMAL,
+    /** The date type. */
     DATE,
+    /** The time type. */
     TIME,
+    /** The timestamp type. */
     TIMESTAMP,
+    /** The interval year type. */
     INTERVAL_YEAR,
+    /** The interval month type. */
     INTERVAL_DAY,
+    /** The interval day type. */
     STRING,
+    /** The varchar type. */
     VARCHAR,
+    /** The char type with fixed length */
     FIXEDCHAR,
+    /** The UUID type. */
     UUID,
+    /** The binary type with fixed length */
     FIXED,
+    /** The binary type with variable length. The length is specified in the type itself. */
     BINARY,
+    /**
+     * The struct type. A struct type is a complex type that contains a set of named fields, each
+     * with a type, and optionally a comment.
+     */
     STRUCT,
+
+    /**
+     * The list type. A list type is a complex type that contains a set of elements, each with the
+     * same type.
+     */
     LIST,
+
+    /**
+     * The map type. A map type is a complex type that contains a set of key-value pairs, each with
+     * a key type and a value type.
+     */
     MAP,
+    /** The union type. A union type is a complex type that contains a set of types. */
     UNION,
-    NULL
+
+    /** The null type. A null type represents a value that is null. */
+    NULL,
+
+    /** The unparsed type. An unparsed type represents an unresolvable type. */
+    UNPARSED
   }
 
   /** The base type of all primitive types. */

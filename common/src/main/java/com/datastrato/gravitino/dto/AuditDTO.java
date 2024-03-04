@@ -37,21 +37,25 @@ public class AuditDTO implements Audit {
     this.lastModifiedTime = lastModifiedTime;
   }
 
+  /** @return The creator of the audit. */
   @Override
   public String creator() {
     return creator;
   }
 
+  /** @return The create time of the audit. */
   @Override
   public Instant createTime() {
     return createTime;
   }
 
+  /** @return The last modifier of the audit. */
   @Override
   public String lastModifier() {
     return lastModifier;
   }
 
+  /** @return The last modified time of the audit. */
   @Override
   public Instant lastModifiedTime() {
     return lastModifiedTime;
@@ -72,11 +76,20 @@ public class AuditDTO implements Audit {
    * @param <S> The type of the builder instance.
    */
   public static class Builder<S extends Builder> {
+
+    /** The creator of the audit. */
     protected String creator;
+
+    /** The create time for the audit. */
     protected Instant createTime;
+
+    /** The last modifier of the audit. */
     protected String lastModifier;
+
+    /** The last modified time for the audit. */
     protected Instant lastModifiedTime;
 
+    /** * Default constructor for the builder. */
     public Builder() {}
 
     /**

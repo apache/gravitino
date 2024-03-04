@@ -32,11 +32,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Random;
 
-/*
+/**
  * Referred from Apache Iceberg's RESTUtil implementation
  * core/src/main/java/org/apache/iceberg/rest/RESTUtil.java
  *
- * Utility class for working with REST related operations.
+ * <p>Utility class for working with REST related operations.
  */
 public class RESTUtils {
 

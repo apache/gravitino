@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 
 The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, and a `Gravitino` server.
 
-Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open <http://localhost:8090> in a browser to access the Gravitino Web UI.
+Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
 ## Prerequisites
 
@@ -21,6 +21,7 @@ Install Git and docker-compose.
 The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
 | Docker container      | Ports used     |
+|-----------------------|----------------|
 | playground-gravitino  | 8090 9001      |
 | playground-hive       | 3307 9000 9083 |
 | playground-mysql      | 3306           |
@@ -120,4 +121,57 @@ FROM "metalake_demo.catalog_postgres".hr.employees AS e,
   "metalake_demo.catalog_hive".sales.sales AS s
 WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
+```
+
+### Using Iceberg REST service
+
+If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
+Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.
+Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
+
+`spark-defaults.conf` is as follows (It's already configured in the playground):
+
+```text
+spark.sql.extensions org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+spark.sql.catalog.catalog_iceberg org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.catalog_iceberg.type rest
+spark.sql.catalog.catalog_iceberg.uri http://gravitino:9001/iceberg/
+spark.locality.wait.node 0
+```
+
+1. Login Spark container and execute the steps.
+
+```shell
+docker exec -it playground-spark bash
+```
+
+```shell
+spark@7a495f27b92e:/$ cd /opt/spark && /bin/bash bin/spark-sql 
+```
+
+```SQL
+use catalog_iceberg;
+create database sales;
+use sales;
+create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
+describe extended customers;    
+insert into customers (customer_id, customer_name, customer_email) values (11,'Rory Brown','rory@123.com');
+insert into customers (customer_id, customer_name, customer_email) values (12,'Jerry Washington','jerry@dt.com');
+```
+
+2. Login Trino container and execute the steps.
+You can get all the customers from both the Hive and Iceberg table.
+
+```shell
+docker exec -it playground-trino bash
+```
+
+```shell
+trino@d2bbfccc7432:/$ trino  
+```
+
+```SQL
+select * from "metalake_demo.catalog_hive".sales.customers
+union
+select * from "metalake_demo.catalog_iceberg".sales.customers;
 ```

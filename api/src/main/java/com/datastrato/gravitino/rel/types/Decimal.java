@@ -110,7 +110,7 @@ public class Decimal {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof Decimal)) {
       return false;
     }
     Decimal decimal = (Decimal) o;

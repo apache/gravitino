@@ -5,8 +5,10 @@
 package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Jdbc column. */
+@EqualsAndHashCode(callSuper = true)
 public class JdbcColumn extends BaseColumn {
 
   private JdbcColumn() {}
@@ -26,7 +28,10 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.comment = comment;
       jdbcColumn.dataType = dataType;
       jdbcColumn.nullable = nullable;
-      jdbcColumn.defaultValue = defaultValue;
+      // In theory, defaultValue should never be null, because we set it to
+      // DEFAULT_VALUE_NOT_SET if it is null in JSONSerde. But in case of the JdbcColumn is created
+      // by other ways(e.g. integration test), we still need to handle the null case.
+      jdbcColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       jdbcColumn.autoIncrement = autoIncrement;
       return jdbcColumn;
     }

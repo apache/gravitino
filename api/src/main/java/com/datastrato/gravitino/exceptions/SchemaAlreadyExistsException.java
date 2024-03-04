@@ -4,14 +4,33 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** An exception thrown when the schema already exists. */
 public class SchemaAlreadyExistsException extends AlreadyExistsException {
 
-  public SchemaAlreadyExistsException(String message) {
-    super(message);
+  /**
+   * Constructs a new SchemaAlreadyExistsException.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public SchemaAlreadyExistsException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
-  public SchemaAlreadyExistsException(String message, Throwable cause) {
-    super(message, cause);
+  /**
+   * Constructs a new SchemaAlreadyExistsException.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public SchemaAlreadyExistsException(
+      Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

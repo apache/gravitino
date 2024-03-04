@@ -7,11 +7,13 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +29,6 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
-  private EntitySerDe entitySerDe;
-
   private CatalogManager catalogManager;
 
   private CatalogOperationDispatcher catalogOperationDispatcher;
@@ -40,6 +40,8 @@ public class GravitinoEnv {
   private AuxiliaryServiceManager auxServiceManager;
 
   private MetricsSystem metricsSystem;
+
+  private LockManager lockManager;
 
   private GravitinoEnv() {}
 
@@ -57,6 +59,18 @@ public class GravitinoEnv {
   }
 
   /**
+   * This method is used for testing purposes only to set the lock manager for test in package
+   * `com.datastrato.gravitino.server.web.rest`, as tree lock depends on the lock manager and we did
+   * not mock the lock manager in the test, so we need to set the lock manager for test.
+   *
+   * @param lockManager The lock manager to be set.
+   */
+  @VisibleForTesting
+  public void setLockManager(LockManager lockManager) {
+    this.lockManager = lockManager;
+  }
+
+  /**
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
@@ -68,13 +82,9 @@ public class GravitinoEnv {
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
-    // Initialize EntitySerDe
-    this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);
-
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    entityStore.setSerDe(entitySerDe);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
@@ -91,6 +101,8 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX));
 
+    // Tree lock
+    this.lockManager = new LockManager(config);
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -101,15 +113,6 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
-  }
-
-  /**
-   * Get the EntitySerDe associated with the Gravitino environment.
-   *
-   * @return The EntitySerDe instance.
-   */
-  public EntitySerDe entitySerDe() {
-    return entitySerDe;
   }
 
   /**
@@ -165,6 +168,10 @@ public class GravitinoEnv {
    */
   public MetricsSystem metricsSystem() {
     return metricsSystem;
+  }
+
+  public LockManager getLockManager() {
+    return lockManager;
   }
 
   public void start() {

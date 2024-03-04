@@ -9,13 +9,12 @@ import { useEffect } from 'react'
 
 import { Box } from '@mui/material'
 
-import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch } from '@/lib/hooks/useStore'
 
 import LeftContent from './LeftContent'
 import RightContent from './RightContent'
 
 import {
-  initMetalakeTree,
   fetchCatalogs,
   fetchSchemas,
   fetchTables,
@@ -23,60 +22,63 @@ import {
   getCatalogDetails,
   getSchemaDetails,
   getTableDetails,
-  setSelectedTreeNode
+  setSelectedNodes
 } from '@/lib/store/metalakes'
 
 const MetalakeView = props => {
   const { page, tableTitle, routeParams } = props
 
   const dispatch = useAppDispatch()
-  const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
-    const { metalake, catalog, schema, table } = routeParams
+    if (JSON.stringify(routeParams) !== '{}') {
+      const { metalake, catalog, schema, table } = routeParams
 
-    if (store.metalakeTree.length === 0) {
-      dispatch(initMetalakeTree({ metalake, catalog, schema, table }))
-    }
+      switch (page) {
+        case 'metalakes':
+          dispatch(fetchCatalogs({ init: true, page, metalake }))
+          dispatch(getMetalakeDetails({ metalake }))
+          break
 
-    switch (page) {
-      case 'metalakes':
-        dispatch(fetchCatalogs({ init: true, page, metalake }))
-        dispatch(getMetalakeDetails({ metalake }))
-        break
-      case 'catalogs':
-        if (catalog !== null) {
-          dispatch(fetchSchemas({ init: true, page, metalake, catalog }))
-          dispatch(getCatalogDetails({ metalake, catalog }))
-        }
-        break
-      case 'schemas':
-        if (catalog !== null && schema !== null) {
-          dispatch(fetchTables({ init: true, page, metalake, catalog, schema }))
-          dispatch(getSchemaDetails({ metalake, catalog, schema }))
-        }
-        break
-      case 'tables':
-        if (catalog !== null && schema !== null && table !== null) {
-          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-        }
-        break
-      default:
-        break
+        case 'catalogs':
+          if (catalog !== null) {
+            dispatch(fetchSchemas({ init: true, page, metalake, catalog }))
+            dispatch(getCatalogDetails({ metalake, catalog }))
+          }
+          break
+
+        case 'schemas':
+          if (catalog !== null && schema !== null) {
+            dispatch(fetchTables({ init: true, page, metalake, catalog, schema }))
+            dispatch(getSchemaDetails({ metalake, catalog, schema }))
+          }
+          break
+
+        case 'tables':
+          if (catalog !== null && schema !== null && table !== null) {
+            dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+          }
+          break
+
+        default:
+          break
+      }
     }
 
     dispatch(
-      setSelectedTreeNode(
+      setSelectedNodes(
         routeParams.catalog
-          ? `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
-              routeParams.schema ? `{{${routeParams.schema}}}` : ''
-            }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
-          : null
+          ? [
+              `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
+                routeParams.schema ? `{{${routeParams.schema}}}` : ''
+              }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
+            ]
+          : []
       )
     )
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, dispatch, routeParams])
+  }, [routeParams])
 
   return (
     <Box className='app-metalake twc-w-full twc-h-full twc-flex twc-rounded-lg twc-overflow-auto twc-relative shadow-md'>

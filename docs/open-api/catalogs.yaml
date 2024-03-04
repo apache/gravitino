@@ -13,7 +13,7 @@ paths:
     get:
       tags:
         - catalog
-      summary: List all catalogs in the specified metalake
+      summary: List catalogs
       operationId: listCatalogs
       responses:
         "200":
@@ -26,7 +26,7 @@ paths:
     post:
       tags:
         - catalog
-      summary: Create a new catalog in the specified metalake
+      summary: Create catalog
       operationId: createCatalog
       requestBody:
         content:
@@ -60,7 +60,7 @@ paths:
     get:
       tags:
         - catalog
-      summary: Get the specified catalog in the specified metalake
+      summary: Get catalog
       operationId: loadCatalog
       description: Returns the specified catalog information in the specified metalake
       responses:
@@ -83,7 +83,7 @@ paths:
     put:
       tags:
         - catalog
-      summary: Update the specified catalog in the specified metalake
+      summary: Update catalog
       operationId: alterCatalog
       description: Alters the specified catalog information in the specified metalake
       requestBody:
@@ -120,7 +120,7 @@ paths:
     delete:
       tags:
         - catalog
-      summary: Drop the specified catalog in the specified metalake
+      summary: Drop catalog
       operationId: dropCatalog
       responses:
         "200":

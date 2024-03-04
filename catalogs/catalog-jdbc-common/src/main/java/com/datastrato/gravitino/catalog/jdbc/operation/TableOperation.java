@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -33,6 +34,7 @@ public interface TableOperation {
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf);
 
   /**

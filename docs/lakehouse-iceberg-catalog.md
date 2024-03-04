@@ -78,6 +78,8 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Table capabilities
 
+- Doesn't support column default value.
+
 #### Table partitions
 
 Supports transforms:
@@ -193,7 +195,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
+| `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -213,6 +215,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
 ### Table properties
@@ -231,6 +234,10 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
 | `identifier-fields`             | The identifier fields for defining the table.           |
 | `write.distribution-mode`       | Defines distribution of write data                      |
+
+### Table indexes
+
+- Doesn't support table indexes.
 
 ### Table operations
 
@@ -254,7 +261,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-Iceberg just supports updating primitive types.
 :::
 
 :::caution

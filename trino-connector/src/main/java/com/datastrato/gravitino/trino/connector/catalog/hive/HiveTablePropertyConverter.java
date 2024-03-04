@@ -4,14 +4,25 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_EXTERNAL;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_FORMAT;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_INPUT_FORMAT;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_LOCATION;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_NUM_FILES;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_OUTPUT_FORMAT;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_SERDE_LIB;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_SERDE_NAME;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_TOTAL_SIZE;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_TYPE;
+
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
-import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 
 public class HiveTablePropertyConverter extends PropertyConverter {
   private final BasePropertiesMetadata hiveTablePropertiesMetadata =
@@ -22,16 +33,16 @@ public class HiveTablePropertyConverter extends PropertyConverter {
   static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              .put("format", HiveTablePropertiesMetadata.FORMAT)
-              .put("total_size", HiveTablePropertiesMetadata.TOTAL_SIZE)
-              .put("num_files", HiveTablePropertiesMetadata.NUM_FILES)
-              .put("external", HiveTablePropertiesMetadata.EXTERNAL)
-              .put("location", HiveTablePropertiesMetadata.LOCATION)
-              .put("table_type", HiveTablePropertiesMetadata.TABLE_TYPE)
-              .put("input_format", HiveTablePropertiesMetadata.INPUT_FORMAT)
-              .put("output_format", HiveTablePropertiesMetadata.OUTPUT_FORMAT)
-              .put("serde_lib", HiveTablePropertiesMetadata.SERDE_LIB)
-              .put("serde_name", HiveTablePropertiesMetadata.SERDE_NAME)
+              .put(HIVE_TABLE_FORMAT, HiveTablePropertiesMetadata.FORMAT)
+              .put(HIVE_TABLE_TOTAL_SIZE, HiveTablePropertiesMetadata.TOTAL_SIZE)
+              .put(HIVE_TABLE_NUM_FILES, HiveTablePropertiesMetadata.NUM_FILES)
+              .put(HIVE_TABLE_EXTERNAL, HiveTablePropertiesMetadata.EXTERNAL)
+              .put(HIVE_TABLE_LOCATION, HiveTablePropertiesMetadata.LOCATION)
+              .put(HIVE_TABLE_TYPE, HiveTablePropertiesMetadata.TABLE_TYPE)
+              .put(HIVE_TABLE_INPUT_FORMAT, HiveTablePropertiesMetadata.INPUT_FORMAT)
+              .put(HIVE_TABLE_OUTPUT_FORMAT, HiveTablePropertiesMetadata.OUTPUT_FORMAT)
+              .put(HIVE_TABLE_SERDE_LIB, HiveTablePropertiesMetadata.SERDE_LIB)
+              .put(HIVE_TABLE_SERDE_NAME, HiveTablePropertiesMetadata.SERDE_NAME)
               .build());
 
   @Override

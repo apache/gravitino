@@ -58,7 +58,7 @@ public class DummyGravitinoConnector implements Connector {
               new Procedure.Argument("PROVIDER", VARCHAR),
               new Procedure.Argument(
                   "PROPERTIES", new MapType(VARCHAR, VARCHAR, new TypeOperators())),
-              new Procedure.Argument("IGNORE_EXIST", BOOLEAN, false, true));
+              new Procedure.Argument("IGNORE_EXIST", BOOLEAN, false, false));
       Procedure procedure = new Procedure("system", "create_catalog", arguments, createCatalog);
       procedures.add(procedure);
 
@@ -72,7 +72,7 @@ public class DummyGravitinoConnector implements Connector {
       arguments =
           List.of(
               new Procedure.Argument("CATALOG", VARCHAR),
-              new Procedure.Argument("IGNORE_NOT_EXIST", BOOLEAN, false, true));
+              new Procedure.Argument("IGNORE_NOT_EXIST", BOOLEAN, false, false));
       procedure = new Procedure("system", "drop_catalog", arguments, dropCatalog);
       procedures.add(procedure);
 

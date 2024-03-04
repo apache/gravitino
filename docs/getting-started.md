@@ -314,11 +314,11 @@ You'll also need to open port 8090 in the security group of your AWS instance to
 
 After completing these steps, you should be able to access the Gravitino REST interface from either the command line or a web browser on your local computer. You can also connect to Hive via DBeaver or any other database IDE.
 
-### Next steps:
+## Next steps
 
 1. **Explore documentation:**
    - Delve deeper into the Gravitino documentation for advanced features and configuration options.
-   - Check out https://datastrato.ai/docs/0.3.1/
+   - Check out https://datastrato.ai/docs
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
