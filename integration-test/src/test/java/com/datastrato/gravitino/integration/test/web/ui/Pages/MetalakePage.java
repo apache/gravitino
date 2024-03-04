@@ -6,8 +6,10 @@
 package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -27,6 +29,9 @@ public class MetalakePage {
 
   @FindBy(xpath = "//*[@id='metalakeCommentField']")
   public WebElement commentField;
+
+  @FindBy(xpath = "//*[@id='query-metalake']")
+  public WebElement queryMetalakeInput;
 
   @FindBy(xpath = "//*[@id='submitHandleMetalake']")
   public WebElement submitHandleMetalakeBtn;
@@ -75,13 +80,18 @@ public class MetalakePage {
   }
 
   public void enterNameField(String nameField) {
-    LOG.info("set name field");
+    LOG.info("enter name field");
     this.nameField.sendKeys(nameField);
   }
 
   public void enterCommentField(String commentField) {
-    LOG.info("set comment field");
+    LOG.info("enter comment field");
     this.commentField.sendKeys(commentField);
+  }
+
+  public void enterQueryInput(String queryInput) {
+    LOG.info("enter query input");
+    this.queryMetalakeInput.sendKeys(queryInput);
   }
 
   public void clickSubmitBtn() {
@@ -104,6 +114,16 @@ public class MetalakePage {
     this.confirmDeleteBtn.click();
   }
 
+  public void clickViewMetalakeBtn() {
+    LOG.info("click view metalake details button");
+    this.viewMetalakeBtn.click();
+  }
+
+  public void clickEditMetalakeBtn() {
+    LOG.info("click edit metalake button");
+    this.editMetalakeBtn.click();
+  }
+
   public boolean verifyIsCreatedMetalake() {
     try {
       createdMetalakeRow.isDisplayed();
@@ -111,8 +131,23 @@ public class MetalakePage {
 
       return Objects.equals(createdMetalakeLink.getText(), "test");
     } catch (Exception e) {
-      LOG.error(String.valueOf(e));
+      return false;
+    }
+  }
 
+  public boolean verifyQueryMetalake() {
+    try {
+      WebElement dataGrid =
+          driver.findElement(By.xpath("//div[contains(@class, 'MuiDataGrid-main')]"));
+      WebElement dataViewer =
+          dataGrid.findElement(
+              By.xpath(
+                  ".//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']"));
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+
+      return dataList.size() == 1 && Objects.equals(dataList.get(0).getText(), "test");
+
+    } catch (Exception e) {
       return false;
     }
   }
@@ -121,8 +156,6 @@ public class MetalakePage {
     try {
       return Objects.equals(editedMetalakeLink.getText(), "test_edited");
     } catch (Exception e) {
-      LOG.error(String.valueOf(e));
-
       return false;
     }
   }
@@ -135,8 +168,6 @@ public class MetalakePage {
 
       return true;
     } catch (Exception e) {
-      LOG.error(String.valueOf(e));
-
       return false;
     } finally {
       driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
@@ -148,22 +179,17 @@ public class MetalakePage {
     return Objects.equals(noMetalakeRows.getText(), "No rows");
   }
 
-  public void clickViewMetalakeBtn() {
-    LOG.info("click view metalake details button");
-    this.viewMetalakeBtn.click();
-  }
-
-  public void clickEditMetalakeBtn() {
-    LOG.info("click edit metalake button");
-    this.editMetalakeBtn.click();
-  }
-
   public void createMetalakeAction() {
     LOG.info("test create metalake action started");
     clickCreateBtn();
     enterNameField("test");
     enterCommentField("test");
     clickSubmitBtn();
+  }
+
+  public void queryMetalakeAction() {
+    LOG.info("test query metalake action started");
+    enterQueryInput("tes");
   }
 
   public void viewMetalakeAction() {

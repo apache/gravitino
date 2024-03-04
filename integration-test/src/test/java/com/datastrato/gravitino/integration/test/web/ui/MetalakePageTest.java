@@ -38,6 +38,20 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(2)
+  public void testQueryMetalake() {
+    metalakePage.queryMetalakeAction();
+
+    boolean status = metalakePage.verifyQueryMetalake();
+
+    if (status) {
+      LOG.info("query metalake successful");
+    } else {
+      Assertions.fail("query metalake failed");
+    }
+  }
+
+  @Test
+  @Order(3)
   public void testViewMetalakeDetails() {
     metalakePage.viewMetalakeAction();
 
@@ -51,7 +65,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(3)
+  @Order(4)
   public void testEditMetalake() {
     metalakePage.editMetalakeAction();
 
@@ -65,7 +79,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(4)
+  @Order(5)
   public void testDeleteMetalake() {
     metalakePage.deleteMetalakeAction();
 
