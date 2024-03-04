@@ -32,8 +32,8 @@ public interface GravitinoCatalogAdaptor {
    * @param identifier Spark's table identifier
    * @param gravitinoTable Gravitino table to do DDL operations
    * @param sparkCatalog specific Spark catalog to do IO operations
-   * @param propertiesConverter transform properties between Gravitino and Spark @Retrun a specific
-   *     Spark table
+   * @param propertiesConverter transform properties between Gravitino and Spark
+   * @return a specific Spark table
    */
   SparkBaseTable createSparkTable(
       Identifier identifier,
@@ -46,7 +46,8 @@ public interface GravitinoCatalogAdaptor {
    *
    * @param name catalog name
    * @param options catalog options from configuration
-   * @param properties catalog properties from Gravitino @Retrun a specific Spark catalog
+   * @param properties catalog properties from Gravitino
+   * @return a specific Spark catalog
    */
   TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties);
