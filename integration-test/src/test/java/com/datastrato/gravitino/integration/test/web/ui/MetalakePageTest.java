@@ -25,7 +25,7 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   @Order(1)
   public void testCreateMetalake() {
-    metalakePage.createMetalakeAction();
+    metalakePage.createMetalakeAction("test", "test");
 
     boolean status = metalakePage.verifyIsCreatedMetalake();
 
@@ -85,12 +85,24 @@ public class MetalakePageTest extends AbstractWebIT {
 
     boolean status = metalakePage.verifyIsDeletedMetalake();
 
-    LOG.info(String.valueOf(status));
-
     if (status) {
       LOG.info("delete metalake successful");
     } else {
       Assertions.fail("delete metalake failed");
+    }
+  }
+
+  @Test
+  @Order(6)
+  public void testCreateManyMetalakes() {
+    metalakePage.createManyMetalakesAction();
+
+    boolean status = metalakePage.verifyIsCreatedManyMetalakes();
+
+    if (status) {
+      LOG.info("create many metalakes successful");
+    } else {
+      Assertions.fail("create many metalakes failed");
     }
   }
 }

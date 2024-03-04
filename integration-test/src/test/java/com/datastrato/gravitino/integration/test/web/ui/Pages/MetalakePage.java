@@ -164,9 +164,8 @@ public class MetalakePage {
     try {
       metalakeDetailsDrawer.isDisplayed();
       String drawerVisible = metalakeDetailsDrawer.getCssValue("visibility");
-      LOG.info(drawerVisible);
 
-      return true;
+      return Objects.equals(drawerVisible, "visible");
     } catch (Exception e) {
       return false;
     } finally {
@@ -179,11 +178,27 @@ public class MetalakePage {
     return Objects.equals(noMetalakeRows.getText(), "No rows");
   }
 
-  public void createMetalakeAction() {
+  public boolean verifyIsCreatedManyMetalakes() {
+    try {
+      WebElement dataGrid =
+          driver.findElement(By.xpath("//div[contains(@class, 'MuiDataGrid-main')]"));
+      WebElement dataViewer =
+          dataGrid.findElement(
+              By.xpath(
+                  ".//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']"));
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+
+      return dataList.size() == 10;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public void createMetalakeAction(String name, String comment) {
     LOG.info("test create metalake action started");
     clickCreateBtn();
-    enterNameField("test");
-    enterCommentField("test");
+    enterNameField(name);
+    enterCommentField(comment);
     clickSubmitBtn();
   }
 
@@ -209,5 +224,14 @@ public class MetalakePage {
     LOG.info("test delete metalake action started");
     clickDeleteMetalakeBtn();
     clickConfirmDeleteBtn();
+  }
+
+  public void createManyMetalakesAction() {
+    LOG.info("test create many metalakes action started");
+    int[] arraySize = new int[10];
+    for (int i = 0; i < arraySize.length; i++) {
+      LOG.info("create metalake: {}", String.valueOf(i + 1));
+      createMetalakeAction("test_" + (i + 1), "test");
+    }
   }
 }
