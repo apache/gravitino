@@ -36,14 +36,14 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * could implement more capabilities like SupportsPartitionManagement for Hive table, SupportsIndex
  * for JDBC table, SupportsRowLevelOperations for Iceberg table.
  */
-public class GravitinoBaseTable implements Table, SupportsRead, SupportsWrite {
+public class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
   private Identifier identifier;
   private com.datastrato.gravitino.rel.Table gravitinoTable;
   private TableCatalog sparkCatalog;
   private Table lazySparkTable;
   private PropertiesConverter propertiesConverter;
 
-  public GravitinoBaseTable(
+  public SparkBaseTable(
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       TableCatalog sparkCatalog,

@@ -9,7 +9,7 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.PropertiesConverter;
-import com.datastrato.gravitino.spark.table.GravitinoBaseTable;
+import com.datastrato.gravitino.spark.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,12 +28,12 @@ public class HiveAdaptor implements GravitinoCatalogAdaptor {
   }
 
   @Override
-  public GravitinoBaseTable createSparkTable(
+  public SparkBaseTable createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
       PropertiesConverter propertiesConverter) {
-    return new GravitinoHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+    return new SparkHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
   }
 
   @Override

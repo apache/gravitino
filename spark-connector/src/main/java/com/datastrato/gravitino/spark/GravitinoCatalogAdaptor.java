@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.spark;
 
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.spark.table.GravitinoBaseTable;
+import com.datastrato.gravitino.spark.table.SparkBaseTable;
 import java.util.Map;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -35,7 +35,7 @@ public interface GravitinoCatalogAdaptor {
    * @param propertiesConverter transform properties between Gravitino and Spark @Retrun a specific
    *     Spark table
    */
-  GravitinoBaseTable createSparkTable(
+  SparkBaseTable createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
@@ -46,7 +46,7 @@ public interface GravitinoCatalogAdaptor {
    *
    * @param name catalog name
    * @param options catalog options from configuration
-   * @param properties catalog properties from Gravitino @Retrun an specific Spark catalog
+   * @param properties catalog properties from Gravitino @Retrun a specific Spark catalog
    */
   TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties);
