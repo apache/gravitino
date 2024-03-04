@@ -44,9 +44,14 @@ public class FileSystemTestUtils {
             + fileset);
   }
 
+  public static Path createHdfsFilePath(String filePath) {
+    return new Path(
+        GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME_PREFIX + "localhost" + filePath);
+  }
+
   public static void create(Path path, FileSystem fileSystem) throws IOException {
     boolean overwrite = true;
-    FSDataOutputStream outputStream =
+    try (FSDataOutputStream outputStream =
         fileSystem.create(
             path,
             HdfsMiniClusterTestBase.fsPermission(),
@@ -54,27 +59,29 @@ public class FileSystemTestUtils {
             HdfsMiniClusterTestBase.bufferSize(),
             HdfsMiniClusterTestBase.replication(),
             HdfsMiniClusterTestBase.blockSize(),
-            HdfsMiniClusterTestBase.progressable());
-    outputStream.close();
+            HdfsMiniClusterTestBase.progressable())) {}
   }
 
   public static void append(Path path, FileSystem fileSystem) throws IOException {
-    FSDataOutputStream mockOutputStream =
-        fileSystem.append(path, HdfsMiniClusterTestBase.bufferSize());
-    // Hello, World!
-    byte[] mockBytes = new byte[] {72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33};
-    mockOutputStream.write(mockBytes);
-    mockOutputStream.close();
+    try (FSDataOutputStream mockOutputStream =
+        fileSystem.append(path, HdfsMiniClusterTestBase.bufferSize())) {
+      // Hello, World!
+      byte[] mockBytes = new byte[] {72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33};
+      mockOutputStream.write(mockBytes);
+    }
   }
 
   public static byte[] read(Path path, FileSystem fileSystem) throws IOException {
-    FSDataInputStream inputStream = fileSystem.open(path, HdfsMiniClusterTestBase.bufferSize());
-    int bytesRead;
-    byte[] buffer = new byte[1024];
-    ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    while ((bytesRead = inputStream.read(buffer)) != -1) {
-      byteOutputStream.write(buffer, 0, bytesRead);
+    try (FSDataInputStream inputStream =
+        fileSystem.open(path, HdfsMiniClusterTestBase.bufferSize())) {
+      int bytesRead;
+      byte[] buffer = new byte[1024];
+      try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream()) {
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+          byteOutputStream.write(buffer, 0, bytesRead);
+        }
+        return byteOutputStream.toByteArray();
+      }
     }
-    return byteOutputStream.toByteArray();
   }
 }

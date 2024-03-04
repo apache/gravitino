@@ -9,6 +9,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
 import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
 import com.datastrato.gravitino.shaded.com.google.common.cache.Cache;
 import com.datastrato.gravitino.shaded.com.google.common.cache.CacheBuilder;
@@ -39,6 +40,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
   private static final int DEFAULT_CACHE_CAPACITY = 20;
   private static final int CACHE_EXPIRE_AFTER_ACCESS_MINUTES = 5;
+
   private final Cache<NameIdentifier, FilesetMeta> filesetCache =
       CacheBuilder.newBuilder()
           .maximumSize(DEFAULT_CACHE_CAPACITY)
@@ -64,23 +66,22 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
     if (name.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(
-              configuration.get(
-                  GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY)),
-          "Gravitino server uri is not set in the configuration");
-      NameIdentifier filesetIdentifier = normalizedIdentifier(name.getPath());
       String serverUri =
           configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverUri),
+          "Gravitino server uri is not set in the configuration");
+      NameIdentifier filesetIdentifier = extractIdentifier(name);
       // TODO Need support more authentication types, now we only support simple auth
       this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
+      // Close the cache for gvfs. Therefore, different gvfs instances can be obtained based on the
+      // user token.
       configuration.set(
           String.format(
-              "fs.%s.impl.disable.filesetCache",
-              GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
+              "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
           "true");
       setConf(configuration);
-      getOrCreateCachedFileset(filesetIdentifier);
+      getCachedFileset(filesetIdentifier);
 
       this.workingDirectory = new Path(name);
       this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
@@ -93,11 +94,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     }
   }
 
-  private void closeProxyFSCache(Configuration configuration, URI storageUri) {
-    // Close the proxy fs filesetCache, so that the user can not get the fs by FileSystem.get(),
-    // avoid issues related to authority authentication
-    configuration.set(
-        String.format("fs.%s.impl.disable.filesetCache", storageUri.getScheme()), "true");
+  @VisibleForTesting
+  Cache<NameIdentifier, FilesetMeta> getFilesetCache() {
+    return filesetCache;
   }
 
   @Override
@@ -107,10 +106,10 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
-    return proxyFileSystem.open(proxyPath, bufferSize);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    return meta.getFileSystem().open(proxyPath, bufferSize);
   }
 
   @Override
@@ -123,74 +122,84 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       long blockSize,
       Progressable progress)
       throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
-    return proxyFileSystem.create(
-        proxyPath, permission, overwrite, bufferSize, replication, blockSize, progress);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    return meta.getFileSystem()
+        .create(proxyPath, permission, overwrite, bufferSize, replication, blockSize, progress);
   }
 
   @Override
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
       throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
-    return proxyFileSystem.append(proxyPath, bufferSize, progress);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    return meta.getFileSystem().append(proxyPath, bufferSize, progress);
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    // Fileset identifier is not allowed to be renamed, only subdirectories can be renamed,
-    // otherwise metadata may be inconsistent.
-    NameIdentifier srcIdentifier = reservedIdentifier(src.toString());
-    NameIdentifier dstIdentifier = reservedIdentifier(dst.toString());
+    // There are two cases that cannot be renamed:
+    // 1. Fileset identifier is not allowed to be renamed, only its subdirectories can be renamed
+    // which not in the storage location of the fileset;
+    // 2. Fileset only mounts a single file, the storage location of the fileset cannot be renamed;
+    // Otherwise the metadata in the Gravitino server may be inconsistent.
+    NameIdentifier srcIdentifier = extractIdentifier(src.toUri());
+    NameIdentifier dstIdentifier = extractIdentifier(dst.toUri());
     Preconditions.checkArgument(
         srcIdentifier.equals(dstIdentifier),
-        "Destination path identifier should be same with src path identifier.");
-    Path srcProxyPath = resolvePathByIdentifier(srcIdentifier, src);
-    Path dstProxyPath = resolvePathByIdentifier(dstIdentifier, dst);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(srcIdentifier).getFileSystem();
-    return proxyFileSystem.rename(srcProxyPath, dstProxyPath);
+        "Destination path fileset identifier: %s should be same with src path fileset identifier: %s.",
+        srcIdentifier,
+        dstIdentifier);
+    FilesetMeta meta = getCachedFileset(srcIdentifier);
+    if (meta.getFileSystem().isFile(new Path(meta.getFileset().storageLocation()))) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Cannot rename the fileset: %s which only mounts a single file.", srcIdentifier));
+    } else {
+      Path srcProxyPath = resolvePathByIdentifier(srcIdentifier, meta, src);
+      Path dstProxyPath = resolvePathByIdentifier(dstIdentifier, meta, dst);
+      FileSystem proxyFileSystem = meta.getFileSystem();
+      return proxyFileSystem.rename(srcProxyPath, dstProxyPath);
+    }
   }
 
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
-    return proxyFileSystem.delete(proxyPath, recursive);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    return meta.getFileSystem().delete(proxyPath, recursive);
   }
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FilesetMeta meta = getOrCreateCachedFileset(identifier);
-    FileSystem proxyFileSystem = meta.getFileSystem();
-    FileStatus[] fileStatusResults = proxyFileSystem.listStatus(proxyPath);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    FileStatus[] fileStatusResults = meta.getFileSystem().listStatus(proxyPath);
     return Arrays.stream(fileStatusResults)
         .map(
             fileStatus ->
-                resolveFileStatusPathScheme(
+                resolveFileStatusPathPrefix(
                     fileStatus,
                     meta.getFileset().storageLocation(),
-                    concatFilesetPrefix(identifier, meta.getFileset().storageLocation())))
+                    concatFilesetPrefix(identifier, meta)))
         .toArray(FileStatus[]::new);
   }
 
   @Override
   public void setWorkingDirectory(Path newDir) {
-    NameIdentifier identifier = reservedIdentifier(newDir.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, newDir);
-    FileSystem proxyFileSystem = null;
     try {
-      proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
+      NameIdentifier identifier = extractIdentifier(newDir.toUri());
+      FilesetMeta meta = getCachedFileset(identifier);
+      Path proxyPath = resolvePathByIdentifier(identifier, meta, newDir);
+      meta.getFileSystem().setWorkingDirectory(proxyPath);
+      this.workingDirectory = newDir;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    proxyFileSystem.setWorkingDirectory(proxyPath);
-    this.workingDirectory = newDir;
   }
 
   @Override
@@ -200,29 +209,25 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FileSystem proxyFileSystem = getOrCreateCachedFileset(identifier).getFileSystem();
-    return proxyFileSystem.mkdirs(proxyPath, permission);
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    return meta.getFileSystem().mkdirs(proxyPath, permission);
   }
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    NameIdentifier identifier = reservedIdentifier(f.toString());
-    Path proxyPath = resolvePathByIdentifier(identifier, f);
-    FilesetMeta meta = getOrCreateCachedFileset(identifier);
-    FileSystem proxyFileSystem = meta.getFileSystem();
-    FileStatus fileStatus = proxyFileSystem.getFileStatus(proxyPath);
-    return resolveFileStatusPathScheme(
-        fileStatus,
-        meta.getFileset().storageLocation(),
-        concatFilesetPrefix(identifier, meta.getFileset().storageLocation()));
+    NameIdentifier identifier = extractIdentifier(f.toUri());
+    FilesetMeta meta = getCachedFileset(identifier);
+    Path proxyPath = resolvePathByIdentifier(identifier, meta, f);
+    FileStatus fileStatus = meta.getFileSystem().getFileStatus(proxyPath);
+    return resolveFileStatusPathPrefix(
+        fileStatus, meta.getFileset().storageLocation(), concatFilesetPrefix(identifier, meta));
   }
 
-  private String concatFilesetPrefix(NameIdentifier identifier, String storageLocation) {
+  private String concatFilesetPrefix(NameIdentifier identifier, FilesetMeta meta) {
     String filesetPrefix =
         GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
-            + "/"
             + identifier.namespace().level(0)
             + "/"
             + identifier.namespace().level(1)
@@ -230,57 +235,73 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             + identifier.namespace().level(2)
             + "/"
             + identifier.name();
-    if (storageLocation.endsWith("/")) {
+    if (meta.getFileset().storageLocation().endsWith("/")) {
       filesetPrefix += "/";
     }
     return filesetPrefix;
   }
 
-  Path resolvePathByIdentifier(NameIdentifier identifier, Path path) {
-    String absolutePath = path.toString();
-    if (absolutePath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
+  private Path resolvePathByIdentifier(NameIdentifier identifier, FilesetMeta meta, Path path) {
+    String originPath = path.toString();
+    if (originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       try {
-        FilesetMeta meta = getOrCreateCachedFileset(identifier);
-        return new Path(
-            absolutePath.replaceFirst(
-                concatFilesetPrefix(identifier, meta.getFileset().storageLocation()),
-                meta.getFileset().storageLocation()));
+        Path storageLocation = new Path(meta.getFileset().storageLocation());
+        boolean isMountSingleFile = meta.getFileSystem().isFile(storageLocation);
+        if (isMountSingleFile) {
+          Preconditions.checkArgument(
+              originPath.equals(concatFilesetPrefix(identifier, meta)),
+              "Cannot resolve path: %s to actual storage path, because the fileset only mounts a single file.",
+              path);
+          return storageLocation;
+        } else {
+          return new Path(
+              originPath.replaceFirst(
+                  concatFilesetPrefix(identifier, meta), storageLocation.toString()));
+        }
       } catch (Exception e) {
         throw new RuntimeException(
-            String.format("Cannot resolve source path: %s to actual storage path", path));
+            String.format("Cannot resolve path: %s to actual storage path, exception:", path), e);
       }
     } else {
       throw new InvalidPathException(
           String.format(
-              "Path %s doesn't start with scheme \"%s\"",
+              "Path %s doesn't start with the scheme \"%s\"",
               path, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
     }
   }
 
-  private FileStatus resolveFileStatusPathScheme(
-      FileStatus fileStatus, String fromScheme, String toScheme) {
+  private FileStatus resolveFileStatusPathPrefix(
+      FileStatus fileStatus, String fromPrefix, String toPrefix) {
     String uri = fileStatus.getPath().toString();
-    if (!uri.startsWith(fromScheme)) {
+    if (!uri.startsWith(fromPrefix)) {
       throw new InvalidPathException(
-          String.format("Path %s doesn't start with 'fromScheme' \"%s\"", uri, fromScheme));
+          String.format("Path %s doesn't start with prefix \"%s\"", uri, fromPrefix));
     }
-    String srcUri = uri.replaceFirst(fromScheme, toScheme);
-    Path path = new Path(srcUri);
+    String proxyUri = uri.replaceFirst(fromPrefix, toPrefix);
+    Path path = new Path(proxyUri);
     fileStatus.setPath(path);
     return fileStatus;
   }
 
-  private NameIdentifier reservedIdentifier(String path) {
+  private NameIdentifier extractIdentifier(URI uri) {
     Preconditions.checkArgument(
-        path.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
+        uri.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
         "Path %s doesn't start with scheme \"%s\"");
-    String reservedPath =
-        path.substring((GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX).length());
-    NameIdentifier reservedIdentifier = normalizedIdentifier(reservedPath);
-    return reservedIdentifier;
+
+    if (StringUtils.isBlank(uri.toString())) {
+      throw new InvalidPathException("Uri which need be extracted cannot be null or empty");
+    }
+
+    // remove first '/' symbol with empty string
+    String[] reservedDirs =
+        Arrays.stream(uri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
+    Preconditions.checkArgument(
+        reservedDirs.length >= 4, "URI %s doesn't contains valid identifier", uri);
+
+    return NameIdentifier.of(reservedDirs[0], reservedDirs[1], reservedDirs[2], reservedDirs[3]);
   }
 
-  private FilesetMeta getOrCreateCachedFileset(NameIdentifier identifier) throws IOException {
+  private FilesetMeta getCachedFileset(NameIdentifier identifier) throws IOException {
     try {
       rwLock.readLock().lock();
       FilesetMeta meta = filesetCache.getIfPresent(identifier);
@@ -298,39 +319,33 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         return meta;
       }
       Fileset fileset = loadFileset(identifier);
+
       URI storageUri = URI.create(fileset.storageLocation());
-      Configuration configuration = getConf();
-      closeProxyFSCache(configuration, storageUri);
-      FileSystem proxyFileSystem = FileSystem.get(storageUri, configuration);
-      Preconditions.checkArgument(proxyFileSystem != null, "Cannot get the proxy file system");
+
+      // Always create a new file system instance for the fileset.
+      // Therefore, users cannot bypass gvfs and use `FileSystem.get()` to directly obtain the
+      // Filesystem
+      FileSystem proxyFileSystem = FileSystem.newInstance(storageUri, getConf());
+      Preconditions.checkState(proxyFileSystem != null, "Cannot get the proxy file system");
+
       meta = FilesetMeta.builder().withFileset(fileset).withFileSystem(proxyFileSystem).build();
+
       filesetCache.put(identifier, meta);
+
       return meta;
     } finally {
       rwLock.writeLock().unlock();
     }
   }
 
-  private Fileset loadFileset(NameIdentifier filesetIdentifier) {
+  private Fileset loadFileset(NameIdentifier identifier) {
     GravitinoMetaLake metalake =
-        client.loadMetalake(NameIdentifier.of(filesetIdentifier.namespace().level(0)));
+        client.loadMetalake(NameIdentifier.ofMetalake(identifier.namespace().level(0)));
     Catalog catalog =
         metalake.loadCatalog(
-            NameIdentifier.of(
-                filesetIdentifier.namespace().level(0), filesetIdentifier.namespace().level(1)));
-    return catalog.asFilesetCatalog().loadFileset(filesetIdentifier);
-  }
-
-  private NameIdentifier normalizedIdentifier(String path) {
-    if (StringUtils.isBlank(path)) {
-      throw new InvalidPathException("Path which need be normalized cannot be null or empty");
-    }
-
-    // remove first '/' symbol
-    String[] reservedDirs = Arrays.stream(path.substring(1).split("/")).toArray(String[]::new);
-    Preconditions.checkArgument(
-        reservedDirs.length >= 4, "Path %s doesn't contains valid identifier", path);
-    return NameIdentifier.of(reservedDirs[0], reservedDirs[1], reservedDirs[2], reservedDirs[3]);
+            NameIdentifier.ofCatalog(
+                identifier.namespace().level(0), identifier.namespace().level(1)));
+    return catalog.asFilesetCatalog().loadFileset(identifier);
   }
 
   @Override

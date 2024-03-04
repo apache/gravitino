@@ -7,13 +7,17 @@ package com.datastrato.gravitino.filesystem.hadoop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.filesystem.hadoop.utils.FileSystemTestUtils;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -31,7 +35,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
   private FileSystem gravitinoFileSystem = null;
   private Configuration conf = null;
   private Path hdfsPath = null;
-  private Path gravitinoPath = null;
+  private Path gvfsPath = null;
 
   @BeforeAll
   public static void setup() {
@@ -51,10 +55,11 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     configuration.set("fs.AbstractFileSystem.gvfs.impl", GVFS_ABSTRACT_IMPL_CLASS);
     configuration.set("fs.gravitino.server.uri", MockServerTestBase.serverUri());
     conf = configuration;
-    gravitinoPath =
+
+    gvfsPath =
         FileSystemTestUtils.createGvfsPrefix(metalakeName, catalogName, schemaName, filesetName);
     hadoopFileSystem = HdfsMiniClusterTestBase.hadoopFileSystem();
-    gravitinoFileSystem = gravitinoPath.getFileSystem(conf);
+    gravitinoFileSystem = gvfsPath.getFileSystem(conf);
   }
 
   @AfterEach
@@ -62,56 +67,60 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     if (hadoopFileSystem.exists(hdfsPath)) {
       hadoopFileSystem.delete(hdfsPath, true);
     }
-    if (gravitinoFileSystem.exists(gravitinoPath)) {
-      gravitinoFileSystem.delete(gravitinoPath, true);
+    if (gravitinoFileSystem.exists(gvfsPath)) {
+      gravitinoFileSystem.delete(gvfsPath, true);
     }
   }
 
   @Test
-  public void testCloseFSCache() throws IOException {
-    Configuration configuration = HdfsMiniClusterTestBase.hadoopFileSystem().getConf();
+  public void testFSCache() throws IOException {
+    Configuration conf1 = HdfsMiniClusterTestBase.hadoopFileSystem().getConf();
     assertEquals(
         "true",
-        configuration.get(
+        conf1.get(
             String.format(
                 "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME)));
-    assertEquals("true", configuration.get(String.format("fs.%s.impl.disable.cache", "hdfs")));
 
-    String testFilesetName = "fileset_3";
+    Configuration conf2 = gravitinoFileSystem.getConf();
+    assertEquals(
+        "true",
+        conf2.get(
+            String.format(
+                "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME)));
+
+    // test gvfs, should not get the same fs
+    String anotherFileset = "fileset_2";
     Path hdfsPath =
-        FileSystemTestUtils.createHdfsPrefix(
-            metalakeName, catalogName, schemaName, testFilesetName);
+        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, anotherFileset);
 
-    mockFilesetDTO(metalakeName, catalogName, schemaName, testFilesetName, hdfsPath.toString());
+    mockFilesetDTO(metalakeName, catalogName, schemaName, anotherFileset, hdfsPath.toString());
 
     Path diffGvfsPath =
-        FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, testFilesetName);
-    FileSystem gvfs = diffGvfsPath.getFileSystem(conf);
-    assertNotEquals(gvfs, gravitinoFileSystem);
+        FileSystemTestUtils.createGvfsPrefix(metalakeName, catalogName, schemaName, anotherFileset);
+    FileSystem anotherGvfs = diffGvfsPath.getFileSystem(conf);
+    assertNotEquals(anotherGvfs, gravitinoFileSystem);
+
+    // test proxy hdfs, should not get the same fs
+    FileSystem proxyHdfs =
+        Objects.requireNonNull(
+                ((GravitinoVirtualFileSystem) gravitinoFileSystem)
+                    .getFilesetCache()
+                    .getIfPresent(
+                        NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)))
+            .getFileSystem();
 
     Path diffHdfsPath =
-        FileSystemTestUtils.createHdfsPrefix(
-            metalakeName, catalogName, schemaName, testFilesetName);
+        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, anotherFileset);
     FileSystem hdfs = diffHdfsPath.getFileSystem(conf);
-    assertNotEquals(hdfs, hadoopFileSystem);
+
+    assertNotEquals(hdfs, proxyHdfs);
   }
 
   @Test
   public void testCreate() throws IOException {
-    // mock the verified fileset with diff name
-    String createFilesetName = "fileset_create";
-    Path createFilesetPath =
-        FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, createFilesetName);
-    Path createHdfsPath =
-        FileSystemTestUtils.createHdfsPrefix(
-            metalakeName, catalogName, schemaName, createFilesetName);
-    mockFilesetDTO(
-        metalakeName, catalogName, schemaName, createFilesetName, createHdfsPath.toString());
-    FileSystemTestUtils.create(createFilesetPath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(createFilesetPath));
-    gravitinoFileSystem.delete(createFilesetPath, true);
+    FileSystemTestUtils.create(gvfsPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(gvfsPath));
+    gravitinoFileSystem.delete(gvfsPath, true);
 
     // mock the unverified fileset with diff name
     String unverifiedCreateFilesetName = "fileset_create_unverified";
@@ -129,108 +138,87 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
         RuntimeException.class,
         () -> FileSystemTestUtils.create(hdfsPrefixPath, gravitinoFileSystem));
 
-    // check if the file is created in the hdfs and gvfs can access it
-    Path hdfsFilePath = new Path(hdfsPath.toString() + "/append.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/append.txt");
-    FileSystemTestUtils.create(hdfsFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(hdfsFilePath));
-    FileStatus hdfsFileStatus = hadoopFileSystem.getFileStatus(hdfsFilePath);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    hadoopFileSystem.delete(hdfsFilePath, true);
-
-    // check if the file is created in the gvfs and hdfs can access it
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    assertTrue(hadoopFileSystem.exists(hdfsFilePath));
-    FileStatus gravitinoFileStatus = gravitinoFileSystem.getFileStatus(gravitinoFilePath);
-    gravitinoFileSystem.delete(gravitinoFilePath, true);
-
-    assertEquals(
-        hdfsFileStatus.getPath().toString(),
-        gravitinoFileStatus
-            .getPath()
-            .toString()
-            .replaceFirst(
-                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
-  }
-
-  @Test
-  public void testAppend() throws IOException {
-    Path diffAppendPath =
+    // test fileset mount the single file
+    Path hdfsSingleFilePath = FileSystemTestUtils.createHdfsFilePath("/files/test.txt");
+    Path filesetMountPath =
         FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, "fileset_append");
+            metalakeName, catalogName, schemaName, "fileset_single_file");
     mockFilesetDTO(
         metalakeName,
         catalogName,
         schemaName,
-        "fileset_append",
-        FileSystemTestUtils.createHdfsPrefix(
-                metalakeName, catalogName, schemaName, "fileset_append")
-            .toString());
-    Path appendFile = new Path(diffAppendPath + "/test.txt");
+        "fileset_single_file",
+        hdfsSingleFilePath.toString());
+    FileSystemTestUtils.create(filesetMountPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(filesetMountPath));
+    assertTrue(gravitinoFileSystem.isFile(filesetMountPath));
+    gravitinoFileSystem.delete(filesetMountPath, true);
+  }
+
+  @Test
+  public void testAppend() throws IOException {
+    // test fileset append
+    Path appendFile = new Path(gvfsPath + "/test.txt");
     FileSystemTestUtils.create(appendFile, gravitinoFileSystem);
     FileSystemTestUtils.append(appendFile, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(appendFile));
+    assertTrue(gravitinoFileSystem.isFile(appendFile));
     gravitinoFileSystem.delete(appendFile, true);
 
-    Path mockFilePath = new Path(hdfsPath.toString() + "/append.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/append.txt");
-    FileSystemTestUtils.create(mockFilePath, hadoopFileSystem);
-    FileSystemTestUtils.append(mockFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(mockFilePath));
-    FileStatus mockFileStatus = hadoopFileSystem.getFileStatus(mockFilePath);
-    byte[] mockInputContent = FileSystemTestUtils.read(mockFilePath, hadoopFileSystem);
-    assertEquals(new String(mockInputContent, StandardCharsets.UTF_8), "Hello, World!");
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    hadoopFileSystem.delete(mockFilePath, true);
+    // mock the unverified fileset with diff name
+    String unverifiedAppendFilesetName = "fileset_append_unverified";
+    Path unverifiedAppendFilesetPath =
+        FileSystemTestUtils.createGvfsPrefix(
+            metalakeName, catalogName, schemaName, unverifiedAppendFilesetName);
+    assertThrows(
+        RuntimeException.class,
+        () -> FileSystemTestUtils.append(unverifiedAppendFilesetPath, gravitinoFileSystem));
 
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    FileSystemTestUtils.append(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    FileStatus gravitinoFileStatus = gravitinoFileSystem.getFileStatus(gravitinoFilePath);
-    byte[] gravitinoInputContent = FileSystemTestUtils.read(gravitinoFilePath, gravitinoFileSystem);
-    assertEquals(new String(gravitinoInputContent, StandardCharsets.UTF_8), "Hello, World!");
-    gravitinoFileSystem.delete(gravitinoFilePath, true);
+    // mock the not correct prefix path
+    Path hdfsPrefixPath =
+        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, "test");
+    assertThrows(
+        RuntimeException.class,
+        () -> FileSystemTestUtils.append(hdfsPrefixPath, gravitinoFileSystem));
 
-    assertEquals(
-        new String(mockInputContent, StandardCharsets.UTF_8),
-        new String(gravitinoInputContent, StandardCharsets.UTF_8));
-    assertEquals(
-        mockFileStatus.getPath().toString(),
-        gravitinoFileStatus
-            .getPath()
-            .toString()
-            .replaceFirst(
-                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
+    // test fileset mount the single file
+    Path hdfsSingleFilePath = FileSystemTestUtils.createHdfsFilePath("/files/test.txt");
+    Path filesetMountPath =
+        FileSystemTestUtils.createGvfsPrefix(
+            metalakeName, catalogName, schemaName, "fileset_single_file");
+    mockFilesetDTO(
+        metalakeName,
+        catalogName,
+        schemaName,
+        "fileset_single_file",
+        hdfsSingleFilePath.toString());
+    FileSystemTestUtils.create(filesetMountPath, gravitinoFileSystem);
+    FileSystemTestUtils.append(filesetMountPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(filesetMountPath));
+    assertTrue(gravitinoFileSystem.isFile(filesetMountPath));
+    gravitinoFileSystem.delete(filesetMountPath, true);
   }
 
   @Test
   public void testRename() throws IOException {
-    Path mockFilePath = new Path(hdfsPath.toString() + "/append.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/append.txt");
-    FileSystemTestUtils.create(mockFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(mockFilePath));
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
+    Path srcRenamePath = new Path(gvfsPath + "/rename_src");
+    gravitinoFileSystem.mkdirs(srcRenamePath);
+    assertTrue(gravitinoFileSystem.isDirectory(srcRenamePath));
+    assertTrue(gravitinoFileSystem.exists(srcRenamePath));
 
-    Path renameMockFilePath = new Path(hdfsPath.toString() + "/append1.txt");
-    hadoopFileSystem.rename(mockFilePath, renameMockFilePath);
-    assertFalse(hadoopFileSystem.exists(mockFilePath));
-    assertTrue(hadoopFileSystem.exists(renameMockFilePath));
-    FileStatus renameFileStatus = hadoopFileSystem.getFileStatus(renameMockFilePath);
-    hadoopFileSystem.delete(renameMockFilePath, true);
+    // cannot rename the identifier
+    Path dstRenamePath1 =
+        FileSystemTestUtils.createGvfsPrefix(metalakeName, catalogName, schemaName, "rename_dst1");
+    assertThrows(
+        RuntimeException.class, () -> gravitinoFileSystem.rename(srcRenamePath, dstRenamePath1));
 
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    Path renameGravitinoFilePath = new Path(gravitinoPath.toString() + "/append1.txt");
-    gravitinoFileSystem.rename(gravitinoFilePath, renameGravitinoFilePath);
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
-    assertTrue(gravitinoFileSystem.exists(renameGravitinoFilePath));
-    FileStatus renameGravitinoFileStatus =
-        gravitinoFileSystem.getFileStatus(renameGravitinoFilePath);
-    gravitinoFileSystem.delete(renameGravitinoFilePath, true);
+    Path dstRenamePath2 = new Path(gvfsPath.toString() + "/rename_dst2");
+    gravitinoFileSystem.rename(srcRenamePath, dstRenamePath2);
+    assertFalse(gravitinoFileSystem.exists(srcRenamePath));
+    assertTrue(gravitinoFileSystem.exists(dstRenamePath2));
+    gravitinoFileSystem.delete(dstRenamePath2, true);
 
+    // test invalid src path
     Path invalidSrcPath =
         FileSystemTestUtils.createGvfsPrefix(
             metalakeName, catalogName, schemaName, "invalid_src_name");
@@ -239,177 +227,146 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     assertThrows(
         RuntimeException.class, () -> gravitinoFileSystem.rename(invalidSrcPath, validDstPath));
 
+    // test invalid dst path
     Path invalidDstPath =
         FileSystemTestUtils.createGvfsPrefix(
             metalakeName, catalogName, schemaName, "invalid_dst_name");
     assertThrows(
-        RuntimeException.class, () -> gravitinoFileSystem.rename(gravitinoPath, invalidDstPath));
+        RuntimeException.class, () -> gravitinoFileSystem.rename(gvfsPath, invalidDstPath));
 
-    assertEquals(
-        renameFileStatus.getPath().toString(),
-        renameGravitinoFileStatus
-            .getPath()
-            .toString()
-            .replaceFirst(
-                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
+    // test fileset mount the single file
+    Path hdfsSingleFilePath = FileSystemTestUtils.createHdfsFilePath("/files/test.txt");
+    FileSystemTestUtils.create(hdfsSingleFilePath, hadoopFileSystem);
+    FileSystemTestUtils.append(hdfsSingleFilePath, hadoopFileSystem);
+    assertTrue(hadoopFileSystem.exists(hdfsSingleFilePath));
+    assertTrue(hadoopFileSystem.isFile(hdfsSingleFilePath));
+
+    Path filesetPath =
+        FileSystemTestUtils.createGvfsPrefix(metalakeName, catalogName, schemaName, "fileset_tst1");
+    mockFilesetDTO(
+        metalakeName, catalogName, schemaName, "fileset_tst1", hdfsSingleFilePath.toString());
+    FileSystemTestUtils.create(filesetPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(filesetPath));
+    assertTrue(gravitinoFileSystem.isFile(filesetPath));
+    Path dstPath = new Path(filesetPath + "/files/test1.txt");
+    assertThrows(RuntimeException.class, () -> gravitinoFileSystem.rename(filesetPath, dstPath));
   }
 
   @Test
   public void testDelete() throws IOException {
-    String deleteFilesetName = "fileset_delete";
+    FileSystemTestUtils.create(gvfsPath, gravitinoFileSystem);
+    gravitinoFileSystem.delete(gvfsPath, true);
+    assertFalse(gravitinoFileSystem.exists(gvfsPath));
+
+    // mock the unverified fileset with diff name
+    String unverifiedDeleteFilesetName = "fileset_append_unverified";
+    Path unverifiedDeleteFilesetPath =
+        FileSystemTestUtils.createGvfsPrefix(
+            metalakeName, catalogName, schemaName, unverifiedDeleteFilesetName);
+    assertThrows(
+        RuntimeException.class,
+        () -> gravitinoFileSystem.delete(unverifiedDeleteFilesetPath, true));
+
+    // mock the not correct prefix path
+    Path hdfsPrefixPath =
+        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, "test");
+    assertThrows(RuntimeException.class, () -> gravitinoFileSystem.delete(hdfsPrefixPath, true));
+
+    // test fileset mount the single file
+    Path hdfsSingleFilePath = FileSystemTestUtils.createHdfsFilePath("/files/test.txt");
+    Path filesetMountPath =
+        FileSystemTestUtils.createGvfsPrefix(
+            metalakeName, catalogName, schemaName, "fileset_single_file");
     mockFilesetDTO(
         metalakeName,
         catalogName,
         schemaName,
-        deleteFilesetName,
-        FileSystemTestUtils.createHdfsPrefix(
-                metalakeName, catalogName, schemaName, deleteFilesetName)
-            .toString());
-
-    Path diffDeletePath =
-        FileSystemTestUtils.createHdfsPrefix(
-            metalakeName, catalogName, schemaName, deleteFilesetName);
-    FileSystem fs1 = diffDeletePath.getFileSystem(conf);
-    FileSystemTestUtils.create(diffDeletePath, fs1);
-    assertNotEquals(fs1, gravitinoFileSystem);
-    assertThrows(
-        IllegalArgumentException.class, () -> gravitinoFileSystem.delete(diffDeletePath, true));
-    fs1.delete(diffDeletePath, true);
-
-    Path mockFilePath = new Path(hdfsPath.toString() + "/testDelete.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testDelete.txt");
-    FileSystemTestUtils.create(mockFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(mockFilePath));
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    hadoopFileSystem.delete(mockFilePath, true);
-    assertFalse(hadoopFileSystem.exists(mockFilePath));
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
-
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    gravitinoFileSystem.delete(gravitinoFilePath, true);
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
+        "fileset_single_file",
+        hdfsSingleFilePath.toString());
+    FileSystemTestUtils.create(filesetMountPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(filesetMountPath));
+    gravitinoFileSystem.delete(filesetMountPath, true);
+    assertFalse(gravitinoFileSystem.exists(filesetMountPath));
   }
 
   @Test
   public void testGetStatus() throws IOException {
-    Path diffGetStatusPath =
-        FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, "fileset_get_status");
-    Path hdfsFilePath =
-        FileSystemTestUtils.createHdfsPrefix(
-            metalakeName, catalogName, schemaName, "fileset_get_status");
-    mockFilesetDTO(
-        metalakeName, catalogName, schemaName, "fileset_get_status", hdfsFilePath.toString());
-    FileSystemTestUtils.create(diffGetStatusPath, gravitinoFileSystem);
-    assertNotNull(gravitinoFileSystem.getFileStatus(diffGetStatusPath));
-    gravitinoFileSystem.delete(diffGetStatusPath, true);
-
-    Path mockFilePath = new Path(hdfsPath.toString() + "/testGet.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testGet.txt");
-    FileSystemTestUtils.create(mockFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(mockFilePath));
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    FileStatus mockStatuses = hadoopFileSystem.getFileStatus(hdfsPath);
-    hadoopFileSystem.delete(mockFilePath, true);
-    assertFalse(hadoopFileSystem.exists(mockFilePath));
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
-
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    FileStatus gravitinoStatuses = gravitinoFileSystem.getFileStatus(gravitinoPath);
-    gravitinoFileSystem.delete(gravitinoFilePath, true);
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
+    FileSystemTestUtils.create(gvfsPath, gravitinoFileSystem);
+    assertTrue(gravitinoFileSystem.exists(gvfsPath));
+    assertTrue(hadoopFileSystem.exists(hdfsPath));
+    FileStatus gravitinoStatuses = gravitinoFileSystem.getFileStatus(gvfsPath);
+    FileStatus hdfsStatuses = hadoopFileSystem.getFileStatus(hdfsPath);
+    gravitinoFileSystem.delete(gvfsPath, true);
+    assertFalse(gravitinoFileSystem.exists(gvfsPath));
     assertEquals(
-        mockStatuses.getPath().toString(),
+        hdfsStatuses.getPath().toString(),
         gravitinoStatuses
             .getPath()
             .toString()
             .replaceFirst(
                 GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
+                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost() + "/"));
   }
 
   @Test
   public void testListStatus() throws IOException {
-    String listFilesetName = "fileset_status";
-    mockFilesetDTO(
-        metalakeName,
-        catalogName,
-        schemaName,
-        listFilesetName,
-        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, listFilesetName)
-            .toString());
+    gravitinoFileSystem.mkdirs(gvfsPath, HdfsMiniClusterTestBase.fsPermission());
+    assertTrue(gravitinoFileSystem.exists(gvfsPath));
+    assertTrue(gravitinoFileSystem.isDirectory(gvfsPath));
+    assertTrue(hadoopFileSystem.exists(hdfsPath));
 
-    Path diffStatusPath =
-        FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, listFilesetName);
-    FileSystem fs2 = diffStatusPath.getFileSystem(conf);
-    FileSystemTestUtils.create(diffStatusPath, fs2);
-    assertNotEquals(fs2, gravitinoFileSystem);
-    assertNotNull(gravitinoFileSystem.listStatus(diffStatusPath));
-    fs2.delete(diffStatusPath, true);
+    for (int i = 0; i < 5; i++) {
+      Path subPath = new Path(gvfsPath + "/sub" + i);
+      gravitinoFileSystem.mkdirs(subPath, HdfsMiniClusterTestBase.fsPermission());
+      assertTrue(gravitinoFileSystem.exists(subPath));
+      assertTrue(gravitinoFileSystem.isDirectory(subPath));
+    }
 
-    Path mockFilePath = new Path(hdfsPath.toString() + "/testList.txt");
-    Path gravitinoFilePath = new Path(gravitinoPath.toString() + "/testList.txt");
-    FileSystemTestUtils.create(mockFilePath, hadoopFileSystem);
-    assertTrue(hadoopFileSystem.exists(mockFilePath));
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    FileStatus[] mockStatuses = hadoopFileSystem.listStatus(hdfsPath);
-    assertEquals(1, mockStatuses.length);
-    hadoopFileSystem.delete(mockFilePath, true);
-    assertFalse(hadoopFileSystem.exists(mockFilePath));
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
+    List<FileStatus> gravitinoStatuses =
+        new ArrayList<>(Arrays.asList(gravitinoFileSystem.listStatus(gvfsPath)));
+    gravitinoStatuses.sort(Comparator.comparing(FileStatus::getPath));
+    assertEquals(5, gravitinoStatuses.size());
 
-    FileSystemTestUtils.create(gravitinoFilePath, gravitinoFileSystem);
-    assertTrue(gravitinoFileSystem.exists(gravitinoFilePath));
-    FileStatus[] gravitinoStatuses = gravitinoFileSystem.listStatus(gravitinoPath);
-    assertEquals(1, gravitinoStatuses.length);
-    gravitinoFileSystem.delete(gravitinoFilePath, true);
-    assertFalse(gravitinoFileSystem.exists(gravitinoFilePath));
-    assertEquals(
-        mockStatuses[0].getPath().toString(),
-        gravitinoStatuses[0]
-            .getPath()
-            .toString()
-            .replaceFirst(
-                GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
+    List<FileStatus> hdfsStatuses =
+        new ArrayList<>(Arrays.asList(hadoopFileSystem.listStatus(hdfsPath)));
+    hdfsStatuses.sort(Comparator.comparing(FileStatus::getPath));
+    assertEquals(5, hdfsStatuses.size());
+
+    for (int i = 0; i < 5; i++) {
+      assertEquals(
+          hdfsStatuses.get(i).getPath().toString(),
+          gravitinoStatuses
+              .get(i)
+              .getPath()
+              .toString()
+              .replaceFirst(
+                  GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
+                  hadoopFileSystem.getScheme()
+                      + "://"
+                      + hadoopFileSystem.getUri().getHost()
+                      + "/"));
+      gravitinoFileSystem.delete(gravitinoStatuses.get(i).getPath(), true);
+    }
   }
 
   @Test
-  public void testMkdir() throws IOException {
-    Path diffMkdirPath =
-        FileSystemTestUtils.createGvfsPrefix(
-            metalakeName, catalogName, schemaName, "fileset_mkdir");
-    mockFilesetDTO(
-        metalakeName,
-        catalogName,
-        schemaName,
-        "fileset_mkdir",
-        FileSystemTestUtils.createHdfsPrefix(metalakeName, catalogName, schemaName, "fileset_mkdir")
-            .toString());
-    gravitinoFileSystem.mkdirs(diffMkdirPath, HdfsMiniClusterTestBase.fsPermission());
-    assertTrue(gravitinoFileSystem.exists(diffMkdirPath));
+  public void testMkdirs() throws IOException {
+    gravitinoFileSystem.mkdirs(gvfsPath, HdfsMiniClusterTestBase.fsPermission());
+    assertTrue(gravitinoFileSystem.exists(gvfsPath));
+    assertTrue(gravitinoFileSystem.isDirectory(gvfsPath));
 
-    hadoopFileSystem.mkdirs(hdfsPath);
-    assertTrue(hadoopFileSystem.exists(hdfsPath));
-    assertTrue(gravitinoFileSystem.exists(gravitinoPath));
-    FileStatus mockStatus = hadoopFileSystem.getFileStatus(hdfsPath);
-    hadoopFileSystem.delete(hdfsPath, true);
+    FileStatus gravitinoStatus = gravitinoFileSystem.getFileStatus(gvfsPath);
+    FileStatus hdfsStatus = hadoopFileSystem.getFileStatus(hdfsPath);
+    gravitinoFileSystem.delete(gvfsPath, true);
+    assertFalse(gravitinoFileSystem.exists(gvfsPath));
 
-    gravitinoFileSystem.mkdirs(gravitinoPath);
-    assertTrue(gravitinoFileSystem.exists(gravitinoPath));
-    FileStatus gravitinoStatus = gravitinoFileSystem.getFileStatus(gravitinoPath);
-    gravitinoFileSystem.delete(gravitinoPath, true);
     assertEquals(
-        mockStatus.getPath().toString(),
+        hdfsStatus.getPath().toString(),
         gravitinoStatus
             .getPath()
             .toString()
             .replaceFirst(
                 GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost()));
+                hadoopFileSystem.getScheme() + "://" + hadoopFileSystem.getUri().getHost() + "/"));
   }
 }

@@ -34,9 +34,9 @@ public class FilesetMeta {
     if (!(o instanceof FilesetMeta)) {
       return false;
     }
-    FilesetMeta that = (FilesetMeta) o;
-    return Objects.equal(getFileset(), that.getFileset())
-        && Objects.equal(getFileSystem(), that.getFileSystem());
+    FilesetMeta meta = (FilesetMeta) o;
+    return Objects.equal(getFileset(), meta.getFileset())
+        && Objects.equal(getFileSystem(), meta.getFileSystem());
   }
 
   @Override
