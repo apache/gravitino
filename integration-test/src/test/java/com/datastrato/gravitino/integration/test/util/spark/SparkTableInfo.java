@@ -61,16 +61,16 @@ public class SparkTableInfo {
     }
   }
 
-  public enum ParseStage {
-    COLLUMN,
+  private enum ParseStage {
+    COLUMN,
     DETECT,
     PARTITION,
     PARTITIONBUCKET,
     TABLE_INFO,
   }
 
-  public static SparkTableInfo getSparkTableInfo(List<Object[]> rows) {
-    ParseStage stage = ParseStage.COLLUMN;
+  static SparkTableInfo getSparkTableInfo(List<Object[]> rows) {
+    ParseStage stage = ParseStage.COLUMN;
     SparkTableInfo tableInfo = new SparkTableInfo();
     for (Object[] os : rows) {
       String[] items =
@@ -92,7 +92,7 @@ public class SparkTableInfo {
         stage = ParseStage.DETECT;
         continue;
       }
-      if (stage.equals(ParseStage.COLLUMN)) {
+      if (stage.equals(ParseStage.COLUMN)) {
         tableInfo.addColumn(SparkColumnInfo.of(items[0], items[1], items[2]));
       } else if (stage.equals(ParseStage.DETECT)) {
         String item = items[0];
@@ -128,7 +128,7 @@ public class SparkTableInfo {
     return tableInfo;
   }
 
-  // TO: will implement it in property PR.
+  // TODO: will implement in the property PR.
   private static Map<String, String> parseTableProperty(String str) {
     return new HashMap<>();
   }

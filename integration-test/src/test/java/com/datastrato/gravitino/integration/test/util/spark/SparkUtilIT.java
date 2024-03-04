@@ -66,7 +66,7 @@ public abstract class SparkUtilIT extends AbstractIT {
   protected void createDatabaseIfNotExists(String database) {
     sql(
         String.format(
-            "create database IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
+            "CREATE DATABASE IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
   }
 
   protected Map<String, String> getDatabaseMetadata(String database) {
@@ -79,11 +79,11 @@ public abstract class SparkUtilIT extends AbstractIT {
   }
 
   protected SparkTableInfo getTableInfo(String tableName) {
-    return SparkTableInfo.getSparkTableInfo(sql("desc table extended " + tableName));
+    return SparkTableInfo.getSparkTableInfo(sql("DESC TABLE EXTENDED " + tableName));
   }
 
   protected void dropTableIfExists(String tableName) {
-    sql("drop table if exists " + tableName);
+    sql("DROP TABLE IF EXISTS " + tableName);
   }
 
   protected boolean tableExists(String tableName) {
@@ -123,7 +123,7 @@ public abstract class SparkUtilIT extends AbstractIT {
         .toArray(Object[]::new);
   }
 
-  private Set<String> convertToStringSet(List<Object[]> objects, int index) {
+  private static Set<String> convertToStringSet(List<Object[]> objects, int index) {
     return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toSet());
   }
 

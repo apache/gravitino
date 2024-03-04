@@ -15,8 +15,8 @@ import org.junit.jupiter.api.Assertions;
  * set fields will be checked.
  */
 public class SparkTableInfoChecker {
-  SparkTableInfo expectedTableInfo = new SparkTableInfo();
-  List<CheckField> checkFields = new ArrayList<>();
+  private SparkTableInfo expectedTableInfo = new SparkTableInfo();
+  private List<CheckField> checkFields = new ArrayList<>();
 
   private SparkTableInfoChecker() {}
 
@@ -24,7 +24,7 @@ public class SparkTableInfoChecker {
     return new SparkTableInfoChecker();
   }
 
-  public enum CheckField {
+  private enum CheckField {
     NAME,
     COLUMN,
     COMMENT,
