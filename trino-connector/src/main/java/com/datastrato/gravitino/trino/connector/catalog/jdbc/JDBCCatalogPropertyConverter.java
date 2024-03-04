@@ -7,7 +7,6 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc;
 
 import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.PropertyEntry;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;
@@ -80,9 +79,9 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
     Map<String, String> trinoProperties = super.gravitinoToEngineProperties(properties);
     for (String requiredProperty : REQUIRED_PROPERTIES) {
-      Preconditions.checkArgument(
-          trinoProperties.containsKey(requiredProperty),
-          "Missing required property: " + requiredProperty);
+      if (!trinoProperties.containsKey(requiredProperty)) {
+        throw new IllegalArgumentException("Missing required property: " + requiredProperty);
+      }
     }
 
     return trinoProperties;

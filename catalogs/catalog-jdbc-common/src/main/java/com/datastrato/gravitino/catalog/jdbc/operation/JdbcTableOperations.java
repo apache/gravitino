@@ -22,7 +22,6 @@ import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -379,9 +378,10 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
-    Preconditions.checkArgument(
-        change.nullable() || !column.defaultValue().equals(Literals.NULL),
-        "Column " + col + " with null default value cannot be changed to not null");
+    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
+      throw new IllegalArgumentException(
+          "column " + col + " with null default value cannot be changed to not null");
+    }
   }
 
   protected JdbcColumn getJdbcColumnFromTable(JdbcTable jdbcTable, String colName) {

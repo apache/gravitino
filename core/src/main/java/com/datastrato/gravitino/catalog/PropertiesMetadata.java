@@ -108,8 +108,9 @@ public interface PropertiesMetadata {
   }
 
   default Object getOrDefault(Map<String, String> properties, String propertyName) {
-    Preconditions.checkArgument(
-        containsProperty(propertyName), "Property is not defined: " + propertyName);
+    if (!containsProperty(propertyName)) {
+      throw new IllegalArgumentException("Property is not defined: " + propertyName);
+    }
 
     if (properties.containsKey(propertyName)) {
       return propertyEntries().get(propertyName).decode(properties.get(propertyName));
@@ -118,8 +119,9 @@ public interface PropertiesMetadata {
   }
 
   default Object getDefaultValue(String propertyName) {
-    Preconditions.checkArgument(
-        containsProperty(propertyName), "Property is not defined: " + propertyName);
+    if (!containsProperty(propertyName)) {
+      throw new IllegalArgumentException("Property is not defined: " + propertyName);
+    }
 
     return propertyEntries().get(propertyName).getDefaultValue();
   }
