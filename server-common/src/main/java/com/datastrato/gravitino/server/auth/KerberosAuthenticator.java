@@ -16,6 +16,7 @@ import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -55,19 +56,16 @@ public class KerberosAuthenticator implements Authenticator {
   public void initialize(Config config) throws RuntimeException {
     try {
       String principal = config.get(KerberosConfig.PRINCIPAL);
-      if (!principal.startsWith("HTTP/")) {
-        throw new IllegalArgumentException("Principal must starts with `HTTP/`");
-      }
+      Preconditions.checkArgument(
+          principal.startsWith("HTTP/"), "Principal must starts with `HTTP/`");
 
       String keytab = config.get(KerberosConfig.KEYTAB);
       File keytabFile = new File(keytab);
-      if (!keytabFile.exists()) {
-        throw new IllegalArgumentException(String.format("Keytab %s doesn't exist", keytab));
-      }
+      Preconditions.checkArgument(
+          keytabFile.exists(), String.format("Keytab %s doesn't exist", keytab));
 
-      if (!keytabFile.canRead()) {
-        throw new IllegalArgumentException(String.format("Keytab %s can't be read", keytab));
-      }
+      Preconditions.checkArgument(
+          keytabFile.canRead(), String.format("Keytab %s can't be read", keytab));
 
       Principal krbPrincipal = new KerberosPrincipal(principal);
       LOG.info("Using keytab {}, for principal {}", keytab, krbPrincipal);
@@ -115,9 +113,8 @@ public class KerberosAuthenticator implements Authenticator {
 
     try {
       String serverPrincipal = KerberosServerUtils.getTokenServerName(clientToken);
-      if (!serverPrincipal.startsWith("HTTP/")) {
-        throw new IllegalArgumentException("Principal must start with `HTTP/`");
-      }
+      Preconditions.checkArgument(
+          serverPrincipal.startsWith("HTTP/"), "Principal must start with `HTTP/`");
 
       return Subject.doAs(
           serverSubject,

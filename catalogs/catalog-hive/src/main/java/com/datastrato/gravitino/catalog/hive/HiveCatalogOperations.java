@@ -598,25 +598,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       || !partitionFields.contains(fieldToAdd),
                   "Cannot alter partition column: " + fieldToAdd);
 
-              if (c instanceof TableChange.UpdateColumnNullability) {
-                throw new IllegalArgumentException(
-                    "Hive does not support altering column nullability");
-              }
+              Preconditions.checkArgument(
+                  !(c instanceof TableChange.UpdateColumnNullability),
+                  "Hive does not support altering column nullability");
 
-              if (c instanceof TableChange.UpdateColumnPosition
-                  && afterPartitionColumn(
-                      partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
-                throw new IllegalArgumentException(
-                    "Cannot alter column position to after partition column");
-              }
+              Preconditions.checkArgument(
+                  !(c instanceof TableChange.UpdateColumnPosition)
+                      || !afterPartitionColumn(
+                          partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition()),
+                  "Cannot alter column " + "position to after partition column");
 
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if (existingFields.contains(fieldToAdd)) {
-                  throw new IllegalArgumentException(
-                      "Cannot add column with duplicate name: " + fieldToAdd);
-                }
+                Preconditions.checkArgument(
+                    !existingFields.contains(fieldToAdd),
+                    "Cannot add column with duplicate name: " + fieldToAdd);
 
                 if (addColumn.getPosition() == null) {
                   // If the position is not specified, the column will be added to the end of the
@@ -624,9 +621,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                   return;
                 }
 
-                if ((afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
-                  throw new IllegalArgumentException("Cannot add column after partition column");
-                }
+                Preconditions.checkArgument(
+                    !afterPartitionColumn(partitionFields, addColumn.getPosition()),
+                    "Cannot add column after partition column");
               }
             });
   }
@@ -810,6 +807,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           } else if (change instanceof TableChange.UpdateColumnType) {
             doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
 
+          } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+            throw new IllegalArgumentException(
+                "Hive does not support altering column auto increment");
           } else {
             throw new IllegalArgumentException(
                 "Unsupported column change type: " + change.getClass().getSimpleName());
@@ -857,23 +857,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private void validateColumnDefaultValue(String fieldName, Expression defaultValue) {
     // The DEFAULT constraint for column is supported since Hive3.0, see
     // https://issues.apache.org/jira/browse/HIVE-18726
-    if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
-      throw new IllegalArgumentException(
-          "The DEFAULT constraint for column is only supported since Hive 3.0, "
-              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + fieldName);
-    }
+    Preconditions.checkArgument(
+        defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET),
+        "The DEFAULT constraint for column is only supported since Hive 3.0, "
+            + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
+            + fieldName);
   }
 
   private void validateNullable(String fieldName, boolean nullable) {
     // The NOT NULL constraint for column is supported since Hive3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!nullable) {
-      throw new IllegalArgumentException(
-          "The NOT NULL constraint for column is only supported since Hive 3.0, "
-              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + fieldName);
-    }
+    Preconditions.checkArgument(
+        nullable,
+        "The NOT NULL constraint for column is only supported since Hive 3.0, "
+            + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
+            + fieldName);
   }
 
   private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
@@ -931,6 +929,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
     int targetPosition;
+    if (change.isAutoIncrement()) {
+      throw new IllegalArgumentException("Hive catalog does not support auto-increment column");
+    }
     if (change.getPosition() instanceof TableChange.Default) {
       // add to the end by default
       targetPosition = cols.size();
@@ -950,21 +951,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doDeleteColumn(List<FieldSchema> cols, TableChange.DeleteColumn change) {
     String columnName = change.fieldName()[0];
-    if (!cols.removeIf(c -> c.getName().equals(columnName)) && !change.getIfExists()) {
-      throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
-    }
+    Preconditions.checkArgument(
+        cols.removeIf(c -> c.getName().equals(columnName)) || change.getIfExists(),
+        "DeleteColumn does not exist: " + columnName);
   }
 
   private void doRenameColumn(List<FieldSchema> cols, TableChange.RenameColumn change) {
     String columnName = change.fieldName()[0];
-    if (indexOfColumn(cols, columnName) == -1) {
-      throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
-    }
+    Preconditions.checkArgument(
+        indexOfColumn(cols, columnName) != -1, "RenameColumn does not exist: " + columnName);
 
     String newName = change.getNewName();
-    if (indexOfColumn(cols, newName) != -1) {
-      throw new IllegalArgumentException("Column already exists: " + newName);
-    }
+    Preconditions.checkArgument(
+        indexOfColumn(cols, newName) == -1, "Column already exists: " + newName);
     cols.get(indexOfColumn(cols, columnName)).setName(newName);
   }
 
@@ -977,9 +976,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       List<FieldSchema> cols, TableChange.UpdateColumnPosition change) {
     String columnName = change.fieldName()[0];
     int sourceIndex = indexOfColumn(cols, columnName);
-    if (sourceIndex == -1) {
-      throw new IllegalArgumentException("UpdateColumnPosition does not exist: " + columnName);
-    }
+    Preconditions.checkArgument(
+        sourceIndex != -1, "UpdateColumnPosition does not exist: " + columnName);
 
     // update column position: remove then add to given position
     FieldSchema hiveColumn = cols.remove(sourceIndex);
@@ -989,9 +987,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private void doUpdateColumnType(List<FieldSchema> cols, TableChange.UpdateColumnType change) {
     String columnName = change.fieldName()[0];
     int indexOfColumn = indexOfColumn(cols, columnName);
-    if (indexOfColumn == -1) {
-      throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
-    }
+    Preconditions.checkArgument(
+        indexOfColumn != -1, "UpdateColumnType does not exist: " + columnName);
     cols.get(indexOfColumn).setType(ToHiveType.convert(change.getNewDataType()).getQualifiedName());
   }
 

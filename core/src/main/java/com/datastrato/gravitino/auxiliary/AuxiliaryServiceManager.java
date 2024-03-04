@@ -53,14 +53,11 @@ public class AuxiliaryServiceManager {
             .map(GravitinoAuxiliaryService::getClass)
             .collect(Collectors.toList());
 
-    if (providers.isEmpty()) {
-      throw new IllegalArgumentException("No GravitinoAuxiliaryService found for: " + provider);
-    } else if (providers.size() > 1) {
-      throw new IllegalArgumentException(
-          "Multiple GravitinoAuxiliaryService found for: " + provider);
-    } else {
-      return Iterables.getOnlyElement(providers);
-    }
+    Preconditions.checkArgument(
+        !providers.isEmpty(), "No GravitinoAuxiliaryService found for: " + provider);
+    Preconditions.checkArgument(
+        providers.size() == 1, "Multiple GravitinoAuxiliaryService found for: " + provider);
+    return Iterables.getOnlyElement(providers);
   }
 
   @VisibleForTesting

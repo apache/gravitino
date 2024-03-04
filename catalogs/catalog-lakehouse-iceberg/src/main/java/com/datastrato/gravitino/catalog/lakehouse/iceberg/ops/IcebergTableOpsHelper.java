@@ -78,12 +78,10 @@ public class IcebergTableOpsHelper {
       UpdateSchema icebergUpdateSchema, DeleteColumn deleteColumn, Schema icebergTableSchema) {
     NestedField deleteField = icebergTableSchema.findField(DOT.join(deleteColumn.fieldName()));
     if (deleteField == null) {
-      if (deleteColumn.getIfExists()) {
-        return;
-      } else {
-        throw new IllegalArgumentException(
-            "delete column not exists: " + DOT.join(deleteColumn.fieldName()));
-      }
+      Preconditions.checkArgument(
+          deleteColumn.getIfExists(),
+          "Delete column not exists: " + DOT.join(deleteColumn.fieldName()));
+      return;
     }
     icebergUpdateSchema.deleteColumn(DOT.join(deleteColumn.fieldName()));
   }
@@ -191,6 +189,10 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
+    }
+
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
@@ -248,6 +250,8 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         doUpdateColumnNullability(
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
+      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+        throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");

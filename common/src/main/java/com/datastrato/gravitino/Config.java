@@ -7,6 +7,7 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -63,15 +64,11 @@ public abstract class Config {
                     .map(s -> s + File.separator + "conf")
                     .orElse(null));
 
-    if (confDir == null) {
-      throw new IllegalArgumentException("GRAVITINO_CONF_DIR or GRAVITINO_HOME not set");
-    }
+    Preconditions.checkArgument(confDir != null, "GRAVITINO_CONF_DIR or GRAVITINO_HOME not set");
 
     File confFile = new File(confDir + File.separator + name);
-    if (!confFile.exists()) {
-      throw new IllegalArgumentException(
-          "Config file " + confFile.getAbsolutePath() + " not found");
-    }
+    Preconditions.checkArgument(
+        confFile.exists(), "Config file " + confFile.getAbsolutePath() + " not found");
 
     Properties properties = loadPropertiesFromFile(confFile);
     loadFromProperties(properties);
