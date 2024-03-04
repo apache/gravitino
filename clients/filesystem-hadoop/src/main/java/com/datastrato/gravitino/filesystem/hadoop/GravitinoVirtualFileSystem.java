@@ -32,6 +32,12 @@ import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * {@link GravitinoVirtualFileSystem} is a virtual file system which users can access `fileset` and
+ * other resources. It obtains the actual storage location corresponding to the resource from the
+ * Gravitino server, and creates an independent file system for it to act as an agent for users to
+ * access the underlying storage.
+ */
 public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Logger Logger = LoggerFactory.getLogger(GravitinoVirtualFileSystem.class);
   private Path workingDirectory;
@@ -74,8 +80,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       NameIdentifier filesetIdentifier = extractIdentifier(name);
       // TODO Need support more authentication types, now we only support simple auth
       this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
-      // Close the cache for gvfs. Therefore, different gvfs instances can be obtained based on the
-      // user token.
+      // Close the gvfs cache to achieve tenant isolation based on different user tokens in the
+      // configuration.
       configuration.set(
           String.format(
               "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),

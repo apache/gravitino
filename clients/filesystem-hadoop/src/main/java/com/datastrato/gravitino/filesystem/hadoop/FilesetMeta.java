@@ -9,6 +9,10 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FileSystem;
 
+/**
+ * FilesetMeta is a class that contains the metadata for a fileset. It contains the fileset and the
+ * file system that the fileset storage location corresponding to.
+ */
 public class FilesetMeta {
   private Fileset fileset;
   private FileSystem fileSystem;
