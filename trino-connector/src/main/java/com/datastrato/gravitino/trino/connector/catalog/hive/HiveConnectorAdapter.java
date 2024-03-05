@@ -41,6 +41,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
+    properties.put("hive.security", "allow-all");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
 

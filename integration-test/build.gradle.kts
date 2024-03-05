@@ -262,6 +262,27 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     doFirst {
+      // Get current project version
+      val version = project.version.toString()
+      println("Current project version: $version")
+
+      // Check whether this module has already built
+      val trinoConnectorBuildDir = project(":trino-connector").buildDir
+      if (trinoConnectorBuildDir.exists()) {
+        // Check the version gravitino related jars in build equal to the current project version
+        val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+          val name = it.name
+          !name.endsWith(version + ".jar")
+        }
+
+        if (invalidGravitinoJars!!.isNotEmpty()) {
+          val message = "Found mismatched versions of gravitino jars in trino-connector/build/libs:\n" +
+            "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
+            "The current version of the project is $version. Please clean the project and rebuild it."
+          throw GradleException(message)
+        }
+      }
+
       printDockerCheckInfo()
 
       copy {
