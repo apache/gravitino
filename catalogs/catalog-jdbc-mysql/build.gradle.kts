@@ -16,7 +16,6 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(libs.bundles.log4j)
@@ -24,8 +23,13 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jsqlparser)
+  implementation(project(":catalogs:catalog-jdbc-common"))
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
   testImplementation(libs.mysql.driver)
   testImplementation(libs.guava)
   testImplementation(libs.commons.lang3)
@@ -33,19 +37,20 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
+  implementation(libs.slf4j.api)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
+  val runtimeJars by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs_all")
+    into("build/libs")
   }
+
   val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs_all", "build/libs")
+    dependsOn("jar", "runtimeJars")
+    from("build/libs")
     into("$rootDir/distribution/package/catalogs/jdbc-mysql/libs")
   }
 
@@ -192,11 +197,59 @@ fun checkOrbStackStatus() {
 }
 
 tasks.test {
-  doFirst {
-    printDockerCheckInfo()
-    useJUnitPlatform {
-      if (!DOCKER_IT_TEST) {
-        excludeTags("gravitino-docker-it")
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/docker/**")
+  } else {
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    dependsOn(tasks.jar)
+
+    doFirst {
+      printDockerCheckInfo()
+      jvmArgs(project.property("extraJvmArgs") as List<*>)
+
+      // Default use MiniGravitino to run integration tests
+      environment("GRAVITINO_ROOT_DIR", rootDir.path)
+      environment("IT_PROJECT_DIR", buildDir.path)
+      environment("HADOOP_USER_NAME", "datastrato")
+      environment("HADOOP_HOME", "/tmp")
+      environment("PROJECT_VERSION", version)
+
+      val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+      val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+      if (OperatingSystem.current().isMacOsX() &&
+        dockerRunning &&
+        macDockerConnector
+      ) {
+        environment("NEED_CREATE_DOCKER_NETWORK", "true")
+      }
+
+      // Gravitino CI Docker image
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
+      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
+
+      // Change poll image pause time from 30s to 60s
+      environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
+      systemProperty("gravitino.log.path", buildDir.path + "/mysql-integration-test.log")
+      delete(buildDir.path + "/mysql-integration-test.log")
+      if (testMode == "deploy") {
+        environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
+        systemProperty("testMode", "deploy")
+      } else if (testMode == "embedded") {
+        environment("GRAVITINO_HOME", rootDir.path)
+        environment("GRAVITINO_TEST", "true")
+        environment("GRAVITINO_WAR", rootDir.path + "/web/dist/")
+        systemProperty("testMode", "embedded")
+      } else {
+        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+      }
+
+      useJUnitPlatform {
+        if (!DOCKER_IT_TEST) {
+          excludeTags("gravitino-docker-it")
+        }
       }
     }
   }

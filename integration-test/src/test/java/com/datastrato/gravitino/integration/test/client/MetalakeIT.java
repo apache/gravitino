@@ -13,12 +13,12 @@ import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.common.test.util.AbstractIT;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -31,8 +31,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
-  public static String metalakeNameA = GravitinoITUtils.genRandomName("metalakeA");
-  public static String metalakeNameB = GravitinoITUtils.genRandomName("metalakeB");
+  public static String metalakeNameA = RandomNameUtils.genRandomName("metalakeA");
+  public static String metalakeNameB = RandomNameUtils.genRandomName("metalakeB");
 
   @BeforeEach
   private void start() {
@@ -97,7 +97,7 @@ public class MetalakeIT extends AbstractIT {
 
   @Test
   public void testAlterMetalake() {
-    String newName = GravitinoITUtils.genRandomName("newmetaname");
+    String newName = RandomNameUtils.genRandomName("newmetaname");
 
     client.createMetalake(
         NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
@@ -123,7 +123,7 @@ public class MetalakeIT extends AbstractIT {
 
   @Test
   public void testAlterNonExistantMetalake() {
-    String newName = GravitinoITUtils.genRandomName("newmetaname");
+    String newName = RandomNameUtils.genRandomName("newmetaname");
 
     client.createMetalake(
         NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());

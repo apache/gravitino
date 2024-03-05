@@ -19,3 +19,5 @@ include("trino-connector")
 include("spark-connector")
 include("web")
 include("docs")
+include("catalogs:catalog-common")
+findProject(":catalogs:catalog-common")?.name = "catalog-common"

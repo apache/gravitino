@@ -19,27 +19,27 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-hive"))
-  implementation(project(":catalogs:catalog-jdbc-common"))
-  implementation(project(":catalogs:catalog-jdbc-mysql"))
-  implementation(project(":catalogs:catalog-jdbc-postgresql"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
-  implementation(project(":catalogs:catalog-hadoop"))
-  implementation(project(":clients:client-java"))
-  implementation(project(":common"))
-  implementation(project(":core"))
-  implementation(project(":server"))
-  implementation(project(":server-common"))
-  implementation(project(":spark-connector"))
-  implementation(libs.bundles.jetty)
-  implementation(libs.bundles.jersey)
-  implementation(libs.bundles.jwt)
-  implementation(libs.bundles.log4j)
-  implementation(libs.commons.cli)
-  implementation(libs.commons.io)
-  implementation(libs.guava)
-  implementation(libs.httpclient5)
+  testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+  testImplementation(project(":spark-connector")) {
+    exclude("org.apache.iceberg")
+    exclude("org.apache.hadoop", "hadoop-client-api")
+    exclude("org.apache.hadoop", "hadoop-client-runtime")
+  }
+
+  testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
+  testImplementation(libs.bundles.jetty)
+  testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jwt)
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.commons.cli)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.guava)
+  testImplementation(libs.httpclient5)
 
   testImplementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
@@ -84,9 +84,7 @@ dependencies {
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs) {
-    exclude("*")
-  }
+  testImplementation(libs.hadoop2.hdfs)
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
@@ -104,8 +102,10 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop", "hadoop-client-api")
+    exclude("org.apache.hadoop", "hadoop-client-runtime")
+  }
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
@@ -114,6 +114,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation(libs.org.jodd)
   testImplementation(libs.jline.terminal)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
@@ -268,27 +269,35 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    // Get current project version
-    val version = project.version.toString()
-    println("Current project version: $version")
-    // Check whether this module has already built
-    val buildDir = project.buildDir
-    if (!buildDir.exists()) {
-      dependsOn(":trino-connector:jar")
-    } else {
-      // Check the version gravitino related jars in build equal to the current project version
-      val gravitinoJars = buildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
-        val jarVersion = name.substringAfterLast("-").substringBeforeLast(".")
-        jarVersion != version
-      }
-
-      if (gravitinoJars != null && gravitinoJars.isNotEmpty()) {
-        delete(project(":trino-connector").buildDir)
-        dependsOn(":trino-connector:jar")
-      }
-    }
+    dependsOn(":trino-connector:jar")
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+    dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
 
     doFirst {
+      // Get current project version
+      val version = project.version.toString()
+      println("Current project version: $version")
+
+      // Check whether this module has already built
+      val trinoConnectorBuildDir = project(":trino-connector").buildDir
+      if (trinoConnectorBuildDir.exists()) {
+        // Check the version gravitino related jars in build equal to the current project version
+        val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+          val name = it.name
+          !name.endsWith(version + ".jar")
+        }
+
+        if (invalidGravitinoJars!!.isNotEmpty()) {
+          val message = "Found mismatched versions of gravitino jars in trino-connector/build/libs:\n" +
+            "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
+            "The current version of the project is $version. Please clean the project and rebuild it."
+          throw GradleException(message)
+        }
+      }
+
       printDockerCheckInfo()
 
       copy {
