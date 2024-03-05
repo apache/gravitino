@@ -25,7 +25,7 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   @Order(1)
   public void testCreateMetalake() {
-    metalakePage.createMetalakeAction("test", "test");
+    metalakePage.createMetalakeAction("test", "test", true);
 
     boolean status = metalakePage.verifyIsCreatedMetalake();
 
@@ -103,6 +103,20 @@ public class MetalakePageTest extends AbstractWebIT {
       LOG.info("create many metalakes successful");
     } else {
       Assertions.fail("create many metalakes failed");
+    }
+  }
+
+  @Test
+  @Order(7)
+  public void testCreateMetalakeWithProperty() {
+    metalakePage.createMetalakeWithPropertyAction();
+
+    boolean status = metalakePage.verifyIsCreatedMetalakeWithProperty();
+
+    if (status) {
+      LOG.info("create metalake with property successful");
+    } else {
+      Assertions.fail("create metalake with property failed");
     }
   }
 }

@@ -259,7 +259,7 @@ const CreateMetalakeDialog = props => {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} id='properties'>
+            <Grid item xs={12} id='properties' data-refer='metalake-props-layout'>
               <Typography className={'twc-mb-2'} variant='body2'>
                 Properties
               </Typography>
@@ -267,7 +267,10 @@ const CreateMetalakeDialog = props => {
                 return (
                   <Grid item xs={12} key={index} className={'[&+&]:twc-mt-2'}>
                     <FormControl fullWidth>
-                      <Box className={'twc-flex twc-items-center twc-justify-between'}>
+                      <Box
+                        className={'twc-flex twc-items-center twc-justify-between'}
+                        data-refer='metalake-props-wrapper'
+                      >
                         <TextField
                           size='small'
                           name='key'
@@ -275,6 +278,7 @@ const CreateMetalakeDialog = props => {
                           value={item.key}
                           onChange={event => handleFormChange(index, event)}
                           error={item.hasDuplicateKey}
+                          data-refer={`add-props-key-${index}`}
                         />
                         <TextField
                           size='small'
@@ -282,6 +286,7 @@ const CreateMetalakeDialog = props => {
                           label='Value'
                           value={item.value}
                           onChange={event => handleFormChange(index, event)}
+                          data-refer={`add-props-value-${index}`}
                         />
                         <Box className={'twc-min-w-[40px]'}>
                           <IconButton onClick={() => removeFields(index)}>
@@ -309,6 +314,7 @@ const CreateMetalakeDialog = props => {
                 size='small'
                 onClick={addFields}
                 variant='outlined'
+                data-refer='add-metalake-props'
                 startIcon={<Icon icon='mdi:plus-circle-outline' />}
               >
                 Add Property

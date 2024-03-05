@@ -71,8 +71,14 @@ public class MetalakePage {
   @FindBy(xpath = "//button[@data-refer='close-metalake-details-btn']")
   public WebElement closeMetalakeDetailsBtn;
 
+  @FindBy(xpath = "//button[@data-refer='add-metalake-props']")
+  public WebElement addMetalakePropertyBtn;
+
   @FindBy(xpath = "//button[@aria-label='Go to next page']")
   public WebElement nextPageBtn;
+
+  @FindBy(xpath = "//button[@aria-label='Go to previous page']")
+  public WebElement prevPageBtn;
 
   public MetalakePage(WebDriver driver) {
     MetalakePage.driver = driver;
@@ -129,9 +135,30 @@ public class MetalakePage {
     this.editMetalakeBtn.click();
   }
 
+  public void clickAddPropertyBtn() {
+    LOG.info("click add metalake property button");
+    this.addMetalakePropertyBtn.click();
+  }
+
+  public void enterPropsValues(int index, String key, String value) {
+    LOG.info("enter add property values");
+    String keyPath = "//div[@data-refer='add-props-key-" + index + "']//input[@name='key']";
+    WebElement keyInput = driver.findElement(By.xpath(keyPath));
+    keyInput.sendKeys(key);
+
+    String valuePath = "//div[@data-refer='add-props-value-" + index + "']//input[@name='value']";
+    WebElement valueInput = driver.findElement(By.xpath(valuePath));
+    valueInput.sendKeys(value);
+  }
+
   public void clickNextPageBtn() {
     LOG.info("click next page button");
     this.nextPageBtn.click();
+  }
+
+  public void clickPrevPageBtn() {
+    LOG.info("click prev page button");
+    this.prevPageBtn.click();
   }
 
   public boolean verifyIsCreatedMetalake() {
@@ -196,15 +223,30 @@ public class MetalakePage {
       }
     } catch (Exception e) {
       return false;
+    } finally {
+      clickPrevPageBtn();
     }
   }
 
-  public void createMetalakeAction(String name, String comment) {
+  public boolean verifyIsCreatedMetalakeWithProperty() {
+    try {
+      createdMetalakeRow.isDisplayed();
+      createdMetalakeLink.isDisplayed();
+
+      return Objects.equals(createdMetalakeLink.getText(), "test");
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public void createMetalakeAction(String name, String comment, boolean submit) {
     LOG.info("test create metalake action started");
     clickCreateBtn();
     enterNameField(name);
     enterCommentField(comment);
-    clickSubmitBtn();
+    if (submit) {
+      clickSubmitBtn();
+    }
   }
 
   public void queryMetalakeAction() {
@@ -236,7 +278,17 @@ public class MetalakePage {
     int[] arraySize = new int[11];
     for (int i = 0; i < arraySize.length; i++) {
       LOG.info("create metalake: {}", String.valueOf(i + 1));
-      createMetalakeAction("test_" + (i + 1), "test");
+      createMetalakeAction("test_" + (i + 1), "test", true);
     }
+  }
+
+  public void createMetalakeWithPropertyAction() {
+    LOG.info("test create metalake with property action started");
+    createMetalakeAction("test", "test", false);
+    clickAddPropertyBtn();
+    enterPropsValues(0, "test", "test");
+    clickAddPropertyBtn();
+    enterPropsValues(1, "test1", "test1");
+    clickSubmitBtn();
   }
 }
