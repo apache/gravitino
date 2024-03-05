@@ -21,6 +21,11 @@ public class MetalakePage {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
   protected static WebDriver driver;
 
+  @FindBy(
+      xpath =
+          "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
+  public WebElement dataViewer;
+
   @FindBy(xpath = "//*[@id='createMetalakeBtn']")
   public WebElement createMetalakeBtn;
 
@@ -41,9 +46,6 @@ public class MetalakePage {
 
   @FindBy(xpath = "//div[@data-id='test']")
   public WebElement createdMetalakeRow;
-
-  @FindBy(xpath = "//div[@data-id='test_edited']")
-  public WebElement editedMetalakeRow;
 
   @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']")
   public WebElement createdMetalakeLink;
@@ -68,6 +70,9 @@ public class MetalakePage {
 
   @FindBy(xpath = "//button[@data-refer='close-metalake-details-btn']")
   public WebElement closeMetalakeDetailsBtn;
+
+  @FindBy(xpath = "//button[@aria-label='Go to next page']")
+  public WebElement nextPageBtn;
 
   public MetalakePage(WebDriver driver) {
     MetalakePage.driver = driver;
@@ -124,6 +129,11 @@ public class MetalakePage {
     this.editMetalakeBtn.click();
   }
 
+  public void clickNextPageBtn() {
+    LOG.info("click next page button");
+    this.nextPageBtn.click();
+  }
+
   public boolean verifyIsCreatedMetalake() {
     try {
       createdMetalakeRow.isDisplayed();
@@ -137,16 +147,9 @@ public class MetalakePage {
 
   public boolean verifyQueryMetalake() {
     try {
-      WebElement dataGrid =
-          driver.findElement(By.xpath("//div[contains(@class, 'MuiDataGrid-main')]"));
-      WebElement dataViewer =
-          dataGrid.findElement(
-              By.xpath(
-                  ".//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']"));
       List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
 
       return dataList.size() == 1 && Objects.equals(dataList.get(0).getText(), "test");
-
     } catch (Exception e) {
       return false;
     }
@@ -180,15 +183,17 @@ public class MetalakePage {
 
   public boolean verifyIsCreatedManyMetalakes() {
     try {
-      WebElement dataGrid =
-          driver.findElement(By.xpath("//div[contains(@class, 'MuiDataGrid-main')]"));
-      WebElement dataViewer =
-          dataGrid.findElement(
-              By.xpath(
-                  ".//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']"));
       List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
 
-      return dataList.size() == 10;
+      if (dataList.size() == 9) {
+        clickNextPageBtn();
+        List<WebElement> dataListNext =
+            dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+
+        return dataListNext.size() == 1;
+      } else {
+        return false;
+      }
     } catch (Exception e) {
       return false;
     }
@@ -228,7 +233,7 @@ public class MetalakePage {
 
   public void createManyMetalakesAction() {
     LOG.info("test create many metalakes action started");
-    int[] arraySize = new int[10];
+    int[] arraySize = new int[11];
     for (int i = 0; i < arraySize.length; i++) {
       LOG.info("create metalake: {}", String.valueOf(i + 1));
       createMetalakeAction("test_" + (i + 1), "test");
