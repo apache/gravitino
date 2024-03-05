@@ -46,7 +46,8 @@ public class TestSimpleAuthenticator {
                 (AuthConstants.AUTHORIZATION_BASIC_HEADER
                         + new String(
                             Base64.getEncoder()
-                                .encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8))))
+                                .encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8)),
+                            StandardCharsets.UTF_8))
                     .getBytes(StandardCharsets.UTF_8))
             .getName());
   }

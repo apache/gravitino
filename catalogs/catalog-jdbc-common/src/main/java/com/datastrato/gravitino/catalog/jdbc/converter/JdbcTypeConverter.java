@@ -73,7 +73,7 @@ public abstract class JdbcTypeConverter<TO> {
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (!(o instanceof JdbcTypeBean)) return false;
       JdbcTypeBean typeBean = (JdbcTypeBean) o;
       return Objects.equals(typeName, typeBean.typeName)
           && Objects.equals(columnSize, typeBean.columnSize)

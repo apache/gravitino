@@ -34,6 +34,7 @@ import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.storage.kv.KvGarbageCollector.LogHelper;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@SuppressWarnings("DefaultCharset")
 class TestKvGarbageCollector {
   public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);
@@ -192,8 +194,8 @@ class TestKvGarbageCollector {
       List<Pair<byte[], byte[]>> data =
           kvBackend.scan(
               new KvRange.KvRangeBuilder()
-                  .start("_".getBytes())
-                  .end("z".getBytes())
+                  .start("_".getBytes(StandardCharsets.UTF_8))
+                  .end("z".getBytes(StandardCharsets.UTF_8))
                   .startInclusive(false)
                   .endInclusive(false)
                   .build());

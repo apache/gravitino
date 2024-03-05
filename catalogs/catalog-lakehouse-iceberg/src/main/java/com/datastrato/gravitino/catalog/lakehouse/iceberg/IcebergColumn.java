@@ -5,28 +5,16 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Iceberg column. */
+@EqualsAndHashCode(callSuper = true)
 public class IcebergColumn extends BaseColumn {
-
-  private int id;
 
   private IcebergColumn() {}
 
-  public int getId() {
-    return id;
-  }
-
   /** A builder class for constructing IcebergColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, IcebergColumn> {
-
-    /** The ID of this field. */
-    private int id;
-
-    public Builder withId(int id) {
-      this.id = id;
-      return this;
-    }
 
     /**
      * Internal method to build a IcebergColumn instance using the provided values.
@@ -36,7 +24,6 @@ public class IcebergColumn extends BaseColumn {
     @Override
     protected IcebergColumn internalBuild() {
       IcebergColumn icebergColumn = new IcebergColumn();
-      icebergColumn.id = id;
       icebergColumn.name = name;
       icebergColumn.comment = comment;
       icebergColumn.dataType = dataType;

@@ -113,6 +113,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         });
   }
 
+  @SuppressWarnings("JavaUtilDate")
   private boolean isLoginTicketExpired() {
     Set<KerberosTicket> tickets =
         loginContext.getSubject().getPrivateCredentials(KerberosTicket.class);

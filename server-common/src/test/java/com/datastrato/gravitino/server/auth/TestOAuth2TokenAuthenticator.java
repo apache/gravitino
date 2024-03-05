@@ -22,13 +22,16 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenAuthenticator {
 
   @Test
   public void testAuthentication() {
     OAuth2TokenAuthenticator auth2TokenAuthenticator = new OAuth2TokenAuthenticator();
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
-    String publicKey = new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
+    String publicKey =
+        new String(
+            Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
     Config config = new Config(false) {};
     config.set(OAuthConfig.SERVICE_AUDIENCE, "service1");
     Assertions.assertThrows(

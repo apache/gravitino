@@ -259,6 +259,7 @@ subprojects {
         "InvalidJavaTimeConstant",
         "InvalidPatternSyntax",
         "IsInstanceIncompatibleType",
+        "JavaUtilDate",
         "JUnit4ClassAnnotationNonStatic",
         "JUnit4SetUpNotRun",
         "JUnit4TearDownNotRun",
@@ -294,8 +295,11 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UseCorrectAssertInTests",
         "VarTypeName",
-        "XorPower"
+        "XorPower",
+        "EqualsGetClass",
+        "DefaultCharset"
       )
     }
   }
@@ -582,7 +586,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog"
+        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "spark-connector"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -595,6 +599,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         it.name != "trino-connector" &&
+        it.name != "spark-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
       ) {

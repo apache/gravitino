@@ -807,6 +807,7 @@ public class TestRelationalCatalog extends TestBase {
             Types.StringType.get(),
             "comment2",
             TableChange.ColumnPosition.after("col1"),
+            false,
             false);
 
     testAlterTable(tableId, req, expectedTable);

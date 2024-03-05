@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import org.junit.jupiter.api.Assertions;
@@ -47,5 +48,37 @@ public class TestMysqlTableOperations {
             + "CONSTRAINT PRIMARY KEY (`col_2`, `col_1`, `col_3`),\n"
             + "CONSTRAINT `uk_3` UNIQUE (`col_4`, `col_5`, `col_6`, `col_7`)";
     Assertions.assertEquals(expectedStr, sql.toString());
+  }
+
+  @Test
+  public void testOperationIndexDefinition() {
+    TableChange.AddIndex failIndex =
+        new TableChange.AddIndex(Index.IndexType.PRIMARY_KEY, "pk_1", new String[][] {{"col_1"}});
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MysqlTableOperations.addIndexDefinition(failIndex));
+    Assertions.assertTrue(
+        illegalArgumentException
+            .getMessage()
+            .contains("Primary key name must be PRIMARY in MySQL"));
+
+    TableChange.AddIndex successIndex =
+        new TableChange.AddIndex(
+            Index.IndexType.UNIQUE_KEY, "uk_1", new String[][] {{"col_1"}, {"col_2"}});
+    String sql = MysqlTableOperations.addIndexDefinition(successIndex);
+    Assertions.assertEquals("ADD UNIQUE INDEX `uk_1` (`col_1`, `col_2`)", sql);
+
+    successIndex =
+        new TableChange.AddIndex(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col_1"}, {"col_2"}});
+    sql = MysqlTableOperations.addIndexDefinition(successIndex);
+    Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);
+
+    TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", false);
+    sql = MysqlTableOperations.deleteIndexDefinition(null, deleteIndex);
+    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
   }
 }

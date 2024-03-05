@@ -439,7 +439,7 @@ public class KvEntityStore implements EntityStore {
         return StorageLayoutVersion.V1;
       }
 
-      return StorageLayoutVersion.fromString(new String(bytes));
+      return StorageLayoutVersion.fromString(new String(bytes, StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new IllegalStateException("Failed to get/put layout version information", e);
     }

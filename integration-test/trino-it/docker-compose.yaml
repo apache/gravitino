@@ -64,7 +64,7 @@ services:
       retries: 5
 
   trino:
-    image: datastrato/gravitino-ci-trino:0.1.4
+    image: datastrato/gravitino-ci-trino:0.1.5
     networks:
       - trino-net
     container_name: trino-ci-trino
