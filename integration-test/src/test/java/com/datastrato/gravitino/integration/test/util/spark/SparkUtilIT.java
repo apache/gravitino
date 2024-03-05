@@ -53,12 +53,12 @@ public abstract class SparkUtilIT extends AbstractIT {
     return convertToStringSet(sql("SHOW DATABASES"), 0);
   }
 
-  protected Set<String> getTableNames() {
+  protected Set<String> listTableNames() {
     // the first column is namespace, the second column is table name
     return convertToStringSet(sql("SHOW TABLES"), 1);
   }
 
-  protected Set<String> getTableNames(String database) {
+  protected Set<String> listTableNames(String database) {
     return convertToStringSet(sql("SHOW TABLES in " + database), 1);
   }
 

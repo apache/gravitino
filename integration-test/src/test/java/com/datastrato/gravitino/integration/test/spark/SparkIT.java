@@ -47,19 +47,18 @@ public class SparkIT extends SparkEnvIT {
   // database after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() {
-    sql("use " + hiveCatalogName);
+    sql("USE " + hiveCatalogName);
     createDatabaseIfNotExists(getDefaultDatabase());
   }
 
   @BeforeEach
   void init() {
     sql("USE " + hiveCatalogName);
-    sql("use " + getDefaultDatabase());
+    sql("USE " + getDefaultDatabase());
   }
 
   private String getDefaultDatabase() {
     return "defaultDB";
->>>>>>> f1f75c51 (support table)
   }
 
   @Test
@@ -174,7 +173,7 @@ public class SparkIT extends SparkEnvIT {
     tableName = "dbTable2";
     createDatabaseIfNotExists(databaseName);
 
-    sql("use " + databaseName);
+    sql("USE " + databaseName);
     createSimpleTable(tableName);
     tableInfo = getTableInfo(tableName);
     checker =
@@ -206,7 +205,7 @@ public class SparkIT extends SparkEnvIT {
 
   @Test
   void testDropTable() {
-    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("drop table notExists"));
+    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("DROP TABLE notExists"));
 
     String tableName = "dropTable";
     createSimpleTable(tableName);
@@ -248,7 +247,7 @@ public class SparkIT extends SparkEnvIT {
     String table2 = "list2";
     createSimpleTable(table1);
     createSimpleTable(table2);
-    Set<String> tables = getTableNames();
+    Set<String> tables = listTableNames();
     Assertions.assertTrue(tables.contains(table1));
     Assertions.assertTrue(tables.contains(table2));
 
@@ -259,7 +258,7 @@ public class SparkIT extends SparkEnvIT {
     createDatabaseIfNotExists(database);
     createSimpleTable(String.join(".", database, table3));
     createSimpleTable(String.join(".", database, table4));
-    tables = getTableNames(database);
+    tables = listTableNames(database);
 
     Assertions.assertTrue(tables.contains(table3));
     Assertions.assertTrue(tables.contains(table4));

@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.types.DataType;
 import org.junit.jupiter.api.Assertions;
 
-/** The output of SparkSQL is parsed to SparkTableInfo to check the result in test. */
+/** SparkTableInfo is used to check the result in test. */
 @Data
 public class SparkTableInfo {
   private String tableName;
