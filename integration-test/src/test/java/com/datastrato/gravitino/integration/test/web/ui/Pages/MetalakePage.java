@@ -41,9 +41,6 @@ public class MetalakePage {
   @FindBy(xpath = "//*[@id='submitHandleMetalake']")
   public WebElement submitHandleMetalakeBtn;
 
-  @FindBy(xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]")
-  public WebElement noMetalakeRows;
-
   @FindBy(xpath = "//div[@data-id='test']")
   public WebElement createdMetalakeRow;
 
@@ -205,6 +202,9 @@ public class MetalakePage {
   }
 
   public boolean verifyIsDeletedMetalake() {
+    String noRowPath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
+    WebElement noMetalakeRows = driver.findElement(By.xpath(noRowPath));
+
     return Objects.equals(noMetalakeRows.getText(), "No rows");
   }
 
@@ -224,6 +224,7 @@ public class MetalakePage {
     } catch (Exception e) {
       return false;
     } finally {
+      driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
       clickPrevPageBtn();
     }
   }
@@ -277,8 +278,9 @@ public class MetalakePage {
     LOG.info("test create many metalakes action started");
     int[] arraySize = new int[11];
     for (int i = 0; i < arraySize.length; i++) {
-      LOG.info("create metalake: {}", String.valueOf(i + 1));
+      LOG.info("create metalake: {}", i + 1);
       createMetalakeAction("test_" + (i + 1), "test", true);
+      driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
     }
   }
 
