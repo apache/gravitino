@@ -87,66 +87,49 @@ public class HiveContainer extends BaseContainer {
       }
     }
 
-    // Use JDBC driver to test if hive server is ready
-    //    try {
-    //      Class.forName("org.apache.hive.jdbc.HiveDriver");
-    //      String connectionString = String.format("jdbc:hive2://%s:10000/default");
-    //      Connection con = DriverManager.getConnection(connectionString, "hive", "");
-    //      Statement stmt = con.createStatement();
-    //
-    //      // list all databases
-    //      String sql = "show databases";
-    //      stmt.executeQuery(sql);
-    //
-    //    } catch (ClassNotFoundException e) {
-    //      LOG.error("Failed to load Hive JDBC driver", e);
-    //      throw new RuntimeException("Failed to load Hive JDBC driver", e);
-    //    }
+    //  Use JDBC driver to test if hive server is ready
+    boolean isHiveConnectSuccess = false;
+    boolean isHdfsConnectSuccess = false;
 
-    // Test hive client if it can connect to hive server
-    boolean isHiveConnectSuccess = true;
-    //    HiveConf hiveConf = new HiveConf();
-    //    String hiveMetastoreUris =
-    //        String.format("thrift://%s:%d", getContainerIpAddress(),
-    // HiveContainer.HIVE_METASTORE_PORT);
-    //    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
-    //    HiveClientPool hiveClientPool = new HiveClientPool(1, hiveConf);
-    //
-    //    nRetry = 0;
-    //    while (nRetry++ < retryLimit) {
-    //      try {
-    //        List<String> databases = hiveClientPool.run(IMetaStoreClient::getAllDatabases);
-    //        if (!databases.isEmpty()) {
-    //          isHiveConnectSuccess = true;
-    //          break;
-    //        }
-    //        Thread.sleep(3000);
-    //      } catch (TException | InterruptedException e) {
-    //        LOG.warn("Failed to connect to hive server, retrying...", e);
-    //      }
-    //    }
+    // list all databases
+    int i = 0;
+    Container.ExecResult result;
+    String sql = "show databases";
+    while (i++ < retryLimit) {
+      try {
+        result = executeInContainer("hive", "-e", sql);
+        if (result.getStdout().contains("default")) {
+          isHiveConnectSuccess = true;
+          break;
+        }
+        Thread.sleep(3000);
+      } catch (Exception e) {
+        LOG.error("Failed to execute sql: {}", sql, e);
+      }
+    }
 
-    // Test HDFS client if it can connect to HDFS server
-    boolean isHdfsConnectSuccess = true;
-    //    nRetry = 0;
-    //    Configuration conf = new Configuration();
-    //    conf.set(
-    //        "fs.defaultFS",
-    //        String.format("hdfs://%s:%d", getContainerIpAddress(),
-    // HiveContainer.HDFS_DEFAULTFS_PORT));
-    //    while (nRetry++ < retryLimit) {
-    //      try (FileSystem fs = FileSystem.get(conf)) {
-    //        Path directoryPath = new Path("/");
-    //        FileStatus[] fileStatuses = fs.listStatus(directoryPath);
-    //        if (fileStatuses.length > 0) {
-    //          isHdfsConnectSuccess = true;
-    //          break;
-    //        }
-    //        Thread.sleep(3000);
-    //      } catch (IOException | InterruptedException e) {
-    //        LOG.warn("Failed to connect to HDFS server, retrying...", e);
-    //      }
-    //    }
+    if (!isHiveConnectSuccess) {
+      return false;
+    }
+
+    i = 0;
+    // Create a simple table and insert a record
+    while (i++ < retryLimit) {
+      try {
+        result =
+            executeInContainer(
+                "hive",
+                "-e",
+                "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
+                    + "salary String, destination String) ");
+        if (result.getExitCode() == 0) {
+          isHdfsConnectSuccess = true;
+          break;
+        }
+      } catch (Exception e) {
+        LOG.error("Failed to execute sql: {}", sql, e);
+      }
+    }
 
     LOG.info(
         "Hive container status: isHiveContainerReady={}, isHiveConnectSuccess={}, isHdfsConnectSuccess={}",

@@ -95,3 +95,4 @@ jobs:
             integration-test/build/integration-test.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log

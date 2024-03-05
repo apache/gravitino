@@ -48,7 +48,6 @@ rauschig = "1.2.0"
 mybatis = "3.5.6"
 h2db = "1.4.200"
 kyuubi = "1.8.0"
-jodd-core = "3.5.2"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -147,7 +146,6 @@ minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = 
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
-org-jodd = { group = "org.jodd", name = "jodd-core", version.ref = "jodd-core" }
 
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }

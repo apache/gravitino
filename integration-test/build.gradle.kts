@@ -114,7 +114,6 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation(libs.org.jodd)
   testImplementation(libs.jline.terminal)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
