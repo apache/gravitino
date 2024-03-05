@@ -105,7 +105,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
-    this.gravitinoCatalogClient = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    this.gravitinoCatalogClient = gravitinoCatalogManager.getCatalogInfo(name);
     String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(provider != null, name + " catalog provider is null");
     this.sparkCatalog = createAndInitSparkCatalog(provider, name, options);

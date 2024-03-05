@@ -60,7 +60,40 @@ public class GravitinoCatalogManager {
     gravitinoClient.close();
   }
 
-  public Catalog getGravitinoCatalogInfo(String name) {
+  /**
+   * List all catalog names under this catalog manager with specified metalake namespace.
+   *
+   * @return A list of {@link NameIdentifier} of the catalogs under this catalog manager.
+   */
+  public Set<String> listCatalogs() {
+    return Arrays.stream(listCatalogNames()).map(NameIdentifier::name).collect(Collectors.toSet());
+  }
+
+  /**
+   * List all catalog infos under this catalog manager with specified metalake namespace.
+   *
+   * @return A list of {@link Catalog} of the catalogs under this catalog manager.
+   */
+  public Set<Catalog> listCatalogInfos() {
+    return Arrays.stream(listCatalogNames())
+        .map(
+            nameIdentifier -> {
+              try {
+                return getCatalogInfo(nameIdentifier.name());
+              } catch (RuntimeException e) {
+                return null;
+              }
+            })
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Get the catalog info with specified catalog name.
+   *
+   * @param name The name of the catalog to get.
+   * @return The {@link Catalog} with specified catalog name.
+   */
+  public Catalog getCatalogInfo(String name) {
     try {
       return gravitinoCatalogs.get(name, () -> loadCatalog(name));
     } catch (ExecutionException e) {
@@ -73,15 +106,13 @@ public class GravitinoCatalogManager {
     return metalakeName;
   }
 
-  public Set<String> listCatalogs() {
+  private NameIdentifier[] listCatalogNames() {
     NameIdentifier[] catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
     LOG.info(
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
         Arrays.toString(catalogNames));
-    return Arrays.stream(catalogNames)
-        .map(identifier -> identifier.name())
-        .collect(Collectors.toSet());
+    return catalogNames;
   }
 
   private Catalog loadCatalog(String catalogName) {
