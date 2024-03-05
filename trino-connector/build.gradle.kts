@@ -21,10 +21,7 @@ dependencies {
   implementation(libs.httpclient5)
   implementation(libs.commons.lang3)
   implementation(libs.commons.collections4)
-  implementation(libs.trino.spi) {
-    exclude("org.apache.logging.log4j")
-  }
-  implementation(libs.trino.toolkit) {
+  compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(libs.mysql.driver)
