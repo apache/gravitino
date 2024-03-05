@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
+  private static final long INIT_VERSION = 1L;
+  private static final long DEFAULT_DELETED_AT = 0L;
 
   private POConverters() {}
 
@@ -44,9 +46,9 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.auditInfo()))
           .withSchemaVersion(
               JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.getVersion()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -76,7 +78,7 @@ public class POConverters {
               JsonUtils.anyFieldMapper().writeValueAsString(newMetalake.getVersion()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -137,9 +139,9 @@ public class POConverters {
           .withProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.getProperties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.auditInfo()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -170,7 +172,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newCatalog.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -232,9 +234,9 @@ public class POConverters {
           .withSchemaComment(schemaEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.auditInfo()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -263,7 +265,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -319,9 +321,9 @@ public class POConverters {
           .withTableId(tableEntity.id())
           .withTableName(tableEntity.name())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -349,7 +351,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
