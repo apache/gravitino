@@ -31,7 +31,7 @@ public class SparkTableInfoChecker {
   }
 
   public SparkTableInfoChecker withName(String name) {
-    this.expectedTableInfo.setName(name);
+    this.expectedTableInfo.setTableName(name);
     this.checkFields.add(CheckField.NAME);
     return this;
   }

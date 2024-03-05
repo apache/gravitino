@@ -4,11 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.spark;
 
-import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
-
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
@@ -21,6 +16,9 @@ import java.util.stream.Collectors;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.IntegerType$;
+import org.apache.spark.sql.types.StringType$;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,16 +36,8 @@ public class SparkIT extends SparkEnvIT {
   private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s VALUES (%s)";
 
   // To generate test data for write&read table.
-  private static final Map<String, String> typeConstant =
-      ImmutableMap.of(
-          TINYINT_TYPE_NAME,
-          "1",
-          INT_TYPE_NAME,
-          "2",
-          DATE_TYPE_NAME,
-          "'2023-01-01'",
-          STRING_TYPE_NAME,
-          "'gravitino_it_test'");
+  private static final Map<DataType, String> typeConstant =
+      ImmutableMap.of(IntegerType$.MODULE$, "2", StringType$.MODULE$, "'gravitino_it_test'");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
@@ -319,9 +309,9 @@ public class SparkIT extends SparkEnvIT {
 
   private List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
-        SparkColumnInfo.of("id", "int", "id comment"),
-        SparkColumnInfo.of("name", "string", ""),
-        SparkColumnInfo.of("age", "int", null));
+        SparkColumnInfo.of("id", IntegerType$.MODULE$, "id comment"),
+        SparkColumnInfo.of("name", StringType$.MODULE$, ""),
+        SparkColumnInfo.of("age", IntegerType$.MODULE$, null));
   }
 
   // Helper method to create a simple table, and could use corresponding

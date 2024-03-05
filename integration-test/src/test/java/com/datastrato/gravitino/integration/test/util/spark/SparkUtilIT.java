@@ -20,14 +20,19 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.spark.table.SparkBaseTable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.spark.sql.AnalysisException;
+import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.analysis.ResolvedTable;
+import org.apache.spark.sql.catalyst.plans.logical.CommandResult;
+import org.apache.spark.sql.catalyst.plans.logical.DescribeRelation;
 import org.junit.jupiter.api.Assertions;
 
 /**
@@ -78,8 +83,14 @@ public abstract class SparkUtilIT extends AbstractIT {
     return rowsToJava(rows);
   }
 
+  // It's hard to parse Spark SQL output, create SparkTableInfo from SparkBaseTable.
   protected SparkTableInfo getTableInfo(String tableName) {
-    return SparkTableInfo.getSparkTableInfo(sql("DESC TABLE EXTENDED " + tableName));
+    Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
+    CommandResult result = (CommandResult) ds.logicalPlan();
+    DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
+    ResolvedTable table = (ResolvedTable) relation.child();
+    SparkBaseTable baseTable = (SparkBaseTable) table.table();
+    return SparkTableInfo.create(baseTable);
   }
 
   protected void dropTableIfExists(String tableName) {
