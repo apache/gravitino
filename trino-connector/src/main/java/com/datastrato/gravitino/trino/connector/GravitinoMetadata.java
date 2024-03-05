@@ -168,13 +168,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
     }
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoTable table =
-        catalogConnectorMetadata.getTable(
-            gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
-
-    String columnName = getColumnName(session, gravitinoTableHandle, columnHandle);
-    GravitinoColumn column = table.getColumn(columnName);
-    return metadataAdapter.getColumnMetadata(column);
+    return internalMetadata.getColumnMetadata(
+        session, gravitinoTableHandle.getInternalTableHandle(), columnHandle);
   }
 
   @Override

@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.iceberg.types.Type;
@@ -90,12 +89,12 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
   @Override
   public Type atomic(com.datastrato.gravitino.rel.types.Type.PrimitiveType primitive) {
-    Preconditions.checkArgument(
-        !(primitive instanceof com.datastrato.gravitino.rel.types.Types.ByteType)
-            && !(primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType),
-        "Iceberg do not support Byte and Short Type, use Integer instead");
     if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BooleanType) {
       return Types.BooleanType.get();
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.ByteType
+        || primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType) {
+      throw new IllegalArgumentException(
+          "Iceberg do not support Byte and Short Type, use Integer instead");
     } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.IntegerType) {
       return Types.IntegerType.get();
     } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.LongType) {

@@ -18,7 +18,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
@@ -68,14 +67,15 @@ public final class KvGarbageCollector implements Closeable {
     this.entityKeyEncoder = entityKeyEncoder;
 
     long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
-    Preconditions.checkArgument(
-        deleteTimeLine <= MAX_DELETE_TIME_ALLOW && deleteTimeLine >= MIN_DELETE_TIME_ALLOW,
-        String.format(
-            "The delete time line is too long or too short, "
-                + "please check it. The delete time line is %s ms,"
-                + "max delete time allow is %s ms(30 days),"
-                + "min delete time allow is %s ms(10 minutes)",
-            deleteTimeLine, MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW));
+    if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The delete time line is too long or too short, "
+                  + "please check it. The delete time line is %s ms,"
+                  + "max delete time allow is %s ms(30 days),"
+                  + "min delete time allow is %s ms(10 minutes)",
+              deleteTimeLine, MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW));
+    }
   }
 
   public void start() {

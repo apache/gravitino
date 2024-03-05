@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino;
 
-import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 
 /** This class represents a field in the Gravitino framework. */
@@ -83,12 +82,14 @@ public class Field {
    * @throws IllegalArgumentException If the field value is invalid.
    */
   public <T> void validate(T fieldValue) {
-    Preconditions.checkArgument(
-        fieldValue != null || optional, "Field " + fieldName + " is required");
+    if (fieldValue == null && !optional) {
+      throw new IllegalArgumentException("Field " + fieldName + " is required");
+    }
 
-    Preconditions.checkArgument(
-        fieldValue == null || typeClass.isAssignableFrom(fieldValue.getClass()),
-        "Field " + fieldName + " is not of type " + typeClass.getName());
+    if (fieldValue != null && !typeClass.isAssignableFrom(fieldValue.getClass())) {
+      throw new IllegalArgumentException(
+          "Field " + fieldName + " is not of type " + typeClass.getName());
+    }
   }
 
   /** Builder class for creating Field instances. */
@@ -145,9 +146,13 @@ public class Field {
      * @throws IllegalArgumentException If the field attributes are not properly set.
      */
     public Field build() {
-      Preconditions.checkArgument(field.fieldName != null, "Field name is required");
+      if (field.fieldName == null) {
+        throw new IllegalArgumentException("Field name is required");
+      }
 
-      Preconditions.checkArgument(field.typeClass != null, "Field type class is required");
+      if (field.typeClass == null) {
+        throw new IllegalArgumentException("Field type class is required");
+      }
 
       return field;
     }

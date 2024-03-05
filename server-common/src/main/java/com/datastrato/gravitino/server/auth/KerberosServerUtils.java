@@ -14,7 +14,6 @@
  */
 package com.datastrato.gravitino.server.auth;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -246,12 +245,16 @@ public class KerberosServerUtils {
       token = token.next().get(0xa0, 0x30, 0xa2, 0x04).next();
       oid = token.next();
     }
-    Preconditions.checkArgument(oid.equals(DER.KRB5_MECH_OID), "Malformed gss token");
+    if (!oid.equals(DER.KRB5_MECH_OID)) {
+      throw new IllegalArgumentException("Malformed gss token");
+    }
     // InnerContextToken ::= {
     //     token-id[1]
     //     AP-REQ
     // }
-    Preconditions.checkArgument(token.next().getTag() == 1, "Not an AP-REQ token");
+    if (token.next().getTag() != 1) {
+      throw new IllegalArgumentException("Not an AP-REQ token");
+    }
     // AP-REQ ::= [APPLICATION 14] SEQUENCE {
     //     ticket[3]      Ticket
     // }

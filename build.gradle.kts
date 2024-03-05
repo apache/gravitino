@@ -259,6 +259,7 @@ subprojects {
         "InvalidJavaTimeConstant",
         "InvalidPatternSyntax",
         "IsInstanceIncompatibleType",
+        "JavaUtilDate",
         "JUnit4ClassAnnotationNonStatic",
         "JUnit4SetUpNotRun",
         "JUnit4TearDownNotRun",
