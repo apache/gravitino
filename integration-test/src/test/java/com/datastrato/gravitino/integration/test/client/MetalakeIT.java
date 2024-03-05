@@ -13,7 +13,7 @@ import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.common.test.util.AbstractIT;
+import com.datastrato.gravitino.common.integration.util.AbstractIT;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;

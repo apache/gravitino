@@ -5,13 +5,11 @@
 
 package com.datastrato.gravitino.integration.test.spark;
 
-import static com.datastrato.gravitino.common.test.util.AbstractIT.getGravitinoServerPort;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.common.test.container.ContainerSuite;
-import com.datastrato.gravitino.common.test.container.HiveContainer;
+import com.datastrato.gravitino.common.integration.container.ContainerSuite;
+import com.datastrato.gravitino.common.integration.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.spark.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.plugin.GravitinoSparkPlugin;

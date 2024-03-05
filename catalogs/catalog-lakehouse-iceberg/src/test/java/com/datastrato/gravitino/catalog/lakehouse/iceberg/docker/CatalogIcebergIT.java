@@ -16,10 +16,10 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertie
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.common.test.container.ContainerSuite;
-import com.datastrato.gravitino.common.test.container.HiveContainer;
-import com.datastrato.gravitino.common.test.util.AbstractIT;
-import com.datastrato.gravitino.common.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.common.integration.container.ContainerSuite;
+import com.datastrato.gravitino.common.integration.container.HiveContainer;
+import com.datastrato.gravitino.common.integration.util.AbstractIT;
+import com.datastrato.gravitino.common.integration.util.GravitinoITUtils;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.util.DTOConverters;

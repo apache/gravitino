@@ -2,9 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.test.container;
+package com.datastrato.gravitino.common.integration.container;
 
-import com.datastrato.gravitino.common.test.util.CloseableGroup;
+import com.datastrato.gravitino.common.integration.util.CloseableGroup;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;

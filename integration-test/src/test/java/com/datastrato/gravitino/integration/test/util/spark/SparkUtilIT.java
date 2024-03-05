@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.integration.test.util.spark;
 
-import com.datastrato.gravitino.common.test.util.AbstractIT;
+import com.datastrato.gravitino.common.integration.util.AbstractIT;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

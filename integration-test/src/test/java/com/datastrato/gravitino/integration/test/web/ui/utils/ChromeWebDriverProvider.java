@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.web.ui.utils;
 
-import com.datastrato.gravitino.common.test.util.ITUtils;
+import com.datastrato.gravitino.common.integration.util.ITUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
-import com.datastrato.gravitino.common.test.util.CloseableGroup;
+import com.datastrato.gravitino.common.integration.util.CloseableGroup;
 import java.io.Closeable;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

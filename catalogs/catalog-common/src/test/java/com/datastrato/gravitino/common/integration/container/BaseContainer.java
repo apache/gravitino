@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.test.container;
+package com.datastrato.gravitino.common.integration.container;
 
 import static java.util.Objects.requireNonNull;
 import static org.testcontainers.utility.MountableFile.forHostPath;

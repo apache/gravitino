@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.test.util;
+package com.datastrato.gravitino.common.integration.util;
 
 import java.util.UUID;
 import org.slf4j.Logger;
