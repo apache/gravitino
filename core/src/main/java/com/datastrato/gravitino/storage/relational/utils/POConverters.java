@@ -13,9 +13,11 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,8 @@ import java.util.stream.Collectors;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
+  private static final long INIT_VERSION = 1L;
+  private static final long DEFAULT_DELETED_AT = 0L;
 
   private POConverters() {}
 
@@ -42,9 +46,9 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.auditInfo()))
           .withSchemaVersion(
               JsonUtils.anyFieldMapper().writeValueAsString(baseMetalake.getVersion()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -74,7 +78,7 @@ public class POConverters {
               JsonUtils.anyFieldMapper().writeValueAsString(newMetalake.getVersion()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -135,9 +139,9 @@ public class POConverters {
           .withProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.getProperties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(catalogEntity.auditInfo()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -168,7 +172,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newCatalog.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -230,9 +234,9 @@ public class POConverters {
           .withSchemaComment(schemaEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(schemaEntity.auditInfo()))
-          .withCurrentVersion(1L)
-          .withLastVersion(1L)
-          .withDeletedAt(0L)
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -261,7 +265,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newSchema.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
-          .withDeletedAt(0L)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -301,6 +305,90 @@ public class POConverters {
   public static List<SchemaEntity> fromSchemaPOs(List<SchemaPO> schemaPOs, Namespace namespace) {
     return schemaPOs.stream()
         .map(schemaPO -> POConverters.fromSchemaPO(schemaPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Initialize TablePO
+   *
+   * @param tableEntity TableEntity object
+   * @return TablePO object with version initialized
+   */
+  public static TablePO initializeTablePOWithVersion(
+      TableEntity tableEntity, TablePO.Builder builder) {
+    try {
+      return builder
+          .withTableId(tableEntity.id())
+          .withTableName(tableEntity.name())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update TablePO version
+   *
+   * @param oldTablePO the old TablePO object
+   * @param newTable the new TableEntity object
+   * @return TablePO object with updated version
+   */
+  public static TablePO updateTablePOWithVersion(TablePO oldTablePO, TableEntity newTable) {
+    Long lastVersion = oldTablePO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return new TablePO.Builder()
+          .withTableId(oldTablePO.getTableId())
+          .withTableName(newTable.name())
+          .withMetalakeId(oldTablePO.getMetalakeId())
+          .withCatalogId(oldTablePO.getCatalogId())
+          .withSchemaId(oldTablePO.getSchemaId())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link TablePO} to {@link TableEntity}
+   *
+   * @param tablePO TablePO object to be converted
+   * @param namespace Namespace object to be associated with the table
+   * @return TableEntity object from SchemaPO object
+   */
+  public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
+    try {
+      return new TableEntity.Builder()
+          .withId(tablePO.getTableId())
+          .withName(tablePO.getTableName())
+          .withNamespace(namespace)
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert list of {@link TablePO} to list of {@link TableEntity}
+   *
+   * @param tablePOs list of TablePO objects
+   * @param namespace Namespace object to be associated with the table
+   * @return list of TableEntity objects from list of SchemaPO objects
+   */
+  public static List<TableEntity> fromTablePOs(List<TablePO> tablePOs, Namespace namespace) {
+    return tablePOs.stream()
+        .map(tablePO -> POConverters.fromTablePO(tablePO, namespace))
         .collect(Collectors.toList());
   }
 }

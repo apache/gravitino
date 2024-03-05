@@ -33,6 +33,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.BufferedReader;
 import java.io.File;
@@ -150,16 +151,16 @@ public class TestRelationalEntityStore {
         EntityAlreadyExistsException.class, () -> entityStore.put(duplicateMetalake, false));
 
     // overwrite true
-    BaseMetalake overittenMetalake = createMetalake(1L, "test_metalake2", "this is test2");
-    entityStore.put(overittenMetalake, true);
+    BaseMetalake overwrittenMetalake = createMetalake(1L, "test_metalake2", "this is test2");
+    entityStore.put(overwrittenMetalake, true);
     BaseMetalake insertedMetalake1 =
         entityStore.get(
-            overittenMetalake.nameIdentifier(), Entity.EntityType.METALAKE, BaseMetalake.class);
+            overwrittenMetalake.nameIdentifier(), Entity.EntityType.METALAKE, BaseMetalake.class);
     assertEquals(
         1,
         entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE).size());
-    assertEquals(overittenMetalake.name(), insertedMetalake1.name());
-    assertEquals(overittenMetalake.comment(), insertedMetalake1.comment());
+    assertEquals(overwrittenMetalake.name(), insertedMetalake1.name());
+    assertEquals(overwrittenMetalake.comment(), insertedMetalake1.comment());
   }
 
   @Test
@@ -185,20 +186,20 @@ public class TestRelationalEntityStore {
         EntityAlreadyExistsException.class, () -> entityStore.put(duplicateCatalog, false));
 
     // overwrite true
-    CatalogEntity overittenCatalog =
+    CatalogEntity overwrittenCatalog =
         createCatalog(
             1L, "test_catalog1", Namespace.ofCatalog(metalake.name()), "this is catalog test1");
-    entityStore.put(overittenCatalog, true);
+    entityStore.put(overwrittenCatalog, true);
     CatalogEntity insertedCatalog1 =
         entityStore.get(
-            overittenCatalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class);
+            overwrittenCatalog.nameIdentifier(), Entity.EntityType.CATALOG, CatalogEntity.class);
     assertEquals(
         1,
         entityStore
-            .list(overittenCatalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG)
+            .list(overwrittenCatalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG)
             .size());
-    assertEquals(overittenCatalog.name(), insertedCatalog1.name());
-    assertEquals(overittenCatalog.getComment(), insertedCatalog1.getComment());
+    assertEquals(overwrittenCatalog.name(), insertedCatalog1.name());
+    assertEquals(overwrittenCatalog.getComment(), insertedCatalog1.getComment());
   }
 
   @Test
@@ -207,7 +208,7 @@ public class TestRelationalEntityStore {
     entityStore.put(metalake, false);
 
     CatalogEntity catalog =
-        createCatalog(1L, "test_metalake", Namespace.ofCatalog(metalake.name()), "this is test");
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
     entityStore.put(catalog, false);
 
     SchemaEntity schema =
@@ -233,24 +234,75 @@ public class TestRelationalEntityStore {
     assertThrows(EntityAlreadyExistsException.class, () -> entityStore.put(duplicateSchema, false));
 
     // overwrite true
-    SchemaEntity overittenSchema =
+    SchemaEntity overwrittenSchema =
         createSchema(
             1L,
             "test_schema1",
             Namespace.ofSchema(metalake.name(), catalog.name()),
             "this is schema test1");
-    entityStore.put(overittenSchema, true);
+    entityStore.put(overwrittenSchema, true);
     SchemaEntity insertedSchema1 =
         entityStore.get(
-            overittenSchema.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class);
+            overwrittenSchema.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class);
 
     assertEquals(
         1,
         entityStore
             .list(insertedSchema1.namespace(), SchemaEntity.class, Entity.EntityType.SCHEMA)
             .size());
-    assertEquals(overittenSchema.name(), insertedSchema1.name());
-    assertEquals(overittenSchema.comment(), insertedSchema1.comment());
+    assertEquals(overwrittenSchema.name(), insertedSchema1.name());
+    assertEquals(overwrittenSchema.comment(), insertedSchema1.comment());
+  }
+
+  @Test
+  public void testTablePutAndGet() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L,
+            "test_schema",
+            Namespace.ofSchema(metalake.name(), catalog.name()),
+            "this is schema test");
+    entityStore.put(schema, false);
+
+    TableEntity table =
+        createTable(
+            1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table, false);
+
+    TableEntity insertedTable =
+        entityStore.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
+    assertNotNull(insertedTable);
+    assertTrue(checkTableEquals(table, insertedTable));
+
+    // overwrite false
+    TableEntity duplicateTable =
+        createTable(
+            1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    assertThrows(EntityAlreadyExistsException.class, () -> entityStore.put(duplicateTable, false));
+
+    // overwrite true
+    TableEntity overwrittenTable =
+        createTable(
+            1L, "test_table1", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(overwrittenTable, true);
+    TableEntity insertedTable1 =
+        entityStore.get(
+            overwrittenTable.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
+
+    assertEquals(
+        1,
+        entityStore
+            .list(insertedTable1.namespace(), TableEntity.class, Entity.EntityType.TABLE)
+            .size());
+    assertEquals(overwrittenTable.name(), insertedTable1.name());
+    assertEquals(overwrittenTable.auditInfo().creator(), insertedTable1.auditInfo().creator());
   }
 
   @Test
@@ -343,6 +395,44 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  public void testTablePutAndList() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test 1");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    TableEntity table1 =
+        createTable(
+            1L, "test_table1", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    TableEntity table2 =
+        createTable(
+            2L, "test_schema2", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+
+    List<TableEntity> beforeTableList =
+        entityStore.list(table1.namespace(), TableEntity.class, Entity.EntityType.TABLE);
+    assertNotNull(beforeTableList);
+    assertEquals(0, beforeTableList.size());
+
+    entityStore.put(table1, false);
+    entityStore.put(table2, false);
+    List<TableEntity> tableEntities =
+        entityStore.list(table1.namespace(), TableEntity.class, Entity.EntityType.TABLE).stream()
+            .sorted(Comparator.comparing(TableEntity::id))
+            .collect(Collectors.toList());
+    assertNotNull(tableEntities);
+    assertEquals(2, tableEntities.size());
+    assertTrue(checkTableEquals(table1, tableEntities.get(0)));
+    assertTrue(checkTableEquals(table2, tableEntities.get(1)));
+  }
+
+  @Test
   public void testMetalakePutAndDelete() throws IOException, InterruptedException {
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
@@ -363,6 +453,7 @@ public class TestRelationalEntityStore {
     // test cascade delete
     BaseMetalake metalake1 = createMetalake(2L, "test_metalake1", "this is test");
     entityStore.put(metalake1, false);
+
     CatalogEntity subCatalog =
         createCatalog(
             1L, "test_catalog", Namespace.ofCatalog(metalake1.name()), "test cascade deleted");
@@ -376,6 +467,13 @@ public class TestRelationalEntityStore {
             "test cascade deleted");
     entityStore.put(subSchema, false);
 
+    TableEntity subTable =
+        createTable(
+            1L,
+            "test_table",
+            Namespace.ofTable(metalake1.name(), subCatalog.name(), subSchema.name()));
+    entityStore.put(subTable, false);
+
     // cascade is false
     assertThrows(
         NonEmptyEntityException.class,
@@ -386,6 +484,7 @@ public class TestRelationalEntityStore {
     assertFalse(entityStore.exists(metalake1.nameIdentifier(), Entity.EntityType.METALAKE));
     assertFalse(entityStore.exists(subCatalog.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(entityStore.exists(subSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   @Test
@@ -424,6 +523,13 @@ public class TestRelationalEntityStore {
             "test cascade deleted");
     entityStore.put(subSchema, false);
 
+    TableEntity subTable =
+        createTable(
+            1L,
+            "test_table",
+            Namespace.ofTable(metalake.name(), catalog1.name(), subSchema.name()));
+    entityStore.put(subTable, false);
+
     // cascade is false
     assertThrows(
         NonEmptyEntityException.class,
@@ -433,6 +539,7 @@ public class TestRelationalEntityStore {
     entityStore.delete(catalog1.nameIdentifier(), Entity.EntityType.CATALOG, true);
     assertFalse(entityStore.exists(catalog1.nameIdentifier(), Entity.EntityType.CATALOG));
     assertFalse(entityStore.exists(subSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   @Test
@@ -470,9 +577,61 @@ public class TestRelationalEntityStore {
             "test cascade deleted");
     entityStore.put(schema1, false);
 
+    TableEntity subTable =
+        createTable(
+            1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema1.name()));
+    entityStore.put(subTable, false);
+
+    // cascade is false
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> entityStore.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, false));
+
     // cascade is true
     entityStore.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, true);
     assertFalse(entityStore.exists(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertFalse(entityStore.exists(subTable.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
+  public void testTablePutAndDelete() throws IOException, InterruptedException {
+    BaseMetalake metalake = createMetalake(3L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(2L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            2L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    TableEntity table =
+        createTable(
+            2L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table, false);
+
+    assertNotNull(
+        entityStore.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class));
+    entityStore.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class));
+
+    // sleep 1s to make delete_at seconds differently
+    Thread.sleep(1000);
+
+    // test cascade delete
+    TableEntity table1 =
+        createTable(
+            3L, "test_table1", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table1, false);
+
+    // cascade is true
+    entityStore.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true);
+    assertFalse(entityStore.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   @Test
@@ -736,6 +895,98 @@ public class TestRelationalEntityStore {
   }
 
   @Test
+  public void testTablePutAndUpdate() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is catalog test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L,
+            "test_schema",
+            Namespace.ofSchema(metalake.name(), catalog.name()),
+            "this is schema test");
+    entityStore.put(schema, false);
+
+    TableEntity table =
+        createTable(
+            1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table, false);
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            entityStore.update(
+                table.nameIdentifier(),
+                TableEntity.class,
+                Entity.EntityType.TABLE,
+                s -> {
+                  TableEntity.Builder builder =
+                      new TableEntity.Builder()
+                          // Change the id, which is not allowed
+                          .withId(2L)
+                          .withName("test_table2")
+                          .withNamespace(
+                              Namespace.ofTable(metalake.name(), catalog.name(), schema.name()))
+                          .withAuditInfo(s.auditInfo());
+                  return builder.build();
+                }));
+
+    AuditInfo changedAuditInfo =
+        AuditInfo.builder().withCreator("changed_creator").withCreateTime(Instant.now()).build();
+    TableEntity updatedTable =
+        entityStore.update(
+            table.nameIdentifier(),
+            TableEntity.class,
+            Entity.EntityType.TABLE,
+            s -> {
+              TableEntity.Builder builder =
+                  new TableEntity.Builder()
+                      .withId(s.id())
+                      .withName("test_table2")
+                      .withNamespace(
+                          Namespace.ofTable(metalake.name(), catalog.name(), schema.name()))
+                      .withAuditInfo(changedAuditInfo);
+              return builder.build();
+            });
+
+    TableEntity storedTable =
+        entityStore.get(updatedTable.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
+
+    assertEquals(table.id(), storedTable.id());
+    assertEquals("test_table2", storedTable.name());
+    assertEquals(changedAuditInfo.creator(), storedTable.auditInfo().creator());
+
+    TableEntity table3 =
+        createTable(
+            3L, "test_table3", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table3, false);
+
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            entityStore.update(
+                table3.nameIdentifier(),
+                TableEntity.class,
+                Entity.EntityType.TABLE,
+                s -> {
+                  TableEntity.Builder builder =
+                      new TableEntity.Builder()
+                          .withId(table3.id())
+                          // table name already exists
+                          .withName("test_table2")
+                          .withNamespace(
+                              Namespace.ofTable(metalake.name(), catalog.name(), schema.name()))
+                          .withAuditInfo(s.auditInfo());
+                  return builder.build();
+                }));
+  }
+
+  @Test
   public void testMetalakePutAndExists() throws IOException {
     BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
     entityStore.put(metalake, false);
@@ -769,6 +1020,28 @@ public class TestRelationalEntityStore {
     entityStore.put(schema, false);
 
     assertTrue(entityStore.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  public void testTablePutAndExists() throws IOException {
+    BaseMetalake metalake = createMetalake(1L, "test_metalake", "this is test");
+    entityStore.put(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(1L, "test_catalog", Namespace.ofCatalog(metalake.name()), "this is test");
+    entityStore.put(catalog, false);
+
+    SchemaEntity schema =
+        createSchema(
+            1L, "test_schema", Namespace.ofSchema(metalake.name(), catalog.name()), "this is test");
+    entityStore.put(schema, false);
+
+    TableEntity table =
+        createTable(
+            1L, "test_table", Namespace.ofTable(metalake.name(), catalog.name(), schema.name()));
+    entityStore.put(table, false);
+
+    assertTrue(entityStore.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
@@ -842,6 +1115,24 @@ public class TestRelationalEntityStore {
         && expected.comment().equals(actual.comment())
         && expected.properties() != null
         && expected.properties().equals(actual.properties())
+        && expected.auditInfo().equals(actual.auditInfo());
+  }
+
+  private static TableEntity createTable(Long id, String name, Namespace namespace) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    return new TableEntity.Builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static boolean checkTableEquals(TableEntity expected, TableEntity actual) {
+    return expected.id().equals(actual.id())
+        && expected.name().equals(actual.name())
+        && expected.namespace().equals(actual.namespace())
         && expected.auditInfo().equals(actual.auditInfo());
   }
 
