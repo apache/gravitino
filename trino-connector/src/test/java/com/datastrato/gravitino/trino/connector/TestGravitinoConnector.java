@@ -262,6 +262,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test1.memory1");
   }
 
+  @Test
+  public void testSystemTable() throws Exception {
+    MaterializedResult expectedResult = computeActual("select * from gravitino.system.catalog");
+  }
+
   private TableName createTestTable(String fullTableName) throws Exception {
     TableName tableName = new TableName(fullTableName);
 

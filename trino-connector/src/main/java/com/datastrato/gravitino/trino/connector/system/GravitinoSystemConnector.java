@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.trino.connector;
+package com.datastrato.gravitino.trino.connector.system;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
@@ -12,7 +12,9 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorPageSourceProvider;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.transaction.IsolationLevel;
@@ -31,15 +33,15 @@ import java.util.Set;
  * Trino catalog configuration, a DummyGravitinoFConnector is initially created. It is just a
  * placeholder.
  */
-public class DummyGravitinoConnector implements Connector {
+public class GravitinoSystemConnector implements Connector {
 
   private final String metalake;
   private final CatalogConnectorManager catalogConnectorManager;
 
   private final Set<Procedure> procedures = new HashSet<>();
 
-  public DummyGravitinoConnector(String metalake, CatalogConnectorManager catalogConnectorManager) {
-    super();
+  public GravitinoSystemConnector(
+      String metalake, CatalogConnectorManager catalogConnectorManager) {
     this.metalake = metalake;
     this.catalogConnectorManager = catalogConnectorManager;
 
@@ -48,7 +50,7 @@ public class DummyGravitinoConnector implements Connector {
       MethodHandle createCatalog =
           MethodHandles.lookup()
               .unreflect(
-                  DummyGravitinoConnector.class.getMethod(
+                  GravitinoSystemConnector.class.getMethod(
                       "createCatalog", String.class, String.class, Map.class, boolean.class))
               .bindTo(this);
 
@@ -66,7 +68,7 @@ public class DummyGravitinoConnector implements Connector {
       MethodHandle dropCatalog =
           MethodHandles.lookup()
               .unreflect(
-                  DummyGravitinoConnector.class.getMethod(
+                  GravitinoSystemConnector.class.getMethod(
                       "dropCatalog", String.class, boolean.class))
               .bindTo(this);
       arguments =
@@ -85,7 +87,7 @@ public class DummyGravitinoConnector implements Connector {
   @Override
   public ConnectorTransactionHandle beginTransaction(
       IsolationLevel isolationLevel, boolean readOnly, boolean autoCommit) {
-    return new ConnectorTransactionHandle() {};
+    return TransactionHandle.INSTANCE;
   }
 
   public void createCatalog(
@@ -105,11 +107,20 @@ public class DummyGravitinoConnector implements Connector {
   @Override
   public ConnectorMetadata getMetadata(
       ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
-    return new ConnectorMetadata() {
-      @Override
-      public List<String> listSchemaNames(ConnectorSession session) {
-        return List.of("system");
-      }
-    };
+    return new GravitinoSystemConnectorMetadata();
+  }
+
+  @Override
+  public ConnectorSplitManager getSplitManager() {
+    return new GravitinoSystemConnectorSplitManger();
+  }
+
+  @Override
+  public ConnectorPageSourceProvider getPageSourceProvider() {
+    return new GravitinoSystemConnectorDatasourceProvider();
+  }
+
+  public enum TransactionHandle implements ConnectorTransactionHandle {
+      INSTANCE
   }
 }

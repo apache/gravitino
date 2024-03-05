@@ -10,6 +10,7 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
+import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
@@ -89,7 +90,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
       catalogConnectorManager.addMetalake(metalake);
 
-      return new DummyGravitinoConnector(metalake, catalogConnectorManager);
+      return new GravitinoSystemConnector(metalake, catalogConnectorManager);
     }
   }
 }
