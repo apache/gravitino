@@ -21,7 +21,7 @@ public class SparkIT extends SparkEnvIT {
 
   @BeforeEach
   void init() {
-    sql("use " + hiveCatalogName);
+    sql("USE " + hiveCatalogName);
   }
 
   @Test
@@ -33,7 +33,7 @@ public class SparkIT extends SparkEnvIT {
   @Test
   void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
-    sql("create database " + testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName);
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
@@ -63,15 +63,15 @@ public class SparkIT extends SparkEnvIT {
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 
-    sql("create database " + testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName);
     databases = getDatabases();
     Assertions.assertTrue(databases.contains(testDatabaseName));
 
-    sql("drop database " + testDatabaseName);
+    sql("DROP DATABASE " + testDatabaseName);
     databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 
     Assertions.assertThrowsExactly(
-        NoSuchNamespaceException.class, () -> sql("drop database notExists"));
+        NoSuchNamespaceException.class, () -> sql("DROP DATABASE notExists"));
   }
 }
