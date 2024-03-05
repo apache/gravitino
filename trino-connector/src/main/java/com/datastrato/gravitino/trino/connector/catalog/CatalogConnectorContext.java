@@ -20,8 +20,6 @@ import java.util.Map;
  * connectors.
  */
 public class CatalogConnectorContext {
-
-  private final NameIdentifier catalogName;
   private final GravitinoMetaLake metalake;
 
   // Connector communicates with trino
@@ -37,12 +35,11 @@ public class CatalogConnectorContext {
       GravitinoMetaLake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
-    this.catalogName = catalogName;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
 
-    this.connector = new GravitinoConnector(this.catalogName, this);
+    this.connector = new GravitinoConnector(catalogName, this);
   }
 
   public GravitinoMetaLake getMetalake() {
