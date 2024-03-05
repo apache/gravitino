@@ -33,6 +33,7 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   private static String token;
 
+  @SuppressWarnings("JavaUtilDate")
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();

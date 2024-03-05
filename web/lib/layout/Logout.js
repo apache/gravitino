@@ -5,20 +5,27 @@
 
 'use client'
 
+import { useRouter } from 'next/navigation'
+
 import { Box, IconButton } from '@mui/material'
 
 import Icon from '@/components/Icon'
-import { useAuth } from '../provider/session'
-import { useAppSelector } from '../hooks/useStore'
+import { useAppDispatch, useAppSelector } from '../hooks/useStore'
+import { logoutAction } from '../store/auth'
 
 const LogoutButton = () => {
-  const auth = useAuth()
+  const router = useRouter()
+  const dispatch = useAppDispatch()
   const authStore = useAppSelector(state => state.auth)
+
+  const handleLogout = () => {
+    dispatch(logoutAction({ router }))
+  }
 
   return (
     <Box>
       {authStore.authToken ? (
-        <IconButton onClick={() => auth.logout()}>
+        <IconButton onClick={() => handleLogout()}>
           <Icon icon={'bx:exit'} />
         </IconButton>
       ) : null}

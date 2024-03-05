@@ -9,6 +9,8 @@ import com.google.errorprone.annotations.FormatString;
 
 /** This exception is thrown when an entity is not found. */
 public class NoSuchEntityException extends RuntimeException {
+  /** The no such entity message for the exception. */
+  public static final String NO_SUCH_ENTITY_MESSAGE = "No such %s entity: %s";
 
   /**
    * Constructs a new NoSuchEntityException.

@@ -107,14 +107,14 @@ public interface MetalakeMetaMapper {
           + " current_version = #{newMetalakeMeta.currentVersion},"
           + " last_version = #{newMetalakeMeta.lastVersion}"
           + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
-          + " and metalake_name = #{oldMetalakeMeta.metalakeName}"
-          + " and metalake_comment = #{oldMetalakeMeta.metalakeComment}"
-          + " and properties = #{oldMetalakeMeta.properties}"
-          + " and audit_info = #{oldMetalakeMeta.auditInfo}"
-          + " and schema_version = #{oldMetalakeMeta.schemaVersion}"
-          + " and current_version = #{oldMetalakeMeta.currentVersion}"
-          + " and last_version = #{oldMetalakeMeta.lastVersion}"
-          + " and deleted_at = 0")
+          + " AND metalake_name = #{oldMetalakeMeta.metalakeName}"
+          + " AND metalake_comment = #{oldMetalakeMeta.metalakeComment}"
+          + " AND properties = #{oldMetalakeMeta.properties}"
+          + " AND audit_info = #{oldMetalakeMeta.auditInfo}"
+          + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
+          + " AND current_version = #{oldMetalakeMeta.currentVersion}"
+          + " AND last_version = #{oldMetalakeMeta.lastVersion}"
+          + " AND deleted_at = 0")
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
@@ -122,6 +122,7 @@ public interface MetalakeMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP() WHERE metalake_id = #{metalakeId}")
+          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
 }

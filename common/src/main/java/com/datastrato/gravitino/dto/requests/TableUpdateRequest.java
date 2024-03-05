@@ -60,7 +60,10 @@ import org.apache.commons.lang3.StringUtils;
   @JsonSubTypes.Type(value = TableUpdateRequest.AddTableIndexRequest.class, name = "addTableIndex"),
   @JsonSubTypes.Type(
       value = TableUpdateRequest.DeleteTableIndexRequest.class,
-      name = "deleteTableIndex")
+      name = "deleteTableIndex"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateColumnAutoIncrementRequest.class,
+      name = "updateColumnAutoIncrement")
 })
 public interface TableUpdateRequest extends RESTRequest {
 
@@ -286,9 +289,13 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty(value = "nullable", defaultValue = "true")
     private final boolean nullable;
 
+    @Getter
+    @JsonProperty(value = "autoIncrement", defaultValue = "false")
+    private final boolean autoIncrement;
+
     /** Default constructor for Jackson deserialization. */
     public AddTableColumnRequest() {
-      this(null, null, null, null, true);
+      this(null, null, null, null, true, false);
     }
 
     /**
@@ -299,18 +306,21 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param comment the comment of the field to add
      * @param position the position of the field to add, null for default position
      * @param nullable whether the field to add is nullable
+     * @param autoIncrement whether the field to add is auto increment
      */
     public AddTableColumnRequest(
         String[] fieldName,
         Type dataType,
         String comment,
         TableChange.ColumnPosition position,
-        boolean nullable) {
+        boolean nullable,
+        boolean autoIncrement) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? TableChange.ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
+      this.autoIncrement = autoIncrement;
     }
 
     /**
@@ -323,7 +333,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     public AddTableColumnRequest(
         String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
-      this(fieldName, dataType, comment, position, true);
+      this(fieldName, dataType, comment, position, true, false);
     }
 
     /**
@@ -356,7 +366,7 @@ public interface TableUpdateRequest extends RESTRequest {
     /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldName, dataType, comment, position, nullable);
+      return TableChange.addColumn(fieldName, dataType, comment, position, nullable, autoIncrement);
     }
   }
 
@@ -763,6 +773,56 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.deleteIndex(name, ifExists);
+    }
+  }
+
+  /** Represents a request to update a column autoIncrement from a table. */
+  @EqualsAndHashCode
+  @ToString
+  class UpdateColumnAutoIncrementRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("autoIncrement")
+    private final boolean autoIncrement;
+
+    /**
+     * Constructor for UpdateColumnAutoIncrementRequest.
+     *
+     * @param fieldName the field name to update.
+     * @param autoIncrement Whether the column is auto-incremented.
+     */
+    public UpdateColumnAutoIncrementRequest(String[] fieldName, boolean autoIncrement) {
+      this.fieldName = fieldName;
+      this.autoIncrement = autoIncrement;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateColumnAutoIncrementRequest() {
+      this(null, false);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnAutoIncrement(fieldName, autoIncrement);
     }
   }
 }

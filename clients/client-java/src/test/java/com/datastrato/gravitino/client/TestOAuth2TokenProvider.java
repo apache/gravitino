@@ -31,6 +31,7 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpResponse;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenProvider {
 
   private static final int PORT = 1082;

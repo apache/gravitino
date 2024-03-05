@@ -9,18 +9,16 @@ import { createContext, useEffect, useState, useContext } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { initialVersion, setVersion as setStoreVersion } from '@/lib/store/sys'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { initialVersion } from '@/lib/store/sys'
 
 import { to } from '../utils'
-import { getAuthConfigs, setAuthToken, setIntervalId, loginAction } from '../store/auth'
+import { getAuthConfigs, setAuthToken } from '../store/auth'
 
 const authProvider = {
   version: '',
   loading: true,
-  setLoading: () => Boolean,
-  login: () => Promise.resolve(),
-  logout: () => Promise.resolve()
+  setLoading: () => Boolean
 }
 
 const AuthContext = createContext(authProvider)
@@ -34,22 +32,7 @@ const AuthProvider = ({ children }) => {
   const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
 
-  const authStore = useAppSelector(state => state.auth)
   const dispatch = useAppDispatch()
-
-  const handleLogin = async params => {
-    dispatch(loginAction({ params, router }))
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('version')
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('authParams')
-
-    dispatch(setStoreVersion(''))
-    dispatch(setAuthToken(''))
-    router.push('/ui/login')
-  }
 
   useEffect(() => {
     const initAuth = async () => {
@@ -60,7 +43,6 @@ const AuthProvider = ({ children }) => {
         dispatch(initialVersion())
       } else if (authType === 'oauth') {
         if (token) {
-          dispatch(setIntervalId())
           dispatch(setAuthToken(token))
           dispatch(initialVersion())
         } else {
@@ -76,9 +58,7 @@ const AuthProvider = ({ children }) => {
   const values = {
     version,
     token,
-    loading,
-    login: handleLogin,
-    logout: handleLogout
+    loading
   }
 
   return <AuthContext.Provider value={values}>{children}</AuthContext.Provider>
