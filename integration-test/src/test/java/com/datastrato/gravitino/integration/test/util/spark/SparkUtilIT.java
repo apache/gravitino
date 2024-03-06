@@ -83,7 +83,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     return rowsToJava(rows);
   }
 
-  // It's hard to parse Spark SQL output, create SparkTableInfo from SparkBaseTable.
+  // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
   protected SparkTableInfo getTableInfo(String tableName) {
     Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
     CommandResult result = (CommandResult) ds.logicalPlan();

@@ -97,13 +97,17 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
       validateNamespace(namespace);
       gravitinoNamespace = namespace[0];
     }
-    NameIdentifier[] identifiers =
-        gravitinoCatalogClient
-            .asTableCatalog()
-            .listTables(Namespace.of(metalakeName, catalogName, gravitinoNamespace));
-    return Arrays.stream(identifiers)
-        .map(identifier -> Identifier.of(getNamespace(identifier), identifier.name()))
-        .toArray(Identifier[]::new);
+    try {
+      NameIdentifier[] identifiers =
+          gravitinoCatalogClient
+              .asTableCatalog()
+              .listTables(Namespace.of(metalakeName, catalogName, gravitinoNamespace));
+      return Arrays.stream(identifiers)
+          .map(identifier -> Identifier.of(getNamespace(identifier), identifier.name()))
+          .toArray(Identifier[]::new);
+    } catch (NoSuchSchemaException e) {
+      throw new NoSuchNamespaceException(namespace);
+    }
   }
 
   @Override

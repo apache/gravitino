@@ -133,7 +133,6 @@ public class SparkIT extends SparkEnvIT {
   }
 
   // Create simple tables without advanced features like comment, property, partition, bucket.
-  // To check whether create and load operation with default.
   @Test
   void testCreateSimpleTable() {
     String tableName = "simpleTable";
@@ -151,8 +150,6 @@ public class SparkIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
-  // testCreateSimpleTable create tables without database name,
-  // while this test create tables with specific database name.
   @Test
   void testCreateTableWithDatabase() {
     // test db.table as table identifier
@@ -182,9 +179,8 @@ public class SparkIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
-  // Create tables with advanced features like comment, property, partition, bucket etc.
   @Test
-  void testCreateComplexTable() {
+  void testCreateTableWithAdvancedFeatures() {
     String tableName = "complexTable";
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
@@ -262,6 +258,8 @@ public class SparkIT extends SparkEnvIT {
 
     Assertions.assertTrue(tables.contains(table3));
     Assertions.assertTrue(tables.contains(table4));
+
+    Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("notExistsDB"));
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {

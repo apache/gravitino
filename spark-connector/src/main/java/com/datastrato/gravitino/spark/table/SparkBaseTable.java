@@ -55,14 +55,14 @@ public class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
   }
 
   protected Table getSparkTable() {
-    if (lazySparkTable == null) {
+    if (this.lazySparkTable == null) {
       try {
-        lazySparkTable = this.sparkCatalog.loadTable(identifier);
+        this.lazySparkTable = sparkCatalog.loadTable(identifier);
       } catch (NoSuchTableException e) {
         throw new RuntimeException(e);
       }
     }
-    return lazySparkTable;
+    return this.lazySparkTable;
   }
 
   @Override
