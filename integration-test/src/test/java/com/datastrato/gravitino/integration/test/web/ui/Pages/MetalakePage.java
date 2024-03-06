@@ -41,24 +41,6 @@ public class MetalakePage {
   @FindBy(xpath = "//*[@id='submitHandleMetalake']")
   public WebElement submitHandleMetalakeBtn;
 
-  @FindBy(xpath = "//div[@data-id='test']")
-  public WebElement createdMetalakeRow;
-
-  @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']")
-  public WebElement createdMetalakeLink;
-
-  @FindBy(xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test_edited']")
-  public WebElement editedMetalakeLink;
-
-  @FindBy(xpath = "//button[@data-refer='view-metalake-test']")
-  public WebElement viewMetalakeBtn;
-
-  @FindBy(xpath = "//button[@data-refer='edit-metalake-test']")
-  public WebElement editMetalakeBtn;
-
-  @FindBy(xpath = "//button[@data-refer='delete-metalake-test_edited']")
-  public WebElement deleteMetalakeBtn;
-
   @FindBy(xpath = "//button[@data-refer='confirm-delete']")
   public WebElement confirmDeleteBtn;
 
@@ -80,7 +62,7 @@ public class MetalakePage {
   public MetalakePage(WebDriver driver) {
     MetalakePage.driver = driver;
     PageFactory.initElements(driver, this);
-    driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
+    driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
   }
 
   public void clickCreateBtn() {
@@ -115,7 +97,9 @@ public class MetalakePage {
 
   public void clickDeleteMetalakeBtn() {
     LOG.info("click delete metalake button");
-    this.deleteMetalakeBtn.click();
+    String xpath = "//button[@data-refer='delete-metalake-test_edited']";
+    WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
+    deleteMetalakeBtn.click();
   }
 
   public void clickConfirmDeleteBtn() {
@@ -125,12 +109,16 @@ public class MetalakePage {
 
   public void clickViewMetalakeBtn() {
     LOG.info("click view metalake details button");
-    this.viewMetalakeBtn.click();
+    String xpath = "//button[@data-refer='view-metalake-test']";
+    WebElement viewMetalakeBtn = driver.findElement(By.xpath(xpath));
+    viewMetalakeBtn.click();
   }
 
   public void clickEditMetalakeBtn() {
     LOG.info("click edit metalake button");
-    this.editMetalakeBtn.click();
+    String xpath = "//button[@data-refer='edit-metalake-test']";
+    WebElement editMetalakeBtn = driver.findElement(By.xpath(xpath));
+    editMetalakeBtn.click();
   }
 
   public void clickAddPropertyBtn() {
@@ -161,7 +149,12 @@ public class MetalakePage {
 
   public boolean verifyIsCreatedMetalake() {
     try {
+      String rowPath = "//div[@data-id='test']";
+      WebElement createdMetalakeRow = driver.findElement(By.xpath(rowPath));
       boolean isRow = createdMetalakeRow.isDisplayed();
+
+      String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']";
+      WebElement createdMetalakeLink = driver.findElement(By.xpath(linkPath));
       boolean isLink = createdMetalakeLink.isDisplayed();
       boolean isText = Objects.equals(createdMetalakeLink.getText(), "test");
 
@@ -183,6 +176,9 @@ public class MetalakePage {
 
   public boolean verifyIsEditedMetalake() {
     try {
+      String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test_edited']";
+      WebElement editedMetalakeLink = driver.findElement(By.xpath(xpath));
+
       return Objects.equals(editedMetalakeLink.getText(), "test_edited");
     } catch (Exception e) {
       return false;
@@ -203,8 +199,8 @@ public class MetalakePage {
   }
 
   public boolean verifyIsDeletedMetalake() {
-    String noRowPath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
-    WebElement noMetalakeRows = driver.findElement(By.xpath(noRowPath));
+    String xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
+    WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
 
     return Objects.equals(noMetalakeRows.getText(), "No rows");
   }
@@ -231,7 +227,12 @@ public class MetalakePage {
 
   public boolean verifyIsCreatedMetalakeWithProperty() {
     try {
+      String rowPath = "//div[@data-id='test']";
+      WebElement createdMetalakeRow = driver.findElement(By.xpath(rowPath));
       boolean isRow = createdMetalakeRow.isDisplayed();
+
+      String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=test']";
+      WebElement createdMetalakeLink = driver.findElement(By.xpath(linkPath));
       boolean isLink = createdMetalakeLink.isDisplayed();
       boolean isText = Objects.equals(createdMetalakeLink.getText(), "test");
 
@@ -243,8 +244,8 @@ public class MetalakePage {
 
   public boolean verifyIsLinkedToCatalogsPage() {
     try {
-      String nameLinkPath = "//a[@data-refer='metalake-name-link']";
-      WebElement nameLink = driver.findElement(By.xpath(nameLinkPath));
+      String xpath = "//a[@data-refer='metalake-name-link']";
+      WebElement nameLink = driver.findElement(By.xpath(xpath));
 
       String url = driver.getCurrentUrl();
       boolean isUrl = url.contains("/ui/metalakes?metalake=metalake_test");
@@ -311,8 +312,8 @@ public class MetalakePage {
     LOG.info("test link to catalogs page action started");
     createMetalakeAction("metalake_test", "test", true);
 
-    String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=metalake_test']";
-    WebElement metalakeLink = driver.findElement(By.xpath(linkPath));
+    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=metalake_test']";
+    WebElement metalakeLink = driver.findElement(By.xpath(xpath));
     metalakeLink.click();
   }
 }
