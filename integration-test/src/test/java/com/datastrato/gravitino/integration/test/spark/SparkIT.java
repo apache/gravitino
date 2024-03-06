@@ -42,19 +42,37 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(StringUtils.isBlank(properties));
 
     testDatabaseName = "t_create2";
+    String testDatabaseLocation = "/tmp/" + testDatabaseName;
     sql(
         String.format(
-            "CREATE DATABASE %s COMMENT 'comment' LOCATION '/user'\n"
-                + " WITH DBPROPERTIES (ID=001);",
-            testDatabaseName));
+            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=001);",
+            testDatabaseName, testDatabaseLocation));
     databaseMeta = getDatabaseMetadata(testDatabaseName);
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    // underlying catalog may change /user to file:/user
-    Assertions.assertTrue(databaseMeta.get("Location").contains("/user"));
+    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
+    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
     Assertions.assertEquals("((ID,001))", properties);
+  }
+
+  @Test
+  void testAlterSchema() {
+    String testDatabaseName = "t_alter";
+    sql("CREATE DATABASE " + testDatabaseName);
+    Assertions.assertTrue(
+        StringUtils.isBlank(getDatabaseMetadata(testDatabaseName).get("Properties")));
+
+    sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
+    Assertions.assertEquals("((ID,001))", getDatabaseMetadata(testDatabaseName).get("Properties"));
+
+    // Hive metastore doesn't support alter database location, therefore this test method
+    // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
+
+    Assertions.assertThrowsExactly(
+        NoSuchNamespaceException.class,
+        () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
   }
 
   @Test
