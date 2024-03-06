@@ -18,8 +18,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   private static final int MYSQL_CHAR_LENGTH_LIMIT = 255;
   // 65535 / 4 = 16383, in fact, MySQL limit the row size to 65535, and the utf8mb4 character set
   // uses 4 bytes per character. In fact, if a row has several varchar columns, the length of each
-  // column
-  // should be less than 16383. For more details, please refer to
+  // column should be less than 16383. For more details, please refer to
   // https://dev.mysql.com/doc/refman/8.0/en/char.html
   private static final int MYSQL_VARCHAR_LENGTH_LIMIT = 16383;
 
