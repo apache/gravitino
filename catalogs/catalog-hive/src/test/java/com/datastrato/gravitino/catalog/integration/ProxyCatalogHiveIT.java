@@ -46,8 +46,10 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("gravitino-docker-it")
 public class ProxyCatalogHiveIT extends AbstractIT {
 
   public static final String METALAKE_NAME =
