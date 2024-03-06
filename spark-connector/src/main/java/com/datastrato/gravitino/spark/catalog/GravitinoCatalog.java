@@ -13,7 +13,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.spark.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.ConnectorConstants;
 import com.datastrato.gravitino.spark.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.GravitinoCatalogAdaptorFactory;
