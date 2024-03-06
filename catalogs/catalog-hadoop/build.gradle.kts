@@ -14,10 +14,20 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":common"))
 
   implementation(libs.guava)
+  implementation(libs.hadoop2.common) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+  }
+
+  implementation(libs.hadoop2.hdfs) {
+    exclude("javax.servlet", "servlet-api")
+    exclude("com.sun.jersey")
+  }
+
   implementation(libs.slf4j.api)
 
   testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
@@ -31,15 +41,6 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testRuntimeOnly(libs.junit.jupiter.engine)
-  implementation(libs.hadoop2.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-  }
-
-  implementation(libs.hadoop2.hdfs) {
-    exclude("javax.servlet", "servlet-api")
-    exclude("com.sun.jersey")
-  }
 }
 
 tasks {
