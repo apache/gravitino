@@ -25,7 +25,7 @@ dependencies {
   implementation(libs.jsqlparser)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
-  testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
+  testImplementation(project(":test-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

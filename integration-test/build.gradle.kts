@@ -31,7 +31,7 @@ dependencies {
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
 
-  testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
+  testImplementation(project(":test-common", "testArtifacts"))
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)

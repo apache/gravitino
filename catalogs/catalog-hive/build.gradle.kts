@@ -82,7 +82,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
 
-  testImplementation(project(":catalogs:catalog-common", "testArtifacts"))
+  testImplementation(project(":test-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
