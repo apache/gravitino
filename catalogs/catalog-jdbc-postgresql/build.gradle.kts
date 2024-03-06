@@ -75,9 +75,8 @@ tasks {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  println("start to check, skipIts = $skipITs-------------------------------------------------")
   if (skipITs) {
-    exclude("**/docker/**")
+    exclude("**/integration/**")
   } else {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")

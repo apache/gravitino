@@ -150,9 +150,8 @@ tasks {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  println("start to check, skipIts = $skipITs-------------------------------------------------")
   if (skipITs) {
-    exclude("**/docker/**")
+    exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
 
