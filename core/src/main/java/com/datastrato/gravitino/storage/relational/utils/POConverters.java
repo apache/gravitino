@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
@@ -487,8 +488,9 @@ public class POConverters {
 
   public static boolean checkFilesetVersionNeedUpdate(
       FilesetVersionPO oldFilesetVersionPO, FilesetEntity newFileset) {
-    if (!oldFilesetVersionPO.getFilesetComment().equals(newFileset.comment())
-        || !oldFilesetVersionPO.getStorageLocation().equals(newFileset.storageLocation())) {
+    if (!StringUtils.equals(oldFilesetVersionPO.getFilesetComment(), newFileset.comment())
+        || !StringUtils.equals(
+            oldFilesetVersionPO.getStorageLocation(), newFileset.storageLocation())) {
       return true;
     }
 
