@@ -42,17 +42,17 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(StringUtils.isBlank(properties));
 
     testDatabaseName = "t_create2";
+    String testDatabaseLocation = "/tmp/" + testDatabaseName;
     sql(
         String.format(
-            "CREATE DATABASE %s COMMENT 'comment' LOCATION '/tmp/test_%s'\n"
-                + " WITH DBPROPERTIES (ID=001);",
-            testDatabaseName, testDatabaseName));
+            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=001);",
+            testDatabaseName, testDatabaseLocation));
     databaseMeta = getDatabaseMetadata(testDatabaseName);
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    // underlying catalog may change /user to file:/user
-    Assertions.assertTrue(databaseMeta.get("Location").contains("/tmp/test_" + testDatabaseName));
+    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
+    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
     Assertions.assertEquals("((ID,001))", properties);
   }
