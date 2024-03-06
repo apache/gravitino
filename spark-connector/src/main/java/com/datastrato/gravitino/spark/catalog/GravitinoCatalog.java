@@ -139,7 +139,6 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
-  // Will create a catalog specific table
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     try {
@@ -148,6 +147,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
           gravitinoCatalogClient
               .asTableCatalog()
               .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+      // Will create a catalog specific table
       return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
