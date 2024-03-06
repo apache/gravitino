@@ -20,6 +20,7 @@
 
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
@@ -29,6 +30,7 @@ import java.util.Objects;
  * The TableChange interface defines the public API for managing tables in a schema. If the catalog
  * implementation supports tables, it must implement this interface.
  */
+@Evolving
 public interface TableChange {
 
   /**

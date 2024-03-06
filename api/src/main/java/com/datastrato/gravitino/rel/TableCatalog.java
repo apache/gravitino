@@ -24,6 +24,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMP
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -39,6 +40,7 @@ import java.util.Map;
  * The TableCatalog interface defines the public API for managing tables in a schema. If the catalog
  * implementation supports tables, it must implement this interface.
  */
+@Evolving
 public interface TableCatalog {
 
   /**
