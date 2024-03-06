@@ -8,21 +8,13 @@ CREATE TABLE
    id integer,
    name char(20)
 )
-COMMENT ''
-WITH (
-   engine = 'InnoDB'
-)"
-
-CREATE TABLE
+COMMENT ''"
 
 "CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb02 (
    id integer,
    name char(65536)
 )
-COMMENT ''
-WITH (
-   engine = 'InnoDB'
-)"
+COMMENT ''"
 
 <QUERY_FAILED> Unknown type 'char(65537)' for column 'name'
 
@@ -32,10 +24,7 @@ CREATE TABLE
    id integer,
    name varchar(250)
 )
-COMMENT ''
-WITH (
-   engine = 'InnoDB'
-)"
+COMMENT ''"
 
 CREATE TABLE
 
@@ -43,10 +32,7 @@ CREATE TABLE
    id integer,
    name varchar(10485760)
 )
-COMMENT ''
-WITH (
-   engine = 'InnoDB'
-)"
+COMMENT ''"
 
 <QUERY_FAILED> Failed to create table.
 
