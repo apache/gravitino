@@ -119,4 +119,18 @@ public class MetalakePageTest extends AbstractWebIT {
       Assertions.fail("create metalake with property failed");
     }
   }
+
+  @Test
+  @Order(8)
+  public void testLinkToCatalogsPage() {
+    metalakePage.linkToCatalogsPageAction();
+
+    boolean status = metalakePage.verifyIsLinkedToCatalogsPage();
+
+    if (status) {
+      LOG.info("link to catalogs page successful");
+    } else {
+      Assertions.fail("link to catalogs page failed");
+    }
+  }
 }

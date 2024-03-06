@@ -80,6 +80,7 @@ public class MetalakePage {
   public MetalakePage(WebDriver driver) {
     MetalakePage.driver = driver;
     PageFactory.initElements(driver, this);
+    driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
   }
 
   public void clickCreateBtn() {
@@ -160,10 +161,11 @@ public class MetalakePage {
 
   public boolean verifyIsCreatedMetalake() {
     try {
-      createdMetalakeRow.isDisplayed();
-      createdMetalakeLink.isDisplayed();
+      boolean isRow = createdMetalakeRow.isDisplayed();
+      boolean isLink = createdMetalakeLink.isDisplayed();
+      boolean isText = Objects.equals(createdMetalakeLink.getText(), "test");
 
-      return Objects.equals(createdMetalakeLink.getText(), "test");
+      return isRow && isLink && isText;
     } catch (Exception e) {
       return false;
     }
@@ -196,7 +198,6 @@ public class MetalakePage {
     } catch (Exception e) {
       return false;
     } finally {
-      driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
       clickCloseDetailsBtn();
     }
   }
@@ -224,17 +225,31 @@ public class MetalakePage {
     } catch (Exception e) {
       return false;
     } finally {
-      driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
       clickPrevPageBtn();
     }
   }
 
   public boolean verifyIsCreatedMetalakeWithProperty() {
     try {
-      createdMetalakeRow.isDisplayed();
-      createdMetalakeLink.isDisplayed();
+      boolean isRow = createdMetalakeRow.isDisplayed();
+      boolean isLink = createdMetalakeLink.isDisplayed();
+      boolean isText = Objects.equals(createdMetalakeLink.getText(), "test");
 
-      return Objects.equals(createdMetalakeLink.getText(), "test");
+      return isRow && isLink && isText;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public boolean verifyIsLinkedToCatalogsPage() {
+    try {
+      String nameLinkPath = "//a[@data-refer='metalake-name-link']";
+      WebElement nameLink = driver.findElement(By.xpath(nameLinkPath));
+
+      String url = driver.getCurrentUrl();
+      boolean isUrl = url.contains("/ui/metalakes?metalake=metalake_test");
+
+      return nameLink.isDisplayed() && isUrl;
     } catch (Exception e) {
       return false;
     }
@@ -258,7 +273,6 @@ public class MetalakePage {
   public void viewMetalakeAction() {
     LOG.info("test view metalake action started");
     clickViewMetalakeBtn();
-    driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
   }
 
   public void editMetalakeAction() {
@@ -280,7 +294,6 @@ public class MetalakePage {
     for (int i = 0; i < arraySize.length; i++) {
       LOG.info("create metalake: {}", i + 1);
       createMetalakeAction("test_" + (i + 1), "test", true);
-      driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS);
     }
   }
 
@@ -292,5 +305,14 @@ public class MetalakePage {
     clickAddPropertyBtn();
     enterPropsValues(1, "test1", "test1");
     clickSubmitBtn();
+  }
+
+  public void linkToCatalogsPageAction() {
+    LOG.info("test link to catalogs page action started");
+    createMetalakeAction("metalake_test", "test", true);
+
+    String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=metalake_test']";
+    WebElement metalakeLink = driver.findElement(By.xpath(linkPath));
+    metalakeLink.click();
   }
 }
