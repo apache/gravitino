@@ -200,14 +200,14 @@ public class SparkIT extends SparkEnvIT {
 
   @Test
   void testDropTable() {
-    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("DROP TABLE not_exists"));
-
     String tableName = "drop_table";
     createSimpleTable(tableName);
     Assertions.assertEquals(true, tableExists(tableName));
 
     dropTableIfExists(tableName);
     Assertions.assertEquals(false, tableExists(tableName));
+
+    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("DROP TABLE not_exists"));
   }
 
   @Test
@@ -221,7 +221,7 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(tableExists(tableName));
     Assertions.assertFalse(tableExists(newTableName));
 
-    sql(String.format("ALTER TABLE %s RENAME to %s", tableName, newTableName));
+    sql(String.format("ALTER TABLE %s RENAME TO %s", tableName, newTableName));
     Assertions.assertTrue(tableExists(newTableName));
     Assertions.assertFalse(tableExists(tableName));
 
@@ -229,11 +229,11 @@ public class SparkIT extends SparkEnvIT {
     createSimpleTable(tableName);
     Assertions.assertThrows(
         RuntimeException.class,
-        () -> sql(String.format("ALTER TABLE %s RENAME to %s", tableName, newTableName)));
+        () -> sql(String.format("ALTER TABLE %s RENAME TO %s", tableName, newTableName)));
 
     // rename a not existing tables
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("ALTER TABLE not_exists1 RENAME to not_exist2"));
+        AnalysisException.class, () -> sql("ALTER TABLE not_exists1 RENAME TO not_exist2"));
   }
 
   @Test
