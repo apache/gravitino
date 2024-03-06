@@ -188,8 +188,8 @@ tasks.test {
       environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      systemProperty("gravitino.log.path", buildDir.path + "/postgresql-integration-test.log")
-      delete(buildDir.path + "/postgresql-integration-test.log")
+      systemProperty("gravitino.log.path", buildDir.path + "/${project.name}-integration-test.log")
+      delete(buildDir.path + "/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")

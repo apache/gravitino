@@ -7,6 +7,8 @@ package com.datastrato.gravitino.common.integration.container;
 import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -126,9 +128,30 @@ public class HiveContainer extends BaseContainer {
           isHdfsConnectSuccess = true;
           break;
         }
+        Thread.sleep(3000);
       } catch (Exception e) {
         LOG.error("Failed to execute sql: {}", sql, e);
       }
+    }
+
+    i = 0;
+    String containerIp = getContainerIpAddress();
+    while (i++ < retryLimit) {
+      try (Socket socket = new Socket()) {
+        socket.connect(new InetSocketAddress(containerIp, HiveContainer.HIVE_METASTORE_PORT), 3000);
+        break;
+      } catch (Exception e) {
+        LOG.warn(
+            "Can't connect to Hive Metastore:[{}:{}]",
+            containerIp,
+            HiveContainer.HIVE_METASTORE_PORT,
+            e);
+      }
+    }
+
+    if (i == retryLimit) {
+      LOG.error("Can't connect to Hive Metastore");
+      return false;
     }
 
     LOG.info(
