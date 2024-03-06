@@ -87,7 +87,7 @@ public class HiveContainer extends BaseContainer {
       }
     }
 
-    //  Use JDBC driver to test if hive server is ready
+    // Use JDBC driver to test if hive server is ready
     boolean isHiveConnectSuccess = false;
     boolean isHdfsConnectSuccess = false;
 
