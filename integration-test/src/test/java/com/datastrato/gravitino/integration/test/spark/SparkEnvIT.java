@@ -97,6 +97,12 @@ public class SparkEnvIT extends SparkUtilIT {
             .config("spark.plugins", GravitinoSparkPlugin.class.getName())
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
             .enableHiveSupport()
             .getOrCreate();
   }
