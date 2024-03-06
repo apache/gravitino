@@ -58,7 +58,7 @@ public class SparkIT extends SparkEnvIT {
   }
 
   private String getDefaultDatabase() {
-    return "defaultDB";
+    return "default_db";
   }
 
   @Test
@@ -132,10 +132,9 @@ public class SparkIT extends SparkEnvIT {
         NoSuchNamespaceException.class, () -> sql("DROP DATABASE notExists"));
   }
 
-  // Create simple tables without advanced features like comment, property, partition, bucket.
   @Test
   void testCreateSimpleTable() {
-    String tableName = "simpleTable";
+    String tableName = "simple_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
     SparkTableInfo tableInfo = getTableInfo(tableName);
@@ -154,7 +153,7 @@ public class SparkIT extends SparkEnvIT {
   void testCreateTableWithDatabase() {
     // test db.table as table identifier
     String databaseName = "db1";
-    String tableName = "dbTable1";
+    String tableName = "table1";
     createDatabaseIfNotExists(databaseName);
     String tableIdentifier = String.join(".", databaseName, tableName);
 
@@ -167,7 +166,7 @@ public class SparkIT extends SparkEnvIT {
 
     // use db then create table with table name
     databaseName = "db2";
-    tableName = "dbTable2";
+    tableName = "table2";
     createDatabaseIfNotExists(databaseName);
 
     sql("USE " + databaseName);
@@ -180,8 +179,8 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateTableWithAdvancedFeatures() {
-    String tableName = "complexTable";
+  void testCreateTableWithComment() {
+    String tableName = "comment_table";
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
     String tableComment = "tableComment";
@@ -201,9 +200,9 @@ public class SparkIT extends SparkEnvIT {
 
   @Test
   void testDropTable() {
-    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("DROP TABLE notExists"));
+    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("DROP TABLE not_exists"));
 
-    String tableName = "dropTable";
+    String tableName = "drop_table";
     createSimpleTable(tableName);
     Assertions.assertEquals(true, tableExists(tableName));
 
@@ -234,7 +233,7 @@ public class SparkIT extends SparkEnvIT {
 
     // rename a not existing tables
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("ALTER TABLE noExists RENAME to notExist2"));
+        AnalysisException.class, () -> sql("ALTER TABLE not_exists1 RENAME to not_exist2"));
   }
 
   @Test
@@ -248,7 +247,7 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(tables.contains(table2));
 
     // show tables from not current db
-    String database = "dbList";
+    String database = "db_list";
     String table3 = "list3";
     String table4 = "list4";
     createDatabaseIfNotExists(database);
@@ -259,7 +258,7 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(tables.contains(table3));
     Assertions.assertTrue(tables.contains(table4));
 
-    Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("notExistsDB"));
+    Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("not_exists_db"));
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {

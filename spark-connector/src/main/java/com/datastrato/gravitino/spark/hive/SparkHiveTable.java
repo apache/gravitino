@@ -20,4 +20,9 @@ public class SparkHiveTable extends SparkBaseTable {
       PropertiesConverter propertiesConverter) {
     super(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
   }
+
+  @Override
+  protected boolean isCaseSensitive() {
+    return false;
+  }
 }

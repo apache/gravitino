@@ -11,6 +11,7 @@ import com.datastrato.gravitino.spark.SparkTypeConverter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -54,20 +55,9 @@ public class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
     this.propertiesConverter = propertiesConverter;
   }
 
-  protected Table getSparkTable() {
-    if (this.lazySparkTable == null) {
-      try {
-        this.lazySparkTable = sparkCatalog.loadTable(identifier);
-      } catch (NoSuchTableException e) {
-        throw new RuntimeException(e);
-      }
-    }
-    return this.lazySparkTable;
-  }
-
   @Override
   public String name() {
-    return identifier.toString();
+    return getNormalizedIdentifier(identifier, gravitinoTable.name());
   }
 
   @Override
@@ -125,5 +115,35 @@ public class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
     return ((SupportsWrite) getSparkTable()).newWriteBuilder(info);
+  }
+
+  protected Table getSparkTable() {
+    if (lazySparkTable == null) {
+      try {
+        this.lazySparkTable = sparkCatalog.loadTable(identifier);
+      } catch (NoSuchTableException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return lazySparkTable;
+  }
+
+  protected boolean isCaseSensitive() {
+    return true;
+  }
+
+  // The underlying catalogs may not case-sensitive, to keep consistent with the action of SparkSQL,
+  // we should return normalized identifiers.
+  private String getNormalizedIdentifier(Identifier tableIdentifier, String gravitinoTableName) {
+    if (tableIdentifier.namespace().length == 0) {
+      return gravitinoTableName;
+    }
+
+    String databaseName = tableIdentifier.namespace()[0];
+    if (isCaseSensitive() == false) {
+      databaseName = databaseName.toLowerCase(Locale.ROOT);
+    }
+
+    return String.join(".", databaseName, gravitinoTableName);
   }
 }
