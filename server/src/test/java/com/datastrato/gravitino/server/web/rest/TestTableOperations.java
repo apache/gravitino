@@ -48,6 +48,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -547,6 +549,7 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.first(),
+            false,
             false);
     Column[] columns =
         new Column[] {
@@ -567,7 +570,8 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.after("col2"),
-            true);
+            true,
+            false);
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),
@@ -625,6 +629,48 @@ public class TestTableOperations extends JerseyTest {
     TableUpdateRequest.UpdateTableColumnPositionRequest req =
         new TableUpdateRequest.UpdateTableColumnPositionRequest(
             new String[] {"col1"}, TableChange.ColumnPosition.after("col2"));
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testAddTableIndex() {
+    TableUpdateRequest.AddTableIndexRequest req =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col1"}});
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testDeleteTableIndex() {
+    TableUpdateRequest.DeleteTableIndexRequest req =
+        new TableUpdateRequest.DeleteTableIndexRequest("test", false);
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testUpdateColumnAutoIncrement() {
+    TableUpdateRequest.UpdateColumnAutoIncrementRequest req =
+        new TableUpdateRequest.UpdateColumnAutoIncrementRequest(new String[] {"test"}, false);
     Column[] columns =
         new Column[] {
           mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
@@ -779,6 +825,7 @@ public class TestTableOperations extends JerseyTest {
 
     Assertions.assertEquals(tableDTO.distribution(), updatedTable.distribution());
     Assertions.assertArrayEquals(tableDTO.sortOrder(), updatedTable.sortOrder());
+    Assertions.assertArrayEquals(tableDTO.index(), updatedTable.index());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
@@ -854,6 +901,7 @@ public class TestTableOperations extends JerseyTest {
     when(table.partitioning()).thenReturn(transforms);
     when(table.sortOrder()).thenReturn(new SortOrder[0]);
     when(table.distribution()).thenReturn(DistributionDTO.NONE);
+    when(table.index()).thenReturn(Indexes.EMPTY_INDEXES);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");

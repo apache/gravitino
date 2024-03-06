@@ -81,4 +81,4 @@ jobs:
           distribution: 'temurin'
 
       - name: Build and Push the Docker image
-        run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
+        run: sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/hostedtoolcache/CodeQL && ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest

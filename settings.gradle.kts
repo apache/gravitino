@@ -16,5 +16,6 @@ include("catalogs:catalog-jdbc-common", "catalogs:catalog-jdbc-mysql", "catalogs
 include("catalogs:catalog-hadoop")
 include("clients:client-java", "clients:client-java-runtime")
 include("trino-connector")
+include("spark-connector")
 include("web")
 include("docs")

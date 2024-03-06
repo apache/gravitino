@@ -569,6 +569,15 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testListSchema() {
+    NameIdentifier[] nameIdentifiers =
+        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    Set<String> schemaNames =
+        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    Assertions.assertTrue(schemaNames.contains("public"));
+  }
+
+  @Test
   public void testBackQuoteTable() {
     Column col1 = Column.of("create", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("delete", Types.IntegerType.get(), "number", false, false, null);
@@ -1192,5 +1201,156 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Assertions.assertEquals(Types.UnparsedType.of("bit"), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
+  void testOperationTableIndex() {
+    String tableName = GravitinoITUtils.genRandomName("test_add_index");
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        newColumns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // add index test.
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+        TableChange.addIndex(Index.IndexType.PRIMARY_KEY, "pk1_key", new String[][] {{"col_1"}}));
+
+    Table table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Index[] indexes =
+        new Index[] {
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}})
+        };
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+
+    // delete index and add new column and index.
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.deleteIndex("u1_key", true),
+        TableChange.addColumn(
+            new String[] {"col_4"},
+            Types.VarCharType.of(255),
+            TableChange.ColumnPosition.defaultPos()),
+        TableChange.addIndex(Index.IndexType.UNIQUE_KEY, "u2_key", new String[][] {{"col_4"}}));
+
+    indexes =
+        new Index[] {
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}})
+        };
+    table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
+    newColumns = new Column[] {col1, col2, col3, col4};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+
+    // Add a previously existing index
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u3_key", new String[][] {{"col_1"}, {"col_4"}}));
+
+    indexes =
+        new Index[] {
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
+        };
+    table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+  }
+
+  @Test
+  void testAddColumnAutoIncrement() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", false, false, null);
+    Column col2 = Column.of("col_2", Types.DateType.get(), "comment", false, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "code", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4};
+    String tableName = "auto_increment_table";
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_5"},
+            Types.LongType.get(),
+            "id",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            true));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    Column col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
+    newColumns = new Column[] {col1, col2, col3, col4, col5};
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+
+    // Test drop auto increment column
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_5"}, false));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col5 = Column.of("col_5", Types.LongType.get(), "id", false, false, null);
+    newColumns = new Column[] {col1, col2, col3, col4, col5};
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+
+    // Test add auto increment column
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_5"}, true));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
+    newColumns = new Column[] {col1, col2, col3, col4, col5};
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
   }
 }

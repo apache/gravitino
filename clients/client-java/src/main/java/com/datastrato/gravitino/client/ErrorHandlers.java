@@ -182,9 +182,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -217,9 +218,10 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -253,9 +255,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -286,9 +289,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -313,9 +317,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -362,6 +367,8 @@ public class ErrorHandlers {
           case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
             throw new BadRequestException(
                 "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
+          default:
+            super.accept(errorResponse);
         }
       }
       super.accept(errorResponse);
@@ -396,9 +403,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
