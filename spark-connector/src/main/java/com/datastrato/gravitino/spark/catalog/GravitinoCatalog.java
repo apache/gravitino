@@ -12,6 +12,7 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.spark.GravitinoSparkConfig;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -30,6 +31,7 @@ import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Column;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.NamespaceChange;
+import org.apache.spark.sql.connector.catalog.NamespaceChange.SetProperty;
 import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -175,7 +177,28 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public void alterNamespace(String[] namespace, NamespaceChange... changes)
       throws NoSuchNamespaceException {
-    throw new NotSupportedException("Doesn't support altering namespace");
+    validateNamespace(namespace);
+    SchemaChange[] schemaChanges =
+        Arrays.stream(changes)
+            .map(
+                change -> {
+                  if (change instanceof SetProperty) {
+                    SetProperty setProperty = ((SetProperty) change);
+                    return SchemaChange.setProperty(setProperty.property(), setProperty.value());
+                  } else {
+                    throw new UnsupportedOperationException(
+                        String.format(
+                            "Unsupported namespace change %s", change.getClass().getName()));
+                  }
+                })
+            .toArray(SchemaChange[]::new);
+    try {
+      gravitinoCatalogClient
+          .asSchemas()
+          .alterSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), schemaChanges);
+    } catch (NoSuchSchemaException e) {
+      throw new NoSuchNamespaceException(namespace);
+    }
   }
 
   @Override

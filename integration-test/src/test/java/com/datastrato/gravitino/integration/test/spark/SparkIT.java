@@ -21,7 +21,7 @@ public class SparkIT extends SparkEnvIT {
 
   @BeforeEach
   void init() {
-    sql("use " + hiveCatalogName);
+    sql("USE " + hiveCatalogName);
   }
 
   @Test
@@ -33,7 +33,7 @@ public class SparkIT extends SparkEnvIT {
   @Test
   void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
-    sql("create database " + testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName);
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
@@ -42,19 +42,37 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(StringUtils.isBlank(properties));
 
     testDatabaseName = "t_create2";
+    String testDatabaseLocation = "/tmp/" + testDatabaseName;
     sql(
         String.format(
-            "CREATE DATABASE %s COMMENT 'comment' LOCATION '/user'\n"
-                + " WITH DBPROPERTIES (ID=001);",
-            testDatabaseName));
+            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=001);",
+            testDatabaseName, testDatabaseLocation));
     databaseMeta = getDatabaseMetadata(testDatabaseName);
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    // underlying catalog may change /user to file:/user
-    Assertions.assertTrue(databaseMeta.get("Location").contains("/user"));
+    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
+    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
     Assertions.assertEquals("((ID,001))", properties);
+  }
+
+  @Test
+  void testAlterSchema() {
+    String testDatabaseName = "t_alter";
+    sql("CREATE DATABASE " + testDatabaseName);
+    Assertions.assertTrue(
+        StringUtils.isBlank(getDatabaseMetadata(testDatabaseName).get("Properties")));
+
+    sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
+    Assertions.assertEquals("((ID,001))", getDatabaseMetadata(testDatabaseName).get("Properties"));
+
+    // Hive metastore doesn't support alter database location, therefore this test method
+    // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
+
+    Assertions.assertThrowsExactly(
+        NoSuchNamespaceException.class,
+        () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
   }
 
   @Test
@@ -63,15 +81,15 @@ public class SparkIT extends SparkEnvIT {
     Set<String> databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 
-    sql("create database " + testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName);
     databases = getDatabases();
     Assertions.assertTrue(databases.contains(testDatabaseName));
 
-    sql("drop database " + testDatabaseName);
+    sql("DROP DATABASE " + testDatabaseName);
     databases = getDatabases();
     Assertions.assertFalse(databases.contains(testDatabaseName));
 
     Assertions.assertThrowsExactly(
-        NoSuchNamespaceException.class, () -> sql("drop database notExists"));
+        NoSuchNamespaceException.class, () -> sql("DROP DATABASE notExists"));
   }
 }
