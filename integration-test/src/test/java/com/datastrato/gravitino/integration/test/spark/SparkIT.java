@@ -17,8 +17,7 @@ import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.IntegerType$;
-import org.apache.spark.sql.types.StringType$;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +36,7 @@ public class SparkIT extends SparkEnvIT {
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
-      ImmutableMap.of(IntegerType$.MODULE$, "2", StringType$.MODULE$, "'gravitino_it_test'");
+      ImmutableMap.of(DataTypes.IntegerType, "2", DataTypes.StringType, "'gravitino_it_test'");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
@@ -305,9 +304,9 @@ public class SparkIT extends SparkEnvIT {
 
   private List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
-        SparkColumnInfo.of("id", IntegerType$.MODULE$, "id comment"),
-        SparkColumnInfo.of("name", StringType$.MODULE$, ""),
-        SparkColumnInfo.of("age", IntegerType$.MODULE$, null));
+        SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 
   // Helper method to create a simple table, and could use corresponding
