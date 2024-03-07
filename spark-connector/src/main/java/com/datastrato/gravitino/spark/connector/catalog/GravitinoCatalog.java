@@ -355,23 +355,15 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @VisibleForTesting
   static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
     if (change instanceof TableChange.SetProperty) {
-      return transformSetProperty((TableChange.SetProperty) change);
+      TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
+      return com.datastrato.gravitino.rel.TableChange.setProperty(
+          setProperty.property(), setProperty.value());
     } else if (change instanceof TableChange.RemoveProperty) {
-      return transformRemoveProperty((TableChange.RemoveProperty) change);
+      TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
+      return com.datastrato.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));
     }
-  }
-
-  private static com.datastrato.gravitino.rel.TableChange transformSetProperty(
-      TableChange.SetProperty sparkChange) {
-    return com.datastrato.gravitino.rel.TableChange.setProperty(
-        sparkChange.property(), sparkChange.value());
-  }
-
-  private static com.datastrato.gravitino.rel.TableChange transformRemoveProperty(
-      TableChange.RemoveProperty sparkChange) {
-    return com.datastrato.gravitino.rel.TableChange.removeProperty(sparkChange.property());
   }
 }
