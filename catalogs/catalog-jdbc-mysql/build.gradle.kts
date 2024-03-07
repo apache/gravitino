@@ -17,25 +17,27 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":common"))
   implementation(project(":core"))
+
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jsqlparser)
+  implementation(libs.slf4j.api)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
-  testImplementation(project(":test-common", "testArtifacts"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.guava)
+
   testImplementation(libs.commons.lang3)
+  testImplementation(libs.guava)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
-  implementation(libs.slf4j.api)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

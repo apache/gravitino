@@ -21,12 +21,27 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
 
-  compileOnly(libs.immutables.value)
-  compileOnly(libs.lombok)
-
-  annotationProcessor(libs.immutables.value)
-  annotationProcessor(libs.lombok)
-
+  implementation(libs.caffeine)
+  implementation(libs.guava)
+  implementation(libs.hive2.exec) {
+    artifact {
+      classifier = "core"
+    }
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.protobuf")
+    exclude("org.apache.avro")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.zookeeper")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    exclude("org.pentaho")
+    exclude("org.slf4j")
+  }
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -49,28 +64,7 @@ dependencies {
     exclude("org.slf4j")
   }
 
-  implementation(libs.hive2.exec) {
-    artifact {
-      classifier = "core"
-    }
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.protobuf")
-    exclude("org.apache.avro")
-    exclude("org.apache.calcite")
-    exclude("org.apache.calcite.avatica")
-    exclude("org.apache.curator")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.zookeeper")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.pentaho")
-    exclude("org.slf4j")
-  }
 
-  implementation(libs.caffeine)
-  implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
@@ -79,16 +73,28 @@ dependencies {
   }
   implementation(libs.slf4j.api)
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.mockito.core)
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
 
-  testImplementation(project(":test-common", "testArtifacts"))
+  annotationProcessor(libs.immutables.value)
+  annotationProcessor(libs.lombok)
+
+  testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":common"))
+
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+  }
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
@@ -101,17 +107,8 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation(libs.testcontainers)
-
-  testImplementation(libs.hadoop2.hdfs)
-
-  testImplementation(libs.hive2.common) {
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-  }
-
   testImplementation(libs.slf4j.api)
-  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -3,7 +3,6 @@
  * This software is licensed under the Apache License version 2.
  */
 import org.gradle.internal.os.OperatingSystem
-import java.io.IOException
 import java.util.*
 
 plugins {
@@ -19,10 +18,15 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
+  testAnnotationProcessor(libs.lombok)
+
+  testCompileOnly(libs.lombok)
+
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":spark-connector")) {
@@ -31,16 +35,43 @@ dependencies {
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
 
-  testImplementation(project(":test-common", "testArtifacts"))
+  testImplementation(libs.commons.cli)
+  testImplementation(libs.commons.lang3)
+  testImplementation(libs.guava)
+  testImplementation(libs.commons.io)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.cli)
-  testImplementation(libs.commons.io)
-  testImplementation(libs.guava)
-  testImplementation(libs.httpclient5)
-
+  testImplementation(libs.hadoop2.common) {
+    exclude("*")
+  }
+  testImplementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
+  }
+  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+  }
+  testImplementation(libs.hive2.exec) {
+    artifact {
+      classifier = "core"
+    }
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.avro")
+    exclude("org.apache.zookeeper")
+    exclude("com.google.protobuf")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.curator")
+    exclude("org.pentaho")
+    exclude("org.slf4j")
+  }
   testImplementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -61,47 +92,16 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.slf4j")
   }
-
-  testImplementation(libs.hive2.exec) {
-    artifact {
-      classifier = "core"
-    }
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.avro")
-    exclude("org.apache.zookeeper")
-    exclude("com.google.protobuf")
-    exclude("org.apache.calcite")
-    exclude("org.apache.calcite.avatica")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.curator")
-    exclude("org.pentaho")
-    exclude("org.slf4j")
-  }
-
-  testImplementation(libs.hadoop2.common) {
-    exclude("*")
-  }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
-  testImplementation(libs.hive2.common) {
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-  }
-
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.lang3)
-  testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.jline.terminal)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
+
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
@@ -114,11 +114,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation(libs.jline.terminal)
-  testImplementation(libs.minikdc) {
-    exclude("org.apache.directory.api", "api-ldap-schema-data")
-  }
-  testImplementation(libs.mysql.driver)
+
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.rauschig)
@@ -134,133 +130,8 @@ dependencies {
     exclude("jakarta.annotation")
   }
   testImplementation(libs.trino.jdbc)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-/* Optimizing integration test execution conditions */
-// Use this variable to control if we need to run docker test or not.
-var DOCKER_IT_TEST = false
-project.extra["dockerRunning"] = false
-project.extra["macDockerConnector"] = false
-project.extra["isOrbStack"] = false
-
-fun printDockerCheckInfo() {
-  checkMacDockerConnector()
-  checkDockerStatus()
-  checkOrbStackStatus()
-
-  val testMode = project.properties["testMode"] as? String ?: "embedded"
-  if (testMode != "deploy" && testMode != "embedded") {
-    return
-  }
-  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
-  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
-  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
-
-  if (OperatingSystem.current().isMacOsX() &&
-    dockerRunning &&
-    (macDockerConnector || isOrbStack)
-  ) {
-    DOCKER_IT_TEST = true
-  } else if (OperatingSystem.current().isLinux() && dockerRunning) {
-    DOCKER_IT_TEST = true
-  }
-
-  println("------------------ Check Docker environment ---------------------")
-  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
-  if (OperatingSystem.current().isMacOsX()) {
-    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
-  }
-  if (!DOCKER_IT_TEST) {
-    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
-  } else {
-    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
-  }
-  println("-----------------------------------------------------------------")
-
-  // Print help message if Docker server or mac-docker-connector is not running
-  printDockerServerTip()
-  printMacDockerTip()
-}
-
-fun printDockerServerTip() {
-  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
-  if (!dockerRunning) {
-    val redColor = "\u001B[31m"
-    val resetColor = "\u001B[0m"
-    println("Tip: Please make sure to start the ${redColor}Docker server$resetColor before running the integration tests.")
-  }
-}
-
-fun printMacDockerTip() {
-  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
-  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
-  if (OperatingSystem.current().isMacOsX() && !macDockerConnector && !isOrbStack) {
-    val redColor = "\u001B[31m"
-    val resetColor = "\u001B[0m"
-    println(
-      "Tip: Please make sure to use ${redColor}OrbStack$resetColor or execute the " +
-        "$redColor`dev/docker/tools/mac-docker-connector.sh`$resetColor script before running" +
-        " the integration test on macOS."
-    )
-  }
-}
-
-fun checkMacDockerConnector() {
-  if (OperatingSystem.current().isLinux()) {
-    // Linux does not require the use of `docker-connector`
-    return
-  }
-
-  try {
-    val processName = "docker-connector"
-    val command = "pgrep -x -q $processName"
-
-    val execResult = project.exec {
-      commandLine("bash", "-c", command)
-    }
-    if (execResult.exitValue == 0) {
-      project.extra["macDockerConnector"] = true
-    }
-  } catch (e: Exception) {
-    println("checkContainerRunning command execution failed: ${e.message}")
-  }
-}
-
-fun checkDockerStatus() {
-  try {
-    val process = ProcessBuilder("docker", "info").start()
-    val exitCode = process.waitFor()
-
-    if (exitCode == 0) {
-      project.extra["dockerRunning"] = true
-    } else {
-      println("checkDockerStatus command execution failed with exit code $exitCode")
-    }
-  } catch (e: IOException) {
-    println("checkDockerStatus command execution failed: ${e.message}")
-  }
-}
-
-fun checkOrbStackStatus() {
-  if (OperatingSystem.current().isLinux()) {
-    return
-  }
-
-  try {
-    val process = ProcessBuilder("docker", "context", "show").start()
-    val exitCode = process.waitFor()
-    if (exitCode == 0) {
-      val currentContext = process.inputStream.bufferedReader().readText()
-      println("Current docker context is: $currentContext")
-      project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
-    } else {
-      println("checkOrbStackStatus Command execution failed with exit code $exitCode")
-    }
-  } catch (e: IOException) {
-    println("checkOrbStackStatus command execution failed: ${e.message}")
-  }
 }
 
 tasks.test {
@@ -297,8 +168,6 @@ tasks.test {
         }
       }
 
-      printDockerCheckInfo()
-
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
         into("build/trino-conf")
@@ -315,8 +184,8 @@ tasks.test {
       environment("PROJECT_VERSION", version)
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
-      val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
-      val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+      val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
+      val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
       if (OperatingSystem.current().isMacOsX() &&
         dockerRunning &&
         macDockerConnector
@@ -347,6 +216,7 @@ tasks.test {
       }
 
       useJUnitPlatform {
+        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
         if (!DOCKER_IT_TEST) {
           excludeTags("gravitino-docker-it")
         }

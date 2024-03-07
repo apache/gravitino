@@ -30,13 +30,6 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.iceberg.hive.metastore)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.sqlite.jdbc)
-
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.spotbugs")
@@ -60,15 +53,23 @@ dependencies {
     exclude("com.zaxxer", "HikariCP")
     exclude("com.sun.jersey", "jersey-server")
   }
+  implementation(libs.iceberg.hive.metastore)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.sqlite.jdbc)
 
   annotationProcessor(libs.lombok)
+
   compileOnly(libs.lombok)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
-  testImplementation(project(":test-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
   }
@@ -87,6 +88,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.bundles.log4j)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -96,16 +98,14 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.testcontainers)
-
-  // For test TestMultipleJDBCLoad
-  testImplementation(libs.postgresql.driver)
+  // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql)
   testImplementation(libs.mysql.driver)
-  testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
+  testImplementation(libs.postgresql.driver)
 
   testImplementation(libs.slf4j.api)
-  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

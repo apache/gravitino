@@ -24,22 +24,23 @@ dependencies {
   }
 
   implementation(libs.hadoop2.hdfs) {
-    exclude("javax.servlet", "servlet-api")
     exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
   }
 
   implementation(libs.slf4j.api)
 
-  testImplementation(project(":test-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
