@@ -6,7 +6,7 @@ license: "Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide you through the development of the Gravitino connector for Trino locally.
+This document is to guide users through the development of the Gravitino connector for Trino locally.
 
 ## Prerequisites
 
@@ -37,16 +37,16 @@ To develop the Gravitino connector locally, you need to do the following steps:
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. we advise you use the release version 426 or 435. 
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. We advise you to use the release version 426 or 435. 
 2. Open the Trino project in your IDEA.
-3. Create a new module for the Gravitino connector in the Trino project like ![trino-gravitino](../assets/trino/create-gravitino-connector.jpg)(we will use the name `trino-gravitino` as the module name in the following steps).
-4. Add a soft link to the Gravitino trino connector module in the Trino project. Assuming the src java main directory of the Gravitino trino connector in project Gravitino is `/path/to/gravitino-trino-connector/src/main/java`, 
-and the src java main directory of trino-gravitino in the Trino project is `/path/to/trino-gravitino/src/main/java`, you can use the following command to create a soft link:
+3. Create a new module for the Gravitino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-connector.jpg)
+4. Add a soft link to the Gravitino trino connector module in the Trino project. Assuming the src java main directory of the Gravitino trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, 
+and the src java main directory of trino-gravitino in the Trino project is `trino/path/to/trino-gravitino/src/main/java`, you can use the following command to create a soft link:
 
 ```shell
-ln -s /path/to/gravitino-trino-connector/src/main/java /path/to/trino-gravitino/src/main/java
+ln -s gravitino/path/to/trino-connector/src/main/java trino/path/to/trino-gravitino/src/main/java
 ```
-then you can see the `gravitino` directory in the `trino-gravitino` module as follows:
+then you can see the `gravitino-trino-connecor` source files and directories in the `trino-gravitino` module as follows:
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
@@ -55,7 +55,7 @@ then you can see the `gravitino` directory in the `trino-gravitino` module as fo
 ```shell
 mvn clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
-7. Set up the configuration for the Gravitino connector in the `etc/catalog` directory in the Trino project. You can do as the following picture shows:
+7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
 ![](../assets/trino/add-config.jpg)
 
 The corresponding configuration files are here: [gravitino.properties](../assets/trino/gravitino.properties) and [config.properties](../assets/trino/config.properties).
