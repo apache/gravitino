@@ -171,6 +171,8 @@ subprojects {
   }
 
   java {
+    sourceCompatibility = JavaVersion.VERSION_16
+    targetCompatibility = JavaVersion.VERSION_16
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
       // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and

@@ -284,25 +284,28 @@ public class SparkIT extends SparkEnvIT {
     dropTableIfExists(tableName);
 
     createSimpleTable(tableName);
-    String[] oldColumnNames =
-        getTableInfo(tableName).getColumns().stream()
-            .map(SparkColumnInfo::getName)
-            .toArray(String[]::new);
-    Assertions.assertEquals(oldColumnNames, new String[] {"id", "name", "age"});
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
-    String[] addColumnNames =
-        getTableInfo(tableName).getColumns().stream()
-            .map(SparkColumnInfo::getName)
-            .toArray(String[]::new);
-    Assertions.assertEquals(addColumnNames, new String[] {"id", "name", "age", "col1"});
+    List<SparkColumnInfo> addColumn =
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+            SparkColumnInfo.of("name", DataTypes.StringType, ""),
+            SparkColumnInfo.of("age", DataTypes.IntegerType, null),
+            SparkColumnInfo.of("col1", DataTypes.StringType, null));
+    checkTableColumns(tableName, addColumn, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
-    String[] deleteColumnNames =
-        getTableInfo(tableName).getColumns().stream()
-            .map(SparkColumnInfo::getName)
-            .toArray(String[]::new);
-    Assertions.assertEquals(deleteColumnNames, new String[] {"id", "name", "age"});
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+  }
+
+  private void checkTableColumns(
+      String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
+    SparkTableInfoChecker.create()
+        .withName(tableName)
+        .withColumns(columnInfos)
+        .withComment(null)
+        .check(tableInfo);
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {
