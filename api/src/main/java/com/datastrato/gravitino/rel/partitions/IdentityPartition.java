@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.partitions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 
 /**
@@ -15,6 +16,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literal;
  * its partition name is "dt=2008-08-08/country=us", field names are [["dt"], ["country"]] and
  * values are ["2008-08-08", "us"].
  */
+@Evolving
 public interface IdentityPartition extends Partition {
 
   /** @return The field names of the identity partition. */

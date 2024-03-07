@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.rel.types;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /** An interface representing all data types supported by Gravitino. */
+@Evolving
 public interface Type {
   /** @return The generic name of the type. */
   Name name();
