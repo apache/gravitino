@@ -23,4 +23,8 @@ import java.lang.annotation.Target;
   ElementType.TYPE,
   ElementType.FIELD
 })
-public @interface Stable {}
+public @interface Stable {
+
+  /** @return The version when the API was first marked stable. */
+  String since();
+}
