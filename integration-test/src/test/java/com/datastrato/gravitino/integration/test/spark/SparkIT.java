@@ -261,6 +261,11 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("not_exists_db"));
   }
 
+  @Test
+  void testUpdateColumnPosition() {
+
+  }
+
   private void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     String insertValues =
