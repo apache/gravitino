@@ -4,12 +4,15 @@
  */
 package com.datastrato.gravitino.messaging;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 import java.util.Objects;
 
 /**
  * A topic change is a change to a topic. It can be used to update the comment of a topic, set a
  * property and value pair for a topic, or remove a property from a topic in the catalog.
  */
+@Evolving
 public interface TopicChange {
 
   /**

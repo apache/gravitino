@@ -6,6 +6,7 @@ package com.datastrato.gravitino.messaging;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
@@ -16,6 +17,7 @@ import java.util.Map;
  * The MessagingCatalog interface defines the public API for managing topic objects in a schema. If
  * the catalog implementation supports topic objects, it should implement this interface.
  */
+@Evolving
 public interface TopicCatalog {
 
   /**
