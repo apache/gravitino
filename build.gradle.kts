@@ -135,6 +135,55 @@ allprojects {
       }
     }
   }
+
+  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+    param.doFirst {
+      param.jvmArgs(project.property("extraJvmArgs") as List<*>)
+
+      // Default use MiniGravitino to run integration tests
+      param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
+      param.environment("IT_PROJECT_DIR", project.buildDir.path)
+      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_HOME", "/tmp")
+      param.environment("PROJECT_VERSION", project.version)
+
+      val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
+      val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
+      if (OperatingSystem.current().isMacOsX() &&
+        dockerRunning &&
+        macDockerConnector
+      ) {
+        param.environment("NEED_CREATE_DOCKER_NETWORK", "true")
+      }
+
+      // Change poll image pause time from 30s to 60s
+      param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
+      param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
+      project.delete(project.buildDir.path + "/${project.name}-integration-test.log")
+      if (testMode == "deploy") {
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.systemProperty("testMode", "deploy")
+      } else if (testMode == "embedded") {
+        param.environment("GRAVITINO_HOME", project.rootDir.path)
+        param.environment("GRAVITINO_TEST", "true")
+        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/dist/")
+        param.systemProperty("testMode", "embedded")
+      } else {
+        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+      }
+
+      param.useJUnitPlatform {
+        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
+        if (!DOCKER_IT_TEST) {
+          excludeTags("gravitino-docker-it")
+        }
+      }
+    }
+  }
+
+  extra["initIntegration"] = setIntegrationTestEnvironment
 }
 
 nexusPublishing {
@@ -626,18 +675,19 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
+    // Convert it to Project object
   }
 }
 
 apply(plugin = "com.dorongold.task-tree")
 
+project.extra["docker_it_test"] = false
+project.extra["dockerRunning"] = false
+project.extra["macDockerConnector"] = false
+project.extra["isOrbStack"] = false
+
 // The following is to check the docker status and print the tip message
 fun printDockerCheckInfo() {
-  project.extra["docker_it_test"] = false
-  project.extra["dockerRunning"] = false
-  project.extra["macDockerConnector"] = false
-  project.extra["isOrbStack"] = false
-
   checkMacDockerConnector()
   checkDockerStatus()
   checkOrbStackStatus()
