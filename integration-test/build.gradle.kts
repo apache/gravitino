@@ -183,6 +183,12 @@ tasks.test {
   }
 }
 
+tasks.clean {
+  delete("metastore_db")
+  delete("target")
+  delete("derby.log")
+}
+
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
   systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
