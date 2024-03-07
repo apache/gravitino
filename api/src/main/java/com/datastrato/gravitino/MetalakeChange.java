@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /**
@@ -11,6 +12,7 @@ import java.util.Objects;
  * comment of a metalake, set a property and value pair for a metalake, or remove a property from a
  * metalake.
  */
+@Evolving
 public interface MetalakeChange {
 
   /**

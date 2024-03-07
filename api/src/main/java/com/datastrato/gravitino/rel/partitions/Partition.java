@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.partitions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.Table;
 import java.util.Map;
 
@@ -12,6 +13,7 @@ import java.util.Map;
  * IdentityPartition}, {@link ListPartition} or {@link RangePartition}. It depends on the {@link
  * Table#partitioning()}.
  */
+@Evolving
 public interface Partition {
 
   /** @return The name of the partition. */

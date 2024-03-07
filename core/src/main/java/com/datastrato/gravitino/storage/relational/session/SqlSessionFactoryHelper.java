@@ -8,6 +8,8 @@ package com.datastrato.gravitino.storage.relational.session;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -80,6 +82,8 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(CatalogMetaMapper.class);
     configuration.addMapper(SchemaMetaMapper.class);
     configuration.addMapper(TableMetaMapper.class);
+    configuration.addMapper(FilesetMetaMapper.class);
+    configuration.addMapper(FilesetVersionMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

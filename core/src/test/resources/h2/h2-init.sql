@@ -68,3 +68,41 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     KEY idx_tmid (metalake_id),
     KEY idx_tcid (catalog_id)
 ) ENGINE=InnoDB;
+
+
+CREATE TABLE IF NOT EXISTS `fileset_meta` (
+    `fileset_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'fileset id',
+    `fileset_name` VARCHAR(128) NOT NULL COMMENT 'fileset name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `type` VARCHAR(64) NOT NULL COMMENT 'fileset type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'fileset audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
+    PRIMARY KEY (fileset_id),
+    CONSTRAINT uk_sid_fn_del UNIQUE (schema_id, fileset_name, deleted_at),
+    -- Aliases are used here, and indexes with the same name in H2 can only be created once.
+    KEY idx_fmid (metalake_id),
+    KEY idx_fcid (catalog_id)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE IF NOT EXISTS `fileset_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `fileset_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'fileset id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'fileset info version',
+    `fileset_comment` VARCHAR(256) DEFAULT '' COMMENT 'fileset comment',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'fileset properties',
+    `storage_location` MEDIUMTEXT DEFAULT NULL COMMENT 'fileset storage location',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_fid_ver_del UNIQUE (fileset_id, version, deleted_at),
+    -- Aliases are used here, and indexes with the same name in H2 can only be created once.
+    KEY idx_fvmid (metalake_id),
+    KEY idx_fvcid (catalog_id)
+) ENGINE=InnoDB;

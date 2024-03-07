@@ -6,6 +6,7 @@ package com.datastrato.gravitino.file;
 
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -21,6 +22,7 @@ import javax.annotation.Nullable;
  * <p>{@link Fileset} defines the basic properties of a fileset object. A catalog implementation
  * with {@link FilesetCatalog} should implement this interface.
  */
+@Evolving
 public interface Fileset extends Auditable {
 
   /** An enum representing the type of the fileset object. */

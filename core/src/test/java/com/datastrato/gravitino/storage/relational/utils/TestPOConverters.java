@@ -13,10 +13,13 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
+import com.datastrato.gravitino.storage.relational.po.FilesetPO;
+import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
@@ -112,6 +115,34 @@ public class TestPOConverters {
     assertEquals(expectedTable.name(), convertedTable.name());
     assertEquals(expectedTable.namespace(), convertedTable.namespace());
     assertEquals(expectedTable.auditInfo().creator(), convertedTable.auditInfo().creator());
+  }
+
+  @Test
+  public void testFromFilesetPO() throws JsonProcessingException {
+    FilesetVersionPO filesetVersionPO =
+        createFilesetVersionPO(
+            1L, 1L, 1L, 1L, 1L, "this is test", "hdfs://localhost/test", new HashMap<>());
+    FilesetPO filesetPO = createFilesetPO(1L, "test", 1L, 1L, 1L, 1L, filesetVersionPO);
+
+    FilesetEntity expectedFileset =
+        createFileset(
+            1L,
+            "test",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            new HashMap<>());
+
+    FilesetEntity convertedFileset =
+        POConverters.fromFilesetPO(
+            filesetPO, Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"));
+
+    // Assert
+    assertEquals(expectedFileset.id(), convertedFileset.id());
+    assertEquals(expectedFileset.name(), convertedFileset.name());
+    assertEquals(expectedFileset.namespace(), convertedFileset.namespace());
+    assertEquals(expectedFileset.auditInfo().creator(), convertedFileset.auditInfo().creator());
+    assertEquals(expectedFileset.storageLocation(), convertedFileset.storageLocation());
   }
 
   @Test
@@ -234,6 +265,55 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testFromFilesetPOs() throws JsonProcessingException {
+    FilesetVersionPO filesetVersionPO1 =
+        createFilesetVersionPO(
+            1L, 1L, 1L, 1L, 1L, "this is test1", "hdfs://localhost/test1", new HashMap<>());
+    FilesetPO filesetPO1 = createFilesetPO(1L, "test1", 1L, 1L, 1L, 1L, filesetVersionPO1);
+
+    FilesetVersionPO filesetVersionPO2 =
+        createFilesetVersionPO(
+            2L, 1L, 1L, 1L, 2L, "this is test2", "hdfs://localhost/test2", new HashMap<>());
+    FilesetPO filesetPO2 = createFilesetPO(2L, "test2", 1L, 1L, 1L, 2L, filesetVersionPO2);
+
+    List<FilesetPO> filesetPOs = new ArrayList<>(Arrays.asList(filesetPO1, filesetPO2));
+    List<FilesetEntity> convertedFilesets =
+        POConverters.fromFilesetPOs(
+            filesetPOs, Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"));
+
+    FilesetEntity expectedFileset1 =
+        createFileset(
+            1L,
+            "test1",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test1",
+            "hdfs://localhost/test1",
+            new HashMap<>());
+    FilesetEntity expectedFileset2 =
+        createFileset(
+            2L,
+            "test2",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test2",
+            "hdfs://localhost/test2",
+            new HashMap<>());
+    List<FilesetEntity> expectedFilesets =
+        new ArrayList<>(Arrays.asList(expectedFileset1, expectedFileset2));
+
+    // Assert
+    int index = 0;
+    for (FilesetEntity fileset : convertedFilesets) {
+      assertEquals(expectedFilesets.get(index).id(), fileset.id());
+      assertEquals(expectedFilesets.get(index).name(), fileset.name());
+      assertEquals(expectedFilesets.get(index).namespace(), fileset.namespace());
+      assertEquals(
+          expectedFilesets.get(index).auditInfo().creator(), fileset.auditInfo().creator());
+      assertEquals(expectedFilesets.get(index).storageLocation(), fileset.storageLocation());
+      index++;
+    }
+  }
+
+  @Test
   public void testInitMetalakePOVersion() {
     BaseMetalake metalake = createMetalake(1L, "test", "this is test");
     MetalakePO initPO = POConverters.initializeMetalakePOWithVersion(metalake);
@@ -278,6 +358,28 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+  }
+
+  @Test
+  public void testInitFilesetPOVersion() {
+    FilesetEntity filesetEntity =
+        createFileset(
+            1L,
+            "test",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            new HashMap<>());
+    FilesetPO.Builder builder = new FilesetPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    builder.withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+    assertEquals(1, initPO.getFilesetVersionPO().getVersion());
+    assertEquals("hdfs://localhost/test", initPO.getFilesetVersionPO().getStorageLocation());
   }
 
   @Test
@@ -341,6 +443,76 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("test", updatePO.getTableName());
+  }
+
+  @Test
+  public void testUpdateFilesetPOVersion() throws JsonProcessingException {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key", "value");
+    FilesetEntity filesetEntity =
+        createFileset(
+            1L,
+            "test",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            properties);
+
+    Map<String, String> updateProperties = new HashMap<>();
+    updateProperties.put("key", "value1");
+    FilesetEntity updatedFileset =
+        createFileset(
+            1L,
+            "test",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            updateProperties);
+
+    FilesetEntity updatedFileset1 =
+        createFileset(
+            1L,
+            "test1",
+            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            properties);
+
+    FilesetPO.Builder builder = new FilesetPO.Builder();
+    builder.withMetalakeId(1L);
+    builder.withCatalogId(1L);
+    builder.withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+
+    // map has updated
+    boolean checkNeedUpdate1 =
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset);
+    FilesetPO updatePO1 =
+        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, checkNeedUpdate1);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+    assertEquals(
+        updatedFileset.storageLocation(), updatePO1.getFilesetVersionPO().getStorageLocation());
+    assertEquals(2, updatePO1.getCurrentVersion());
+    assertEquals(2, updatePO1.getLastVersion());
+    assertEquals(2, updatePO1.getFilesetVersionPO().getVersion());
+    Map<String, String> updatedProperties =
+        JsonUtils.anyFieldMapper()
+            .readValue(updatePO1.getFilesetVersionPO().getProperties(), Map.class);
+    assertEquals("value1", updatedProperties.get("key"));
+
+    // will not update version, but update the fileset name
+    boolean checkNeedUpdate2 =
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset1);
+    FilesetPO updatePO2 =
+        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, checkNeedUpdate2);
+    assertEquals(
+        filesetEntity.storageLocation(), updatePO2.getFilesetVersionPO().getStorageLocation());
+    assertEquals(1, updatePO2.getCurrentVersion());
+    assertEquals(1, updatePO2.getLastVersion());
+    assertEquals(1, updatePO2.getFilesetVersionPO().getVersion());
+    assertEquals("test1", updatePO2.getFilesetName());
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
@@ -478,6 +650,78 @@ public class TestPOConverters {
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static FilesetEntity createFileset(
+      Long id,
+      String name,
+      Namespace namespace,
+      String comment,
+      String storageLocation,
+      Map<String, String> properties) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return new FilesetEntity.Builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+        .withStorageLocation(storageLocation)
+        .withProperties(properties)
+        .withComment(comment)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static FilesetPO createFilesetPO(
+      Long id,
+      String name,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      Long filesetId,
+      FilesetVersionPO filesetVersionPO)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return new FilesetPO.Builder()
+        .withFilesetId(id)
+        .withFilesetName(name)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaId(schemaId)
+        .withFilesetId(filesetId)
+        .withType(com.datastrato.gravitino.file.Fileset.Type.MANAGED.name())
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .withFilesetVersionPO(filesetVersionPO)
+        .build();
+  }
+
+  private static FilesetVersionPO createFilesetVersionPO(
+      Long id,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      Long filesetId,
+      String comment,
+      String storageLocation,
+      Map<String, String> properties)
+      throws JsonProcessingException {
+    return new FilesetVersionPO.Builder()
+        .withId(id)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaId(schemaId)
+        .withFilesetId(filesetId)
+        .withFilesetComment(comment)
+        .withStorageLocation(storageLocation)
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+        .withVersion(1L)
         .withDeletedAt(0L)
         .build();
   }

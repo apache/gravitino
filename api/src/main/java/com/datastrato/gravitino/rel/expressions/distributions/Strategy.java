@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.expressions.distributions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Arrays;
 
 /**
@@ -17,6 +18,7 @@ import java.util.Arrays;
  *   <li>Even: Distributes data evenly across partitions.
  * </ul>
  */
+@Evolving
 public enum Strategy {
   /**
    * No distribution strategy. This is the default strategy. Will depend on the allocation strategy
