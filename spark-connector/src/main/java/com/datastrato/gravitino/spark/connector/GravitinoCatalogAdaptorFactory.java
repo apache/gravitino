@@ -3,9 +3,9 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark;
+package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.spark.hive.HiveAdaptor;
+import com.datastrato.gravitino.spark.connector.hive.HiveAdaptor;
 import java.util.Locale;
 
 /**

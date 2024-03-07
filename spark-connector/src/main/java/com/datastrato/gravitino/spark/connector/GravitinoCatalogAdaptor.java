@@ -3,10 +3,10 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark;
+package com.datastrato.gravitino.spark.connector;
 
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.spark.table.SparkBaseTable;
+import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.Map;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
