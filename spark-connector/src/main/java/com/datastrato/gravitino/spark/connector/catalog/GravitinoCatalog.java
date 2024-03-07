@@ -18,6 +18,7 @@ import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -164,7 +165,21 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    throw new NotSupportedException("Doesn't support altering table for now");
+    com.datastrato.gravitino.rel.TableChange[] gravitinoTableChanges =
+        Arrays.stream(changes)
+            .map(GravitinoCatalog::transformTableChange)
+            .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
+    try {
+      com.datastrato.gravitino.rel.Table table =
+          gravitinoCatalogClient
+              .asTableCatalog()
+              .alterTable(
+                  NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
+                  gravitinoTableChanges);
+      return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
   }
 
   @Override
@@ -335,5 +350,37 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
         gravitinoIdentifier.namespace().length() == 3,
         "Only support 3 level namespace," + gravitinoIdentifier.namespace());
     return gravitinoIdentifier.namespace().level(2);
+  }
+
+  @VisibleForTesting
+  static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      return com.datastrato.gravitino.rel.TableChange.addColumn(
+          addColumn.fieldNames(),
+          SparkTypeConverter.toGravitinoType(addColumn.dataType()),
+          addColumn.comment(),
+          transformColumnPosition(addColumn.position()),
+          addColumn.isNullable());
+    } else if (change instanceof TableChange.DeleteColumn) {
+      TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
+      return com.datastrato.gravitino.rel.TableChange.deleteColumn(
+          deleteColumn.fieldNames(), deleteColumn.ifExists());
+    } else {
+      throw new UnsupportedOperationException(
+          String.format("Unsupported table change %s", change.getClass().getName()));
+    }
+  }
+
+  private static com.datastrato.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(
+      TableChange.ColumnPosition columnPosition) {
+    if (columnPosition instanceof TableChange.First) {
+      return com.datastrato.gravitino.rel.TableChange.ColumnPosition.first();
+    } else if (columnPosition instanceof TableChange.After) {
+      TableChange.After after = (TableChange.After) columnPosition;
+      return com.datastrato.gravitino.rel.TableChange.ColumnPosition.after(after.column());
+    } else {
+      return com.datastrato.gravitino.rel.TableChange.ColumnPosition.defaultPos();
+    }
   }
 }

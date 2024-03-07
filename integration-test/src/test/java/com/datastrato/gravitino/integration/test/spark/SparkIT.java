@@ -260,6 +260,30 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("not_exists_db"));
   }
 
+  @Test
+  void testAlterTableAddAndDeleteColumn() {
+    String tableName = "test_column";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    List<SparkColumnInfo> sparkOldColumnInfos = getTableInfo(tableName).getColumns();
+    sparkOldColumnInfos.forEach(
+        sparkColumnInfo ->
+            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
+    List<SparkColumnInfo> sparkAddColumnInfos = getTableInfo(tableName).getColumns();
+    Assertions.assertTrue(
+        sparkAddColumnInfos.stream()
+            .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+
+    sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
+    List<SparkColumnInfo> sparkDeleteColumnInfos = getTableInfo(tableName).getColumns();
+    sparkDeleteColumnInfos.forEach(
+        sparkColumnInfo ->
+            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+  }
+
   private void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     String insertValues =
