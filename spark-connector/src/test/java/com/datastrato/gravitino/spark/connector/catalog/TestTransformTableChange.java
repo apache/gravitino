@@ -49,8 +49,6 @@ public class TestTransformTableChange {
     com.datastrato.gravitino.rel.TableChange.AddColumn gravitinoAddColumn =
         (com.datastrato.gravitino.rel.TableChange.AddColumn) gravitinoChange;
 
-    Assertions.assertEquals(1, sparkAddColumn.fieldNames().length);
-    Assertions.assertEquals(1, gravitinoAddColumn.fieldName().length);
     Assertions.assertEquals(sparkAddColumn.fieldNames(), gravitinoAddColumn.fieldName());
     Assertions.assertTrue(
         "string".equalsIgnoreCase(gravitinoAddColumn.getDataType().simpleString()));
@@ -68,8 +66,6 @@ public class TestTransformTableChange {
     com.datastrato.gravitino.rel.TableChange.DeleteColumn gravitinoDeleteColumn =
         (com.datastrato.gravitino.rel.TableChange.DeleteColumn) gravitinoChange;
 
-    Assertions.assertEquals(1, sparkDeleteColumn.fieldNames().length);
-    Assertions.assertEquals(1, gravitinoDeleteColumn.fieldName().length);
     Assertions.assertEquals(sparkDeleteColumn.fieldNames(), gravitinoDeleteColumn.fieldName());
     Assertions.assertEquals(sparkDeleteColumn.ifExists(), gravitinoDeleteColumn.getIfExists());
   }
