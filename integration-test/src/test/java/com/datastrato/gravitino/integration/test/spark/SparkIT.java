@@ -260,6 +260,35 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("not_exists_db"));
   }
 
+  @Test
+  public void testAlterTableSetProperty() {
+    String tableName = "testSetProperty";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    SparkTableInfo oldProperties = getTableInfo(tableName);
+    Assertions.assertFalse(oldProperties.getTableProperties().containsKey("key1"));
+
+    sql(String.format("alter table %s SET TBLPROPERTIES('key1'='value1')", tableName));
+    SparkTableInfo newProperties = getTableInfo(tableName);
+    Assertions.assertEquals(newProperties.getTableProperties().get("key1"), "value1");
+  }
+
+  @Test
+  public void testAlterTableRemoveProperty() {
+    String tableName = "testRemoveProperty";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    sql(String.format("alter table %s SET TBLPROPERTIES('key1'='value1')", tableName));
+    SparkTableInfo oldProperties = getTableInfo(tableName);
+    Assertions.assertTrue(oldProperties.getTableProperties().containsKey("key1"));
+
+    sql(String.format("alter table %s UNSET TBLPROPERTIES('key1')", tableName));
+    SparkTableInfo newProperties = getTableInfo(tableName);
+    Assertions.assertFalse(newProperties.getTableProperties().containsKey("key1"));
+  }
+
   private void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     String insertValues =

@@ -18,6 +18,7 @@ import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -164,7 +165,21 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    throw new NotSupportedException("Doesn't support altering table for now");
+    com.datastrato.gravitino.rel.TableChange[] gravitinoTableChanges =
+        Arrays.stream(changes)
+            .map(GravitinoCatalog::transformTableChange)
+            .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
+    try {
+      com.datastrato.gravitino.rel.Table table =
+          gravitinoCatalogClient
+              .asTableCatalog()
+              .alterTable(
+                  NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
+                  gravitinoTableChanges);
+      return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
   }
 
   @Override
@@ -335,5 +350,28 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
         gravitinoIdentifier.namespace().length() == 3,
         "Only support 3 level namespace," + gravitinoIdentifier.namespace());
     return gravitinoIdentifier.namespace().level(2);
+  }
+
+  @VisibleForTesting
+  public static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
+    if (change instanceof TableChange.SetProperty) {
+      return transformSetProperty((TableChange.SetProperty) change);
+    } else if (change instanceof TableChange.RemoveProperty) {
+      return transformRemoveProperty((TableChange.RemoveProperty) change);
+    } else {
+      throw new UnsupportedOperationException(
+          String.format("Unsupported table change %s", change.getClass().getName()));
+    }
+  }
+
+  private static com.datastrato.gravitino.rel.TableChange transformSetProperty(
+      TableChange.SetProperty sparkChange) {
+    return com.datastrato.gravitino.rel.TableChange.setProperty(
+        sparkChange.property(), sparkChange.value());
+  }
+
+  private static com.datastrato.gravitino.rel.TableChange transformRemoveProperty(
+      TableChange.RemoveProperty sparkChange) {
+    return com.datastrato.gravitino.rel.TableChange.removeProperty(sparkChange.property());
   }
 }
