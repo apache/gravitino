@@ -364,23 +364,23 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       return com.datastrato.gravitino.rel.TableChange.addColumn(
-              addColumn.fieldNames(),
-              SparkTypeConverter.toGravitinoType(addColumn.dataType()),
-              addColumn.comment(),
-              transformColumnPosition(addColumn.position()),
-              addColumn.isNullable());
+          addColumn.fieldNames(),
+          SparkTypeConverter.toGravitinoType(addColumn.dataType()),
+          addColumn.comment(),
+          transformColumnPosition(addColumn.position()),
+          addColumn.isNullable());
     } else if (change instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
       return com.datastrato.gravitino.rel.TableChange.deleteColumn(
-              deleteColumn.fieldNames(), deleteColumn.ifExists());
+          deleteColumn.fieldNames(), deleteColumn.ifExists());
     } else {
       throw new UnsupportedOperationException(
-              String.format("Unsupported table change %s", change.getClass().getName()));
+          String.format("Unsupported table change %s", change.getClass().getName()));
     }
   }
 
   private static com.datastrato.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(
-          TableChange.ColumnPosition columnPosition) {
+      TableChange.ColumnPosition columnPosition) {
     if (columnPosition instanceof TableChange.First) {
       return com.datastrato.gravitino.rel.TableChange.ColumnPosition.first();
     } else if (columnPosition instanceof TableChange.After) {

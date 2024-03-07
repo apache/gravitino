@@ -286,20 +286,20 @@ public class SparkIT extends SparkEnvIT {
     createSimpleTable(tableName);
     List<SparkColumnInfo> sparkOldColumnInfos = getTableInfo(tableName).getColumns();
     sparkOldColumnInfos.forEach(
-            sparkColumnInfo ->
-                    Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+        sparkColumnInfo ->
+            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
     List<SparkColumnInfo> sparkAddColumnInfos = getTableInfo(tableName).getColumns();
     Assertions.assertTrue(
-            sparkAddColumnInfos.stream()
-                    .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+        sparkAddColumnInfos.stream()
+            .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
 
     sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
     List<SparkColumnInfo> sparkDeleteColumnInfos = getTableInfo(tableName).getColumns();
     sparkDeleteColumnInfos.forEach(
-            sparkColumnInfo ->
-                    Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+        sparkColumnInfo ->
+            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {
