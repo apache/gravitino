@@ -6,20 +6,24 @@
 package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.openqa.selenium.By;
+import org.openqa.selenium.ElementNotInteractableException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.ui.FluentWait;
+import org.openqa.selenium.support.ui.Wait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MetalakePage {
-  protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
   protected static WebDriver driver;
+  protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
 
   @FindBy(
       xpath =
@@ -214,14 +218,17 @@ public class MetalakePage {
         List<WebElement> dataListNext =
             dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
 
-        return dataListNext.size() == 1;
+        if (dataListNext.size() == 1) {
+          clickPrevPageBtn();
+          return true;
+        } else {
+          return false;
+        }
       } else {
         return false;
       }
     } catch (Exception e) {
       return false;
-    } finally {
-      clickPrevPageBtn();
     }
   }
 
@@ -247,8 +254,19 @@ public class MetalakePage {
       String xpath = "//a[@data-refer='metalake-name-link']";
       WebElement nameLink = driver.findElement(By.xpath(xpath));
 
+      Wait<WebDriver> wait =
+          new FluentWait<>(driver)
+              .withTimeout(Duration.ofSeconds(2))
+              .pollingEvery(Duration.ofMillis(300))
+              .ignoring(ElementNotInteractableException.class);
+      wait.until(
+          d -> {
+            nameLink.isDisplayed();
+            return true;
+          });
+
       String url = driver.getCurrentUrl();
-      boolean isUrl = url.contains("/ui/metalakes?metalake=metalake_test");
+      boolean isUrl = url.contains("/ui/metalakes?metalake=a_test");
 
       return nameLink.isDisplayed() && isUrl;
     } catch (Exception e) {
@@ -310,10 +328,22 @@ public class MetalakePage {
 
   public void linkToCatalogsPageAction() {
     LOG.info("test link to catalogs page action started");
-    createMetalakeAction("metalake_test", "test", true);
+    createMetalakeAction("a_test", "test", true);
 
-    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=metalake_test']";
+    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=a_test']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
+
+    Wait<WebDriver> wait =
+        new FluentWait<>(driver)
+            .withTimeout(Duration.ofSeconds(2))
+            .pollingEvery(Duration.ofMillis(300))
+            .ignoring(ElementNotInteractableException.class);
+    wait.until(
+        d -> {
+          metalakeLink.isDisplayed();
+          return true;
+        });
+
     metalakeLink.click();
   }
 }
