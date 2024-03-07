@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.catalog;
+package com.datastrato.gravitino.spark.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
@@ -13,11 +13,11 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.spark.ConnectorConstants;
-import com.datastrato.gravitino.spark.GravitinoCatalogAdaptor;
-import com.datastrato.gravitino.spark.GravitinoCatalogAdaptorFactory;
-import com.datastrato.gravitino.spark.PropertiesConverter;
-import com.datastrato.gravitino.spark.SparkTypeConverter;
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
+import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
+import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;

@@ -3,9 +3,9 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.hive;
+package com.datastrato.gravitino.spark.connector.hive;
 
-import com.datastrato.gravitino.spark.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import java.util.HashMap;
 import java.util.Map;
 
