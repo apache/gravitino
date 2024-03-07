@@ -381,13 +381,17 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   private static com.datastrato.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(
       TableChange.ColumnPosition columnPosition) {
-    if (columnPosition instanceof TableChange.First) {
+    if (null == columnPosition) {
+      return com.datastrato.gravitino.rel.TableChange.ColumnPosition.defaultPos();
+    } else if (columnPosition instanceof TableChange.First) {
       return com.datastrato.gravitino.rel.TableChange.ColumnPosition.first();
     } else if (columnPosition instanceof TableChange.After) {
       TableChange.After after = (TableChange.After) columnPosition;
       return com.datastrato.gravitino.rel.TableChange.ColumnPosition.after(after.column());
     } else {
-      return com.datastrato.gravitino.rel.TableChange.ColumnPosition.defaultPos();
+      throw new UnsupportedOperationException(
+          String.format(
+              "Unsupported table column position %s", columnPosition.getClass().getName()));
     }
   }
 }

@@ -284,22 +284,25 @@ public class SparkIT extends SparkEnvIT {
     dropTableIfExists(tableName);
 
     createSimpleTable(tableName);
-    List<SparkColumnInfo> sparkOldColumnInfos = getTableInfo(tableName).getColumns();
-    sparkOldColumnInfos.forEach(
-        sparkColumnInfo ->
-            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+    String[] oldColumnNames =
+        getTableInfo(tableName).getColumns().stream()
+            .map(SparkColumnInfo::getName)
+            .toArray(String[]::new);
+    Assertions.assertEquals(oldColumnNames, new String[] {"id", "name", "age"});
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
-    List<SparkColumnInfo> sparkAddColumnInfos = getTableInfo(tableName).getColumns();
-    Assertions.assertTrue(
-        sparkAddColumnInfos.stream()
-            .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+    String[] addColumnNames =
+        getTableInfo(tableName).getColumns().stream()
+            .map(SparkColumnInfo::getName)
+            .toArray(String[]::new);
+    Assertions.assertEquals(addColumnNames, new String[] {"id", "name", "age", "col1"});
 
     sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
-    List<SparkColumnInfo> sparkDeleteColumnInfos = getTableInfo(tableName).getColumns();
-    sparkDeleteColumnInfos.forEach(
-        sparkColumnInfo ->
-            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+    String[] deleteColumnNames =
+        getTableInfo(tableName).getColumns().stream()
+            .map(SparkColumnInfo::getName)
+            .toArray(String[]::new);
+    Assertions.assertEquals(deleteColumnNames, new String[] {"id", "name", "age"});
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {
