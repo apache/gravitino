@@ -71,3 +71,4 @@ The `trino-cli-429-executable.jar` is the Trino CLI jar file, you can download i
 :::
 
 10. If nothing goes wrong, you can start developing the Gravitino connector in the Gravitino project and debug it in the Trino project.
+![](../assets/trino/show-catalogs.jpg)
