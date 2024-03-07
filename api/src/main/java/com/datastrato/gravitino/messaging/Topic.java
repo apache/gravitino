@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.stream;
+package com.datastrato.gravitino.messaging;
 
 import com.datastrato.gravitino.Auditable;
 import java.util.Collections;
@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
  * Message Queue system like Kafka, Pulsar, etc.
  *
  * <p>{@link Topic} defines the basic properties of a topic object. A catalog implementation with
- * {@link MessagingCatalog} should implement this interface.
+ * {@link TopicCatalog} should implement this interface.
  */
 public interface Topic extends Auditable {
 

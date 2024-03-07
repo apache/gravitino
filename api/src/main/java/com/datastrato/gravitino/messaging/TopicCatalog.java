@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.stream;
+package com.datastrato.gravitino.messaging;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -16,7 +16,7 @@ import java.util.Map;
  * The MessagingCatalog interface defines the public API for managing topic objects in a schema. If
  * the catalog implementation supports topic objects, it should implement this interface.
  */
-public interface MessagingCatalog {
+public interface TopicCatalog {
 
   /**
    * List the topics in a schema namespace from the catalog.
