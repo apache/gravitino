@@ -21,7 +21,7 @@ public class CommonMetaService {
   public Long getParentEntityIdByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
-        "Namespace should not be empty and length should be less and equal than 3");
+        "Namespace should not be empty and length should be less than or equal to 3.");
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);
