@@ -48,6 +48,32 @@ WITH (
    engine = 'InnoDB'
 )"
 
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb06 (
+   id integer,
+   name char(1),
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb07 (
+   id integer,
+   name varchar,
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+DROP TABLE
+
+DROP TABLE
+
 DROP TABLE
 
 DROP TABLE

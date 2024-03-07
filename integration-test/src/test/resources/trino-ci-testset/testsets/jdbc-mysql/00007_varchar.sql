@@ -20,11 +20,23 @@ CREATE TABLE tb05 (id int, name varchar(256));
 
 SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb05;
 
+CREATE TABLE tb05 (id int, name char);
+
+SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb06;
+
+CREATE TABLE tb05 (id int, name varchar);
+
+SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb07;
+
 drop table "test.gt_mysql".varchar_db1.tb01;
 
 drop table "test.gt_mysql".varchar_db1.tb02;
 
 drop table "test.gt_mysql".varchar_db1.tb04;
+
+drop table "test.gt_mysql".varchar_db1.tb05;
+
+drop table "test.gt_mysql".varchar_db1.tb05;
 
 drop table "test.gt_mysql".varchar_db1.tb05;
 

@@ -36,6 +36,26 @@ COMMENT ''"
 
 <QUERY_FAILED> Failed to create table.
 
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb06 (
+   id integer,
+   name char(1)
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb07 (
+   id integer,
+   name varchar
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP TABLE
+
 DROP TABLE
 
 DROP TABLE
