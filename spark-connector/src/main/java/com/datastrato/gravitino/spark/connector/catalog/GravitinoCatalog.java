@@ -171,7 +171,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
     com.datastrato.gravitino.rel.TableChange[] gravitinoTableChanges =
         Arrays.stream(changes)
-            .map(sparkTableChange -> tranformTableChange(sparkTableChange))
+            .map(sparkTableChange -> transformTableChange(sparkTableChange))
             .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
 
     try {
@@ -358,7 +358,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   }
 
   @VisibleForTesting
-  static com.datastrato.gravitino.rel.TableChange tranformTableChange(
+  static com.datastrato.gravitino.rel.TableChange transformTableChange(
       TableChange sparkTableChange) {
     if (sparkTableChange instanceof UpdateColumnPosition) {
       UpdateColumnPosition updateColumnPosition = (UpdateColumnPosition) sparkTableChange;
