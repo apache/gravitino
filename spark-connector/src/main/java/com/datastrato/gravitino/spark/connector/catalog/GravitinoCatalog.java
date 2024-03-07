@@ -353,7 +353,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   }
 
   @VisibleForTesting
-  public static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
+  static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
     if (change instanceof TableChange.SetProperty) {
       return transformSetProperty((TableChange.SetProperty) change);
     } else if (change instanceof TableChange.RemoveProperty) {

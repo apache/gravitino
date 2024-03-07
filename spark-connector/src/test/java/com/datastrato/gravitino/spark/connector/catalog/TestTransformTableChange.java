@@ -3,9 +3,8 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.connector;
+package com.datastrato.gravitino.spark.connector.catalog;
 
-import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,7 @@ import org.junit.jupiter.api.Test;
 public class TestTransformTableChange {
 
   @Test
-  public void testTransformSetProperty() {
+  void testTransformSetProperty() {
     TableChange sparkSetProperty = TableChange.setProperty("key", "value");
     com.datastrato.gravitino.rel.TableChange tableChange =
         GravitinoCatalog.transformTableChange(sparkSetProperty);
@@ -26,7 +25,7 @@ public class TestTransformTableChange {
   }
 
   @Test
-  public void testTransformRemoveProperty() {
+  void testTransformRemoveProperty() {
     TableChange sparkRemoveProperty = TableChange.removeProperty("key");
     com.datastrato.gravitino.rel.TableChange tableChange =
         GravitinoCatalog.transformTableChange(sparkRemoveProperty);

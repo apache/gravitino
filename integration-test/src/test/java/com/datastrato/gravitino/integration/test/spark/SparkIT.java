@@ -261,32 +261,21 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
-  public void testAlterTableSetProperty() {
-    String tableName = "testSetProperty";
+  void testAlterTableSetAndRemoveProperty() {
+    String tableName = "test_property";
     dropTableIfExists(tableName);
 
     createSimpleTable(tableName);
-    SparkTableInfo oldProperties = getTableInfo(tableName);
-    Assertions.assertFalse(oldProperties.getTableProperties().containsKey("key1"));
+    sql(
+        String.format(
+            "ALTER TABLE %s SET TBLPROPERTIES('key1'='value1', 'key2'='value2')", tableName));
+    Map<String, String> oldProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertTrue(oldProperties.containsKey("key1") && oldProperties.containsKey("key2"));
 
-    sql(String.format("alter table %s SET TBLPROPERTIES('key1'='value1')", tableName));
-    SparkTableInfo newProperties = getTableInfo(tableName);
-    Assertions.assertEquals(newProperties.getTableProperties().get("key1"), "value1");
-  }
-
-  @Test
-  public void testAlterTableRemoveProperty() {
-    String tableName = "testRemoveProperty";
-    dropTableIfExists(tableName);
-
-    createSimpleTable(tableName);
-    sql(String.format("alter table %s SET TBLPROPERTIES('key1'='value1')", tableName));
-    SparkTableInfo oldProperties = getTableInfo(tableName);
-    Assertions.assertTrue(oldProperties.getTableProperties().containsKey("key1"));
-
-    sql(String.format("alter table %s UNSET TBLPROPERTIES('key1')", tableName));
-    SparkTableInfo newProperties = getTableInfo(tableName);
-    Assertions.assertFalse(newProperties.getTableProperties().containsKey("key1"));
+    sql(String.format("ALTER TABLE %s UNSET TBLPROPERTIES('key1')", tableName));
+    Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertFalse(newProperties.containsKey("key1"));
+    Assertions.assertTrue(newProperties.containsKey("key2"));
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {
