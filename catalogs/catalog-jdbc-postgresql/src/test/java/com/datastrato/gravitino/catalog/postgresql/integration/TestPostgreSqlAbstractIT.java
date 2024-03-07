@@ -1,8 +1,8 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.postgresql.integration.ut;
+package com.datastrato.gravitino.catalog.postgresql.integration;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.test.TestJdbcAbstractIT;

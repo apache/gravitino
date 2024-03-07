@@ -79,7 +79,7 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/**")
   } else {
-    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    // PG will use project jdbc-mysql/build/libs directory, so we add the task dependency here.
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(tasks.jar)
 

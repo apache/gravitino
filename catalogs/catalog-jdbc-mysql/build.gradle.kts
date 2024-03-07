@@ -75,7 +75,6 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/**")
   } else {
-    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
     dependsOn(tasks.jar)
 
     doFirst {

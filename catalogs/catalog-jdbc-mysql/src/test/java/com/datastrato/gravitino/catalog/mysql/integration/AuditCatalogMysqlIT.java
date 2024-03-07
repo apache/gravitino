@@ -1,9 +1,9 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.mysql.integration.it;
+package com.datastrato.gravitino.catalog.mysql.integration;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
@@ -11,7 +11,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.catalog.mysql.integration.it.service.MysqlService;
+import com.datastrato.gravitino.catalog.mysql.integration.service.MysqlService;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.common.integration.util.AbstractIT;
 import com.datastrato.gravitino.common.integration.util.GravitinoITUtils;

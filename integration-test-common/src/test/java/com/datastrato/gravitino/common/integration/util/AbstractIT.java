@@ -63,6 +63,8 @@ public class AbstractIT {
 
   protected static Map<String, String> customConfigs = new HashMap<>();
 
+  protected static boolean ignoreIcebergRestService = true;
+
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -110,7 +112,8 @@ public class AbstractIT {
 
     serverConfig = new ServerConfig();
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
-      MiniGravitinoContext context = new MiniGravitinoContext(customConfigs);
+      MiniGravitinoContext context =
+          new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
       miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();

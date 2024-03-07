@@ -59,6 +59,13 @@ public class MiniGravitino {
     mockConfDir.mkdirs();
   }
 
+  private void removeIcebergRestConfiguration(Properties properties) {
+    // Disable iceberg rest service
+    properties.remove(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+  }
+
   public void start() throws Exception {
     LOG.info("Staring MiniGravitino up...");
 
@@ -76,6 +83,14 @@ public class MiniGravitino {
     Properties properties =
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
+
+    // Remove Iceberg rest service.
+    if (context.ignoreIcebergRestService) {
+      removeIcebergRestConfiguration(properties);
+      ITUtils.overwriteConfigFile(
+          ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
+    }
+
     serverConfig.loadFromProperties(properties);
 
     // Prepare delete the rocksdb backend storage directory

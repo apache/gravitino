@@ -47,6 +47,8 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
     initEnv();
     // Inject Iceberg REST service config to gravitino.conf
     registerIcebergCatalogConfig();
+
+    ignoreIcebergRestService = false;
     // Start Gravitino server
     AbstractIT.startIntegrationTest();
     // Start Spark session

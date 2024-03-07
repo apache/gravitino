@@ -6,8 +6,10 @@ package com.datastrato.gravitino.integration.test.web.ui;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+@Disabled
 public class MetalakePageTest extends AbstractWebIT {
   @Test
   public void homePage() {

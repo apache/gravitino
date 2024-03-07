@@ -9,7 +9,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.catalog.postgresql.integration.it.CatalogPostgreSqlIT;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.common.integration.util.AbstractIT;
 import com.datastrato.gravitino.common.integration.util.ITUtils;

@@ -42,5 +42,16 @@ public class ITUtils {
     }
   }
 
+  public static void overwriteConfigFile(String configFileName, Properties props)
+      throws IOException {
+    try (OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
+      for (String key : props.stringPropertyNames()) {
+        String value = props.getProperty(key);
+        // Use customized write functions to avoid escaping `:` into `\:`.
+        outputStream.write((key + " = " + value + "\n").getBytes(StandardCharsets.UTF_8));
+      }
+    }
+  }
+
   private ITUtils() {}
 }
