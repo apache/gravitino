@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
  * Message Queue system like Kafka, Pulsar, etc.
  *
  * <p>{@link Topic} defines the basic properties of a topic object. A catalog implementation with
- * {@link StreamCatalog} should implement this interface.
+ * {@link MessagingCatalog} should implement this interface.
  */
 public interface Topic extends Auditable {
 

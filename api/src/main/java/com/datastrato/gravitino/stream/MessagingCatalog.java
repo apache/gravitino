@@ -13,10 +13,10 @@ import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import java.util.Map;
 
 /**
- * The StreamCatalog interface defines the public API for managing topic objects in a schema. If the
- * catalog implementation supports topic objects, it should implement this interface.
+ * The MessagingCatalog interface defines the public API for managing topic objects in a schema. If
+ * the catalog implementation supports topic objects, it should implement this interface.
  */
-public interface StreamCatalog {
+public interface MessagingCatalog {
 
   /**
    * List the topics in a schema namespace from the catalog.
