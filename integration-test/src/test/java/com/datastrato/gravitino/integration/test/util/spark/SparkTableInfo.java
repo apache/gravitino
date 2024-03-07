@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.integration.test.util.spark;
 
-import com.datastrato.gravitino.spark.ConnectorConstants;
-import com.datastrato.gravitino.spark.table.SparkBaseTable;
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

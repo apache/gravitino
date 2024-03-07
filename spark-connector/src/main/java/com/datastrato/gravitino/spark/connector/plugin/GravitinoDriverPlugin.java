@@ -3,11 +3,11 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.plugin;
+package com.datastrato.gravitino.spark.connector.plugin;
 
-import com.datastrato.gravitino.spark.GravitinoSparkConfig;
-import com.datastrato.gravitino.spark.catalog.GravitinoCatalog;
-import com.datastrato.gravitino.spark.catalog.GravitinoCatalogManager;
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalog;
+import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;

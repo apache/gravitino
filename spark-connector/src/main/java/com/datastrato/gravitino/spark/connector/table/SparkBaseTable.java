@@ -3,11 +3,11 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.table;
+package com.datastrato.gravitino.spark.connector.table;
 
-import com.datastrato.gravitino.spark.ConnectorConstants;
-import com.datastrato.gravitino.spark.PropertiesConverter;
-import com.datastrato.gravitino.spark.SparkTypeConverter;
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
