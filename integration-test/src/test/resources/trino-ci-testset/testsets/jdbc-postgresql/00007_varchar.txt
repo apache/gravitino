@@ -10,6 +10,8 @@ CREATE TABLE
 )
 COMMENT ''"
 
+CREATE TABLE
+
 "CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb02 (
    id integer,
    name char(65536)
