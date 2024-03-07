@@ -262,9 +262,7 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
-  void testUpdateColumnPosition() {
-
-  }
+  void testUpdateColumnPosition() {}
 
   private void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
