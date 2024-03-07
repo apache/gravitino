@@ -5,10 +5,13 @@
 
 package com.datastrato.gravitino.rel.indexes;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /**
  * The Index interface defines methods for implementing table index columns. Currently, settings for
  * PRIMARY_KEY and UNIQUE_KEY are provided.
  */
+@Evolving
 public interface Index {
 
   /** @return The type of the index. eg: PRIMARY_KEY and UNIQUE_KEY. */

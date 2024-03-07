@@ -14,6 +14,7 @@ import java.util.Objects;
 
 /** The helper class to create literals to pass into Gravitino. */
 public class Literals {
+
   /** Used to represent a null literal. */
   public static final Literal<Types.NullType> NULL = new LiteralImpl<>(null, Types.NullType.get());
 

@@ -261,6 +261,24 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
+  void testAlterTableSetAndRemoveProperty() {
+    String tableName = "test_property";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    sql(
+        String.format(
+            "ALTER TABLE %s SET TBLPROPERTIES('key1'='value1', 'key2'='value2')", tableName));
+    Map<String, String> oldProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertTrue(oldProperties.containsKey("key1") && oldProperties.containsKey("key2"));
+
+    sql(String.format("ALTER TABLE %s UNSET TBLPROPERTIES('key1')", tableName));
+    Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertFalse(newProperties.containsKey("key1"));
+    Assertions.assertTrue(newProperties.containsKey("key2"));
+  }
+
+  @Test
   void testAlterTableAddAndDeleteColumn() {
     String tableName = "test_column";
     dropTableIfExists(tableName);
@@ -268,20 +286,20 @@ public class SparkIT extends SparkEnvIT {
     createSimpleTable(tableName);
     List<SparkColumnInfo> sparkOldColumnInfos = getTableInfo(tableName).getColumns();
     sparkOldColumnInfos.forEach(
-        sparkColumnInfo ->
-            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+            sparkColumnInfo ->
+                    Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
     List<SparkColumnInfo> sparkAddColumnInfos = getTableInfo(tableName).getColumns();
     Assertions.assertTrue(
-        sparkAddColumnInfos.stream()
-            .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+            sparkAddColumnInfos.stream()
+                    .anyMatch(sparkColumnInfo -> "col1".equalsIgnoreCase(sparkColumnInfo.getName())));
 
     sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
     List<SparkColumnInfo> sparkDeleteColumnInfos = getTableInfo(tableName).getColumns();
     sparkDeleteColumnInfos.forEach(
-        sparkColumnInfo ->
-            Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
+            sparkColumnInfo ->
+                    Assertions.assertFalse("col1".equalsIgnoreCase(sparkColumnInfo.getName())));
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {

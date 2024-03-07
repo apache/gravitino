@@ -14,12 +14,11 @@ public class ExceptionUtils {
   public static void checkSQLConstraintException(
       RuntimeException re, Entity.EntityType type, String entityName) {
     if (re.getCause() != null
-        && re.getCause().getCause() != null
-        && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
+        && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
       // TODO We should make more fine-grained exception judgments
-      // Usually throwing `SQLIntegrityConstraintViolationException` means that
-      // SQL violates the constraints of `primary key` and `unique key`.
-      // We simply think that the entity already exists at this time.
+      //  Usually throwing `SQLIntegrityConstraintViolationException` means that
+      //  SQL violates the constraints of `primary key` and `unique key`.
+      //  We simply think that the entity already exists at this time.
       throw new EntityAlreadyExistsException(
           String.format("%s entity: %s already exists", type.name(), entityName));
     }
