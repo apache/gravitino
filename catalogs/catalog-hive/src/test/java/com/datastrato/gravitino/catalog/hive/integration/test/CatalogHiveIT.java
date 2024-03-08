@@ -48,6 +48,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -74,6 +75,7 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -99,6 +101,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1363,5 +1366,47 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  // Couldn't run under embedded mode, because Iceberg package may not build yet.
+  @EnabledIf("isDeployMode")
+  void testCustomCatalogOperations() {
+    String catalogName = "custom_catalog";
+    Assertions.assertDoesNotThrow(() -> createCatalogWithCustomOperation(catalogName));
+  }
+
+  private static Catalog createCatalogWithCustomOperation(String catalogName) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(
+        Catalog.CATALOG_OPERATION_CLASS_NAME,
+        "com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations");
+    properties.put(Catalog.CATALOG_OPERATION_CLASS_PATH, getIcebergJarPath());
+
+    properties.put("catalog-backend", "memory");
+    properties.put("warehouse", "mock");
+    properties.put("uri", "mock");
+
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
+
+    return metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+  }
+
+  private static String getIcebergJarPath() {
+    if (ITUtils.getTestMode().equals(ITUtils.EMBEDDED_TEST_MODE)) {
+      return Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
+    } else {
+      return Paths.get("catalogs", "lakehouse-iceberg", "libs").toString();
+    }
+  }
+
+  private static boolean isDeployMode() {
+    return !ITUtils.getTestMode().equals(ITUtils.EMBEDDED_TEST_MODE);
   }
 }

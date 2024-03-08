@@ -41,6 +41,22 @@ public interface Catalog extends Auditable {
    */
   String PROPERTY_PACKAGE = "package";
 
+  /**
+   * Custom catalog operation class name. It is recommended to extend current Gravitino catalog
+   * operations like HiveCatalogOperation, and override interfaces like purgeTable, and
+   * listPartition which should be hacked, but this is not a must. It only needs to implement
+   * CatalogOperations to initialize itself, implement SupportsSchemas to do schema ops, and
+   * TableCatalog to do table ops if necessary.
+   */
+  String CATALOG_OPERATION_CLASS_NAME = "catalog.operation.custom.class-name";
+
+  /**
+   * Custom catalog operation class path. It will be added to the catalog classpath if both custom
+   * catalog operation class name and class path are not empty. The path could be absolute or
+   * relative, if relative, it's supposed to under Gravitino Home directory.
+   */
+  String CATALOG_OPERATION_CLASS_PATH = "catalog.operation.custom.classpath";
+
   /** @return The name of the catalog. */
   String name();
 

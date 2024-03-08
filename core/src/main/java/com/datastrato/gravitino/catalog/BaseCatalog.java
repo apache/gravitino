@@ -12,6 +12,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -27,6 +29,8 @@ import java.util.Optional;
  */
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   private CatalogEntity entity;
 
@@ -91,7 +95,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         if (ops == null) {
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
-          CatalogOperations newOps = newOps(conf);
+          CatalogOperations newOps = createOps(conf);
+          newOps.initialize(conf, entity);
           ops =
               newProxyPlugin(conf)
                   .map(
@@ -104,6 +109,25 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  private CatalogOperations createOps(Map<String, String> conf) {
+    String customCatalogOperationClass = conf.get(CATALOG_OPERATION_CLASS_NAME);
+    return Optional.ofNullable(customCatalogOperationClass)
+        .map(className -> loadCustomerOps(className))
+        .orElse(newOps(conf));
+  }
+
+  private CatalogOperations loadCustomerOps(String className) {
+    // Couldn't find package if not specifying classloader
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    try {
+      return (CatalogOperations)
+          Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      LOG.error("Failed to load custom catalog operations, {}", className, e);
+      throw new RuntimeException(e);
+    }
   }
 
   /**
