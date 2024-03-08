@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.catalog.jdbc.test.TestJdbcAbstractIT;
+import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;

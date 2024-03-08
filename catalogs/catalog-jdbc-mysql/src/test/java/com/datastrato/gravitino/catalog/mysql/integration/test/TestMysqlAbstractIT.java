@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
-import com.datastrato.gravitino.catalog.jdbc.test.TestJdbcAbstractIT;
+import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
