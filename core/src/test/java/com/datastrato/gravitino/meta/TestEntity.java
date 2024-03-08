@@ -47,6 +47,10 @@ public class TestEntity {
   private final Long topicId = 1L;
   private final String topicName = "testTopic";
 
+  // User test data
+  private final Long userId = 1L;
+  private final String userName = "testUser";
+
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
@@ -199,5 +203,26 @@ public class TestEntity {
         TopicEntity.builder().withId(topicId).withName(topicName).withAuditInfo(auditInfo).build();
     Assertions.assertNull(testTopic1.comment());
     Assertions.assertNull(testTopic1.properties());
+  }
+
+  @Test
+  public void testUser() {
+    UserEntity testUser =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withProperties(map)
+            .build();
+
+    Map<Field, Object> fields = testUser.fields();
+    Assertions.assertEquals(userId, fields.get(UserEntity.ID));
+    Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
+    Assertions.assertEquals(map, fields.get(UserEntity.PROPERTIES));
+
+    UserEntity testUserWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    Assertions.assertNull(testUserWithoutFields.properties());
   }
 }
