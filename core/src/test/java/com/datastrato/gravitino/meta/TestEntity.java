@@ -43,6 +43,10 @@ public class TestEntity {
   private final Long fileId = 1L;
   private final String fileName = "testFile";
 
+  // Topic test data
+  private final Long topicId = 1L;
+  private final String topicName = "testTopic";
+
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
@@ -175,5 +179,29 @@ public class TestEntity {
                   .build();
             });
     Assertions.assertEquals("Field storage_location is required", exception.getMessage());
+  }
+
+  @Test
+  public void testTopic() {
+    TopicEntity testTopic =
+        TopicEntity.builder()
+            .withId(topicId)
+            .withName(topicName)
+            .withAuditInfo(auditInfo)
+            .withComment("test topic comment")
+            .withProperties(map)
+            .build();
+
+    Map<Field, Object> fields = testTopic.fields();
+    Assertions.assertEquals(topicId, fields.get(TopicEntity.ID));
+    Assertions.assertEquals(topicName, fields.get(TopicEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(TopicEntity.AUDIT_INFO));
+    Assertions.assertEquals("test topic comment", fields.get(TopicEntity.COMMENT));
+    Assertions.assertEquals(map, fields.get(TopicEntity.PROPERTIES));
+
+    TopicEntity testTopic1 =
+        TopicEntity.builder().withId(topicId).withName(topicName).withAuditInfo(auditInfo).build();
+    Assertions.assertNull(testTopic1.comment());
+    Assertions.assertNull(testTopic1.properties());
   }
 }
