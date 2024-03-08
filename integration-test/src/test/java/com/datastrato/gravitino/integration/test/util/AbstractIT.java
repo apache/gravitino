@@ -167,33 +167,6 @@ public class AbstractIT {
     LOG.info("Tearing down Gravitino Server");
   }
 
-  // Get host IP from primary NIC
-  protected static String getPrimaryNICIp() {
-    String hostIP = "127.0.0.1";
-    try {
-      NetworkInterface networkInterface = NetworkInterface.getByName("en0"); // macOS
-      if (networkInterface == null) {
-        networkInterface = NetworkInterface.getByName("eth0"); // Linux and Windows
-      }
-      if (networkInterface != null) {
-        Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
-        while (addresses.hasMoreElements()) {
-          InetAddress address = addresses.nextElement();
-          if (!address.isLoopbackAddress() && address.getHostAddress().indexOf(':') == -1) {
-            hostIP = address.getHostAddress().replace("/", ""); // remove the first char '/'
-            break;
-          }
-        }
-      } else {
-        InetAddress ip = InetAddress.getLocalHost();
-        hostIP = ip.getHostAddress();
-      }
-    } catch (SocketException | UnknownHostException e) {
-      LOG.error(e.getMessage(), e);
-    }
-    return hostIP;
-  }
-
   public static GravitinoClient getGravitinoClient() {
     return client;
   }

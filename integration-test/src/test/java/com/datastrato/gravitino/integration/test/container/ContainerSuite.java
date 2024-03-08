@@ -89,7 +89,7 @@ public class ContainerSuite implements Closeable {
   public void startTrinoContainer(
       String trinoConfDir,
       String trinoConnectorLibDir,
-      InetSocketAddress gravitinoServerAddr,
+      int gravitinoServerPort,
       String metalakeName) {
     if (trinoContainer != null) {
       return;
@@ -102,14 +102,14 @@ public class ContainerSuite implements Closeable {
             .withEnvVars(
                 ImmutableMap.<String, String>builder()
                     .put("HADOOP_USER_NAME", "root")
-                    .put("GRAVITINO_HOST_IP", gravitinoServerAddr.getAddress().getHostAddress())
-                    .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerAddr.getPort()))
+                    .put("GRAVITINO_HOST_IP", "host.docker.internal")
+                    .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
                     .put("GRAVITINO_METALAKE_NAME", metalakeName)
                     .build())
             .withNetwork(getNetwork())
             .withExtraHosts(
                 ImmutableMap.<String, String>builder()
-                    .put(hiveContainerIp, hiveContainerIp)
+                    .put("host.docker.internal", "host-gateway")
                     .build())
             .withFilesToMount(
                 ImmutableMap.<String, String>builder()
@@ -118,7 +118,6 @@ public class ContainerSuite implements Closeable {
             .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
             .withTrinoConfDir(trinoConfDir)
             .withMetalakeName(metalakeName)
-            .withGravitinoServerAddress(gravitinoServerAddr)
             .withHiveContainerIP(hiveContainerIp);
 
     trinoContainer = closer.register(trinoBuilder.build());

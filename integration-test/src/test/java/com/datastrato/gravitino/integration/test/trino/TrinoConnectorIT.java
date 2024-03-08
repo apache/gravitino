@@ -104,7 +104,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.startTrinoContainer(
         trinoConfDir,
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
-        new InetSocketAddress(AbstractIT.getPrimaryNICIp(), getGravitinoServerPort()),
+        getGravitinoServerPort(),
         metalakeName);
     containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
 
