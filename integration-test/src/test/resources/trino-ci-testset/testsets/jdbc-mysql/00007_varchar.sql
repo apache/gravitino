@@ -36,9 +36,9 @@ drop table "test.gt_mysql".varchar_db1.tb04;
 
 drop table "test.gt_mysql".varchar_db1.tb05;
 
-drop table "test.gt_mysql".varchar_db1.tb05;
+drop table "test.gt_mysql".varchar_db1.tb06;
 
-drop table "test.gt_mysql".varchar_db1.tb05;
+drop table "test.gt_mysql".varchar_db1.tb07;
 
 drop schema "test.gt_mysql".varchar_db1;
 
