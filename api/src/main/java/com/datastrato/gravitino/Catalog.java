@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
@@ -13,6 +14,7 @@ import java.util.Map;
  * The interface of a catalog. The catalog is the second level entity in the gravitino system,
  * containing a set of tables.
  */
+@Evolving
 public interface Catalog extends Auditable {
 
   /** The type of the catalog. */
@@ -24,7 +26,7 @@ public interface Catalog extends Auditable {
     FILESET,
 
     /** Catalog Type for Message Queue, like kafka://topic */
-    STREAM
+    MESSAGING
   }
 
   /**

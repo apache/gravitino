@@ -7,14 +7,18 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
+import com.datastrato.gravitino.storage.relational.po.FilesetPO;
+import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
@@ -22,6 +26,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
@@ -363,7 +368,7 @@ public class POConverters {
    *
    * @param tablePO TablePO object to be converted
    * @param namespace Namespace object to be associated with the table
-   * @return TableEntity object from SchemaPO object
+   * @return TableEntity object from TablePO object
    */
   public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
     try {
@@ -384,11 +389,158 @@ public class POConverters {
    *
    * @param tablePOs list of TablePO objects
    * @param namespace Namespace object to be associated with the table
-   * @return list of TableEntity objects from list of SchemaPO objects
+   * @return list of TableEntity objects from list of TablePO objects
    */
   public static List<TableEntity> fromTablePOs(List<TablePO> tablePOs, Namespace namespace) {
     return tablePOs.stream()
         .map(tablePO -> POConverters.fromTablePO(tablePO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Initialize FilesetPO
+   *
+   * @param filesetEntity FilesetEntity object
+   * @return FilesetPO object with version initialized
+   */
+  public static FilesetPO initializeFilesetPOWithVersion(
+      FilesetEntity filesetEntity, FilesetPO.Builder builder) {
+    try {
+      FilesetVersionPO filesetVersionPO =
+          new FilesetVersionPO.Builder()
+              .withMetalakeId(builder.getFilesetMetalakeId())
+              .withCatalogId(builder.getFilesetCatalogId())
+              .withSchemaId(builder.getFilesetSchemaId())
+              .withFilesetId(filesetEntity.id())
+              .withVersion(INIT_VERSION)
+              .withFilesetComment(filesetEntity.comment())
+              .withStorageLocation(filesetEntity.storageLocation())
+              .withProperties(
+                  JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.properties()))
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build();
+      return builder
+          .withFilesetId(filesetEntity.id())
+          .withFilesetName(filesetEntity.name())
+          .withType(filesetEntity.filesetType().name())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withFilesetVersionPO(filesetVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update FilesetPO version
+   *
+   * @param oldFilesetPO the old FilesetPO object
+   * @param newFileset the new FilesetEntity object
+   * @return FilesetPO object with updated version
+   */
+  public static FilesetPO updateFilesetPOWithVersion(
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, boolean needUpdateVersion) {
+    try {
+      Long lastVersion = oldFilesetPO.getLastVersion();
+      Long currentVersion;
+      FilesetVersionPO newFilesetVersionPO;
+      // Will set the version to the last version + 1
+      if (needUpdateVersion) {
+        lastVersion++;
+        currentVersion = lastVersion;
+        newFilesetVersionPO =
+            new FilesetVersionPO.Builder()
+                .withMetalakeId(oldFilesetPO.getMetalakeId())
+                .withCatalogId(oldFilesetPO.getCatalogId())
+                .withSchemaId(oldFilesetPO.getSchemaId())
+                .withFilesetId(newFileset.id())
+                .withVersion(currentVersion)
+                .withFilesetComment(newFileset.comment())
+                .withStorageLocation(newFileset.storageLocation())
+                .withProperties(
+                    JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties()))
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build();
+      } else {
+        currentVersion = oldFilesetPO.getCurrentVersion();
+        newFilesetVersionPO = oldFilesetPO.getFilesetVersionPO();
+      }
+      return new FilesetPO.Builder()
+          .withFilesetId(newFileset.id())
+          .withFilesetName(newFileset.name())
+          .withMetalakeId(oldFilesetPO.getMetalakeId())
+          .withCatalogId(oldFilesetPO.getCatalogId())
+          .withSchemaId(oldFilesetPO.getSchemaId())
+          .withType(newFileset.filesetType().name())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withFilesetVersionPO(newFilesetVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static boolean checkFilesetVersionNeedUpdate(
+      FilesetVersionPO oldFilesetVersionPO, FilesetEntity newFileset) {
+    if (!StringUtils.equals(oldFilesetVersionPO.getFilesetComment(), newFileset.comment())
+        || !StringUtils.equals(
+            oldFilesetVersionPO.getStorageLocation(), newFileset.storageLocation())) {
+      return true;
+    }
+
+    try {
+      Map<String, String> oldProperties =
+          JsonUtils.anyFieldMapper().readValue(oldFilesetVersionPO.getProperties(), Map.class);
+      return !oldProperties.equals(newFileset.properties());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link FilesetPO} to {@link FilesetEntity}
+   *
+   * @param filesetPO FilesetPO object to be converted
+   * @param namespace Namespace object to be associated with the fileset
+   * @return FilesetEntity object from FilesetPO object
+   */
+  public static FilesetEntity fromFilesetPO(FilesetPO filesetPO, Namespace namespace) {
+    try {
+      return new FilesetEntity.Builder()
+          .withId(filesetPO.getFilesetId())
+          .withName(filesetPO.getFilesetName())
+          .withNamespace(namespace)
+          .withComment(filesetPO.getFilesetVersionPO().getFilesetComment())
+          .withFilesetType(Fileset.Type.valueOf(filesetPO.getType()))
+          .withStorageLocation(filesetPO.getFilesetVersionPO().getStorageLocation())
+          .withProperties(
+              JsonUtils.anyFieldMapper()
+                  .readValue(filesetPO.getFilesetVersionPO().getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(filesetPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert list of {@link FilesetPO} to list of {@link FilesetEntity}
+   *
+   * @param filesetPOs list of FilesetPO objects
+   * @param namespace Namespace object to be associated with the fileset
+   * @return list of FilesetEntity objects from list of FilesetPO objects
+   */
+  public static List<FilesetEntity> fromFilesetPOs(
+      List<FilesetPO> filesetPOs, Namespace namespace) {
+    return filesetPOs.stream()
+        .map(filesetPO -> POConverters.fromFilesetPO(filesetPO, namespace))
         .collect(Collectors.toList());
   }
 }

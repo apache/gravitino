@@ -4,10 +4,13 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /**
  * A Catalog provider is a class that provides a short name for a catalog. This short name is used
  * when creating a catalog.
  */
+@Evolving
 public interface CatalogProvider {
 
   /**

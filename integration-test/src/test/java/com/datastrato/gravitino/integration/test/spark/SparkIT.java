@@ -17,8 +17,7 @@ import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.IntegerType$;
-import org.apache.spark.sql.types.StringType$;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +36,7 @@ public class SparkIT extends SparkEnvIT {
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
-      ImmutableMap.of(IntegerType$.MODULE$, "2", StringType$.MODULE$, "'gravitino_it_test'");
+      ImmutableMap.of(DataTypes.IntegerType, "2", DataTypes.StringType, "'gravitino_it_test'");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
@@ -261,6 +260,24 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertThrows(NoSuchNamespaceException.class, () -> listTableNames("not_exists_db"));
   }
 
+  @Test
+  void testAlterTableSetAndRemoveProperty() {
+    String tableName = "test_property";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    sql(
+        String.format(
+            "ALTER TABLE %s SET TBLPROPERTIES('key1'='value1', 'key2'='value2')", tableName));
+    Map<String, String> oldProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertTrue(oldProperties.containsKey("key1") && oldProperties.containsKey("key2"));
+
+    sql(String.format("ALTER TABLE %s UNSET TBLPROPERTIES('key1')", tableName));
+    Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
+    Assertions.assertFalse(newProperties.containsKey("key1"));
+    Assertions.assertTrue(newProperties.containsKey("key2"));
+  }
+
   private void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     String insertValues =
@@ -305,9 +322,9 @@ public class SparkIT extends SparkEnvIT {
 
   private List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
-        SparkColumnInfo.of("id", IntegerType$.MODULE$, "id comment"),
-        SparkColumnInfo.of("name", StringType$.MODULE$, ""),
-        SparkColumnInfo.of("age", IntegerType$.MODULE$, null));
+        SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 
   // Helper method to create a simple table, and could use corresponding

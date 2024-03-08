@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.expressions.literals;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
 
@@ -12,7 +13,9 @@ import com.datastrato.gravitino.rel.types.Type;
  *
  * @param <T> the JVM type of value held by the literal
  */
+@Evolving
 public interface Literal<T> extends Expression {
+
   /** @return The literal value. */
   T value();
 

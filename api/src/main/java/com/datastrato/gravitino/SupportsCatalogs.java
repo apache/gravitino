@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -13,6 +14,7 @@ import java.util.Map;
  * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
  * and dropping catalogs.
  */
+@Evolving
 public interface SupportsCatalogs {
 
   /**

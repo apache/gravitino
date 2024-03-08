@@ -13,11 +13,8 @@ import com.datastrato.gravitino.rel.types.Types.StringType;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Set;
-import org.apache.spark.sql.types.BinaryType$;
-import org.apache.spark.sql.types.BooleanType$;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.IntegerType$;
-import org.apache.spark.sql.types.StringType$;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -30,13 +27,13 @@ public class TestSparkTypeConverter {
   private HashMap<Type, DataType> gravitinoToSparkTypeMapper = new HashMap<>();
   private Set<Type> notSupportGravitinoTypes = ImmutableSet.of(NullType.get());
 
-  private Set<DataType> notSupportSparkTypes = ImmutableSet.of(BinaryType$.MODULE$);
+  private Set<DataType> notSupportSparkTypes = ImmutableSet.of(DataTypes.BinaryType);
 
   @BeforeAll
   void init() {
-    gravitinoToSparkTypeMapper.put(IntegerType.get(), IntegerType$.MODULE$);
-    gravitinoToSparkTypeMapper.put(BooleanType.get(), BooleanType$.MODULE$);
-    gravitinoToSparkTypeMapper.put(StringType.get(), StringType$.MODULE$);
+    gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
+    gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
+    gravitinoToSparkTypeMapper.put(StringType.get(), DataTypes.StringType);
   }
 
   @Test

@@ -245,5 +245,34 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals("testLocation", fileEntityFromBytes2.storageLocation());
     Assertions.assertEquals(
         com.datastrato.gravitino.file.Fileset.Type.EXTERNAL, fileEntityFromBytes2.filesetType());
+
+    // Test TopicEntity
+    Long topicId = 1L;
+    String topicName = "topic";
+    com.datastrato.gravitino.meta.TopicEntity topicEntity =
+        com.datastrato.gravitino.meta.TopicEntity.builder()
+            .withId(topicId)
+            .withName(topicName)
+            .withAuditInfo(auditInfo)
+            .withComment(comment)
+            .withProperties(props)
+            .build();
+    byte[] topicBytes = protoEntitySerDe.serialize(topicEntity);
+    com.datastrato.gravitino.meta.TopicEntity topicEntityFromBytes =
+        protoEntitySerDe.deserialize(topicBytes, com.datastrato.gravitino.meta.TopicEntity.class);
+    Assertions.assertEquals(topicEntity, topicEntityFromBytes);
+
+    com.datastrato.gravitino.meta.TopicEntity topicEntity1 =
+        com.datastrato.gravitino.meta.TopicEntity.builder()
+            .withId(topicId)
+            .withName(topicName)
+            .withAuditInfo(auditInfo)
+            .build();
+    byte[] topicBytes1 = protoEntitySerDe.serialize(topicEntity1);
+    com.datastrato.gravitino.meta.TopicEntity topicEntityFromBytes1 =
+        protoEntitySerDe.deserialize(topicBytes1, com.datastrato.gravitino.meta.TopicEntity.class);
+    Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
+    Assertions.assertNull(topicEntityFromBytes1.comment());
+    Assertions.assertNull(topicEntityFromBytes1.properties());
   }
 }

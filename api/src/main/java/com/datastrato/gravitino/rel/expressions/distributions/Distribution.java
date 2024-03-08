@@ -4,11 +4,14 @@
  */
 package com.datastrato.gravitino.rel.expressions.distributions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import java.util.Arrays;
 
 /** An interface that defines how data is distributed across partitions. */
+@Evolving
 public interface Distribution extends Expression {
+
   /** @return the distribution strategy name. */
   Strategy strategy();
 

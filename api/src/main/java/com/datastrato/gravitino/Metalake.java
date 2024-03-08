@@ -4,12 +4,14 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Map;
 
 /**
  * The interface of a metalake. The metalake is the top level entity in the gravitino system,
  * containing a set of catalogs.
  */
+@Evolving
 public interface Metalake extends Auditable {
 
   /**
