@@ -2,12 +2,11 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.dyn;
+package com.datastrato.gravitino.catalog.hive.dyn;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.datastrato.gravitino.catalog.hive.dyn.DynFields;
 import com.datastrato.gravitino.catalog.hive.dyn.DynFields.UnboundField;
 import org.junit.jupiter.api.Test;
 
