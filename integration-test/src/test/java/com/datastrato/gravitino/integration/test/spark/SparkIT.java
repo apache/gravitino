@@ -283,20 +283,18 @@ public class SparkIT extends SparkEnvIT {
     String tableName = "test_column";
     dropTableIfExists(tableName);
 
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+
     createSimpleTable(tableName);
-    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
-    List<SparkColumnInfo> addColumn =
-        Arrays.asList(
-            SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-            SparkColumnInfo.of("name", DataTypes.StringType, ""),
-            SparkColumnInfo.of("age", DataTypes.IntegerType, null),
-            SparkColumnInfo.of("col1", DataTypes.StringType, null));
-    checkTableColumns(tableName, addColumn, getTableInfo(tableName));
+    List<SparkColumnInfo> addColumns = getSimpleTableColumn();
+    addColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
+    checkTableColumns(tableName, addColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
-    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
   }
 
   private void checkTableColumns(
