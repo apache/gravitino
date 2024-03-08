@@ -274,5 +274,32 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
     Assertions.assertNull(topicEntityFromBytes1.comment());
     Assertions.assertNull(topicEntityFromBytes1.properties());
+
+    // Test UserEntity
+    Long userId = 1L;
+    String userName = "user";
+    com.datastrato.gravitino.meta.UserEntity userEntity =
+        com.datastrato.gravitino.meta.UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withProperties(props)
+            .build();
+    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
+    com.datastrato.gravitino.meta.UserEntity userEntityFromBytes =
+        protoEntitySerDe.deserialize(userBytes, com.datastrato.gravitino.meta.UserEntity.class);
+    Assertions.assertEquals(userEntity, userEntityFromBytes);
+
+    com.datastrato.gravitino.meta.UserEntity userEntityWithoutFields =
+        com.datastrato.gravitino.meta.UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .build();
+    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
+    userEntityFromBytes =
+        protoEntitySerDe.deserialize(userBytes, com.datastrato.gravitino.meta.UserEntity.class);
+    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
+    Assertions.assertNull(userEntityFromBytes.properties());
   }
 }
