@@ -20,11 +20,11 @@ CREATE TABLE tb05 (id int, name varchar(256));
 
 SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb05;
 
-CREATE TABLE tb05 (id int, name char);
+CREATE TABLE tb06 (id int, name char);
 
 SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb06;
 
-CREATE TABLE tb05 (id int, name varchar);
+CREATE TABLE tb07 (id int, name varchar);
 
 SHOW CREATE TABLE "test.gt_mysql".varchar_db1.tb07;
 
