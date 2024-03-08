@@ -63,7 +63,7 @@ public interface TopicChange {
     }
 
     /**
-     * Compares this UpdateFileComment instance with another object for equality. Two instances are
+     * Compares this UpdateTopicComment instance with another object for equality. Two instances are
      * considered equal if they have the same new comment for the topic.
      *
      * @param o The object to compare with this instance.
