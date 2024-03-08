@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.mysql.integration;
+package com.datastrato.gravitino.catalog.mysql.integration.test;
 
 import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;

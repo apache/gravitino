@@ -183,7 +183,7 @@ allprojects {
     }
   }
 
-  extra["initIntegration"] = setIntegrationTestEnvironment
+  extra["initIntegrationTest"] = setIntegrationTestEnvironment
 }
 
 nexusPublishing {

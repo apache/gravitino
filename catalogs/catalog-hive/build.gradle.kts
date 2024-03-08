@@ -158,7 +158,7 @@ tasks.test {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
     }
 
-    val init = project.extra.get("initIntegration") as (Test) -> Unit
+    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
   }
 }

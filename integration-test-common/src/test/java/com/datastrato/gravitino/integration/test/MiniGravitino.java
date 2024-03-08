@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration;
+package com.datastrato.gravitino.integration.test;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
