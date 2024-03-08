@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
@@ -14,10 +13,11 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IM
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KET_TAB_URI;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;

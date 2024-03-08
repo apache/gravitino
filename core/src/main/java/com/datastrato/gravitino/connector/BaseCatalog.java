@@ -2,11 +2,12 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory;
  *
  * @param <T> The type of the concrete subclass of BaseCatalog.
  */
+@Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
@@ -54,12 +56,26 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   public static final String CATALOG_BYPASS_PREFIX = "gravitino.bypass.";
 
   /**
-   * Creates a new instance of CatalogOperations.
+   * Creates a new instance of CatalogOperations. The child class should implement this method to
+   * provide a specific CatalogOperations instance regarding that catalog.
    *
    * @param config The configuration parameters for creating CatalogOperations.
    * @return A new instance of CatalogOperations.
    */
+  @Evolving
   protected abstract CatalogOperations newOps(Map<String, String> config);
+
+  /**
+   * Create a new instance of ProxyPlugin, it is optional. If the child class needs to support the
+   * specific proxy logic, it should implement this method to provide a specific ProxyPlugin.
+   *
+   * @param config The configuration parameters for creating ProxyPlugin.
+   * @return A new instance of ProxyPlugin.
+   */
+  @Evolving
+  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
+    return Optional.empty();
+  }
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
@@ -215,11 +231,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return entity.auditInfo();
   }
 
-  protected CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
+  private CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
     return OperationsProxy.createProxy(ops, plugin);
-  }
-
-  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
-    return Optional.empty();
   }
 }

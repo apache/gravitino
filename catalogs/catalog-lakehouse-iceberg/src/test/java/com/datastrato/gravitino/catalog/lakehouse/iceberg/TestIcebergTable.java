@@ -12,7 +12,8 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.tru
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -521,7 +522,7 @@ public class TestIcebergTable {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              metadata.validatePropertyForCreate(properties);
+              PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties);
             });
       }
 
@@ -538,7 +539,7 @@ public class TestIcebergTable {
         PropertiesMetadata metadata = ops.tablePropertiesMetadata();
         Assertions.assertDoesNotThrow(
             () -> {
-              metadata.validatePropertyForCreate(properties);
+              PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties);
             });
       }
     }

@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.io.IOException;

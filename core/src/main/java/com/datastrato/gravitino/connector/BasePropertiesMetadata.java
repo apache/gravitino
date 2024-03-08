@@ -2,10 +2,11 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.connector;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -13,6 +14,17 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * An abstract class representing a base properties metadata for entities. Developers should extend
+ * this class to implement a custom properties metadata for their entities, like table, fileset,
+ * schema.
+ *
+ * <p>Note: For catalog related properties metadata, use {@link BaseCatalogPropertiesMetadata}.
+ *
+ * <p>This class defines two reserved properties metadata for Gravitino use only. Developers should
+ * not override these properties.
+ */
+@Evolving
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
   // "gravitino.managed.entity" is an internal and reserved property to indicate whether the
@@ -63,5 +75,12 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
     return propertyEntries;
   }
 
+  /**
+   * Returns the specific property entries for the entity. Developers should override this method to
+   * provide the specific property entries for their entities.
+   *
+   * @return The specific property entries for the entity.
+   */
+  @Evolving
   protected abstract Map<String, PropertyEntry<?>> specificPropertyEntries();
 }

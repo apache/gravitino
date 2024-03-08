@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.rel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.time.Instant;
 import java.util.HashMap;

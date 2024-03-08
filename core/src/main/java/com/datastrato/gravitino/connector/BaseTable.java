@@ -2,11 +2,9 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.rel;
+package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.catalog.OperationsProxy;
-import com.datastrato.gravitino.catalog.ProxyPlugin;
-import com.datastrato.gravitino.catalog.TableOperations;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -20,6 +18,7 @@ import javax.annotation.Nullable;
 import lombok.ToString;
 
 /** An abstract class representing a base table in a relational database. */
+@Evolving
 @ToString
 public abstract class BaseTable implements Table {
 
@@ -49,6 +48,7 @@ public abstract class BaseTable implements Table {
    * @return The {@link TableOperations} instance associated with this table.
    * @throws UnsupportedOperationException if the table does not support operations.
    */
+  @Evolving
   protected abstract TableOperations newOps() throws UnsupportedOperationException;
 
   /**
@@ -76,59 +76,56 @@ public abstract class BaseTable implements Table {
     return ops;
   }
 
-  /** Returns the audit details of the table. */
+  /** @return the audit details of the table. */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
 
-  /** Returns the name of the table. */
+  /** @return the name of the table. */
   @Override
   public String name() {
     return name;
   }
 
-  /** Returns an array of columns that make up the table. */
+  /** @return an array of columns that make up the table. */
   @Override
   public Column[] columns() {
     return columns;
   }
 
-  /** Returns the comment or description for the table. */
+  /** @return the comment or description for the table. */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /** Returns the associated properties of the table. */
+  /** @return the associated properties of the table. */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** Returns the partitioning strategies of the table. */
+  /** @return the partitioning strategies of the table. */
   @Override
   public Transform[] partitioning() {
     return partitioning;
   }
 
-  /** Return the array of {@link SortOrder} of the table. */
+  /** @return the array of {@link SortOrder} of the table. */
   @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
-  /**
-   * Returns the distribution strategy of the table.
-   *
-   * @return The distribution strategy of the table.
-   */
+  /** @return The distribution strategy of the table. */
   @Override
   public Distribution distribution() {
     return distribution;
   }
 
+  /** @return The indexes associated with the table. */
   @Override
   public Index[] index() {
     return indexes;
@@ -257,21 +254,49 @@ public abstract class BaseTable implements Table {
       return self();
     }
 
+    /**
+     * Sets the array of {@link SortOrder} of the table.
+     *
+     * @param sortOrders The array of {@link SortOrder} of the table.
+     * @return The builder instance.
+     */
+    @Override
     public SELF withSortOrders(SortOrder[] sortOrders) {
       this.sortOrders = sortOrders;
       return (SELF) this;
     }
 
+    /**
+     * Sets the distribution strategy of the table.
+     *
+     * @param distribution The distribution strategy of the table.
+     * @return The builder instance.
+     */
+    @Override
     public SELF withDistribution(Distribution distribution) {
       this.distribution = distribution;
       return (SELF) this;
     }
 
+    /**
+     * Sets the indexes associated with the table.
+     *
+     * @param indexes The indexes associated with the table.
+     * @return The builder instance.
+     */
+    @Override
     public SELF withIndexes(Index[] indexes) {
       this.indexes = indexes;
       return (SELF) this;
     }
 
+    /**
+     * Sets the proxy plugin for the table.
+     *
+     * @param proxyPlugin The proxy plugin for the table.
+     * @return The builder instance.
+     */
+    @Override
     public SELF withProxyPlugin(ProxyPlugin proxyPlugin) {
       this.proxyPlugin = Optional.ofNullable(proxyPlugin);
       return (SELF) this;
@@ -292,6 +317,12 @@ public abstract class BaseTable implements Table {
       return (SELF) this;
     }
 
+    /**
+     * Builds the concrete instance of the table with the provided attributes.
+     *
+     * @return The built table instance.
+     */
+    @Evolving
     protected abstract T internalBuild();
   }
 }

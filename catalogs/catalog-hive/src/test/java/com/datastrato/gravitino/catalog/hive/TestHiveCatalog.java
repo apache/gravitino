@@ -7,8 +7,9 @@ package com.datastrato.gravitino.catalog.hive;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
@@ -76,12 +77,13 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
           () -> {
             Map<String, String> map = Maps.newHashMap();
             map.put(METASTORE_URIS, "/tmp");
-            metadata.validatePropertyForCreate(map);
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map);
           });
 
       Throwable throwable =
           Assertions.assertThrows(
-              IllegalArgumentException.class, () -> metadata.validatePropertyForCreate(properties));
+              IllegalArgumentException.class,
+              () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties));
 
       Assertions.assertTrue(
           throwable

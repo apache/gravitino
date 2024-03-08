@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import static java.util.Collections.emptyList;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
