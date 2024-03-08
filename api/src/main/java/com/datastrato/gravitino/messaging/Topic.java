@@ -6,7 +6,6 @@ package com.datastrato.gravitino.messaging;
 
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.annotation.Evolving;
-
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;

@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.messaging;
 
 import com.datastrato.gravitino.annotation.Evolving;
-
 import java.util.Objects;
 
 /**
