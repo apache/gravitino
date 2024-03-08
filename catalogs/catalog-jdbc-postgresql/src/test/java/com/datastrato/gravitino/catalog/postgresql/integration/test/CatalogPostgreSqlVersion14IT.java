@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.postgresql.integration;
+package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
 import org.junit.jupiter.api.Tag;
 
