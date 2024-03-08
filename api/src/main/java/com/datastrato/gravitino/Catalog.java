@@ -26,7 +26,7 @@ public interface Catalog extends Auditable {
     FILESET,
 
     /** Catalog Type for Message Queue, like kafka://topic */
-    STREAM
+    MESSAGING
   }
 
   /**

@@ -80,7 +80,7 @@ class DTOConverters {
             .withRestClient(client)
             .build();
 
-      case STREAM:
+      case MESSAGING:
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
