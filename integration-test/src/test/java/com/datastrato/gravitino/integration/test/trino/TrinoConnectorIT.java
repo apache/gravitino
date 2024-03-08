@@ -191,25 +191,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table1 = catalog.asTableCatalog().loadTable(idTable1);
     Assertions.assertEquals(table1.name(), tab1Name);
 
-    // Verify in Hive Server
-    ArrayList<ArrayList<String>> r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show schemas from \"%s.%s\" like '%s'",
-                    metalakeName, catalogName, databaseName));
-    Assertions.assertEquals(r.get(0).get(0), databaseName);
-
-    // Compare table
-    r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show create table \"%s.%s\".%s.%s",
-                    metalakeName, catalogName, databaseName, tab1Name));
-    Assertions.assertTrue(r.get(0).get(0).contains(tab1Name));
+    verifySchemaAndTable(databaseName, tab1Name);
 
     testShowTable();
   }
@@ -222,6 +204,27 @@ public class TrinoConnectorIT extends AbstractIT {
     ArrayList<ArrayList<String>> queryData =
         containerSuite.getTrinoContainer().executeQuerySQL(sql);
     Assertions.assertEquals(queryData.get(0).get(0), tab1Name);
+  }
+
+  private void verifySchemaAndTable(String dbName, String tableName) {
+    // Verify in Hive Server
+    ArrayList<ArrayList<String>> r =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show schemas from \"%s.%s\" like '%s'", metalakeName, catalogName, dbName));
+    Assertions.assertEquals(r.get(0).get(0), dbName);
+
+    // Compare table
+    r =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show create table \"%s.%s\".%s.%s",
+                    metalakeName, catalogName, dbName, tableName));
+    Assertions.assertTrue(r.get(0).get(0).contains(tableName));
   }
 
   public void testScenarioTable1() throws TException, InterruptedException {
@@ -250,25 +253,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table1 = catalog.asTableCatalog().loadTable(idTable1);
     Assertions.assertEquals(table1.name(), scenarioTab1Name);
 
-    // Verify in Hive Server
-    ArrayList<ArrayList<String>> r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show schemas from \"%s.%s\" like '%s'",
-                    metalakeName, catalogName, databaseName));
-    Assertions.assertEquals(r.get(0).get(0), databaseName);
-
-    // Compare table
-    r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show create table \"%s.%s\".%s.%s",
-                    metalakeName, catalogName, databaseName, scenarioTab1Name));
-    Assertions.assertTrue(r.get(0).get(0).contains(scenarioTab1Name));
+    verifySchemaAndTable(databaseName, scenarioTab1Name);
 
     // Insert data to table1
     ArrayList<ArrayList<String>> table1Data = new ArrayList<>();
@@ -327,25 +312,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table2 = catalog.asTableCatalog().loadTable(idTable2);
     Assertions.assertEquals(table2.name(), scenarioTab2Name);
 
-    // Verify in Hive Server
-    ArrayList<ArrayList<String>> r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show schemas from \"%s.%s\" like '%s'",
-                    metalakeName, catalogName, databaseName));
-    Assertions.assertEquals(r.get(0).get(0), databaseName);
-
-    // Compare table
-    r =
-        containerSuite
-            .getTrinoContainer()
-            .executeQuerySQL(
-                String.format(
-                    "show create table \"%s.%s\".%s.%s",
-                    metalakeName, catalogName, databaseName, scenarioTab2Name));
-    Assertions.assertTrue(r.get(0).get(0).contains(scenarioTab2Name));
+    verifySchemaAndTable(databaseName, scenarioTab2Name);
 
     // Insert data to table2
     ArrayList<ArrayList<String>> table2Data = new ArrayList<>();
