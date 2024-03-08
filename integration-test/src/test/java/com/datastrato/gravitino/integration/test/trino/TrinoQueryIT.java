@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.integration.test.trino;
 
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.common.integration.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

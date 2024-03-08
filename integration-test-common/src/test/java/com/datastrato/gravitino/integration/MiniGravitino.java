@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.integration;
+package com.datastrato.gravitino.integration;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
@@ -14,11 +14,11 @@ import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.client.RESTClient;
-import com.datastrato.gravitino.common.integration.util.ITUtils;
-import com.datastrato.gravitino.common.integration.util.KerberosProviderHelper;
-import com.datastrato.gravitino.common.integration.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
+import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;

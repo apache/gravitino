@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.integration.test.web.rest;
 
 import com.datastrato.gravitino.client.GravitinoVersion;
-import com.datastrato.gravitino.common.integration.util.AbstractIT;
-import com.datastrato.gravitino.common.integration.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

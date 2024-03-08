@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.common.integration;
+package com.datastrato.gravitino.integration;
 
 import java.util.Map;
 

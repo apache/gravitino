@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.common.integration.util;
+package com.datastrato.gravitino.integration.test.util;
 
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 

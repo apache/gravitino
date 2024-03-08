@@ -150,7 +150,7 @@ tasks {
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
-    exclude("**/docker/**")
+    exclude("**/e2e/**")
   } else {
     dependsOn(tasks.jar)
 

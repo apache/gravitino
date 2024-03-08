@@ -10,7 +10,7 @@ import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
-import com.datastrato.gravitino.common.integration.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.ImmutableList;

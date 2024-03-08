@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.datastrato.gravitino.common.integration.util;
+package com.datastrato.gravitino.integration.test.util;
 
 import java.io.IOException;
 import java.util.ArrayList;

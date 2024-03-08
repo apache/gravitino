@@ -13,7 +13,7 @@
  */
 // Referred from Trino's AutoCloseableCloser implementation
 // core/trino-main/src/main/java/io/trino/util/AutoCloseableCloser.java
-package com.datastrato.gravitino.common.integration.util;
+package com.datastrato.gravitino.integration.test.util;
 
 import static com.google.common.base.Throwables.propagateIfPossible;
 import static java.util.Objects.requireNonNull;

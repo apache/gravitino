@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.integration.util;
+package com.datastrato.gravitino.integration.test.util;
 
 import java.io.File;
 import java.io.IOException;

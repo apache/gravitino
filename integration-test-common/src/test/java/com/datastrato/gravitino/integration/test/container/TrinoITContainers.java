@@ -2,11 +2,11 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.common.integration.container;
+package com.datastrato.gravitino.integration.test.container;
 
-import com.datastrato.gravitino.common.integration.util.CommandExecutor;
-import com.datastrato.gravitino.common.integration.util.ITUtils;
-import com.datastrato.gravitino.common.integration.util.ProcessData;
+import com.datastrato.gravitino.integration.test.util.CommandExecutor;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.logging.log4j.util.Strings;

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.web.ui.utils;
 
-import com.datastrato.gravitino.common.integration.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.openqa.selenium.WebDriver;
