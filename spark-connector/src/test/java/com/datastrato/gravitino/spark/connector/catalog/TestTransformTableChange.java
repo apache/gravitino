@@ -63,6 +63,9 @@ public class TestTransformTableChange {
     Assertions.assertEquals(sparkAddColumnFirst.fieldNames(), gravitinoAddColumnFirst.fieldName());
     Assertions.assertTrue(
         "string".equalsIgnoreCase(gravitinoAddColumnFirst.getDataType().simpleString()));
+    Assertions.assertTrue(
+        gravitinoAddColumnFirst.getPosition()
+            instanceof com.datastrato.gravitino.rel.TableChange.First);
 
     TableChange.AddColumn sparkAddColumnAfter =
         (TableChange.AddColumn)
@@ -79,6 +82,9 @@ public class TestTransformTableChange {
     Assertions.assertEquals(sparkAddColumnAfter.fieldNames(), gravitinoAddColumnAfter.fieldName());
     Assertions.assertTrue(
         "string".equalsIgnoreCase(gravitinoAddColumnAfter.getDataType().simpleString()));
+    Assertions.assertTrue(
+        gravitinoAddColumnAfter.getPosition()
+            instanceof com.datastrato.gravitino.rel.TableChange.After);
 
     TableChange.AddColumn sparkAddColumnDefault =
         (TableChange.AddColumn)
@@ -96,6 +102,9 @@ public class TestTransformTableChange {
         sparkAddColumnDefault.fieldNames(), gravitinoAddColumnDefault.fieldName());
     Assertions.assertTrue(
         "string".equalsIgnoreCase(gravitinoAddColumnDefault.getDataType().simpleString()));
+    Assertions.assertTrue(
+        gravitinoAddColumnDefault.getPosition()
+            instanceof com.datastrato.gravitino.rel.TableChange.Default);
   }
 
   @Test
