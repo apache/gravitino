@@ -269,7 +269,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     if (expectResult.startsWith("<QUERY_FAILED>")) {
       boolean match =
           Pattern.compile(
-                  "^Query \\w+ failed.*: " + expectResult.replace("<QUERY_FAILED>", "").trim())
+                  "^Query \\w+ failed.*: "
+                      + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
               .matcher(result)
               .find();
       return match;
