@@ -675,7 +675,6 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    // Convert it to Project object
   }
 }
 

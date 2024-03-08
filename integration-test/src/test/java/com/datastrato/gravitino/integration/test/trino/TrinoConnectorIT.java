@@ -90,7 +90,6 @@ public class TrinoConnectorIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
-    //    hiveClientPool = closer.register(new HiveClientPool(1, hiveConf));
 
     // Currently must first create metalake and catalog then start trino container
     createMetalake();
