@@ -134,8 +134,6 @@ public class CatalogConnectorMetadata {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
     } catch (TableAlreadyExistsException e) {
       throw new TrinoException(GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
-    } catch (Exception e) {
-      throw new TrinoException(GRAVITINO_OPERATION_FAILED, "Failed to create table.", e.getCause());
     }
   }
 
