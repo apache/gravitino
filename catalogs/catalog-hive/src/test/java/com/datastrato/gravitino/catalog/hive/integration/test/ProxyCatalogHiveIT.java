@@ -13,7 +13,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -69,7 +69,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   private static String HIVE_METASTORE_URIS;
   private static FileSystem hdfs;
   private static String originHadoopUser;
-  private static GravitinoClient anotherClient;
+  private static GravitinoAdminClient anotherClient;
   private static Catalog anotherCatalog;
 
   @BeforeAll
@@ -108,7 +108,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
 
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     System.setProperty("user.name", "test");
-    anotherClient = GravitinoClient.builder(uri).withSimpleAuth().build();
+    anotherClient = GravitinoAdminClient.builder(uri).withSimpleAuth().build();
     createMetalake();
     createCatalog();
     loadCatalogWithAnotherClient();

@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -70,8 +70,8 @@ public class GravitinoMockServer implements AutoCloseable {
     this.catalogConnectorManager = catalogConnectorManager;
   }
 
-  public GravitinoClient createGravitinoClient() {
-    GravitinoClient client = mock(GravitinoClient.class);
+  public GravitinoAdminClient createGravitinoClient() {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
 
     when(client.createMetalake(any(NameIdentifier.class), anyString(), anyMap()))
         .thenAnswer(
