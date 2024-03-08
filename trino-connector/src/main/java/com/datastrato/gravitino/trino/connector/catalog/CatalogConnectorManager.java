@@ -12,7 +12,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -60,7 +60,7 @@ public class CatalogConnectorManager {
   private final ConcurrentHashMap<String, CatalogConnectorContext> catalogConnectors =
       new ConcurrentHashMap<>();
 
-  private GravitinoClient gravitinoClient;
+  private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
   private final Set<String> usedMetalakes = new HashSet<>();
 
@@ -88,13 +88,13 @@ public class CatalogConnectorManager {
   }
 
   @VisibleForTesting
-  public void setGravitinoClient(GravitinoClient gravitinoClient) {
+  public void setGravitinoClient(GravitinoAdminClient gravitinoClient) {
     this.gravitinoClient = gravitinoClient;
   }
 
   public void start() {
     if (gravitinoClient == null) {
-      gravitinoClient = GravitinoClient.builder(config.getURI()).build();
+      gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
     }
 
     // Schedule a task to load catalog from gravitino server.

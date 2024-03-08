@@ -9,7 +9,7 @@ import static java.lang.Thread.sleep;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -47,7 +47,7 @@ public class TrinoQueryITBase {
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
-  protected static GravitinoClient gravitinoClient;
+  protected static GravitinoAdminClient gravitinoClient;
   protected static TrinoITContainers trinoITContainers;
   protected static TrinoQueryRunner trinoQueryRunner;
 
@@ -75,7 +75,7 @@ public class TrinoQueryITBase {
       gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     } else {
-      gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+      gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     }
   }
 
