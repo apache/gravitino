@@ -5,7 +5,9 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
+import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.expressions.LiteralValue;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -39,19 +41,61 @@ public class TestTransformTableChange {
 
   @Test
   void testTransformAddColumn() {
-    TableChange.AddColumn sparkAddColumn =
-        (TableChange.AddColumn) TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType);
-    com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkAddColumn);
+
+    TableChange.ColumnPosition first = TableChange.ColumnPosition.first();
+    TableChange.ColumnPosition after = TableChange.ColumnPosition.after("col0");
+    ColumnDefaultValue defaultValue =
+        new ColumnDefaultValue(
+            "CURRENT_DEFAULT", new LiteralValue("default_value", DataTypes.StringType));
+
+    TableChange.AddColumn sparkAddColumnFirst =
+        (TableChange.AddColumn)
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", first, defaultValue);
+    com.datastrato.gravitino.rel.TableChange gravitinoChangeFirst =
+        GravitinoCatalog.transformTableChange(sparkAddColumnFirst);
 
     Assertions.assertTrue(
-        gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
-    com.datastrato.gravitino.rel.TableChange.AddColumn gravitinoAddColumn =
-        (com.datastrato.gravitino.rel.TableChange.AddColumn) gravitinoChange;
+        gravitinoChangeFirst instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
+    com.datastrato.gravitino.rel.TableChange.AddColumn gravitinoAddColumnFirst =
+        (com.datastrato.gravitino.rel.TableChange.AddColumn) gravitinoChangeFirst;
 
-    Assertions.assertEquals(sparkAddColumn.fieldNames(), gravitinoAddColumn.fieldName());
+    Assertions.assertEquals(sparkAddColumnFirst.fieldNames(), gravitinoAddColumnFirst.fieldName());
     Assertions.assertTrue(
-        "string".equalsIgnoreCase(gravitinoAddColumn.getDataType().simpleString()));
+        "string".equalsIgnoreCase(gravitinoAddColumnFirst.getDataType().simpleString()));
+
+    TableChange.AddColumn sparkAddColumnAfter =
+        (TableChange.AddColumn)
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", after, defaultValue);
+    com.datastrato.gravitino.rel.TableChange gravitinoChangeAfter =
+        GravitinoCatalog.transformTableChange(sparkAddColumnAfter);
+
+    Assertions.assertTrue(
+        gravitinoChangeAfter instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
+    com.datastrato.gravitino.rel.TableChange.AddColumn gravitinoAddColumnAfter =
+        (com.datastrato.gravitino.rel.TableChange.AddColumn) gravitinoChangeAfter;
+
+    Assertions.assertEquals(sparkAddColumnAfter.fieldNames(), gravitinoAddColumnAfter.fieldName());
+    Assertions.assertTrue(
+        "string".equalsIgnoreCase(gravitinoAddColumnAfter.getDataType().simpleString()));
+
+    TableChange.AddColumn sparkAddColumnDefault =
+        (TableChange.AddColumn)
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", null, defaultValue);
+    com.datastrato.gravitino.rel.TableChange gravitinoChangeDefault =
+        GravitinoCatalog.transformTableChange(sparkAddColumnDefault);
+
+    Assertions.assertTrue(
+        gravitinoChangeDefault instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
+    com.datastrato.gravitino.rel.TableChange.AddColumn gravitinoAddColumnDefault =
+        (com.datastrato.gravitino.rel.TableChange.AddColumn) gravitinoChangeDefault;
+
+    Assertions.assertEquals(
+        sparkAddColumnDefault.fieldNames(), gravitinoAddColumnDefault.fieldName());
+    Assertions.assertTrue(
+        "string".equalsIgnoreCase(gravitinoAddColumnDefault.getDataType().simpleString()));
   }
 
   @Test
