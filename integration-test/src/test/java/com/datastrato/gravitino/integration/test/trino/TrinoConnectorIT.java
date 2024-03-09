@@ -526,30 +526,30 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   private Column[] createHiveFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
     Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimeType");
     // MySQL doesn't support timestamp time zone
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
 
   private Column[] createMySQLFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
     Set<String> unsupportedType =
         Sets.newHashSet("FixedType", "StringType", "TimestampType", "BooleanType");
     // MySQL doesn't support timestamp time zone
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
 
   private Column[] createIcebergFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
 
     Set<String> unsupportedType =
         Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
@@ -1220,9 +1220,9 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Create a table with primary key
-    Column[] columnDTOS = createMySQLFullTypeColumns();
-    columnDTOS =
-        Arrays.stream(columnDTOS)
+    Column[] columns = createMySQLFullTypeColumns();
+    columns =
+        Arrays.stream(columns)
             .map(
                 c -> {
                   if ("IntegerType".equals(c.name())) {
@@ -1237,7 +1237,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columnDTOS,
+            columns,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build(),
             new Transform[0],
