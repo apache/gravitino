@@ -3,7 +3,9 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 import requests
-from typing import Dict
+from requests.exceptions import HTTPError
+from gravitino_client.core.dto import VersionDTO
+
 
 class GravitinoClient:
     """
@@ -26,24 +28,29 @@ class GravitinoClient:
         """
         self.base_url = base_url
 
-    def getVersion(self) -> Dict[str, str]:
+    def getVersion(self) -> VersionDTO:
         """
         Retrieves the version information from the Gravitino API.
 
-        This method makes a GET request to the Gravitino API and extracts the version information from the response.
+        This method makes a GET request to the Gravitino API and extracts the version information from the response,
+        wrapping it into a VersionDTO object.
 
         Returns:
-            A dictionary containing the version details. For example:
-            {
-                'version': '0.3.2-SNAPSHOT',
-                'compileDate': '25/01/2024 00:04:59',
-                'gitCommit': 'cb7a604bf19b6f992f00529e938cdd1d37af0187'
-            }
+            VersionDTO: An object containing the version details, including version, compile date, and git commit hash.
 
         Raises:
             HTTPError: An error from the requests library if the HTTP request returned an unsuccessful status code.
         """
-        response = requests.get(f"{self.base_url}/api/version")
-        response.raise_for_status()
-        version_info = response.json()
-        return version_info.get('version')
+        try:
+            response = requests.get(f"{self.base_url}/api/version")
+            response.raise_for_status()
+            version_data = response.json()
+            version_info = version_data.get("version")
+
+            return VersionDTO(
+                version=version_info['version'],
+                compile_date=version_info['compileDate'],
+                git_commit=version_info['gitCommit']
+            )
+        except HTTPError as e:
+            raise HTTPError(f"Failed to retrieve version information: {e}")
