@@ -6,6 +6,7 @@ package com.datastrato.gravitino.file;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -16,6 +17,7 @@ import java.util.Map;
  * The FilesetCatalog interface defines the public API for managing fileset objects in a schema. If
  * the catalog implementation supports fileset objects, it should implement this interface.
  */
+@Evolving
 public interface FilesetCatalog {
 
   /**

@@ -26,6 +26,7 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.Column.ColumnImpl;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
@@ -254,9 +255,12 @@ public class CatalogMysqlIT extends AbstractIT {
         Arrays.stream(mysqlNamespaces).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
+    Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap()));
+        () -> {
+          schemas.createSchema(schemaIdent, schema_comment, emptyMap);
+        });
 
     // drop schema check.
     schemas.dropSchema(schemaIdent, false);
@@ -695,16 +699,13 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0]);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange change =
+        TableChange.updateColumnPosition(
+            new String[] {"no_column"}, TableChange.ColumnPosition.first());
     NotFoundException notFoundException =
         assertThrows(
-            NotFoundException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnPosition(
-                            new String[] {"no_column"}, TableChange.ColumnPosition.first())));
+            NotFoundException.class, () -> tableCatalog.alterTable(tableIdentifier, change));
     Assertions.assertTrue(notFoundException.getMessage().contains("no_column"));
 
     catalog
@@ -768,12 +769,13 @@ public class CatalogMysqlIT extends AbstractIT {
     // Try to drop a database, and cascade equals to true, it should be allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
     // Check database has been dropped
+    SupportsSchemas schemas = catalog.asSchemas();
+    NameIdentifier of = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
-        () ->
-            catalog
-                .asSchemas()
-                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
+        () -> {
+          schemas.loadSchema(of);
+        });
   }
 
   @Test
@@ -817,38 +819,43 @@ public class CatalogMysqlIT extends AbstractIT {
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed");
+    Index[] indexes2 =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
+    SortOrder[] sortOrder = new SortOrder[0];
     IllegalArgumentException illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})});
+                  sortOrder,
+                  indexes2);
             });
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in MySQL"));
 
+    Index[] indexes3 = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
               tableCatalog.createTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  id,
                   newColumns,
                   table_comment,
                   properties,
                   Transforms.EMPTY_TRANSFORM,
                   Distributions.NONE,
-                  new SortOrder[0],
-                  new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})});
+                  sortOrder,
+                  indexes3);
             });
     Assertions.assertTrue(
         StringUtils.contains(
@@ -987,28 +994,24 @@ public class CatalogMysqlIT extends AbstractIT {
             "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
 
     // Test create auto increment fail(Many index col)
+    ColumnImpl column = Column.of("col_6", Types.LongType.get(), "id2", false, true, null);
+    SortOrder[] sortOrder = new SortOrder[0];
+    Index[] index2 =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})};
+
     runtimeException =
         assertThrows(
             RuntimeException.class,
             () ->
                 tableCatalog.createTable(
                     tableIdentifier,
-                    new Column[] {
-                      col1,
-                      col2,
-                      col3,
-                      col4,
-                      col5,
-                      Column.of("col_6", Types.LongType.get(), "id2", false, true, null)
-                    },
+                    new Column[] {col1, col2, col3, col4, col5, column},
                     table_comment,
                     properties,
                     Transforms.EMPTY_TRANSFORM,
                     Distributions.NONE,
-                    new SortOrder[0],
-                    new Index[] {
-                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})
-                    }));
+                    sortOrder,
+                    index2));
     Assertions.assertTrue(
         StringUtils.contains(
             runtimeException.getMessage(),
@@ -1081,12 +1084,14 @@ public class CatalogMysqlIT extends AbstractIT {
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
-    String tableName = "t112";
-    Column col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
-    Column[] columns = {col1};
+    String t1_name = "t112";
+    Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
+    Column[] columns = {t1_col};
+
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
 
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+        NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -1094,12 +1099,14 @@ public class CatalogMysqlIT extends AbstractIT {
         properties,
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
-        new SortOrder[0]);
+        new SortOrder[0],
+        t1_indexes);
 
-    tableName = "t212";
-    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
-    columns = new Column[] {col1};
-    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    String t2_name = "t212";
+    Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    columns = new Column[] {t2_col};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -1107,12 +1114,14 @@ public class CatalogMysqlIT extends AbstractIT {
         properties,
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
-        new SortOrder[0]);
+        new SortOrder[0],
+        t2_indexes);
 
-    tableName = "t_12";
-    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
-    columns = new Column[] {col1};
-    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    String t3_name = "t_12";
+    Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    columns = new Column[] {t3_col};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -1120,12 +1129,14 @@ public class CatalogMysqlIT extends AbstractIT {
         properties,
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
-        new SortOrder[0]);
+        new SortOrder[0],
+        t3_indexes);
 
-    tableName = "_1__";
-    col1 = Column.of(tableName, Types.LongType.get(), "id", false, false, null);
-    columns = new Column[] {col1};
-    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    String t4_name = "_1__";
+    Column t4_col = Column.of(t4_name, Types.LongType.get(), "id", false, false, null);
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}})};
+    columns = new Column[] {t4_col};
+    tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -1133,23 +1144,28 @@ public class CatalogMysqlIT extends AbstractIT {
         properties,
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
-        new SortOrder[0]);
+        new SortOrder[0],
+        t4_indexes);
 
     Table t1 =
-        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t112"));
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
+    assertionsTableInfo(t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
     Table t2 =
-        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t212"));
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
+    assertionsTableInfo(t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
     Table t3 =
-        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "t_12"));
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
+    assertionsTableInfo(t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
     Table t4 =
-        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, "_1__"));
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
+    assertionsTableInfo(t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
   }
 
   @Test
@@ -1208,5 +1224,249 @@ public class CatalogMysqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier2);
     assertionsTableInfo(
         "TABLENAME", table_comment, Arrays.asList(newColumns), properties, indexes, table);
+  }
+
+  @Test
+  void testMySQLSchemaNameCaseSensitive() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3};
+
+    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+
+    String[] schemas = {"db_", "db_1", "db_2", "db12"};
+    SupportsSchemas schemaSupport = catalog.asSchemas();
+
+    for (String schema : schemas) {
+      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
+      schemaSupport.createSchema(schemaIdentifier, null, Collections.emptyMap());
+      Assertions.assertNotNull(schemaSupport.loadSchema(schemaIdentifier));
+    }
+
+    Set<String> schemaNames =
+        Arrays.stream(schemaSupport.listSchemas(Namespace.of(metalakeName, catalogName)))
+            .map(NameIdentifier::name)
+            .collect(Collectors.toSet());
+
+    Assertions.assertTrue(schemaNames.containsAll(Arrays.asList(schemas)));
+
+    String tableName = "test1";
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    for (String schema : schemas) {
+      tableCatalog.createTable(
+          NameIdentifier.of(metalakeName, catalogName, schema, tableName),
+          newColumns,
+          table_comment,
+          properties,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          new SortOrder[0],
+          indexes);
+      tableCatalog.createTable(
+          NameIdentifier.of(
+              metalakeName, catalogName, schema, GravitinoITUtils.genRandomName("test2")),
+          newColumns,
+          table_comment,
+          properties,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          new SortOrder[0],
+          Indexes.EMPTY_INDEXES);
+    }
+
+    for (String schema : schemas) {
+      NameIdentifier[] nameIdentifiers =
+          tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schema));
+      Assertions.assertEquals(2, nameIdentifiers.length);
+      Assertions.assertTrue(
+          Arrays.stream(nameIdentifiers)
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet())
+              .stream()
+              .anyMatch(n -> n.equals(tableName)));
+    }
+  }
+
+  @Test
+  void testUnparsedTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
+    mysqlService.executeQuery(
+        String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertEquals(Types.UnparsedType.of("BIT"), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
+  void testOperationTableIndex() {
+    String tableName = GravitinoITUtils.genRandomName("test_add_index");
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        newColumns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // add index test.
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+        TableChange.addIndex(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col_1"}}));
+
+    Table table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Index[] indexes =
+        new Index[] {
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}})
+        };
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+
+    // delete index and add new column and index.
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.deleteIndex("u1_key", false),
+        TableChange.addColumn(
+            new String[] {"col_4"},
+            Types.VarCharType.of(255),
+            TableChange.ColumnPosition.defaultPos()),
+        TableChange.addIndex(Index.IndexType.UNIQUE_KEY, "u2_key", new String[][] {{"col_4"}}));
+
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}})
+        };
+    table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
+    newColumns = new Column[] {col1, col2, col3, col4};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+
+    // Add a previously existing index
+    tableCatalog.alterTable(
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+        TableChange.addIndex(
+            Index.IndexType.UNIQUE_KEY, "u3_key", new String[][] {{"col_1"}, {"col_4"}}));
+
+    indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
+        };
+    table =
+        tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+  }
+
+  @Test
+  void testAddColumnAutoIncrement() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", false, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    String tableName = "auto_increment_table";
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // Test add auto increment ,but not insert index. will failed.
+    RuntimeException runtimeException =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.addColumn(
+                        new String[] {"col_6"},
+                        Types.LongType.get(),
+                        "id",
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            runtimeException.getMessage(),
+            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
+
+    // Test add auto increment success.
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_6"},
+            Types.LongType.get(),
+            "id",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            true),
+        TableChange.addIndex(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col_6"}}));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
+    Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+
+    // Test the auto-increment property of modified fields
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, false));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+
+    // Add the auto-increment attribute to the field
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, true));
+    table = tableCatalog.loadTable(tableIdentifier);
+    col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
   }
 }

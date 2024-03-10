@@ -20,6 +20,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -46,6 +48,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String BACK_QUOTE = "`";
   public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
+  private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
+      "Mysql does not support nested column names.";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -168,17 +172,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
-      String fieldStr =
-          Arrays.stream(index.fieldNames())
-              .map(
-                  colNames -> {
-                    if (colNames.length > 1) {
-                      throw new IllegalArgumentException(
-                          "Index does not support complex fields in MySQL");
-                    }
-                    return BACK_QUOTE + colNames[0] + BACK_QUOTE;
-                  })
-              .collect(Collectors.joining(", "));
+      String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",\n");
       switch (index.type()) {
         case PRIMARY_KEY:
@@ -200,6 +194,19 @@ public class MysqlTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
       }
     }
+  }
+
+  private static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in MySQL");
+              }
+              return BACK_QUOTE + colNames[0] + BACK_QUOTE;
+            })
+        .collect(Collectors.joining(", "));
   }
 
   @Override
@@ -317,6 +324,16 @@ public class MysqlTableOperations extends JdbcTableOperations {
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+      } else if (change instanceof TableChange.AddIndex) {
+        alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
+      } else if (change instanceof TableChange.DeleteIndex) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
+      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        alterSql.add(
+            updateColumnAutoIncrementDefinition(
+                lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -353,6 +370,46 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  private String updateColumnAutoIncrementDefinition(
+      JdbcTable table, TableChange.UpdateColumnAutoIncrement change) {
+    if (change.fieldName().length > 1) {
+      throw new UnsupportedOperationException("Nested column names are not supported");
+    }
+    String col = change.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromTable(table, col);
+    if (change.isAutoIncrement()) {
+      Preconditions.checkArgument(
+          Types.allowAutoIncrement(column.dataType()),
+          "Auto increment is not allowed, type: " + column.dataType());
+    }
+    JdbcColumn updateColumn =
+        new JdbcColumn.Builder()
+            .withName(col)
+            .withDefaultValue(column.defaultValue())
+            .withNullable(column.nullable())
+            .withType(column.dataType())
+            .withComment(column.comment())
+            .withAutoIncrement(change.isAutoIncrement())
+            .build();
+    return MODIFY_COLUMN
+        + BACK_QUOTE
+        + col
+        + BACK_QUOTE
+        + appendColumnDefinition(updateColumn, new StringBuilder());
+  }
+
+  @VisibleForTesting
+  static String deleteIndexDefinition(
+      JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
+    if (deleteIndex.isIfExists()) {
+      if (Arrays.stream(lazyLoadTable.index())
+          .anyMatch(index -> index.name().equals(deleteIndex.getName()))) {
+        throw new IllegalArgumentException("Index does not exist");
+      }
+    }
+    return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
+  }
+
   private String updateColumnNullabilityDefinition(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
     validateUpdateColumnNullable(change, table);
@@ -367,11 +424,38 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN "
+    return MODIFY_COLUMN
         + BACK_QUOTE
         + col
         + BACK_QUOTE
         + appendColumnDefinition(updateColumn, new StringBuilder());
+  }
+
+  @VisibleForTesting
+  static String addIndexDefinition(TableChange.AddIndex addIndex) {
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder.append("ADD ");
+    switch (addIndex.getType()) {
+      case PRIMARY_KEY:
+        if (null != addIndex.getName()
+            && !StringUtils.equalsIgnoreCase(
+                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+          throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
+        }
+        sqlBuilder.append("PRIMARY KEY ");
+        break;
+      case UNIQUE_KEY:
+        sqlBuilder
+            .append("UNIQUE INDEX ")
+            .append(BACK_QUOTE)
+            .append(addIndex.getName())
+            .append(BACK_QUOTE);
+        break;
+      default:
+        break;
+    }
+    sqlBuilder.append(" (").append(getIndexFieldStr(addIndex.getFieldNames())).append(")");
+    return sqlBuilder.toString();
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -391,7 +475,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       TableChange.UpdateColumnComment updateColumnComment, JdbcTable jdbcTable) {
     String newComment = updateColumnComment.getNewComment();
     if (updateColumnComment.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
@@ -404,7 +488,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return "MODIFY COLUMN "
+    return MODIFY_COLUMN
         + BACK_QUOTE
         + col
         + BACK_QUOTE
@@ -414,7 +498,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = addColumn.fieldName()[0];
 
@@ -427,6 +511,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .append(SPACE)
         .append(dataType)
         .append(SPACE);
+
+    if (addColumn.isAutoIncrement()) {
+      Preconditions.checkArgument(
+          Types.allowAutoIncrement(addColumn.getDataType()),
+          "Auto increment is not allowed, type: " + addColumn.getDataType());
+      columnDefinition.append(MYSQL_AUTO_INCREMENT).append(SPACE);
+    }
 
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
@@ -442,7 +533,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
       columnDefinition
-          .append("AFTER ")
+          .append(AFTER)
           .append(BACK_QUOTE)
           .append(afterPosition.getColumn())
           .append(BACK_QUOTE);
@@ -457,7 +548,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String renameColumnFieldDefinition(
       TableChange.RenameColumn renameColumn, JdbcTable jdbcTable) {
     if (renameColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
 
     String oldColumnName = renameColumn.fieldName()[0];
@@ -488,23 +579,23 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, JdbcTable jdbcTable) {
     if (updateColumnPosition.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("MODIFY COLUMN ").append(col);
+    columnDefinition.append(MODIFY_COLUMN).append(col);
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(afterPosition.getColumn());
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
     }
     return columnDefinition.toString();
   }
@@ -512,7 +603,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String deleteColumnFieldDefinition(
       TableChange.DeleteColumn deleteColumn, JdbcTable jdbcTable) {
     if (deleteColumn.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = deleteColumn.fieldName()[0];
     boolean colExists = true;
@@ -534,11 +625,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(col)

@@ -162,11 +162,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       synchronized (this) {
         if (properties == null) {
           Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
-          properties = Maps.newHashMap(entity.getProperties());
-          properties
+          Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
+          tempProperties
               .entrySet()
               .removeIf(
                   entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+          properties = tempProperties;
         }
       }
     }

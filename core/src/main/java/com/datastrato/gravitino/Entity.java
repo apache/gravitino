@@ -20,6 +20,7 @@ public interface Entity extends Serializable {
     TABLE("ta", 3),
     COLUMN("co", 4),
     FILESET("fi", 5),
+    TOPIC("to", 6),
 
     AUDIT("au", 65534);
 

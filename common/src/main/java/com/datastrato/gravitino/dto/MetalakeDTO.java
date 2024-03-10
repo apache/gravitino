@@ -158,7 +158,7 @@ public class MetalakeDTO implements Metalake {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof MetalakeDTO)) {
       return false;
     }
     MetalakeDTO that = (MetalakeDTO) o;

@@ -12,6 +12,7 @@ on:
           - 'gravitino'
           - 'gravitino-ci-hive'
           - 'gravitino-ci-trino'
+          - 'gravitino-ci-doris'
           - 'trino'
           - 'hive'
       tag:
@@ -39,6 +40,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
+            echo "image_type=doris" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
@@ -77,4 +81,4 @@ jobs:
           distribution: 'temurin'
 
       - name: Build and Push the Docker image
-        run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
+        run: sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/hostedtoolcache/CodeQL && ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest

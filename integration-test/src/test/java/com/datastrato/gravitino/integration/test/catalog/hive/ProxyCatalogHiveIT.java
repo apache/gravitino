@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
@@ -20,7 +21,9 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -28,7 +31,6 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -76,7 +78,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     System.setProperty("user.name", "datastrato");
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();
@@ -142,10 +144,10 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             anotherSchemaName.toLowerCase()));
+    SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class,
-            () -> anotherCatalog.asSchemas().createSchema(anotherIdent, comment, properties));
+            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -182,18 +184,15 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(EXPECT_USER, hiveTab.getOwner());
 
     // create table with exception with system user
+    TableCatalog tableCatalog = anotherCatalog.asTableCatalog();
+    ImmutableMap<String, String> of = ImmutableMap.of();
     Exception e =
         Assertions.assertThrows(
             RuntimeException.class,
-            () ->
-                anotherCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        anotherNameIdentifier,
-                        columns,
-                        comment,
-                        ImmutableMap.of(),
-                        Partitioning.EMPTY_PARTITIONING));
+            () -> {
+              tableCatalog.createTable(
+                  anotherNameIdentifier, columns, comment, of, Partitioning.EMPTY_PARTITIONING);
+            });
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -265,12 +264,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             new Literal<?>[] {primaryPartition, anotherSecondaryPartition});
 
     // create partition with exception with system user
+    TableCatalog tableCatalog = anotherCatalog.asTableCatalog();
     Exception e =
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                anotherCatalog
-                    .asTableCatalog()
+                tableCatalog
                     .loadTable(nameIdentifier)
                     .supportPartitions()
                     .addPartition(anotherIdentity));

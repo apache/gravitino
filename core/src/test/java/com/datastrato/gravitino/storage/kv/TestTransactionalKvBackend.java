@@ -39,6 +39,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("DefaultCharset")
 class TestTransactionalKvBackend {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);
@@ -370,7 +371,7 @@ class TestTransactionalKvBackend {
           }
         });
 
-    Thread.currentThread().sleep(100);
+    Thread.sleep(100);
     threadPoolExecutor.shutdown();
     threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
     LOGGER.info(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 2));
@@ -417,7 +418,7 @@ class TestTransactionalKvBackend {
           }
         });
 
-    Thread.currentThread().sleep(100);
+    Thread.sleep(100);
     threadPoolExecutor.shutdown();
     threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
     LOGGER.info(String.format("%d thread write qps is: %d/s", threadNum, atomicLong.get() / 2));

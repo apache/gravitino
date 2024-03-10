@@ -14,7 +14,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -40,7 +43,7 @@ public class RocksDBKvBackend implements KvBackend {
   private RocksDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
 
-    String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
+    String dbPath = getStoragePath(config);
     File dbDir = new File(dbPath, "instance");
     try (final Options options = new Options()) {
       options.setCreateIfMissing(true);
@@ -60,6 +63,23 @@ public class RocksDBKvBackend implements KvBackend {
           ex.getStackTrace());
       throw ex;
     }
+  }
+
+  @VisibleForTesting
+  String getStoragePath(Config config) {
+    String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
+    if (StringUtils.isBlank(dbPath)) {
+      return Configs.DEFAULT_KV_ROCKSDB_BACKEND_PATH;
+    }
+
+    Path path = Paths.get(dbPath);
+    // Relative Path
+    if (!path.isAbsolute()) {
+      path = Paths.get(System.getenv("GRAVITINO_HOME"), dbPath);
+      return path.toString();
+    }
+
+    return dbPath;
   }
 
   @Override

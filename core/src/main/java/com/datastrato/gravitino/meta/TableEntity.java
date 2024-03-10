@@ -101,7 +101,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof TableEntity)) {
       return false;
     }
 

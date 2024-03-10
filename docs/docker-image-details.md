@@ -139,6 +139,9 @@ You can use this image to test Trino.
 
 Changelog
 
+- gravitino-ci-trino:0.1.5
+  - Add check for the version of gravitino-trino-connector
+
 - gravitino-ci-trino:0.1.4
   - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`
 
@@ -153,3 +156,18 @@ Changelog
   - Based on `trinodb/trino:426` and removed some unused plugins from it.
   - Expose ports:
     - `8080` Trino JDBC port
+
+## Gravitino CI Doris image
+
+You can use this image to test Apache Doris.
+
+Changelog
+
+- gravitino-ci-doris:0.1.0
+    - Docker image `datastrato/gravitino-ci-doris:0.1.0`
+    - Start Doris BE & FE in one container
+    - Please set table properties `"replication_num" = "1"` when creating a table in Doris, because the default replication number is 3, but the Doris container only has one BE.
+    - Username: `root`, Password: N/A (password is empty)
+    - Expose ports:
+        - `8030` Doris FE HTTP port
+        - `9030` Doris FE MySQL server port

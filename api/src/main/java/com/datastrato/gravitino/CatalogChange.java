@@ -4,12 +4,14 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /**
  * A catalog change is a change to a catalog. It can be used to rename a catalog, update the comment
  * of a catalog, set a property and value pair for a catalog, or remove a property from a catalog.
  */
+@Evolving
 public interface CatalogChange {
 
   /**

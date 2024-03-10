@@ -6,9 +6,10 @@
 package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,8 +64,8 @@ public class TreeLock {
   // TreeLockNode to be locked
   private final List<TreeLockNode> lockNodes;
 
-  // TreeLockNode that has been locked.
-  private final Deque<TreeLockNode> heldLocks = new ArrayDeque<>();
+  // TreeLockNode that has been locked along with its lock type.
+  private final Deque<Pair<TreeLockNode, LockType>> heldLocks = new ConcurrentLinkedDeque<>();
   private LockType lockType;
 
   TreeLock(List<TreeLockNode> lockNodes, NameIdentifier identifier) {
@@ -73,7 +74,9 @@ public class TreeLock {
   }
 
   /**
-   * Lock the tree lock with the given lock type.
+   * Lock the tree lock with the given lock type. This method locks all nodes in the list, from the
+   * root to the leaf, and pushes them onto the deque. If an exception occurs during the locking
+   * process, it will unlock all nodes that have been locked so far.
    *
    * @param lockType The lock type to lock the tree lock.
    */
@@ -84,8 +87,23 @@ public class TreeLock {
     for (int i = 0; i < length; i++) {
       TreeLockNode treeLockNode = lockNodes.get(i);
       LockType type = i == length - 1 ? lockType : LockType.READ;
-      treeLockNode.lock(type);
-      heldLocks.push(treeLockNode);
+      try {
+        treeLockNode.lock(type);
+        heldLocks.push(Pair.of(treeLockNode, type));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Locked node: {}, lock type: {}", treeLockNode, type);
+        }
+      } catch (Exception e) {
+        LOG.error(
+            "Failed to lock the treeNode, identifier: {}, node {} of lockNodes: [{}]",
+            identifier,
+            treeLockNode,
+            lockNodes,
+            e);
+        // unlock all nodes that have been locked when an exception occurs.
+        unlock();
+        throw e;
+      }
     }
 
     if (LOG.isTraceEnabled()) {
@@ -103,22 +121,19 @@ public class TreeLock {
       throw new IllegalStateException("We must lock the tree lock before unlock it.");
     }
 
-    boolean lastNode = false;
     while (!heldLocks.isEmpty()) {
-      LockType type = LockType.READ;
-      if (!lastNode) {
-        lastNode = true;
-        type = lockType;
-      }
-
-      TreeLockNode current = heldLocks.pop();
-      // Unlock the node and decrease the reference count.
+      Pair<TreeLockNode, LockType> pair = heldLocks.pop();
+      TreeLockNode current = pair.getLeft();
+      LockType type = pair.getRight();
       current.unlock(type);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Unlocked node: {}, lock type: {}", current, type);
+      }
     }
 
     if (LOG.isTraceEnabled()) {
       LOG.trace(
-          "Unlocked the tree lock, ident: {}, lockNodes: [{}], lock type: {}",
+          "Unlocked the tree lock, identifier: {}, lockNodes: [{}], lock type: {}",
           identifier,
           lockNodes,
           lockType);

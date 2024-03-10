@@ -3,7 +3,6 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import axios from 'axios'
 import { defHttp } from '@/lib/utils/axios'
 
 export const getAuthConfigsApi = () => {
@@ -13,9 +12,11 @@ export const getAuthConfigsApi = () => {
 }
 
 export const loginApi = (url, params) => {
-  return axios({
-    url,
-    method: 'post',
-    params
-  })
+  return defHttp.post(
+    {
+      url,
+      params
+    },
+    { withToken: false }
+  )
 }

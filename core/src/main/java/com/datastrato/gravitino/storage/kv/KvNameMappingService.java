@@ -54,95 +54,79 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public Long getIdByName(String name) throws IOException {
     byte[] nameByte = getNameKey(name);
-    return FunctionUtils.executeWithReadLock(
-        () ->
-            FunctionUtils.executeInTransaction(
-                () -> {
-                  byte[] idByte = transactionalKvBackend.get(nameByte);
-                  return idByte == null ? null : ByteUtils.byteToLong(idByte);
-                },
-                transactionalKvBackend),
-        lock);
+    return FunctionUtils.executeInTransaction(
+        () -> {
+          byte[] idByte = transactionalKvBackend.get(nameByte);
+          return idByte == null ? null : ByteUtils.byteToLong(idByte);
+        },
+        transactionalKvBackend);
   }
 
   @Override
   public String getNameById(long id) throws IOException {
     byte[] idByte = getIdKey(id);
-    return FunctionUtils.executeWithReadLock(
-        () ->
-            FunctionUtils.executeInTransaction(
-                () -> {
-                  byte[] name = transactionalKvBackend.get(idByte);
-                  return name == null ? null : new String(name);
-                },
-                transactionalKvBackend),
-        lock);
+    return FunctionUtils.executeInTransaction(
+        () -> {
+          byte[] name = transactionalKvBackend.get(idByte);
+          return name == null ? null : new String(name, StandardCharsets.UTF_8);
+        },
+        transactionalKvBackend);
   }
 
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = getNameKey(name);
     long id = idGenerator.nextId();
     byte[] idByte = getIdKey(id);
-    return FunctionUtils.executeWithWriteLock(
-        () ->
-            FunctionUtils.executeInTransaction(
-                () -> {
-                  transactionalKvBackend.put(nameByte, ByteUtils.longToByte(id), false);
-                  transactionalKvBackend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
-                  return id;
-                },
-                transactionalKvBackend),
-        lock);
+    return FunctionUtils.executeInTransaction(
+        () -> {
+          transactionalKvBackend.put(nameByte, ByteUtils.longToByte(id), false);
+          transactionalKvBackend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
+          return id;
+        },
+        transactionalKvBackend);
   }
 
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
-    return FunctionUtils.executeWithWriteLock(
-        () ->
-            FunctionUtils.executeInTransaction(
-                () -> {
-                  byte[] nameByte = getNameKey(oldName);
-                  byte[] oldIdValue = transactionalKvBackend.get(nameByte);
-                  // Old mapping has been deleted, no need to do it;
-                  if (oldIdValue == null) {
-                    return false;
-                  }
+    return FunctionUtils.executeInTransaction(
+        () -> {
+          byte[] nameByte = getNameKey(oldName);
+          byte[] oldIdValue = transactionalKvBackend.get(nameByte);
+          // Old mapping has been deleted, no need to do it;
+          if (oldIdValue == null) {
+            return false;
+          }
 
-                  // Delete old name --> id mapping
-                  transactionalKvBackend.delete(nameByte);
-                  // In case there exists the mapping of new_name --> id, so we should use
-                  // the overwritten strategy. In the following scenario, we should use the
-                  // overwritten strategy:
-                  // 1. Create name1
-                  // 2. Delete name1
-                  // 3. Create name2
-                  // 4. Rename name2 -> name1
-                  transactionalKvBackend.put(getNameKey(newName), oldIdValue, true);
-                  transactionalKvBackend.put(
-                      oldIdValue, newName.getBytes(StandardCharsets.UTF_8), true);
-                  return true;
-                },
-                transactionalKvBackend),
-        lock);
+          // Delete old name --> id mapping
+          transactionalKvBackend.delete(nameByte);
+          // In case there exists the mapping of new_name --> id, so we should use
+          // the overwritten strategy. In the following scenario, we should use the
+          // overwritten strategy:
+          // 1. Create name1
+          // 2. Delete name1
+          // 3. Create name2
+          // 4. Rename name2 -> name1
+          transactionalKvBackend.put(getNameKey(newName), oldIdValue, true);
+          transactionalKvBackend.put(oldIdValue, newName.getBytes(StandardCharsets.UTF_8), true);
+          return true;
+        },
+        transactionalKvBackend);
   }
 
   @Override
   public boolean unbindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
-    return FunctionUtils.executeWithWriteLock(
-        () ->
-            FunctionUtils.executeInTransaction(
-                () -> {
-                  byte[] idByte = transactionalKvBackend.get(nameByte);
-                  if (idByte == null) {
-                    return false;
-                  }
-                  transactionalKvBackend.delete(nameByte);
-                  transactionalKvBackend.delete(Bytes.concat(ID_PREFIX, idByte));
-                  return true;
-                },
-                transactionalKvBackend),
-        lock);
+    return FunctionUtils.executeInTransaction(
+        () -> {
+          byte[] idByte = transactionalKvBackend.get(nameByte);
+          if (idByte == null) {
+            return false;
+          }
+          transactionalKvBackend.delete(nameByte);
+          transactionalKvBackend.delete(Bytes.concat(ID_PREFIX, idByte));
+          return true;
+        },
+        transactionalKvBackend);
   }
 
   @Override
