@@ -23,9 +23,12 @@ import org.slf4j.LoggerFactory;
 public abstract class GravitinoClientBase implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClientBase.class);
+  /** The REST client to communicate with the REST server */
   protected final RESTClient restClient;
+  /** The REST API path for listing metalakes */
   protected static final String API_METALAKES_LIST_PATH = "api/metalakes";
-  protected static final String API_METALAKES_IDENTIFIER_PATH = "api/metalakes/";
+  /** The REST API path prefix for load a specific metalake */
+  protected static final String API_METALAKES_IDENTIFIER_PATH = API_METALAKES_LIST_PATH + "/";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.

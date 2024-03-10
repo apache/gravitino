@@ -47,6 +47,12 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     this.metalake_name = metalake_name;
   }
 
+  /**
+   * Get the current metalake object
+   *
+   * @return the {@link GravitinoMetaLake} object
+   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
+   */
   public GravitinoMetaLake getMetaLake() {
     if (this.metaLake == null) {
       synchronized (GravitinoClient.class) {
@@ -117,6 +123,12 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
       this.uri = uri;
     }
 
+    /**
+     * Set the default metalake name for this client.
+     *
+     * @param metalakeName The name of the metalake that the client is working on.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withMetalake(String metalakeName) {
       this.metalakeName = metalakeName;
       return this;
@@ -166,8 +178,8 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     /**
      * Builds a new GravitinoClient instance.
      *
-     * @return A new instance of GravitinoClient with the specified base URI.
-     * @throws IllegalArgumentException If the base URI is null or empty.
+     * @return A new instance of GravitinoClient with the specified base URI and metalake name.
+     * @throws IllegalArgumentException If the base URI or the metalake name is null or empty.
      */
     public GravitinoClient build() {
       Preconditions.checkArgument(
