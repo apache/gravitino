@@ -25,8 +25,10 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
+import com.datastrato.gravitino.dto.requests.DropPartitionsRequest;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
+import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
@@ -45,6 +47,7 @@ import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -247,5 +250,58 @@ public class TestRelationalTable extends TestRelationalCatalog {
         Assertions.assertThrows(
             PartitionAlreadyExistsException.class, () -> partitions.addPartition(partition));
     Assertions.assertEquals("partition already exists", exception.getMessage());
+  }
+
+  @Test
+  public void testDropPartition() throws JsonProcessingException {
+    String partitionName = "p1";
+
+    RelationalTable table = (RelationalTable) partitionedTable;
+    String partitionPath =
+        withSlash(
+            RelationalTable.formatPartitionRequestPath(
+                table.getPartitionRequestPath(), partitionName));
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, partitionPath, null, resp, SC_OK);
+    Assertions.assertTrue(table.supportPartitions().dropPartition(partitionName, true));
+
+    // test throws exception
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(
+            NoSuchPartitionException.class.getSimpleName(), "partition not found");
+    buildMockResource(Method.DELETE, partitionPath, null, errorResp, SC_NOT_FOUND);
+
+    NoSuchPartitionException exception =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> table.supportPartitions().dropPartition(partitionName, false));
+    Assertions.assertEquals("partition not found", exception.getMessage());
+  }
+
+  @Test
+  public void testDropPartitions() throws JsonProcessingException {
+    String[] partitionNames = {"p1"};
+    DropPartitionsRequest req = new DropPartitionsRequest(partitionNames);
+
+    RelationalTable table = (RelationalTable) partitionedTable;
+    String partitionPath = withSlash(table.getPartitionRequestPath()) + "/delete";
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.POST, partitionPath, req, resp, SC_OK);
+    Assertions.assertTrue(
+        table.supportPartitions().dropPartitions(Arrays.asList(partitionNames), true));
+
+    // test throws exception
+    String[] partitionNames1 = {"p2"};
+    DropPartitionsRequest req1 = new DropPartitionsRequest(partitionNames1);
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(
+            NoSuchPartitionException.class.getSimpleName(), "partition not found");
+    buildMockResource(Method.POST, partitionPath, req1, errorResp, SC_NOT_FOUND);
+
+    NoSuchPartitionException exception =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> table.supportPartitions().dropPartitions(Arrays.asList(partitionNames1), false));
+    Assertions.assertEquals("partition not found", exception.getMessage());
   }
 }

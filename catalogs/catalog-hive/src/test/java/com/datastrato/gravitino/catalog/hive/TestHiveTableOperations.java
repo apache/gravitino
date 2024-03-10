@@ -26,6 +26,8 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -154,5 +156,126 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
             .getMessage()
             .contains("Hive partition field name must be in table partitioning field names"),
         exception.getMessage());
+  }
+
+  @Test
+  public void testDropPartition() {
+    // add partition: city=2/dt=2020-01-01
+    String partitionName1 = "city=2/dt=2020-01-01";
+    String[] fieldCity1 = new String[] {columns[1].name()};
+    Literal<?> valueCity1 = Literals.byteLiteral((byte) 2);
+    String[] fieldDt1 = new String[] {columns[2].name()};
+    Literal<?> valueDt1 = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition1 =
+        Partitions.identity(
+            new String[][] {fieldCity1, fieldDt1}, new Literal<?>[] {valueCity1, valueDt1});
+    hiveTable.supportPartitions().addPartition(partition1);
+
+    // add partition: city=3/dt=2020-01-01
+    String partitionName2 = "city=3/dt=2020-01-01";
+    String[] fieldCity2 = new String[] {columns[1].name()};
+    Literal<?> valueCity2 = Literals.byteLiteral((byte) 3);
+    String[] fieldDt2 = new String[] {columns[2].name()};
+    Literal<?> valueDt2 = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition2 =
+        Partitions.identity(
+            new String[][] {fieldCity2, fieldDt2}, new Literal<?>[] {valueCity2, valueDt2});
+    hiveTable.supportPartitions().addPartition(partition2);
+
+    // add partition: city=3/dt=2020-01-02
+    String partitionName3 = "city=3/dt=2020-01-02";
+    String[] fieldCity3 = new String[] {columns[1].name()};
+    Literal<?> valueCity3 = Literals.byteLiteral((byte) 3);
+    String[] fieldDt3 = new String[] {columns[2].name()};
+    Literal<?> valueDt3 = Literals.dateLiteral(LocalDate.parse("2020-01-02"));
+    Partition partition3 =
+        Partitions.identity(
+            new String[][] {fieldCity3, fieldDt3}, new Literal<?>[] {valueCity3, valueDt3});
+    hiveTable.supportPartitions().addPartition(partition3);
+
+    // test drop one partition: city=2/dt=2020-01-01
+    hiveTable.supportPartitions().dropPartition(partitionName1, true);
+    NoSuchPartitionException exception1 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().getPartition(partitionName1);
+            });
+    Assertions.assertEquals(
+        String.format("Hive partition %s does not exist in Hive Metastore", partitionName1),
+        exception1.getMessage());
+
+    // test drop cascade partitions: city=3
+    hiveTable.supportPartitions().dropPartition(partitionName2, true);
+    NoSuchPartitionException exception2 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().getPartition(partitionName2);
+            });
+    Assertions.assertEquals(
+        String.format("Hive partition %s does not exist in Hive Metastore", partitionName2),
+        exception2.getMessage());
+    hiveTable.supportPartitions().dropPartition(partitionName3, true);
+    NoSuchPartitionException exception3 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().getPartition(partitionName3);
+            });
+    Assertions.assertEquals(
+        String.format("Hive partition %s does not exist in Hive Metastore", partitionName3),
+        exception3.getMessage());
+
+    // test exception
+    NoSuchPartitionException exception4 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().dropPartition("does_not_exist_partition", false);
+            });
+    Assertions.assertEquals(
+        "Hive partition does_not_exist_partition does not exist in Hive Metastore",
+        exception4.getMessage());
+  }
+
+  @Test
+  public void testDropPartitions() {
+    // add partition: city=2/dt=2020-01-01
+    String partitionName1 = "city=2/dt=2020-01-01";
+    String[] fieldCity1 = new String[] {columns[1].name()};
+    Literal<?> valueCity1 = Literals.byteLiteral((byte) 2);
+    String[] fieldDt1 = new String[] {columns[2].name()};
+    Literal<?> valueDt1 = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition1 =
+        Partitions.identity(
+            new String[][] {fieldCity1, fieldDt1}, new Literal<?>[] {valueCity1, valueDt1});
+    hiveTable.supportPartitions().addPartition(partition1);
+
+    // test drop one partition: city=2/dt=2020-01-01
+    List<String> partitionNames = Collections.singletonList(partitionName1);
+    hiveTable.supportPartitions().dropPartitions(partitionNames, true);
+    NoSuchPartitionException exception1 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().getPartition(partitionName1);
+            });
+    Assertions.assertEquals(
+        String.format("Hive partition %s does not exist in Hive Metastore", partitionName1),
+        exception1.getMessage());
+
+    // test exception
+    NoSuchPartitionException exception4 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable
+                  .supportPartitions()
+                  .dropPartitions(Collections.singletonList("does_not_exist_partition"), false);
+            });
+    Assertions.assertEquals(
+        "Hive partition does_not_exist_partition does not exist in Hive Metastore",
+        exception4.getMessage());
   }
 }

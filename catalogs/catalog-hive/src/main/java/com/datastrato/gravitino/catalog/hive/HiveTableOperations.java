@@ -18,15 +18,19 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.parquet.Strings;
 import org.apache.thrift.TException;
@@ -215,8 +219,84 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   }
 
   @Override
-  public boolean dropPartition(String partitionName) {
-    throw new UnsupportedOperationException();
+  public boolean dropPartition(String partitionName, boolean ifExists)
+      throws NoSuchPartitionException {
+    try {
+      // check the partition exists
+      if (!ifExists) {
+        table
+            .clientPool()
+            .run(c -> c.getPartition(table.schemaName(), table.name(), partitionName));
+      }
+
+      // get all partitions that will be deleted
+      Table hiveTable = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
+      List<org.apache.hadoop.hive.metastore.api.Partition> partitions =
+          table
+              .clientPool()
+              .run(
+                  c ->
+                      c.listPartitions(
+                          table.schemaName(),
+                          table.name(),
+                          getFilterPartitionList(hiveTable, partitionName),
+                          (short) -1));
+
+      // delete partitions iteratively
+      for (org.apache.hadoop.hive.metastore.api.Partition partition : partitions) {
+        table
+            .clientPool()
+            .run(
+                c ->
+                    c.dropPartition(
+                        partition.getDbName(),
+                        partition.getTableName(),
+                        partition.getValues(),
+                        false));
+      }
+    } catch (UnknownTableException e) {
+      if (!ifExists) {
+        throw new NoSuchTableException(
+            e, "Hive table %s does not exist in Hive Metastore", table.name());
+      }
+
+    } catch (NoSuchObjectException e) {
+      if (!ifExists) {
+        throw new NoSuchPartitionException(
+            e, "Hive partition %s does not exist in Hive Metastore", partitionName);
+      }
+
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(
+          "Failed to get partition "
+              + partitionName
+              + " of table "
+              + table.name()
+              + "from Hive Metastore",
+          e);
+    }
+    return true;
+  }
+
+  @Override
+  public boolean dropPartitions(List<String> partitionNames, boolean ifExists)
+      throws NoSuchPartitionException, UnsupportedOperationException {
+    if (partitionNames.size() > 1) {
+      throw new UnsupportedOperationException("Only one partition is supported");
+    }
+    return dropPartition(partitionNames.get(0), ifExists);
+  }
+
+  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec) {
+    Map<String, String> partMap = new HashMap<>();
+    String[] parts = partitionSpec.split("/");
+    for (String part : parts) {
+      String[] keyValue = part.split("=");
+      if (keyValue.length == 2) {
+        partMap.put(keyValue[0], keyValue[1]);
+      }
+    }
+    return MetaStoreUtils.getPvals(dropTable.getPartitionKeys(), partMap);
   }
 
   @Override
