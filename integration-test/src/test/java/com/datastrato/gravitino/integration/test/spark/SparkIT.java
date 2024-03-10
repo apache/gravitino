@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -289,7 +290,7 @@ public class SparkIT extends SparkEnvIT {
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
-    List<SparkColumnInfo> addColumns = getSimpleTableColumn();
+    ArrayList<SparkColumnInfo> addColumns = new ArrayList<>(simpleTableColumns);
     addColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
     checkTableColumns(tableName, addColumns, getTableInfo(tableName));
 
