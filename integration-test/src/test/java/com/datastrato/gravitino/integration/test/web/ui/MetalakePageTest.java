@@ -14,9 +14,21 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage(driver);
+  MetalakePage metalakePage = new MetalakePage();
+
+  public void createMetalakeAction(String name) {
+    metalakePage.createMetalakeBtn.click();
+    metalakePage.setMetalakeNameField(name);
+    metalakePage.setMetalakeCommentField("metalake comment");
+    metalakePage.addMetalakePropsBtn.click();
+    metalakePage.setMetalakeProps(0, "key1", "value1");
+    metalakePage.addMetalakePropsBtn.click();
+    metalakePage.setMetalakeProps(1, "key2", "value2");
+    metalakePage.submitHandleMetalakeBtn.click();
+  }
 
   @Test
+  @Order(0)
   public void homePage() {
     String title = driver.getTitle();
     Assertions.assertEquals("Gravitino", title);
@@ -25,112 +37,63 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   @Order(1)
   public void testCreateMetalake() {
-    metalakePage.createMetalakeAction("test", "test", true);
-
-    boolean status = metalakePage.verifyIsCreatedMetalake();
-
-    if (status) {
-      LOG.info("create metalake successful");
-    } else {
-      Assertions.fail("create metalake failed");
-    }
+    String name = "metalake_name";
+    createMetalakeAction(name);
+    Assertions.assertTrue(metalakePage.verifyCreateMetalake(name));
   }
 
   @Test
   @Order(2)
-  public void testQueryMetalake() {
-    metalakePage.queryMetalakeAction();
-
-    boolean status = metalakePage.verifyQueryMetalake();
-
-    if (status) {
-      LOG.info("query metalake successful");
-    } else {
-      Assertions.fail("query metalake failed");
-    }
+  public void testViewMetalakeDetails() {
+    metalakePage.clickViewMetalakeBtn("metalake_name");
+    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails());
   }
 
   @Test
   @Order(3)
-  public void testViewMetalakeDetails() {
-    metalakePage.viewMetalakeAction();
-
-    boolean status = metalakePage.verifyIsShowDetails();
-
-    if (status) {
-      LOG.info("view metalake details successful");
-    } else {
-      Assertions.fail("view metalake details failed");
-    }
+  public void testEditMetalake() {
+    metalakePage.clickEditMetalakeBtn("metalake_name");
+    metalakePage.setMetalakeNameField("metalake_name_edited");
+    metalakePage.submitHandleMetalakeBtn.click();
+    Assertions.assertTrue(metalakePage.verifyEditedMetalake("metalake_name_edited"));
   }
 
   @Test
   @Order(4)
-  public void testEditMetalake() {
-    metalakePage.editMetalakeAction();
-
-    boolean status = metalakePage.verifyIsEditedMetalake();
-
-    if (status) {
-      LOG.info("edit metalake successful");
-    } else {
-      Assertions.fail("edit metalake failed");
-    }
+  public void testDeleteMetalake() {
+    metalakePage.clickDeleteMetalakeBtn("metalake_name_edited");
+    metalakePage.confirmDeleteBtn.click();
+    Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
 
   @Test
   @Order(5)
-  public void testDeleteMetalake() {
-    metalakePage.deleteMetalakeAction();
+  public void testCreateMultipleMetalakes() {
+    int towPagesCount = 11;
 
-    boolean status = metalakePage.verifyIsDeletedMetalake();
-
-    if (status) {
-      LOG.info("delete metalake successful");
-    } else {
-      Assertions.fail("delete metalake failed");
+    for (int i = 0; i < towPagesCount; i++) {
+      String name = "metalake_" + (i + 1);
+      createMetalakeAction(name);
     }
+
+    Assertions.assertTrue(metalakePage.verifyChangePagination());
   }
 
   @Test
   @Order(6)
-  public void testCreateManyMetalakes() {
-    metalakePage.createManyMetalakesAction();
-
-    boolean status = metalakePage.verifyIsCreatedManyMetalakes();
-
-    if (status) {
-      LOG.info("create many metalakes successful");
-    } else {
-      Assertions.fail("create many metalakes failed");
-    }
+  public void testQueryMetalake() {
+    String name = "query";
+    createMetalakeAction(name);
+    Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
   }
 
   @Test
   @Order(7)
-  public void testCreateMetalakeWithProperty() {
-    metalakePage.createMetalakeWithPropertyAction();
-
-    boolean status = metalakePage.verifyIsCreatedMetalakeWithProperty();
-
-    if (status) {
-      LOG.info("create metalake with property successful");
-    } else {
-      Assertions.fail("create metalake with property failed");
-    }
-  }
-
-  @Test
-  @Order(8)
   public void testLinkToCatalogsPage() {
-    metalakePage.linkToCatalogsPageAction();
-
-    boolean status = metalakePage.verifyIsLinkedToCatalogsPage();
-
-    if (status) {
-      LOG.info("link to catalogs page successful");
-    } else {
-      Assertions.fail("link to catalogs page failed");
-    }
+    String name = "a_link";
+    createMetalakeAction(name);
+    metalakePage.waitElementDisplayed(name);
+    metalakePage.findElementByLink(name).click();
+    Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
   }
 }
