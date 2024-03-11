@@ -53,7 +53,12 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 5. Change the `pom.xml` file in the `trino-gravitino` module accordingly. This is a [example](../assets/trino/pom.xml) of the `pom.xml` file in the `trino-gravitino` module.
 6. Try to compile module `trino-gravitino` to see if there are any errors. 
 ```shell
-mvn clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
+# build the whole trino project
+./mvnw -pl '!core/trino-server-rpm' package -DskipTests -Dair.check.skip-all=true
+
+
+# build the trino-gravitino module if we change the code in the trino-gravitino module
+./mvnw clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
 ![](../assets/trino/add-config.jpg)

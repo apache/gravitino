@@ -143,22 +143,20 @@
             <scope>test</scope>
         </dependency>
 
+        <!--
+        The following dependencies are required for the Gravitino connector. You can install them
+        locally or just use the release version like 0.5.0
+        -->
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>gravitino-client-java-runtime</artifactId>
-            <version>0.4.0-SNAPSHOT</version>
+            <artifactId>client-java-runtime</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
             <artifactId>bundled-catalog</artifactId>
-            <version>0.4.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>catalog-common</artifactId>
-            <version>0.4.0-SNAPSHOT</version>
+            <version>0.5.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -166,13 +164,5 @@
             <artifactId>commons-collections4</artifactId>
             <version>4.4</version>
         </dependency>
-
-
-<!--        <dependency>-->
-<!--            <groupId>mysql</groupId>-->
-<!--            <artifactId>mysql-connector-java</artifactId>-->
-<!--            <version>8.0.23</version>-->
-<!--        </dependency>-->
-
     </dependencies>
 </project>
