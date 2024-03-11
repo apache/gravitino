@@ -357,8 +357,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public void close() throws IOException {
+    rwLock.writeLock().lock();
     try {
-      rwLock.writeLock().lock();
       // close all actual FileSystems
       for (FilesetMeta instance : filesetCache.asMap().values()) {
         try {
