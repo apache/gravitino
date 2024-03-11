@@ -34,8 +34,11 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.parquet.Strings;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveTableOperations implements TableOperations, SupportsPartitions {
+  public static final Logger LOG = LoggerFactory.getLogger(HiveTableOperations.class);
 
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
@@ -223,10 +226,17 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       throws NoSuchPartitionException {
     try {
       // check the partition exists
-      if (!ifExists) {
+      try {
         table
             .clientPool()
             .run(c -> c.getPartition(table.schemaName(), table.name(), partitionName));
+      } catch (NoSuchObjectException e) {
+        if (ifExists) {
+          return true;
+        } else {
+          throw new NoSuchPartitionException(
+              e, "Hive partition %s does not exist in Hive Metastore", partitionName);
+        }
       }
 
       // get all partitions that will be deleted
@@ -255,16 +265,8 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                         false));
       }
     } catch (UnknownTableException e) {
-      if (!ifExists) {
-        throw new NoSuchTableException(
-            e, "Hive table %s does not exist in Hive Metastore", table.name());
-      }
-
-    } catch (NoSuchObjectException e) {
-      if (!ifExists) {
-        throw new NoSuchPartitionException(
-            e, "Hive partition %s does not exist in Hive Metastore", partitionName);
-      }
+      throw new NoSuchTableException(
+          e, "Hive table %s does not exist in Hive Metastore", table.name());
 
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
@@ -287,16 +289,18 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     return dropPartition(partitionNames.get(0), ifExists);
   }
 
-  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec) throws NoSuchPartitionException{
+  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec)
+      throws NoSuchPartitionException {
     Map<String, String> partMap = new HashMap<>();
     String[] parts = partitionSpec.split("/");
     for (String part : parts) {
       String[] keyValue = part.split("=");
       if (keyValue.length == 2) {
         partMap.put(keyValue[0], keyValue[1]);
-      }
-      else {
-        throw new NoSuchPartitionException("Hive partition %s does not exist in Hive Metastore", partitionSpec);
+      } else {
+        LOG.error("Error partition format: " + partitionSpec);
+        throw new NoSuchPartitionException(
+            "Hive partition %s does not exist in Hive Metastore", partitionSpec);
       }
     }
     return MetaStoreUtils.getPvals(dropTable.getPartitionKeys(), partMap);
