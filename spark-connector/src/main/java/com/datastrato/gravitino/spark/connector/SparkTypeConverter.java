@@ -10,6 +10,8 @@ import com.datastrato.gravitino.rel.types.Types;
 import org.apache.spark.sql.types.BooleanType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.DoubleType;
+import org.apache.spark.sql.types.FloatType;
 import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.StringType;
 
@@ -22,6 +24,10 @@ public class SparkTypeConverter {
       return Types.BooleanType.get();
     } else if (sparkType instanceof IntegerType) {
       return Types.IntegerType.get();
+    } else if (sparkType instanceof FloatType) {
+      return Types.FloatType.get();
+    } else if (sparkType instanceof DoubleType) {
+      return Types.DoubleType.get();
     }
     throw new UnsupportedOperationException("Not support " + sparkType.toString());
   }
@@ -33,6 +39,10 @@ public class SparkTypeConverter {
       return DataTypes.BooleanType;
     } else if (gravitinoType instanceof Types.IntegerType) {
       return DataTypes.IntegerType;
+    } else if (gravitinoType instanceof Types.FloatType) {
+      return DataTypes.FloatType;
+    } else if (gravitinoType instanceof Types.DoubleType) {
+      return DataTypes.DoubleType;
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }

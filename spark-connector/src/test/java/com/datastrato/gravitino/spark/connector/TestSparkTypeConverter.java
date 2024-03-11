@@ -7,6 +7,8 @@ package com.datastrato.gravitino.spark.connector;
 
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types.BooleanType;
+import com.datastrato.gravitino.rel.types.Types.DoubleType;
+import com.datastrato.gravitino.rel.types.Types.FloatType;
 import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.datastrato.gravitino.rel.types.Types.NullType;
 import com.datastrato.gravitino.rel.types.Types.StringType;
@@ -34,6 +36,8 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
     gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
     gravitinoToSparkTypeMapper.put(StringType.get(), DataTypes.StringType);
+    gravitinoToSparkTypeMapper.put(FloatType.get(), DataTypes.FloatType);
+    gravitinoToSparkTypeMapper.put(DoubleType.get(), DataTypes.DoubleType);
   }
 
   @Test
