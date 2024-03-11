@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.filesystem.hadoop;
 
 import com.datastrato.gravitino.file.Fileset;
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
+import org.apache.curator.shaded.com.google.common.base.Objects;
+import org.apache.curator.shaded.com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FileSystem;
 
 /**
