@@ -131,7 +131,8 @@ public class MetalakePage extends AbstractWebIT {
   public boolean checkIsErrorName() {
     String xpath = "//div[@data-refer='metalake-name-field']";
     WebElement nameField = findElementByXPath(xpath);
-    List<WebElement> errorText = nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
+    List<WebElement> errorText =
+        nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
 
     return !errorText.isEmpty();
   }
