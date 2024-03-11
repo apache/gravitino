@@ -21,12 +21,22 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-tasks.build {
-  dependsOn("javadoc")
+tasks.named("generateMetadataFileForMavenJavaPublication") {
+  dependsOn(":clients:filesystem-hadoop:copyDepends")
 }
 
-tasks.javadoc {
-  source = sourceSets["main"].allJava
+tasks {
+  val copyDepends by registering(Copy::class) {
+    from(configurations.runtimeClasspath)
+    into("build/libs")
+  }
+  jar {
+    finalizedBy(copyDepends)
+  }
 
-  classpath = configurations["compileClasspath"]
+  register("copyLibs", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/${rootProject.name}-filesystem-hadoop")
+  }
 }

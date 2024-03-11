@@ -72,42 +72,38 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
-    if (name.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      // initialize the Gravitino client
-      String serverUri =
-          configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(serverUri),
-          "Gravitino server uri is not set in the configuration");
-      String metalakeName =
-          configuration.get(
-              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(metalakeName),
-          "Gravitino metalake is not set in the configuration");
-      // TODO Need support more authentication types, now we only support simple auth
-      this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
-      this.metalake = client.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
-
-      // Close the gvfs cache to achieve tenant isolation based on different user tokens in the
-      // configuration.
-      configuration.set(
-          String.format(
-              "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
-          "true");
-      setConf(configuration);
-
-      NameIdentifier filesetIdentifier = extractIdentifier(name);
-      getCachedFileset(filesetIdentifier);
-      this.workingDirectory = new Path(name);
-      this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
-      super.initialize(uri, getConf());
-    } else {
+    if (!name.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       throw new IllegalArgumentException(
           String.format(
               "Unsupported file system scheme: %s for %s: ",
               name.getScheme(), GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME));
     }
+    // initialize the Gravitino client
+    String serverUri =
+        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(serverUri), "Gravitino server uri is not set in the configuration");
+    String metalakeName =
+        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metalakeName), "Gravitino metalake is not set in the configuration");
+    // TODO Need support more authentication types, now we only support simple auth
+    this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
+    this.metalake = client.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
+
+    // Close the gvfs cache to achieve tenant isolation based on different user tokens in the
+    // configuration.
+    configuration.set(
+        String.format(
+            "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
+        "true");
+    setConf(configuration);
+
+    NameIdentifier filesetIdentifier = extractIdentifier(name);
+    getCachedFileset(filesetIdentifier);
+    this.workingDirectory = new Path(name);
+    this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
+    super.initialize(uri, getConf());
   }
 
   @VisibleForTesting
@@ -168,16 +164,17 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "Destination path fileset identifier: %s should be same with src path fileset identifier: %s.",
         srcIdentifier,
         dstIdentifier);
+
     FilesetMeta meta = getCachedFileset(srcIdentifier);
     if (meta.getFileSystem().isFile(new Path(meta.getFileset().storageLocation()))) {
       throw new UnsupportedOperationException(
           String.format(
               "Cannot rename the fileset: %s which only mounts a single file.", srcIdentifier));
-    } else {
-      Path srcActualPath = resolvePathByIdentifier(srcIdentifier, meta, src);
-      Path dstActualPath = resolvePathByIdentifier(dstIdentifier, meta, dst);
-      return meta.getFileSystem().rename(srcActualPath, dstActualPath);
     }
+
+    Path srcActualPath = resolvePathByIdentifier(srcIdentifier, meta, src);
+    Path dstActualPath = resolvePathByIdentifier(dstIdentifier, meta, dst);
+    return meta.getFileSystem().rename(srcActualPath, dstActualPath);
   }
 
   @Override
@@ -256,30 +253,29 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private Path resolvePathByIdentifier(NameIdentifier identifier, FilesetMeta meta, Path path) {
     String originPath = path.toString();
-    if (originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      try {
-        Path storageLocation = new Path(meta.getFileset().storageLocation());
-        boolean isMountSingleFile = meta.getFileSystem().isFile(storageLocation);
-        if (isMountSingleFile) {
-          Preconditions.checkArgument(
-              originPath.equals(concatFilesetPrefix(identifier, meta)),
-              "Cannot resolve path: %s to actual storage path, because the fileset only mounts a single file.",
-              path);
-          return storageLocation;
-        } else {
-          return new Path(
-              originPath.replaceFirst(
-                  concatFilesetPrefix(identifier, meta), storageLocation.toString()));
-        }
-      } catch (Exception e) {
-        throw new RuntimeException(
-            String.format("Cannot resolve path: %s to actual storage path, exception:", path), e);
-      }
-    } else {
+    if (!originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       throw new InvalidPathException(
           String.format(
               "Path %s doesn't start with the scheme \"%s\"",
               path, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
+    }
+    try {
+      Path storageLocation = new Path(meta.getFileset().storageLocation());
+      boolean isMountSingleFile = meta.getFileSystem().isFile(storageLocation);
+      if (isMountSingleFile) {
+        Preconditions.checkArgument(
+            originPath.equals(concatFilesetPrefix(identifier, meta)),
+            "Cannot resolve path: %s to actual storage path, because the fileset only mounts a single file.",
+            path);
+        return storageLocation;
+      } else {
+        return new Path(
+            originPath.replaceFirst(
+                concatFilesetPrefix(identifier, meta), storageLocation.toString()));
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Cannot resolve path: %s to actual storage path, exception:", path), e);
     }
   }
 
@@ -316,8 +312,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private FilesetMeta getCachedFileset(NameIdentifier identifier) throws IOException {
+    rwLock.readLock().lock();
     try {
-      rwLock.readLock().lock();
       FilesetMeta meta = filesetCache.getIfPresent(identifier);
       if (meta != null) {
         return meta;
@@ -326,14 +322,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       rwLock.readLock().unlock();
     }
 
+    rwLock.writeLock().lock();
     try {
-      rwLock.writeLock().lock();
       FilesetMeta meta = filesetCache.getIfPresent(identifier);
       if (meta != null) {
         return meta;
       }
-      Fileset fileset = loadFileset(identifier);
 
+      Fileset fileset = loadFileset(identifier);
       URI storageUri = URI.create(fileset.storageLocation());
 
       // Always create a new file system instance for the fileset.
