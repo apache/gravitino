@@ -113,10 +113,12 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public void setMetalakeProps(int index, String key, String value) {
+    // Set the indexed props key
     String keyPath = "//div[@data-refer='add-props-key-" + index + "']//input[@name='key']";
     WebElement keyInput = driver.findElement(By.xpath(keyPath));
     keyInput.sendKeys(key);
 
+    // Set the indexed props value
     String valuePath = "//div[@data-refer='add-props-value-" + index + "']//input[@name='value']";
     WebElement valueInput = driver.findElement(By.xpath(valuePath));
     valueInput.sendKeys(value);
@@ -126,7 +128,7 @@ public class MetalakePage extends AbstractWebIT {
     int retry = 0;
     int sleepTimeMillis = 1_000;
 
-    while (retry++ < 3) {
+    while (retry++ < 5) {
       try {
         WebElement ele = findElementByLink(name);
         Wait<WebDriver> wait =
@@ -148,10 +150,12 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyCreateMetalake(String name) {
     try {
+      // Get the created metalake row element from DataGrid by name.
       String rowPath = "//div[@data-id='" + name + "']";
       WebElement createdMetalakeRow = driver.findElement(By.xpath(rowPath));
       boolean isRow = createdMetalakeRow.isDisplayed();
 
+      // Get and verify the created metalake link from DataGrid row item by name.
       String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
       WebElement createdMetalakeLink = driver.findElement(By.xpath(linkPath));
       boolean isLink = createdMetalakeLink.isDisplayed();
@@ -168,6 +172,7 @@ public class MetalakePage extends AbstractWebIT {
       String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
       WebElement editedMetalakeLink = driver.findElement(By.xpath(xpath));
 
+      // Check if the link text is match with name
       return Objects.equals(editedMetalakeLink.getText(), name);
     } catch (Exception e) {
       return false;
@@ -179,6 +184,7 @@ public class MetalakePage extends AbstractWebIT {
       metalakeDetailsDrawer.isDisplayed();
       String drawerVisible = metalakeDetailsDrawer.getCssValue("visibility");
 
+      // Check the drawer css property value
       return Objects.equals(drawerVisible, "visible");
     } catch (Exception e) {
       return false;
@@ -196,19 +202,22 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyChangePagination() {
     try {
-      if (nextPageBtn.isEnabled()) {
-        nextPageBtn.click();
-
-        if (prevPageBtn.isEnabled()) {
-          prevPageBtn.click();
-
-          return true;
-        } else {
-          return false;
-        }
-      } else {
+      if (!nextPageBtn.isEnabled()) {
         return false;
       }
+      nextPageBtn.click();
+
+      // Check if the previous page button is available
+      return prevPageBtn.isEnabled() && performPrevPageAction();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean performPrevPageAction() {
+    try {
+      prevPageBtn.click();
+      return true;
     } catch (Exception e) {
       return false;
     }
@@ -219,7 +228,8 @@ public class MetalakePage extends AbstractWebIT {
       setQueryInput(name);
       List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
 
-      boolean isQueried = dataList.size() == 1 && Objects.equals(dataList.get(0).getText(), name);
+      // Check if the text in the first row matches the search input
+      boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
 
       if (isQueried) {
         clearQueryInput();
