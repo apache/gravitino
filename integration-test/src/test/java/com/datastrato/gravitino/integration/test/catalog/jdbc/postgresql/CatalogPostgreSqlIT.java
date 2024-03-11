@@ -15,7 +15,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql.service.PostgreSqlService;
@@ -192,77 +191,31 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdSchema.comment(), loadSchema.comment());
   }
 
-  private ColumnDTO[] createColumns() {
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName(POSTGRESQL_COL_NAME1)
-            .withDataType(Types.IntegerType.get())
-            .withComment("col_1_comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder()
-            .withName(POSTGRESQL_COL_NAME2)
-            .withDataType(Types.DateType.get())
-            .withComment("col_2_comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder()
-            .withName(POSTGRESQL_COL_NAME3)
-            .withDataType(Types.StringType.get())
-            .withComment("col_3_comment")
-            .build();
-    return new ColumnDTO[] {col1, col2, col3};
+  private Column[] createColumns() {
+    Column col1 = Column.of(POSTGRESQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of(POSTGRESQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of(POSTGRESQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
+
+    return new Column[] {col1, col2, col3};
   }
 
-  private ColumnDTO[] columnsWithSpecialNames() {
-    return new ColumnDTO[] {
-      new ColumnDTO.Builder()
-          .withName("integer")
-          .withDataType(Types.IntegerType.get())
-          .withComment("integer")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("long")
-          .withDataType(Types.LongType.get())
-          .withComment("long")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("float")
-          .withDataType(Types.FloatType.get())
-          .withComment("float")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("double")
-          .withDataType(Types.DoubleType.get())
-          .withComment("double")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("decimal")
-          .withDataType(Types.DecimalType.of(10, 3))
-          .withComment("decimal")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("date")
-          .withDataType(Types.DateType.get())
-          .withComment("date")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("time")
-          .withDataType(Types.TimeType.get())
-          .withComment("time")
-          .build(),
-      new ColumnDTO.Builder()
-          .withName("binary")
-          .withDataType(Types.TimestampType.withoutTimeZone())
-          .withComment("binary")
-          .build()
+  private Column[] columnsWithSpecialNames() {
+    return new Column[] {
+      Column.of("integer", Types.IntegerType.get(), "integer"),
+      Column.of("long", Types.LongType.get(), "long"),
+      Column.of("float", Types.FloatType.get(), "float"),
+      Column.of("double", Types.DoubleType.get(), "double"),
+      Column.of("decimal", Types.DecimalType.of(10, 3), "decimal"),
+      Column.of("date", Types.DateType.get(), "date"),
+      Column.of("time", Types.TimeType.get(), "time"),
+      Column.of("binary", Types.TimestampType.withoutTimeZone(), "binary")
     };
   }
 
   @Test
   void testCreateTableWithSpecialColumnNames() {
     // Create table from Gravitino API
-    ColumnDTO[] columns = columnsWithSpecialNames();
+    Column[] columns = columnsWithSpecialNames();
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -370,7 +323,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @Test
   void testCreateAndLoadPostgreSqlTable() {
     // Create table from Gravitino API
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -418,7 +371,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   @Test
   void testAlterAndDropPostgreSqlTable() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     Table table =
         catalog
             .asTableCatalog()
@@ -491,25 +444,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(table.auditInfo().lastModifier());
 
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName("name")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder()
-            .withName("address")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder()
-            .withName("date_of_birth")
-            .withDataType(Types.DateType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};
+    Column col1 = Column.of("name", Types.StringType.get(), "comment");
+    Column col2 = Column.of("address", Types.StringType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+
+    Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             metalakeName, catalogName, schemaName, GravitinoITUtils.genRandomName("jdbc_it_table"));
