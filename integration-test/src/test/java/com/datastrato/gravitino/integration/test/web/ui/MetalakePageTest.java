@@ -17,15 +17,25 @@ public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
 
   // Create a metalake by name, set the default comment and properties.
-  public void createMetalakeAction(String name) {
+  public void createMetalakeAction(boolean valid, String name) {
     metalakePage.createMetalakeBtn.click();
-    metalakePage.setMetalakeNameField(name);
+    String invalidPrefix = "1!@#$";
+    String concatName = valid ? name : invalidPrefix + name;
+    metalakePage.setMetalakeNameField(concatName);
     metalakePage.setMetalakeCommentField("metalake comment");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(0, "key1", "value1");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(1, "key2", "value2");
-    metalakePage.submitHandleMetalakeBtn.click();
+
+    try {
+      if (!valid && metalakePage.checkIsErrorName()) {
+        metalakePage.setMetalakeNameField(name);
+      }
+      metalakePage.submitHandleMetalakeBtn.click();
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   @Test
@@ -39,7 +49,7 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(1)
   public void testCreateMetalake() {
     String name = "metalake_name";
-    createMetalakeAction(name);
+    createMetalakeAction(false, name);
     Assertions.assertTrue(metalakePage.verifyCreateMetalake(name));
   }
 
@@ -74,7 +84,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
     for (int i = 0; i < towPagesCount; i++) {
       String name = "metalake_" + (i + 1);
-      createMetalakeAction(name);
+      createMetalakeAction(true, name);
     }
 
     Assertions.assertTrue(metalakePage.verifyChangePagination());
@@ -84,16 +94,16 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(6)
   public void testQueryMetalake() {
     String name = "query";
-    createMetalakeAction(name);
+    createMetalakeAction(true, name);
     Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   public void testLinkToCatalogsPage() {
     String name = "a_link";
-    createMetalakeAction(name);
-    metalakePage.waitElementDisplayed(name);
+    createMetalakeAction(true, name);
+    metalakePage.waitLinkElementDisplayed(name);
     metalakePage.findElementByLink(name).click();
     Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
   }

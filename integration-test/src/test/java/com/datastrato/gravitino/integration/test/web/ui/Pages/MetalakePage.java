@@ -63,6 +63,10 @@ public class MetalakePage extends AbstractWebIT {
     PageFactory.initElements(driver, this);
   }
 
+  public WebElement findElementByXPath(String xpath) {
+    return driver.findElement(By.xpath(xpath));
+  }
+
   public WebElement findElementByLink(String name) {
     String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
 
@@ -124,7 +128,15 @@ public class MetalakePage extends AbstractWebIT {
     valueInput.sendKeys(value);
   }
 
-  public void waitElementDisplayed(String name) {
+  public boolean checkIsErrorName() {
+    String xpath = "//div[@data-refer='metalake-name-field']";
+    WebElement nameField = findElementByXPath(xpath);
+    List<WebElement> errorText = nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
+
+    return !errorText.isEmpty();
+  }
+
+  public void waitLinkElementDisplayed(String name) {
     int retry = 0;
     int sleepTimeMillis = 1_000;
 
@@ -244,7 +256,9 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public boolean verifyLinkToCatalogsPage(String name) {
+    int sleepTimeMillis = 1_000;
     try {
+      Thread.sleep(sleepTimeMillis);
       String xpath = "//a[@data-refer='metalake-name-link']";
       WebElement nameLink = driver.findElement(By.xpath(xpath));
 
@@ -265,6 +279,11 @@ public class MetalakePage extends AbstractWebIT {
       return nameLink.isDisplayed() && isUrl;
     } catch (Exception e) {
       return false;
+    } finally {
+      // Back to homepage
+      String xpath = "//button[@data-refer='back-home-btn']";
+      WebElement backHomeBtn = driver.findElement(By.xpath(xpath));
+      backHomeBtn.click();
     }
   }
 }

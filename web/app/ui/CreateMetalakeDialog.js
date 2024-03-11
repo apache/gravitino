@@ -224,6 +224,7 @@ const CreateMetalakeDialog = props => {
                     <TextField
                       value={value}
                       id='metalakeNameField'
+                      data-refer='metalake-name-field'
                       label='Name'
                       onChange={onChange}
                       placeholder=''
@@ -232,7 +233,9 @@ const CreateMetalakeDialog = props => {
                   )}
                 />
                 {errors.name && (
-                  <FormHelperText className={'twc-text-error-main'}>{errors.name.message}</FormHelperText>
+                  <FormHelperText className={'twc-text-error-main'} data-refer='metalake-name-field-error-text'>
+                    {errors.name.message}
+                  </FormHelperText>
                 )}
               </FormControl>
             </Grid>
