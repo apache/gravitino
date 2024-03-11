@@ -5,24 +5,30 @@
 package com.datastrato.gravitino.filesystem.hadoop.utils;
 
 import com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
-import com.datastrato.gravitino.filesystem.hadoop.HdfsMiniClusterTestBase;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
 
 public class FileSystemTestUtils {
+  private static final String LOCAL_FS_PREFIX = "file:/tmp/";
+
+  private static final int BUFFER_SIZE = 3;
+  private static final short REPLICATION = 1;
+  private static final long BLOCK_SIZE = 1048576L;
+  private static final FsPermission MOCK_PERMISSION = FsPermission.createImmutable((short) 0777);
+  private static final Progressable DEFAULT_PROGRESS = () -> {};
+
   private FileSystemTestUtils() {}
 
-  public static Path createGvfsPrefix(
-      String metalakeName, String filesetCatalog, String schema, String fileset) {
+  public static Path createGvfsPrefix(String filesetCatalog, String schema, String fileset) {
     return new Path(
         GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
             + "/"
-            + metalakeName
-            + "/"
             + filesetCatalog
             + "/"
             + schema
@@ -30,23 +36,12 @@ public class FileSystemTestUtils {
             + fileset);
   }
 
-  public static Path createHdfsPrefix(
-      String metalakeName, String filesetCatalog, String schema, String fileset) {
-    return new Path(
-        GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME_PREFIX
-            + "localhost/"
-            + metalakeName
-            + "/"
-            + filesetCatalog
-            + "/"
-            + schema
-            + "/"
-            + fileset);
+  public static Path createLocalPrefix(String filesetCatalog, String schema, String fileset) {
+    return new Path(LOCAL_FS_PREFIX + filesetCatalog + "/" + schema + "/" + fileset);
   }
 
-  public static Path createHdfsFilePath(String filePath) {
-    return new Path(
-        GravitinoVirtualFileSystemConfiguration.HDFS_SCHEME_PREFIX + "localhost" + filePath);
+  public static Path createLocalFilePath(String filePath) {
+    return new Path(LOCAL_FS_PREFIX + filePath);
   }
 
   public static void create(Path path, FileSystem fileSystem) throws IOException {
@@ -54,17 +49,16 @@ public class FileSystemTestUtils {
     try (FSDataOutputStream outputStream =
         fileSystem.create(
             path,
-            HdfsMiniClusterTestBase.fsPermission(),
+            MOCK_PERMISSION,
             overwrite,
-            HdfsMiniClusterTestBase.bufferSize(),
-            HdfsMiniClusterTestBase.replication(),
-            HdfsMiniClusterTestBase.blockSize(),
-            HdfsMiniClusterTestBase.progressable())) {}
+            BUFFER_SIZE,
+            REPLICATION,
+            BLOCK_SIZE,
+            DEFAULT_PROGRESS)) {}
   }
 
   public static void append(Path path, FileSystem fileSystem) throws IOException {
-    try (FSDataOutputStream mockOutputStream =
-        fileSystem.append(path, HdfsMiniClusterTestBase.bufferSize())) {
+    try (FSDataOutputStream mockOutputStream = fileSystem.append(path, BUFFER_SIZE)) {
       // Hello, World!
       byte[] mockBytes = new byte[] {72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33};
       mockOutputStream.write(mockBytes);
@@ -72,8 +66,7 @@ public class FileSystemTestUtils {
   }
 
   public static byte[] read(Path path, FileSystem fileSystem) throws IOException {
-    try (FSDataInputStream inputStream =
-        fileSystem.open(path, HdfsMiniClusterTestBase.bufferSize())) {
+    try (FSDataInputStream inputStream = fileSystem.open(path, BUFFER_SIZE)) {
       int bytesRead;
       byte[] buffer = new byte[1024];
       try (ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream()) {
@@ -83,5 +76,9 @@ public class FileSystemTestUtils {
         return byteOutputStream.toByteArray();
       }
     }
+  }
+
+  public static void mkdirs(Path path, FileSystem fileSystem) throws IOException {
+    fileSystem.mkdirs(path, MOCK_PERMISSION);
   }
 }
