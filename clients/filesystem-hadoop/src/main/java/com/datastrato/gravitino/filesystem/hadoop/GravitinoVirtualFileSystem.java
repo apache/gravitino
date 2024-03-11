@@ -40,35 +40,12 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Logger Logger = LoggerFactory.getLogger(GravitinoVirtualFileSystem.class);
-  private static final int DEFAULT_CACHE_CAPACITY = 20;
-  private static final int CACHE_EXPIRE_AFTER_ACCESS_MINUTES = 5;
   private Path workingDirectory;
   private URI uri;
   private GravitinoClient client;
   private GravitinoMetaLake metalake;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-
-  private final Cache<NameIdentifier, FilesetMeta> filesetCache =
-      CacheBuilder.newBuilder()
-          .maximumSize(DEFAULT_CACHE_CAPACITY)
-          .expireAfterAccess(CACHE_EXPIRE_AFTER_ACCESS_MINUTES, TimeUnit.MINUTES)
-          .removalListener(
-              (RemovalListener<NameIdentifier, FilesetMeta>)
-                  removedCache -> {
-                    if (removedCache.getKey() != null) {
-                      try {
-                        if (removedCache.getValue() != null) {
-                          removedCache.getValue().getFileSystem().close();
-                        }
-                      } catch (IOException e) {
-                        Logger.error(
-                            String.format(
-                                "Failed to close the file system for fileset: %s",
-                                removedCache.getKey().toString()));
-                      }
-                    }
-                  })
-          .build();
+  private Cache<NameIdentifier, FilesetMeta> filesetCache;
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -78,15 +55,36 @@ public class GravitinoVirtualFileSystem extends FileSystem {
               "Unsupported file system scheme: %s for %s: ",
               name.getScheme(), GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME));
     }
+
+    int maxCapacity =
+        configuration.getInt(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY,
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_DEFAULT);
+    Preconditions.checkArgument(maxCapacity > 0, "Cache max capacity should be greater than 0");
+
+    long evictionMillsAfterAccess =
+        configuration.getLong(
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY,
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT);
+    Preconditions.checkArgument(
+        evictionMillsAfterAccess > 0, "Cache eviction mills after access should be greater than 0");
+
+    initializeCache(maxCapacity, evictionMillsAfterAccess);
+
     // initialize the Gravitino client
     String serverUri =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(serverUri), "Gravitino server uri is not set in the configuration");
+
     String metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalakeName), "Gravitino metalake is not set in the configuration");
+
     // TODO Need support more authentication types, now we only support simple auth
     this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
     this.metalake = client.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
@@ -104,6 +102,30 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
     super.initialize(uri, getConf());
+  }
+
+  private void initializeCache(int maxCapacity, long expireAfterAccess) {
+    this.filesetCache =
+        CacheBuilder.newBuilder()
+            .maximumSize(maxCapacity)
+            .expireAfterAccess(expireAfterAccess, TimeUnit.MILLISECONDS)
+            .removalListener(
+                (RemovalListener<NameIdentifier, FilesetMeta>)
+                    removedCache -> {
+                      if (removedCache.getKey() != null) {
+                        try {
+                          if (removedCache.getValue() != null) {
+                            removedCache.getValue().getFileSystem().close();
+                          }
+                        } catch (IOException e) {
+                          Logger.error(
+                              String.format(
+                                  "Failed to close the file system for fileset: %s",
+                                  removedCache.getKey().toString()));
+                        }
+                      }
+                    })
+            .build();
   }
 
   @VisibleForTesting
@@ -281,12 +303,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private FileStatus resolveFileStatusPathPrefix(
       FileStatus fileStatus, String fromPrefix, String toPrefix) {
-    String uri = fileStatus.getPath().toString();
-    if (!uri.startsWith(fromPrefix)) {
+    String filePath = fileStatus.getPath().toString();
+    if (!filePath.startsWith(fromPrefix)) {
       throw new InvalidPathException(
-          String.format("Path %s doesn't start with prefix \"%s\"", uri, fromPrefix));
+          String.format("Path %s doesn't start with prefix \"%s\"", filePath, fromPrefix));
     }
-    String proxyUri = uri.replaceFirst(fromPrefix, toPrefix);
+    String proxyUri = filePath.replaceFirst(fromPrefix, toPrefix);
     Path path = new Path(proxyUri);
     fileStatus.setPath(path);
     return fileStatus;
