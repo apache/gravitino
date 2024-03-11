@@ -12,12 +12,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.mysql.service.MysqlService;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
@@ -117,12 +117,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> properties = Maps.newHashMap();
 
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName("col_1")
-            .withDataType(Types.IntegerType.get())
-            .withComment("col_1_comment")
-            .build();
+    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
 
     catalog
         .asSchemas()
@@ -132,7 +127,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
             .asTableCatalog()
             .createTable(
                 NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                new ColumnDTO[] {col1},
+                new Column[] {col1},
                 "comment",
                 properties);
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
