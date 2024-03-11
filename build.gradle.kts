@@ -252,6 +252,7 @@ subprojects {
         "IdentityBinaryExpression",
         "IdentityHashMapBoxing",
         "Immutable",
+        "ImmutableEnumChecker",
         "Incomparable",
         "IncompatibleArgumentType",
         "IndexOfChar",
