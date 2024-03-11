@@ -287,13 +287,16 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     return dropPartition(partitionNames.get(0), ifExists);
   }
 
-  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec) {
+  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec) throws NoSuchPartitionException{
     Map<String, String> partMap = new HashMap<>();
     String[] parts = partitionSpec.split("/");
     for (String part : parts) {
       String[] keyValue = part.split("=");
       if (keyValue.length == 2) {
         partMap.put(keyValue[0], keyValue[1]);
+      }
+      else {
+        throw new NoSuchPartitionException("Hive partition %s does not exist in Hive Metastore", partitionSpec);
       }
     }
     return MetaStoreUtils.getPvals(dropTable.getPartitionKeys(), partMap);
