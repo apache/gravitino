@@ -7,7 +7,6 @@ package com.datastrato.gravitino.integration.test.container;
 import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
-import java.net.InetSocketAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -187,7 +186,6 @@ public class TrinoContainer extends BaseContainer {
   public static class Builder
       extends BaseContainer.Builder<TrinoContainer.Builder, TrinoContainer> {
     protected String trinoConfDir;
-    protected InetSocketAddress gravitinoServerAddress;
     protected String metalakeName;
     protected String hiveContainerIP;
 
@@ -199,12 +197,6 @@ public class TrinoContainer extends BaseContainer {
 
     public TrinoContainer.Builder withTrinoConfDir(String trinoConfDir) {
       this.trinoConfDir = trinoConfDir;
-      return self;
-    }
-
-    public TrinoContainer.Builder withGravitinoServerAddress(
-        InetSocketAddress gravitinoServerAddress) {
-      this.gravitinoServerAddress = gravitinoServerAddress;
       return self;
     }
 
