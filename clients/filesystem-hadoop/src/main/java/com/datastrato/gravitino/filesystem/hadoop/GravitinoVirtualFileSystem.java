@@ -169,7 +169,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         srcIdentifier,
         dstIdentifier);
     FilesetMeta meta = getCachedFileset(srcIdentifier);
-    if (meta.getFileSystem().isFile(new Path(meta.getFileset().storageLocation()))) {
+    if (meta.getFileSystem()
+        .getFileStatus(new Path(meta.getFileset().storageLocation()))
+        .isFile()) {
       throw new UnsupportedOperationException(
           String.format(
               "Cannot rename the fileset: %s which only mounts a single file.", srcIdentifier));
@@ -259,7 +261,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     if (originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       try {
         Path storageLocation = new Path(meta.getFileset().storageLocation());
-        boolean isMountSingleFile = meta.getFileSystem().isFile(storageLocation);
+        boolean isMountSingleFile = meta.getFileSystem().getFileStatus(storageLocation).isFile();
         if (isMountSingleFile) {
           Preconditions.checkArgument(
               originPath.equals(concatFilesetPrefix(identifier, meta)),
