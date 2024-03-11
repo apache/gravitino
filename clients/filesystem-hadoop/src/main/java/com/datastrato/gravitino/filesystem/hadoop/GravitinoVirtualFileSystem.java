@@ -308,8 +308,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       throw new InvalidPathException(
           String.format("Path %s doesn't start with prefix \"%s\"", filePath, fromPrefix));
     }
-    String proxyUri = filePath.replaceFirst(fromPrefix, toPrefix);
-    Path path = new Path(proxyUri);
+    String proxyPath = filePath.replaceFirst(fromPrefix, toPrefix);
+    Path path = new Path(proxyPath);
     fileStatus.setPath(path);
     return fileStatus;
   }
