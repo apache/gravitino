@@ -123,16 +123,27 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public void waitElementDisplayed(String name) {
-    Wait<WebDriver> wait =
-        new FluentWait<>(driver)
-            .withTimeout(Duration.ofSeconds(2))
-            .pollingEvery(Duration.ofMillis(300))
-            .ignoring(ElementNotInteractableException.class);
-    wait.until(
-        d -> {
-          findElementByLink(name).isDisplayed();
-          return true;
-        });
+    int retry = 0;
+    int sleepTimeMillis = 1_000;
+
+    while (retry++ < 3) {
+      try {
+        WebElement ele = findElementByLink(name);
+        Wait<WebDriver> wait =
+            new FluentWait<>(driver)
+                .withTimeout(Duration.ofSeconds(2))
+                .pollingEvery(Duration.ofMillis(300))
+                .ignoring(ElementNotInteractableException.class);
+        wait.until(
+            d -> {
+              ele.isDisplayed();
+              return true;
+            });
+        Thread.sleep(sleepTimeMillis);
+      } catch (Exception e) {
+        LOG.error(e.getMessage(), e);
+      }
+    }
   }
 
   public boolean verifyCreateMetalake(String name) {

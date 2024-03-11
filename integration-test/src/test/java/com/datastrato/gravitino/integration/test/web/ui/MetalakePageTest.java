@@ -16,6 +16,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
 
+  // Create a metalake by name, set the default comment and properties.
   public void createMetalakeAction(String name) {
     metalakePage.createMetalakeBtn.click();
     metalakePage.setMetalakeNameField(name);
