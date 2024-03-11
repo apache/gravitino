@@ -150,7 +150,7 @@ tasks {
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
-    exclude("**/e2e/**")
+    exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
 
