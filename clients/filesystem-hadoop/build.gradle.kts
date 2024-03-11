@@ -11,13 +11,13 @@ dependencies {
   compileOnly(libs.hadoop2.common)
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
+  testImplementation(libs.hadoop2.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty) {
     exclude("com.google.guava", "guava")
   }
-  testImplementation(libs.hadoop2.common)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
