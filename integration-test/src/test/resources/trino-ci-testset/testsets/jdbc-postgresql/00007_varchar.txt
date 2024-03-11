@@ -1,0 +1,69 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb01 (
+   id integer,
+   name char(20)
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb02 (
+   id integer,
+   name char(65536)
+)
+COMMENT ''"
+
+<QUERY_FAILED> Unknown type 'char(65537)' for column 'name'
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb04 (
+   id integer,
+   name varchar(250)
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb05 (
+   id integer,
+   name varchar(10485760)
+)
+COMMENT ''"
+
+<QUERY_FAILED> length for type varchar cannot exceed 10485760
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb06 (
+   id integer,
+   name char(1)
+)
+COMMENT ''"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_postgresql"".varchar_db1.tb07 (
+   id integer,
+   name varchar
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

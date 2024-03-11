@@ -10,10 +10,10 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
@@ -155,18 +155,13 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     String tableName = RandomNameUtils.genRandomName("it_table");
 
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName("col_1")
-            .withDataType(Types.IntegerType.get())
-            .withComment("col_1_comment")
-            .build();
+    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
     String comment = "test";
     mysqlCatalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName, tableName),
-            new ColumnDTO[] {col1},
+            new Column[] {col1},
             comment,
             Collections.emptyMap());
 
@@ -174,7 +169,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName, tableName),
-            new ColumnDTO[] {col1},
+            new Column[] {col1},
             comment,
             Collections.emptyMap());
 

@@ -37,7 +37,6 @@ import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -49,6 +48,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -275,26 +275,11 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("val2", database.getParameters().get("key2"));
   }
 
-  private ColumnDTO[] createColumns() {
-    ColumnDTO col1 =
-        new ColumnDTO.Builder<>()
-            .withName(HIVE_COL_NAME1)
-            .withDataType(Types.ByteType.get())
-            .withComment("col_1_comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder<>()
-            .withName(HIVE_COL_NAME2)
-            .withDataType(Types.DateType.get())
-            .withComment("col_2_comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder<>()
-            .withName(HIVE_COL_NAME3)
-            .withDataType(Types.StringType.get())
-            .withComment("col_3_comment")
-            .build();
-    return new ColumnDTO[] {col1, col2, col3};
+  private Column[] createColumns() {
+    Column col1 = Column.of(HIVE_COL_NAME1, Types.ByteType.get(), "col_1_comment");
+    Column col2 = Column.of(HIVE_COL_NAME2, Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
+    return new Column[] {col1, col2, col3};
   }
 
   private void checkTableReadWrite(org.apache.hadoop.hive.metastore.api.Table table) {
@@ -345,7 +330,7 @@ public class CatalogHiveIT extends AbstractIT {
   public void testCreateHiveTableWithDistributionAndSortOrder()
       throws TException, InterruptedException {
     // Create table from Gravitino API
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -445,7 +430,7 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testCreateHiveTable() throws TException, InterruptedException {
     // Create table from Gravitino API
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -498,7 +483,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testHiveTableProperties() throws TException, InterruptedException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     // test default properties
@@ -616,7 +601,7 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testCreatePartitionedHiveTable() throws TException, InterruptedException {
     // Create table from Gravitino API
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -667,7 +652,7 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testListPartitionNames() throws TException, InterruptedException {
     // test empty partitions
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Table nonPartitionedTable =
@@ -694,7 +679,7 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testListPartitions() throws TException, InterruptedException {
     // test empty partitions
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Table nonPartitionedTable =
@@ -821,7 +806,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   private Table preparePartitionedTable() throws TException, InterruptedException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(
@@ -913,7 +898,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     Table createdTable =
         catalog
             .asTableCatalog()
@@ -983,25 +968,11 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
     // test updateColumnPosition exception
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName("name")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder()
-            .withName("address")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder()
-            .withName("date_of_birth")
-            .withDataType(Types.DateType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};
+    Column col1 = Column.of("name", Types.StringType.get(), "comment");
+    Column col2 = Column.of("address", Types.StringType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+
+    Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             metalakeName,
@@ -1218,7 +1189,7 @@ public class CatalogHiveIT extends AbstractIT {
     // Now try to rename table
     final String tableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
     final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     catalog
         .asTableCatalog()
         .createTable(
@@ -1278,7 +1249,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     catalog
         .asTableCatalog()
         .createTable(
@@ -1303,7 +1274,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     catalog
         .asTableCatalog()
         .createTable(
@@ -1330,7 +1301,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     catalog
         .asTableCatalog()
         .createTable(
@@ -1357,7 +1328,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     catalog
         .asTableCatalog()
         .createTable(

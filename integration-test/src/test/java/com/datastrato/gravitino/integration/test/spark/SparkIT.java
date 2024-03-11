@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -276,6 +277,34 @@ public class SparkIT extends SparkEnvIT {
     Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
     Assertions.assertFalse(newProperties.containsKey("key1"));
     Assertions.assertTrue(newProperties.containsKey("key2"));
+  }
+
+  @Test
+  void testAlterTableAddAndDeleteColumn() {
+    String tableName = "test_column";
+    dropTableIfExists(tableName);
+
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
+    ArrayList<SparkColumnInfo> addColumns = new ArrayList<>(simpleTableColumns);
+    addColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
+    checkTableColumns(tableName, addColumns, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+  }
+
+  private void checkTableColumns(
+      String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
+    SparkTableInfoChecker.create()
+        .withName(tableName)
+        .withColumns(columnInfos)
+        .withComment(null)
+        .check(tableInfo);
   }
 
   private void checkTableReadWrite(SparkTableInfo table) {

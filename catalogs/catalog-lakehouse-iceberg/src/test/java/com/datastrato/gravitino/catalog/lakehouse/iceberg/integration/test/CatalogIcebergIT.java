@@ -16,7 +16,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertie
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -215,25 +214,10 @@ public class CatalogIcebergIT extends AbstractIT {
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
   }
 
-  private ColumnDTO[] createColumns() {
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName(ICEBERG_COL_NAME1)
-            .withDataType(Types.IntegerType.get())
-            .withComment("col_1_comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder()
-            .withName(ICEBERG_COL_NAME2)
-            .withDataType(Types.DateType.get())
-            .withComment("col_2_comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder()
-            .withName(ICEBERG_COL_NAME3)
-            .withDataType(Types.StringType.get())
-            .withComment("col_3_comment")
-            .build();
+  private Column[] createColumns() {
+    Column col1 = Column.of(ICEBERG_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of(ICEBERG_COL_NAME2, Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of(ICEBERG_COL_NAME3, Types.StringType.get(), "col_3_comment");
     Types.StructType structTypeInside =
         Types.StructType.of(
             Types.StructType.Field.notNullField("integer_field_inside", Types.IntegerType.get()),
@@ -245,13 +229,8 @@ public class CatalogIcebergIT extends AbstractIT {
             Types.StructType.Field.notNullField(
                 "string_field", Types.StringType.get(), "string field"),
             Types.StructType.Field.nullableField("struct_field", structTypeInside, "struct field"));
-    ColumnDTO col4 =
-        new ColumnDTO.Builder()
-            .withName(ICEBERG_COL_NAME4)
-            .withDataType(structType)
-            .withComment("col_4_comment")
-            .build();
-    return new ColumnDTO[] {col1, col2, col3, col4};
+    Column col4 = Column.of(ICEBERG_COL_NAME4, structType, "col_4_comment");
+    return new Column[] {col1, col2, col3, col4};
   }
 
   private Map<String, String> createProperties() {
@@ -352,7 +331,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testCreateTableWithNullComment() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
 
@@ -368,7 +347,7 @@ public class CatalogIcebergIT extends AbstractIT {
   @Test
   void testCreateAndLoadIcebergTable() {
     // Create table from Gravitino API
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -403,7 +382,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(createdTable.columns()[i], columns[i]);
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
     }
 
     // TODO add partitioning and sort order check
@@ -420,7 +399,7 @@ public class CatalogIcebergIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(columns[i], loadTable.columns()[i]);
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
     }
 
     Assertions.assertEquals(partitioning.length, loadTable.partitioning().length);
@@ -462,7 +441,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testListAndDropIcebergTable() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier table1 = NameIdentifier.of(metalakeName, catalogName, schemaName, "table_1");
 
@@ -524,7 +503,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   public void testAlterIcebergTable() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     Table table =
         catalog
             .asTableCatalog()
@@ -601,25 +580,11 @@ public class CatalogIcebergIT extends AbstractIT {
         columns[0].name(),
         ((Partitioning.SingleFieldPartitioning) table.partitioning()[0]).fieldName()[0]);
 
-    ColumnDTO col1 =
-        new ColumnDTO.Builder()
-            .withName("name")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder()
-            .withName("address")
-            .withDataType(Types.StringType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder()
-            .withName("date_of_birth")
-            .withDataType(Types.DateType.get())
-            .withComment("comment")
-            .build();
-    ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};
+    Column col1 = Column.of("name", Types.StringType.get(), "comment");
+    Column col2 = Column.of("address", Types.StringType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+
+    Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
             metalakeName,
@@ -676,7 +641,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testPartitionAndSortOrderIcebergTable() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
       SortOrders.ascending(NamedReference.field(columns[0].name())),
@@ -721,7 +686,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testOperationDataIcebergTable() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
       SortOrders.of(
@@ -867,7 +832,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   public void testTableDistribution() {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
