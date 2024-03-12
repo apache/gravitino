@@ -308,7 +308,7 @@ public class SparkIT extends SparkEnvIT {
     createSimpleTable(tableName);
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 bigint)", tableName));
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
     sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 string", tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>(simpleTableColumns);
     updateColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
