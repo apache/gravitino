@@ -119,6 +119,12 @@ public class MetalakePage extends AbstractWebIT {
     editMetalakeBtn.click();
   }
 
+  public void clickMetalakeLink(String name) {
+    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
+    WebElement metalakeLink = driver.findElement(By.xpath(xpath));
+    metalakeLink.click();
+  }
+
   public void setMetalakeProps(int index, String key, String value) {
     // Set the indexed props key
     String keyPath = "//div[@data-refer='add-props-key-" + index + "']//input[@name='key']";

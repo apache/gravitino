@@ -104,8 +104,7 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testLinkToCatalogsPage() {
     String name = "a_link";
     createMetalakeAction(true, name);
-    metalakePage.waitLinkElementDisplayed(name);
-    metalakePage.findElementByLink(name).click();
+    metalakePage.clickMetalakeLink(name);
     Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
   }
 }
