@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Gravitino Client for administrator to interacte with the Gravitino API, allowing the client to
+ * Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to
  * list, load, create, and alter Metalakes.
  *
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
