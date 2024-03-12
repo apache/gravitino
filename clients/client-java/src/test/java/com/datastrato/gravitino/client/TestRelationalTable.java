@@ -36,7 +36,6 @@ import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -73,7 +72,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
-    schema = catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+    schema =
+        ((BaseSchemaCatalog) catalog)
+            .createSchema(schemaId.name(), "comment", Collections.emptyMap());
 
     // setup partitioned table
     NameIdentifier tableId =
@@ -133,7 +134,8 @@ public class TestRelationalTable extends TestRelationalCatalog {
 
     buildMockResource(Method.GET, partitionPath, null, resp, SC_OK);
 
-    String[] partitionNames = partitionedTable.supportPartitions().listPartitionNames();
+    RelationalTable relationalTable = (RelationalTable) partitionedTable;
+    String[] partitionNames = relationalTable.listPartitionNames();
     Assertions.assertEquals(2, partitionNames.length);
     Assertions.assertEquals(names[0], partitionNames[0]);
     Assertions.assertEquals(names[1], partitionNames[1]);
@@ -143,10 +145,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         ErrorResponse.unsupportedOperation("table does not support partition operations");
     buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_IMPLEMENTED);
 
-    SupportsPartitions partitions = partitionedTable.supportPartitions();
     UnsupportedOperationException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> partitions.listPartitionNames());
+            UnsupportedOperationException.class, () -> relationalTable.listPartitionNames());
     Assertions.assertEquals("table does not support partition operations", exception.getMessage());
   }
 
@@ -173,7 +174,8 @@ public class TestRelationalTable extends TestRelationalCatalog {
 
     buildMockResource(Method.GET, partitionPath, null, resp, SC_OK);
 
-    Partition[] partitions = partitionedTable.supportPartitions().listPartitions();
+    RelationalTable relationalTable = (RelationalTable) partitionedTable;
+    Partition[] partitions = relationalTable.listPartitions();
     Assertions.assertEquals(1, partitions.length);
     Assertions.assertTrue(partitions[0] instanceof RangePartition);
     Assertions.assertEquals(partition, partitions[0]);
@@ -183,10 +185,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         ErrorResponse.unsupportedOperation("table does not support partition operations");
     buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_IMPLEMENTED);
 
-    SupportsPartitions supportPartitions = partitionedTable.supportPartitions();
     UnsupportedOperationException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> supportPartitions.listPartitions());
+            UnsupportedOperationException.class, () -> relationalTable.listPartitions());
     Assertions.assertEquals("table does not support partition operations", exception.getMessage());
   }
 
@@ -215,7 +216,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
     PartitionResponse resp = new PartitionResponse(partition);
     buildMockResource(Method.GET, partitionPath, null, resp, SC_OK);
 
-    Partition actualPartition = table.supportPartitions().getPartition(partitionName);
+    Partition actualPartition = table.getPartition(partitionName);
     Assertions.assertTrue(actualPartition instanceof RangePartition);
     Assertions.assertEquals(partition, actualPartition);
 
@@ -225,10 +226,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
             NoSuchPartitionException.class.getSimpleName(), "partition not found");
     buildMockResource(Method.GET, partitionPath, null, errorResp, SC_NOT_FOUND);
 
-    SupportsPartitions partitions = partitionedTable.supportPartitions();
     NoSuchPartitionException exception =
         Assertions.assertThrows(
-            NoSuchPartitionException.class, () -> partitions.getPartition(partitionName));
+            NoSuchPartitionException.class, () -> table.getPartition(partitionName));
     Assertions.assertEquals("partition not found", exception.getMessage());
   }
 
@@ -247,7 +247,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
     PartitionListResponse resp = new PartitionListResponse(new PartitionDTO[] {toDTO(partition)});
     buildMockResource(Method.POST, partitionPath, req, resp, SC_OK);
 
-    Partition addedPartition = partitionedTable.supportPartitions().addPartition(partition);
+    Partition addedPartition = table.addPartition(partition);
     Assertions.assertEquals(toDTO(partition), addedPartition);
 
     // test throws exception
@@ -256,10 +256,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
             PartitionAlreadyExistsException.class.getSimpleName(), "partition already exists");
     buildMockResource(Method.POST, partitionPath, req, errorResp, SC_CONFLICT);
 
-    SupportsPartitions partitions = partitionedTable.supportPartitions();
     PartitionAlreadyExistsException exception =
         Assertions.assertThrows(
-            PartitionAlreadyExistsException.class, () -> partitions.addPartition(partition));
+            PartitionAlreadyExistsException.class, () -> table.addPartition(partition));
     Assertions.assertEquals("partition already exists", exception.getMessage());
   }
 }
