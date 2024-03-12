@@ -18,8 +18,8 @@ import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.FluentWait;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.support.ui.Wait;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
 
@@ -122,7 +122,7 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public void clickMetalakeLink(String name) {
-    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
+    String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
     metalakeLink.click();
     WebDriverWait wait = new WebDriverWait(driver, 10);
