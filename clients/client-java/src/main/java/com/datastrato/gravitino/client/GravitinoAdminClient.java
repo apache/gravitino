@@ -157,19 +157,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     }
   }
 
-  /** Closes the GravitinoClient and releases any underlying resources. */
-  @Override
-  public void close() {
-    if (restClient != null) {
-      try {
-        restClient.close();
-      } catch (Exception e) {
-        // Swallow the exception
-        LOG.warn("Failed to close the HTTP REST client", e);
-      }
-    }
-  }
-
   /**
    * Creates a new builder for constructing a GravitinoClient.
    *
