@@ -17,6 +17,7 @@ import com.datastrato.gravitino.rel.types.Types.FixedCharType;
 import com.datastrato.gravitino.rel.types.Types.FloatType;
 import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.datastrato.gravitino.rel.types.Types.LongType;
+import com.datastrato.gravitino.rel.types.Types.NullType;
 import com.datastrato.gravitino.rel.types.Types.ShortType;
 import com.datastrato.gravitino.rel.types.Types.StringType;
 import com.datastrato.gravitino.rel.types.Types.TimestampType;
@@ -38,7 +39,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 public class TestSparkTypeConverter {
 
   private HashMap<Type, DataType> gravitinoToSparkTypeMapper = new HashMap<>();
-  private Set<Type> notSupportGravitinoTypes = ImmutableSet.of(Types.NullType.get());
+  private Set<Type> notSupportGravitinoTypes = ImmutableSet.of(NullType.get());
 
   private Set<DataType> notSupportSparkTypes = ImmutableSet.of();
 
