@@ -56,8 +56,9 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   @Order(2)
   public void testViewMetalakeDetails() {
-    metalakePage.clickViewMetalakeBtn("metalake_name");
-    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails());
+    String name = "metalake_name";
+    metalakePage.clickViewMetalakeBtn(name);
+    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(name));
   }
 
   @Test
@@ -80,9 +81,9 @@ public class MetalakePageTest extends AbstractWebIT {
   @Test
   @Order(5)
   public void testCreateMultipleMetalakes() {
-    int towPagesCount = 11;
+    int twoPagesCount = 11;
 
-    for (int i = 0; i < towPagesCount; i++) {
+    for (int i = 0; i < twoPagesCount; i++) {
       String name = "metalake_" + (i + 1);
       createMetalakeAction(true, name);
     }

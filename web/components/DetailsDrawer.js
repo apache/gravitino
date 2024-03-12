@@ -68,7 +68,7 @@ const DetailsDrawer = props => {
 
   return (
     <Drawer
-      data-refer='metalake-details-drawer'
+      data-refer='details-drawer'
       open={openDrawer}
       anchor='right'
       variant='temporary'
@@ -112,6 +112,7 @@ const DetailsDrawer = props => {
               sx={{
                 borderBottom: theme => `1px solid ${theme.palette.divider}`
               }}
+              data-refer='details-title'
             >
               {drawerData.name}
             </Typography>

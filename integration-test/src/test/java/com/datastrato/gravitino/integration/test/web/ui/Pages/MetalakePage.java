@@ -44,8 +44,11 @@ public class MetalakePage extends AbstractWebIT {
   @FindBy(xpath = "//button[@data-refer='confirm-delete']")
   public WebElement confirmDeleteBtn;
 
-  @FindBy(xpath = "//div[@data-refer='metalake-details-drawer']")
-  public WebElement metalakeDetailsDrawer;
+  @FindBy(xpath = "//div[@data-refer='details-drawer']")
+  public WebElement detailsDrawer;
+
+  @FindBy(xpath = "//h6[@data-refer='details-title']")
+  public WebElement detailsTitle;
 
   @FindBy(xpath = "//button[@data-refer='close-metalake-details-btn']")
   public WebElement closeMetalakeDetailsBtn;
@@ -192,13 +195,18 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyShowMetalakeDetails() {
+  public boolean verifyShowMetalakeDetails(String name) {
     try {
-      metalakeDetailsDrawer.isDisplayed();
-      String drawerVisible = metalakeDetailsDrawer.getCssValue("visibility");
-
       // Check the drawer css property value
-      return Objects.equals(drawerVisible, "visible");
+      detailsDrawer.isDisplayed();
+      String drawerVisible = detailsDrawer.getCssValue("visibility");
+      boolean isVisible = Objects.equals(drawerVisible, "visible");
+
+      // Check the created metalake name
+      String drawerTitle = detailsTitle.getText();
+      boolean isText = Objects.equals(drawerTitle, name);
+
+      return isVisible && isText;
     } catch (Exception e) {
       return false;
     } finally {
@@ -282,7 +290,7 @@ public class MetalakePage extends AbstractWebIT {
       return false;
     } finally {
       // Back to homepage
-      String xpath = "//button[@data-refer='back-home-btn']";
+      String xpath = "//*[@data-refer='back-home-btn']";
       WebElement backHomeBtn = driver.findElement(By.xpath(xpath));
       backHomeBtn.click();
     }
