@@ -326,9 +326,7 @@ public class SparkIT extends SparkEnvIT {
     String oldColumnName = "col1";
     String newColumnName = "col2";
 
-    sql(
-        String.format(
-            "ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
     sql(
         String.format(
             "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
