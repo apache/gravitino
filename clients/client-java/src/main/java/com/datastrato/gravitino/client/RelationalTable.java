@@ -17,7 +17,6 @@ import com.datastrato.gravitino.dto.responses.PartitionResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -33,7 +32,7 @@ import javax.annotation.Nullable;
 import lombok.SneakyThrows;
 
 /** Represents a relational table. */
-public class RelationalTable implements Table, SupportsPartitions {
+public class RelationalTable implements Table {
 
   /**
    * Creates a new RelationalTable.
@@ -134,7 +133,6 @@ public class RelationalTable implements Table, SupportsPartitions {
   }
 
   /** @return The partition names of the table. */
-  @Override
   public String[] listPartitionNames() {
     PartitionNameListResponse resp =
         restClient.get(
@@ -160,7 +158,6 @@ public class RelationalTable implements Table, SupportsPartitions {
   }
 
   /** @return The partitions of the table. */
-  @Override
   public Partition[] listPartitions() {
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
@@ -181,7 +178,6 @@ public class RelationalTable implements Table, SupportsPartitions {
    * @return the partition with the given name
    * @throws NoSuchPartitionException if the partition does not exist, throws this exception.
    */
-  @Override
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
     PartitionResponse resp =
         restClient.get(
@@ -199,7 +195,6 @@ public class RelationalTable implements Table, SupportsPartitions {
    * @return The added partition.
    * @throws PartitionAlreadyExistsException If the partition already exists, throws this exception.
    */
-  @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
     AddPartitionsRequest req = new AddPartitionsRequest(new PartitionDTO[] {toDTO(partition)});
     req.validate();
@@ -222,19 +217,8 @@ public class RelationalTable implements Table, SupportsPartitions {
    * @param partitionName The identifier of the partition.
    * @return true if the partition is dropped, false otherwise.
    */
-  @Override
   public boolean dropPartition(String partitionName) {
     throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Returns the partitioning strategy of the table.
-   *
-   * @return the partitioning strategy of the table.
-   */
-  @Override
-  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
-    return this;
   }
 
   /**
