@@ -119,9 +119,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                           }
                         } catch (IOException e) {
                           Logger.error(
-                              String.format(
-                                  "Failed to close the file system for fileset: %s",
-                                  removedCache.getKey().toString()));
+                              "Failed to close the file system for fileset: {}",
+                              removedCache.getKey());
                         }
                       }
                     })
