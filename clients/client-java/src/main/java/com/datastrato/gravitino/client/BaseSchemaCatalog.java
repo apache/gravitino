@@ -65,9 +65,10 @@ abstract class BaseSchemaCatalog extends CatalogDTO {
    */
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
 
+    Namespace namespaceForSchema = Namespace.ofSchema(namespace.level(0), this.name());
     EntityListResponse resp =
         restClient.get(
-            formatSchemaRequestPath(namespace),
+            formatSchemaRequestPath(namespaceForSchema),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());

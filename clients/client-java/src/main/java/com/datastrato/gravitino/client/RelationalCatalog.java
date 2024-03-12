@@ -291,7 +291,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     @Override
     public RelationalCatalog build() {
-      Namespace.checkMetalake(namespace);
+      Namespace.checkCatalog(namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");

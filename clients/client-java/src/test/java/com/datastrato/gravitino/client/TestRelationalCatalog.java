@@ -53,7 +53,6 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -136,7 +135,7 @@ public class TestRelationalCatalog extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {schema1, schema2});
     buildMockResource(Method.GET, schemaPath, null, resp, SC_OK);
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas(schemaNs);
+    NameIdentifier[] schemas = ((BaseSchemaCatalog) catalog).listSchemas();
 
     Assertions.assertEquals(2, schemas.length);
     Assertions.assertEquals(schema1, schemas[0]);
@@ -145,30 +144,32 @@ public class TestRelationalCatalog extends TestBase {
     // Test return empty schema list
     EntityListResponse emptyResp = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, schemaPath, null, emptyResp, SC_OK);
-    NameIdentifier[] emptySchemas = catalog.asSchemas().listSchemas(schemaNs);
+    NameIdentifier[] emptySchemas = ((BaseSchemaCatalog) catalog).listSchemas();
     Assertions.assertEquals(0, emptySchemas.length);
 
     // Test throw NoSuchCatalogException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NoSuchCatalogException.class.getSimpleName(), "catalog not found");
     buildMockResource(Method.GET, schemaPath, null, errorResp, SC_NOT_FOUND);
-    SupportsSchemas supportSchemas = catalog.asSchemas();
+
     Throwable ex =
         Assertions.assertThrows(
-            NoSuchCatalogException.class, () -> supportSchemas.listSchemas(schemaNs));
+            NoSuchCatalogException.class, () -> ((BaseSchemaCatalog) catalog).listSchemas());
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw RuntimeException
     ErrorResponse errorResp1 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, schemaPath, null, errorResp1, SC_INTERNAL_SERVER_ERROR);
     Throwable ex1 =
-        Assertions.assertThrows(RuntimeException.class, () -> supportSchemas.listSchemas(schemaNs));
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ((BaseSchemaCatalog) catalog).listSchemas());
     Assertions.assertTrue(ex1.getMessage().contains("internal error"));
 
     // Test throw unparsed system error
     buildMockResource(Method.GET, schemaPath, null, "unparsed error", SC_BAD_REQUEST);
     Throwable ex2 =
-        Assertions.assertThrows(RESTException.class, () -> supportSchemas.listSchemas(schemaNs));
+        Assertions.assertThrows(
+            RESTException.class, () -> ((BaseSchemaCatalog) catalog).listSchemas());
     Assertions.assertTrue(ex2.getMessage().contains("unparsed error"));
   }
 
@@ -183,7 +184,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
     Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+        ((BaseSchemaCatalog) catalog).createSchema("schema1", "comment", Collections.emptyMap());
     Assertions.assertEquals("schema1", createdSchema.name());
     Assertions.assertEquals("comment", createdSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), createdSchema.properties());
@@ -193,12 +194,12 @@ public class TestRelationalCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchCatalogException.class.getSimpleName(), "catalog not found");
     buildMockResource(Method.POST, schemaPath, req, errorResp, SC_NOT_FOUND);
 
-    SupportsSchemas schemas = catalog.asSchemas();
+    BaseSchemaCatalog schemas = (BaseSchemaCatalog) catalog;
     Map<String, String> emptyMap = Collections.emptyMap();
     Throwable ex =
         Assertions.assertThrows(
             NoSuchCatalogException.class,
-            () -> schemas.createSchema(schemaId, "comment", emptyMap));
+            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw SchemaAlreadyExistsException
@@ -210,7 +211,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
-            () -> schemas.createSchema(schemaId, "comment", emptyMap));
+            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("schema already exists"));
   }
 
@@ -227,7 +228,7 @@ public class TestRelationalCatalog extends TestBase {
     SchemaResponse resp = new SchemaResponse(schema);
     buildMockResource(Method.GET, schemaPath, null, resp, SC_OK);
 
-    Schema loadedSchema = catalog.asSchemas().loadSchema(schemaId);
+    Schema loadedSchema = ((BaseSchemaCatalog) catalog).loadSchema(schemaId.name());
     Assertions.assertEquals("schema1", loadedSchema.name());
     Assertions.assertEquals("comment", loadedSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), loadedSchema.properties());
@@ -237,9 +238,10 @@ public class TestRelationalCatalog extends TestBase {
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
     buildMockResource(Method.GET, schemaPath, null, errorResp1, SC_NOT_FOUND);
 
-    SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex1 =
-        Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId));
+        Assertions.assertThrows(
+            NoSuchSchemaException.class,
+            () -> ((BaseSchemaCatalog) catalog).loadSchema(schemaId.name()));
     Assertions.assertTrue(ex1.getMessage().contains("schema not found"));
   }
 
@@ -272,14 +274,14 @@ public class TestRelationalCatalog extends TestBase {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, schemaPath, null, resp, SC_OK);
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
+    Assertions.assertTrue(((BaseSchemaCatalog) catalog).dropSchema(ident.name(), false));
 
     // Test with cascade to ture
     DropResponse resp1 = new DropResponse(true);
     buildMockResource(
         Method.DELETE, schemaPath, ImmutableMap.of("cascade", "true"), null, resp1, SC_OK);
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, true));
+    Assertions.assertTrue(((BaseSchemaCatalog) catalog).dropSchema(ident.name(), true));
 
     // Test throw NonEmptySchemaException
     ErrorResponse errorResp =
@@ -287,10 +289,10 @@ public class TestRelationalCatalog extends TestBase {
             NonEmptySchemaException.class.getSimpleName(), "schema is not empty");
     buildMockResource(Method.DELETE, schemaPath, null, errorResp, SC_CONFLICT);
 
-    SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex =
         Assertions.assertThrows(
-            NonEmptySchemaException.class, () -> schemas.dropSchema(ident, true));
+            NonEmptySchemaException.class,
+            () -> ((BaseSchemaCatalog) catalog).dropSchema(ident.name(), true));
 
     Assertions.assertTrue(ex.getMessage().contains("schema is not empty"));
   }
@@ -1105,7 +1107,8 @@ public class TestRelationalCatalog extends TestBase {
     SchemaResponse resp = new SchemaResponse(updatedSchema);
     buildMockResource(Method.PUT, schemaPath, updatesReq, resp, SC_OK);
 
-    Schema alteredSchema = catalog.asSchemas().alterSchema(ident, req.schemaChange());
+    Schema alteredSchema =
+        ((BaseSchemaCatalog) catalog).alterSchema(ident.name(), req.schemaChange());
     Assertions.assertEquals(updatedSchema.name(), alteredSchema.name());
     Assertions.assertEquals(updatedSchema.comment(), alteredSchema.comment());
     Assertions.assertEquals(updatedSchema.properties(), alteredSchema.properties());
