@@ -11,9 +11,9 @@ import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PRE
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.rel.Column;
