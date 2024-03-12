@@ -52,8 +52,8 @@ public class MetalakePage extends AbstractWebIT {
   @FindBy(xpath = "//h6[@data-refer='details-title']")
   public WebElement detailsTitle;
 
-  @FindBy(xpath = "//button[@data-refer='close-metalake-details-btn']")
-  public WebElement closeMetalakeDetailsBtn;
+  @FindBy(xpath = "//button[@data-refer='close-details-btn']")
+  public WebElement closeDetailsBtn;
 
   @FindBy(xpath = "//button[@data-refer='add-metalake-props']")
   public WebElement addMetalakePropsBtn;
@@ -216,7 +216,7 @@ public class MetalakePage extends AbstractWebIT {
     } catch (Exception e) {
       return false;
     } finally {
-      closeMetalakeDetailsBtn.click();
+      closeDetailsBtn.click();
     }
   }
 
