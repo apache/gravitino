@@ -9,10 +9,10 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -35,7 +35,7 @@ public class TestMetalakeManager {
   public static void setUp() {
     config = new Config(false) {};
 
-    entityStore = new TestEntityStore.InMemoryEntityStore();
+    entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
