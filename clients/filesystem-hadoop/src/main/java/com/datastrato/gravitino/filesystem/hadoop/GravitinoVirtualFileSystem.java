@@ -52,7 +52,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     if (!name.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       throw new IllegalArgumentException(
           String.format(
-              "Unsupported file system scheme: %s for %s: ",
+              "Unsupported file system scheme: %s for %s.",
               name.getScheme(), GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME));
     }
 
@@ -277,7 +277,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     if (!originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
       throw new InvalidPathException(
           String.format(
-              "Path %s doesn't start with the scheme \"%s\"",
+              "Path %s doesn't start with the scheme \"%s\".",
               path, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
     }
     try {
@@ -305,7 +305,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     String filePath = fileStatus.getPath().toString();
     if (!filePath.startsWith(fromPrefix)) {
       throw new InvalidPathException(
-          String.format("Path %s doesn't start with prefix \"%s\"", filePath, fromPrefix));
+          String.format("Path %s doesn't start with prefix \"%s\".", filePath, fromPrefix));
     }
     String proxyPath = filePath.replaceFirst(fromPrefix, toPrefix);
     Path path = new Path(proxyPath);
@@ -313,20 +313,20 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  private NameIdentifier extractIdentifier(URI uri) {
+  private NameIdentifier extractIdentifier(URI proxyUri) {
     Preconditions.checkArgument(
-        uri.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme \"%s\"");
+        proxyUri.toString().startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
+        "Path %s doesn't start with scheme \"%s\".");
 
-    if (StringUtils.isBlank(uri.toString())) {
-      throw new InvalidPathException("Uri which need be extracted cannot be null or empty");
+    if (StringUtils.isBlank(proxyUri.toString())) {
+      throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
     }
 
     // remove first '/' symbol with empty string
     String[] reservedDirs =
-        Arrays.stream(uri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
+        Arrays.stream(proxyUri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
     Preconditions.checkArgument(
-        reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", uri);
+        reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", proxyUri);
 
     return NameIdentifier.ofFileset(
         metalake.name(), reservedDirs[0], reservedDirs[1], reservedDirs[2]);
