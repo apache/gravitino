@@ -315,6 +315,28 @@ public class SparkIT extends SparkEnvIT {
     checkTableColumns(tableName, updateColumns, getTableInfo(tableName));
   }
 
+  @Test
+  void testAlterTableRenameColumn() {
+    String tableName = "test_rename_column";
+    dropTableIfExists(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    String oldColumnName = "col1";
+    String newColumnName = "col2";
+
+    sql(
+        String.format(
+            "ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
+    sql(
+        String.format(
+            "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+    ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
+    renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
+    checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
+  }
+
   private void checkTableColumns(
       String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
