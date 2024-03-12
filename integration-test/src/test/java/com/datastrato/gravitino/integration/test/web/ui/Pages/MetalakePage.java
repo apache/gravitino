@@ -149,14 +149,10 @@ public class MetalakePage extends AbstractWebIT {
         WebElement ele = findElementByLink(name);
         Wait<WebDriver> wait =
             new FluentWait<>(driver)
-                .withTimeout(Duration.ofSeconds(2))
+                .withTimeout(Duration.ofSeconds(10))
                 .pollingEvery(Duration.ofMillis(300))
                 .ignoring(ElementNotInteractableException.class);
-        wait.until(
-            d -> {
-              ele.isDisplayed();
-              return true;
-            });
+        wait.until(d -> ele.isDisplayed());
         Thread.sleep(sleepTimeMillis);
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
@@ -273,14 +269,10 @@ public class MetalakePage extends AbstractWebIT {
 
       Wait<WebDriver> wait =
           new FluentWait<>(driver)
-              .withTimeout(Duration.ofSeconds(2))
+              .withTimeout(Duration.ofSeconds(10))
               .pollingEvery(Duration.ofMillis(300))
               .ignoring(ElementNotInteractableException.class);
-      wait.until(
-          d -> {
-            nameLink.isDisplayed();
-            return true;
-          });
+      wait.until(d -> nameLink.isDisplayed());
 
       String url = driver.getCurrentUrl();
       boolean isUrl = url.contains("/ui/metalakes?metalake=" + name);

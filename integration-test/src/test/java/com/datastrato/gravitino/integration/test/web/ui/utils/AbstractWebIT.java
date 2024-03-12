@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 public class AbstractWebIT extends AbstractIT {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
   protected static WebDriver driver;
+
+  // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 10;
 
   @BeforeAll
