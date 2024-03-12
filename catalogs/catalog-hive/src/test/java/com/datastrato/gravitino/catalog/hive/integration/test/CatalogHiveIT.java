@@ -126,9 +126,18 @@ public class CatalogHiveIT extends AbstractIT {
   private static SparkSession sparkSession;
   private static FileSystem hdfs;
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
-  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
-  private static final String INSERT_WITH_PARTITION_TEMPLATE =
-      "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)";
+
+  private static String getInsertWithoutPartitionSql(
+      String dbName, String tableName, String values) {
+    return String.format("INSERT INTO %s.%s VALUES (%s)", dbName, tableName, values);
+  }
+
+  private static String getInsertWithPartitionSql(
+      String dbName, String tableName, String partitionExpressions, String values) {
+    return String.format(
+        "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)",
+        dbName, tableName, partitionExpressions, values);
+  }
 
   private static final Map<String, String> typeConstant =
       ImmutableMap.of(
@@ -292,15 +301,13 @@ public class CatalogHiveIT extends AbstractIT {
             .map(Object::toString)
             .collect(Collectors.joining(","));
     if (table.getPartitionKeys().isEmpty()) {
-      sparkSession.sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, dbName, tableName, values));
+      sparkSession.sql(getInsertWithoutPartitionSql(dbName, tableName, values));
     } else {
       String partitionExpressions =
           table.getPartitionKeys().stream()
               .map(f -> f.getName() + "=" + typeConstant.get(f.getType()))
               .collect(Collectors.joining(","));
-      sparkSession.sql(
-          String.format(
-              INSERT_WITH_PARTITION_TEMPLATE, dbName, tableName, partitionExpressions, values));
+      sparkSession.sql(getInsertWithPartitionSql(dbName, tableName, partitionExpressions, values));
     }
     Assertions.assertEquals(
         count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
