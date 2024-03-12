@@ -21,7 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Gravitino Client for an user to interacte with the Gravitino API, allowing the client to list,
+ * Gravitino Client for an user to interact with the Gravitino API, allowing the client to list,
  * load, create, and alter Catalog.
  *
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
@@ -31,20 +31,20 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
-  private final String metalake_name;
+  private final String metalakeName;
 
-  private GravitinoMetaLake metaLake = null;
+  private volatile GravitinoMetaLake metaLake = null;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
-   * @param metalake_name The specified metalake name.
+   * @param metalakeName The specified metalake name.
    * @param authDataProvider The provider of the data which is used for authentication.
    */
-  private GravitinoClient(String uri, String metalake_name, AuthDataProvider authDataProvider) {
+  private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
     super(uri, authDataProvider);
-    this.metalake_name = metalake_name;
+    this.metalakeName = metalakeName;
   }
 
   /**
@@ -57,7 +57,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     if (this.metaLake == null) {
       synchronized (GravitinoClient.class) {
         if (this.metaLake == null) {
-          this.metaLake = loadMetalake(NameIdentifier.of(metalake_name));
+          this.metaLake = loadMetalake(NameIdentifier.of(metalakeName));
         }
       }
     }
