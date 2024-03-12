@@ -20,7 +20,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,13 +34,16 @@ import org.slf4j.LoggerFactory;
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO {
   private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
+  /** the namespace of current catalog */
+  protected final Namespace namespace;
 
   BaseSchemaCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -51,23 +53,17 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
-  }
-
-  @Override
-  public SupportsSchemas asSchemas() throws UnsupportedOperationException {
-    return this;
+    Namespace.checkCatalog(namespace);
+    this.namespace = namespace;
   }
 
   /**
-   * List all the schemas under the given catalog namespace.
+   * List all the schemas under the current catalog.
    *
-   * @param namespace The namespace of the catalog.
    * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
-  @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    Namespace.checkSchema(namespace);
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
 
     EntityListResponse resp =
         restClient.get(
@@ -81,20 +77,19 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   }
 
   /**
-   * Create a new schema with specified identifier, comment and metadata.
+   * Create a new schema with specified name, comment and metadata.
    *
-   * @param ident The name identifier of the schema.
+   * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
    * @return The created {@link Schema}.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
    */
-  @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    NameIdentifier ident = NameIdentifier.ofSchema(namespace.level(0), this.name(), schemaName);
     NameIdentifier.checkSchema(ident);
-
     SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, properties);
     req.validate();
 
@@ -113,12 +108,13 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   /**
    * Load the schema with specified identifier.
    *
-   * @param ident The name identifier of the schema.
+   * @param schemaName The name of the schema.
    * @return The {@link Schema} with specified identifier.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
    */
-  @Override
-  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+  public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
+
+    NameIdentifier ident = NameIdentifier.ofSchema(namespace.level(0), this.name(), schemaName);
     NameIdentifier.checkSchema(ident);
 
     SchemaResponse resp =
@@ -133,16 +129,16 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   }
 
   /**
-   * Alter the schema with specified identifier by applying the changes.
+   * Alter the schema with specified schema name by applying the changes.
    *
-   * @param ident The name identifier of the schema.
+   * @param schemaName The name of the schema.
    * @param changes The metadata changes to apply.
    * @return The altered {@link Schema}.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
    */
-  @Override
-  public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
+  public Schema alterSchema(String schemaName, SchemaChange... changes)
       throws NoSuchSchemaException {
+    NameIdentifier ident = NameIdentifier.ofSchema(namespace.level(0), this.name(), schemaName);
     NameIdentifier.checkSchema(ident);
 
     List<SchemaUpdateRequest> reqs =
@@ -165,15 +161,15 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   }
 
   /**
-   * Drop the schema with specified identifier.
+   * Drop the schema with specified name.
    *
-   * @param ident The name identifier of the schema.
+   * @param schemaName The name of the schema.
    * @param cascade Whether to drop all the tables under the schema.
    * @return true if the schema is dropped successfully, false otherwise.
    * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
    */
-  @Override
-  public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    NameIdentifier ident = NameIdentifier.ofSchema(namespace.level(0), this.name(), schemaName);
     NameIdentifier.checkSchema(ident);
 
     try {

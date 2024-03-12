@@ -50,6 +50,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -57,7 +58,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, provider, comment, properties, auditDTO, restClient);
+    super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
   }
 
   @Override
@@ -273,6 +274,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     /** The REST client to send the requests. */
     private RESTClient restClient;
 
+    /** The namespace of the catalog */
+    private Namespace namespace;
+
     private Builder() {}
 
     Builder withRestClient(RESTClient restClient) {
@@ -280,15 +284,22 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       return this;
     }
 
+    Builder withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return this;
+    }
+
     @Override
     public RelationalCatalog build() {
+      Namespace.checkMetalake(namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new RelationalCatalog(name, type, provider, comment, properties, audit, restClient);
+      return new RelationalCatalog(
+          namespace, name, type, provider, comment, properties, audit, restClient);
     }
   }
 }

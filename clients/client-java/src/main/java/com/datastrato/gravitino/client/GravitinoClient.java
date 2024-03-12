@@ -9,7 +9,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -25,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
  * API.
  */
-public class GravitinoClient extends GravitinoClientBase implements SupportsCatalogs {
+public class GravitinoClient extends GravitinoClientBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
@@ -54,36 +53,85 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     return metaLake;
   }
 
-  @Override
-  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetaLake().listCatalogs(namespace);
+  /**
+   * List all catalogs in the metalake.
+   *
+   * @return The list of catalog's name identifiers.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   */
+  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+    return getMetaLake().listCatalogs(Namespace.ofCatalog(this.getMetaLake().name()));
   }
 
-  @Override
-  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return getMetaLake().loadCatalog(ident);
+  /**
+   * Load a catalog by its identifier.
+   *
+   * @param catalogName the name of the catalog.
+   * @return The catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
+    return getMetaLake().loadCatalog(ofCatalogIdent(catalogName));
   }
 
-  @Override
+  /**
+   * Create a catalog with specified name.
+   *
+   * <p>The parameter "provider" is a short name of the catalog, used to tell Gravitino which
+   * catalog should be created.
+   *
+   * @param catalogName the name of the catalog.
+   * @param type the type of the catalog.
+   * @param comment the comment of the catalog.
+   * @param provider the provider of the catalog.
+   * @param properties the properties of the catalog.
+   * @return The created catalog.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   * @throws CatalogAlreadyExistsException If the catalog already exists.
+   */
   public Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetaLake().createCatalog(ident, type, provider, comment, properties);
+    return getMetaLake()
+        .createCatalog(ofCatalogIdent(catalogName), type, provider, comment, properties);
   }
 
-  @Override
-  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  /**
+   * Alter a catalog with specified identifier.
+   *
+   * @param catalogName the name of the catalog.
+   * @param changes the changes to apply to the catalog.
+   * @return The altered catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws IllegalArgumentException If the changes cannot be applied to the catalog.
+   */
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return getMetaLake().alterCatalog(ident, changes);
+    return getMetaLake().alterCatalog(ofCatalogIdent(catalogName), changes);
   }
 
-  @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    return getMetaLake().dropCatalog(ident);
+  /**
+   * Drop a catalog with specified identifier.
+   *
+   * @param catalogName the name of the catalog.
+   * @return True if the catalog was dropped, false otherwise.
+   */
+  public boolean dropCatalog(String catalogName) {
+    return getMetaLake().dropCatalog(ofCatalogIdent(catalogName));
+  }
+
+  /**
+   * Get a catalog identifier from its name.
+   *
+   * @param catalogName the name of the catalog.
+   * @return The {@link NameIdentifier} of the catalog.
+   */
+  public NameIdentifier ofCatalogIdent(String catalogName) {
+    return NameIdentifier.ofCatalog(this.getMetaLake().name(), catalogName);
   }
 
   /**

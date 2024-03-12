@@ -94,7 +94,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -132,7 +132,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -165,7 +165,7 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
