@@ -124,9 +124,9 @@ public class MetalakePage extends AbstractWebIT {
   public void clickMetalakeLink(String name) {
     String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
-    metalakeLink.click();
     WebDriverWait wait = new WebDriverWait(driver, 10);
     wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+    metalakeLink.click();
   }
 
   public void setMetalakeProps(int index, String key, String value) {
