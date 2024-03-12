@@ -68,6 +68,21 @@ public abstract class GravitinoClientBase implements Closeable {
   }
 
   /**
+   * Check if a metalake exists.
+   *
+   * @param ident The identifier of the metalake.
+   * @return True if the metalake exists, false otherwise.
+   */
+  public boolean metalakeExists(NameIdentifier ident) {
+    try {
+      loadMetalake(ident);
+      return true;
+    } catch (NoSuchMetalakeException e) {
+      return false;
+    }
+  }
+
+  /**
    * Retrieves the version of the Gravitino API.
    *
    * @return A GravitinoVersion instance representing the version of the Gravitino API.

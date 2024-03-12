@@ -39,7 +39,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO {
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
-  /** the namespace of current catalog */
+  /** The namespace of current catalog, which is the metalake name. */
   protected final Namespace namespace;
 
   BaseSchemaCatalog(

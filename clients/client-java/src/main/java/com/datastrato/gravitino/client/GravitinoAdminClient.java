@@ -7,7 +7,6 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
@@ -31,7 +30,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
-public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
+public class GravitinoAdminClient extends GravitinoClientBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
 
@@ -50,7 +49,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @return An array of GravitinoMetaLake objects representing the Metalakes.
    */
-  @Override
   public GravitinoMetaLake[] listMetalakes() {
     MetalakeListResponse resp =
         restClient.get(
@@ -75,7 +73,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @throws MetalakeAlreadyExistsException If a Metalake with the specified identifier already
    *     exists.
    */
-  @Override
   public GravitinoMetaLake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
@@ -105,7 +102,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    * @throws IllegalArgumentException If the provided changes are invalid or not applicable.
    */
-  @Override
   public GravitinoMetaLake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     NameIdentifier.checkMetalake(ident);
@@ -135,7 +131,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param ident The identifier of the Metalake to be dropped.
    * @return True if the Metalake was successfully dropped, false otherwise.
    */
-  @Override
   public boolean dropMetalake(NameIdentifier ident) {
     NameIdentifier.checkMetalake(ident);
 
