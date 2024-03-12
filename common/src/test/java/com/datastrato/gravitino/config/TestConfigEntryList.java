@@ -41,9 +41,7 @@ public class TestConfigEntryList {
             .stringConf()
             .checkValue(value -> value == null, "error")
             .toSequence()
-            .checkValue(
-                valueList -> valueList.stream().allMatch(element -> element == "test-string"),
-                "error")
+            .checkValue(valueList -> valueList.stream().allMatch("test-string"::equals), "error")
             .createWithDefault(Lists.newArrayList("test-string", "test-string", "test-string"));
     List<String> valueList = testConf.readFrom(configMapEmpty);
     Assertions.assertEquals(null, configMapEmpty.get("gravitino.test.string.list"));

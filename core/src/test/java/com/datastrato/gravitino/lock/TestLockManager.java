@@ -649,4 +649,11 @@ public class TestLockManager {
       service.take().get();
     }
   }
+
+  @Test
+  public void testMockRootTreeLock() {
+    LockManager lockManager = new LockManager(getConfig());
+    lockManager.createTreeLock(NameIdentifier.of("/"));
+    Assertions.assertEquals(2L, lockManager.totalNodeCount.get(), "Should have 2 nodes");
+  }
 }
