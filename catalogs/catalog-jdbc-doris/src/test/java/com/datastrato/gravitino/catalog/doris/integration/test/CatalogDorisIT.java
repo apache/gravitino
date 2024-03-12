@@ -2,9 +2,8 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.catalog.jdbc.doris;
+package com.datastrato.gravitino.catalog.doris.integration.test;
 
-import static com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT.assertColumn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.Catalog;
@@ -15,12 +14,12 @@ import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
@@ -43,7 +42,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.math.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -84,12 +82,10 @@ public class CatalogDorisIT extends AbstractIT {
 
   protected Catalog catalog;
 
-  protected final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
-
   @BeforeAll
   public void startup() throws IOException {
 
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
@@ -105,13 +101,23 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    AbstractIT.client.dropMetalake(NameIdentifier.of(metalakeName));
   }
 
   @AfterEach
   private void resetSchema() {
     clearTableAndSchema();
     createSchema();
+  }
+
+  private static void waitForDorisOperation() {
+    // TODO: use a better way to wait for the operation to complete
+    // see: https://doris.apache.org/docs/1.2/advanced/alter-table/schema-change/
+    try {
+      Thread.sleep(2000);
+    } catch (InterruptedException e) {
+      // do nothing
+    }
   }
 
   private void clearTableAndSchema() {
@@ -124,12 +130,14 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
+    GravitinoMetaLake[] gravitinoMetaLakes = AbstractIT.client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
 
     GravitinoMetaLake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        AbstractIT.client.createMetalake(
+            NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+    GravitinoMetaLake loadMetalake =
+        AbstractIT.client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -327,7 +335,7 @@ public class CatalogDorisIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], createdTable.columns()[i]);
+      AbstractIT.assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     // test load table
@@ -341,7 +349,7 @@ public class CatalogDorisIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], loadTable.columns()[i]);
+      AbstractIT.assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -374,11 +382,7 @@ public class CatalogDorisIT extends AbstractIT {
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
 
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-      // do nothing
-    }
+    waitForDorisOperation();
     Table table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Index[] indexes = table.index();
@@ -391,11 +395,7 @@ public class CatalogDorisIT extends AbstractIT {
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
 
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-      // do nothing
-    }
+    waitForDorisOperation();
 
     table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));

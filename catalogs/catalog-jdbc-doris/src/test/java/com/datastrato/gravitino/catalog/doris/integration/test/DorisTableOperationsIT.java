@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.catalog.jdbc.doris;
+package com.datastrato.gravitino.catalog.doris.integration.test;
 
 import com.datastrato.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.doris.converter.DorisExceptionConverter;
@@ -13,10 +13,10 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
