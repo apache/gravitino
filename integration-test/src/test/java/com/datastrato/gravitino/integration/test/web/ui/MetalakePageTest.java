@@ -17,25 +17,15 @@ public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
 
   // Create a metalake by name, set the default comment and properties.
-  public void createMetalakeAction(boolean valid, String name) {
+  public void createMetalakeAction(String name) {
     metalakePage.createMetalakeBtn.click();
-    String invalidPrefix = "1!@#$";
-    String concatName = valid ? name : invalidPrefix + name;
-    metalakePage.setMetalakeNameField(concatName);
+    metalakePage.setMetalakeNameField(name);
     metalakePage.setMetalakeCommentField("metalake comment");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(0, "key1", "value1");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(1, "key2", "value2");
-
-    try {
-      if (!valid && metalakePage.checkIsErrorName()) {
-        metalakePage.setMetalakeNameField(name);
-      }
-      metalakePage.submitHandleMetalakeBtn.click();
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
+    metalakePage.submitHandleMetalakeBtn.click();
   }
 
   @Test
@@ -49,7 +39,7 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(1)
   public void testCreateMetalake() {
     String name = "metalake_name";
-    createMetalakeAction(false, name);
+    createMetalakeAction(name);
     Assertions.assertTrue(metalakePage.verifyCreateMetalake(name));
   }
 
@@ -85,7 +75,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
     for (int i = 0; i < twoPagesCount; i++) {
       String name = "metalake_" + (i + 1);
-      createMetalakeAction(true, name);
+      createMetalakeAction(name);
     }
 
     Assertions.assertTrue(metalakePage.verifyChangePagination());
@@ -95,8 +85,18 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(6)
   public void testQueryMetalake() {
     String name = "query";
-    createMetalakeAction(true, name);
+    createMetalakeAction(name);
     Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
+  }
+
+  @Test
+  @Order(7)
+  public void testCreateInvalidMetalake() {
+    String name = "1!@#$";
+    metalakePage.createMetalakeBtn.click();
+    metalakePage.setMetalakeNameField(name);
+    metalakePage.submitHandleMetalakeBtn.click();
+    Assertions.assertTrue(metalakePage.checkIsErrorName());
   }
 
   //  https://github.com/datastrato/gravitino/issues/2512

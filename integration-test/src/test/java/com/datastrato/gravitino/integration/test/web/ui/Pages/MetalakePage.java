@@ -67,6 +67,7 @@ public class MetalakePage extends AbstractWebIT {
     return driver.findElement(By.xpath(xpath));
   }
 
+  // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
   //  public WebElement findElementByLink(String name) {
   //    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
   //
@@ -145,6 +146,7 @@ public class MetalakePage extends AbstractWebIT {
     return !errorText.isEmpty();
   }
 
+  // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
   //  public void waitLinkElementDisplayed(String name) {
   //    int retry = 0;
   //    int sleepTimeMillis = 1_000;
@@ -265,6 +267,7 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
+  // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
   //  public boolean verifyLinkToCatalogsPage(String name) {
   //    int sleepTimeMillis = 1_000;
   //    try {
