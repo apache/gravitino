@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.spark.connector;
 
 import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rel.types.Types.BinaryType;
 import com.datastrato.gravitino.rel.types.Types.BooleanType;
 import com.datastrato.gravitino.rel.types.Types.ByteType;
@@ -45,22 +44,21 @@ public class TestSparkTypeConverter {
 
   @BeforeAll
   void init() {
-    gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
-    gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
-    gravitinoToSparkTypeMapper.put(StringType.get(), DataTypes.StringType);
-    gravitinoToSparkTypeMapper.put(FloatType.get(), DataTypes.FloatType);
-    gravitinoToSparkTypeMapper.put(DoubleType.get(), DataTypes.DoubleType);
     gravitinoToSparkTypeMapper.put(ByteType.get(), DataTypes.ByteType);
     gravitinoToSparkTypeMapper.put(ShortType.get(), DataTypes.ShortType);
+    gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
     gravitinoToSparkTypeMapper.put(LongType.get(), DataTypes.LongType);
+    gravitinoToSparkTypeMapper.put(FloatType.get(), DataTypes.FloatType);
+    gravitinoToSparkTypeMapper.put(DoubleType.get(), DataTypes.DoubleType);
     gravitinoToSparkTypeMapper.put(DecimalType.of(10, 2), DataTypes.createDecimalType(10, 2));
-    gravitinoToSparkTypeMapper.put(BinaryType.get(), DataTypes.BinaryType);
-    gravitinoToSparkTypeMapper.put(FixedCharType.of(2), CharType.apply(2));
+    gravitinoToSparkTypeMapper.put(StringType.get(), DataTypes.StringType);
     gravitinoToSparkTypeMapper.put(VarCharType.of(2), VarcharType.apply(2));
+    gravitinoToSparkTypeMapper.put(FixedCharType.of(2), CharType.apply(2));
+    gravitinoToSparkTypeMapper.put(BinaryType.get(), DataTypes.BinaryType);
+    gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
     gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
     gravitinoToSparkTypeMapper.put(TimestampType.withTimeZone(), DataTypes.TimestampType);
-    gravitinoToSparkTypeMapper.put(
-        Types.TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
+    gravitinoToSparkTypeMapper.put(TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
   }
 
   @Test
