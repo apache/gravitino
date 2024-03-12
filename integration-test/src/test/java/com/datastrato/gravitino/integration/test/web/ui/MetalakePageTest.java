@@ -99,12 +99,14 @@ public class MetalakePageTest extends AbstractWebIT {
     Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
   }
 
+  //  https://github.com/datastrato/gravitino/issues/2512
   //  @Test
-  //  @Order(8)
+  //  @Order(7)
   //  public void testLinkToCatalogsPage() {
   //    String name = "a_link";
   //    createMetalakeAction(true, name);
   //    metalakePage.clickMetalakeLink(name);
+  //    metalakePage.waitLinkElementDisplayed(name);
   //    Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
   //  }
 }
