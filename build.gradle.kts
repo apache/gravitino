@@ -334,6 +334,7 @@ subprojects {
         "RandomCast",
         "RandomModInteger",
         "ReferenceEquality",
+        "StaticGuardedByInstance",
         "SelfAssignment",
         "SelfComparison",
         "SelfEquals",
