@@ -40,6 +40,25 @@ public class TestTransformTableChange {
   }
 
   @Test
+  void testTransformRenameColumn() {
+    String[] oldFiledsName = new String[] {"default_name"};
+    String newFiledName = "new_name";
+
+    TableChange.RenameColumn sparkRenameColumn =
+        (TableChange.RenameColumn) TableChange.renameColumn(oldFiledsName, newFiledName);
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkRenameColumn);
+
+    Assertions.assertTrue(
+        gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.RenameColumn);
+    com.datastrato.gravitino.rel.TableChange.RenameColumn gravitinoRenameColumn =
+        (com.datastrato.gravitino.rel.TableChange.RenameColumn) gravitinoChange;
+
+    Assertions.assertEquals(oldFiledsName, gravitinoRenameColumn.getFieldName());
+    Assertions.assertEquals(newFiledName, gravitinoRenameColumn.getNewName());
+  }
+
+  @Test
   void testTransformAddColumn() {
 
     TableChange.ColumnPosition first = TableChange.ColumnPosition.first();
