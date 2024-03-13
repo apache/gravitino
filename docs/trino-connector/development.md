@@ -72,7 +72,7 @@ The corresponding configuration files are here: [gravitino.properties](../assets
 java -jar trino-cli-429-executable.jar --server localhost:8180
 ```
 :::note
-The `trino-cli-429-executable.jar` is the Trino CLI jar file, you can download it from the [Trino release page](https://trino.io/download.html).
+The `trino-cli-429-executable.jar` is the Trino CLI jar file, you can download it from the [Trino release page](https://trino.io/docs/current/client/cli.html). **Users can use the version of the Trino CLI jar file according to the version of the Trino server.**
 :::
 
 10. If nothing goes wrong, you can start developing the Gravitino connector in the Gravitino project and debug it in the Trino project.
