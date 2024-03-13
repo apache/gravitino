@@ -208,7 +208,7 @@ const CreateMetalakeDialog = props => {
             <Icon icon='bx:x' />
           </IconButton>
           <Box className={'twc-mb-8 twc-text-center'}>
-            <Typography className={'twc-mb-3'} variant='h5'>
+            <Typography className={'twc-mb-3'} variant='h5' data-refer='handle-metalake-title'>
               {typeText} Metalake
             </Typography>
           </Box>
@@ -223,6 +223,8 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
+                      id='metalakeNameField'
+                      data-refer='metalake-name-field'
                       label='Name'
                       onChange={onChange}
                       placeholder=''
@@ -231,7 +233,9 @@ const CreateMetalakeDialog = props => {
                   )}
                 />
                 {errors.name && (
-                  <FormHelperText className={'twc-text-error-main'}>{errors.name.message}</FormHelperText>
+                  <FormHelperText className={'twc-text-error-main'} data-refer='metalake-name-field-error-text'>
+                    {errors.name.message}
+                  </FormHelperText>
                 )}
               </FormControl>
             </Grid>
@@ -245,6 +249,7 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
+                      id='metalakeCommentField'
                       label='Comment'
                       multiline
                       rows={2}
@@ -257,7 +262,7 @@ const CreateMetalakeDialog = props => {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} id='properties' data-refer='metalake-props-layout'>
               <Typography className={'twc-mb-2'} variant='body2'>
                 Properties
               </Typography>
@@ -265,7 +270,10 @@ const CreateMetalakeDialog = props => {
                 return (
                   <Grid item xs={12} key={index} className={'[&+&]:twc-mt-2'}>
                     <FormControl fullWidth>
-                      <Box className={'twc-flex twc-items-center twc-justify-between'}>
+                      <Box
+                        className={'twc-flex twc-items-center twc-justify-between'}
+                        data-refer='metalake-props-wrapper'
+                      >
                         <TextField
                           size='small'
                           name='key'
@@ -273,6 +281,7 @@ const CreateMetalakeDialog = props => {
                           value={item.key}
                           onChange={event => handleFormChange(index, event)}
                           error={item.hasDuplicateKey}
+                          data-refer={`add-props-key-${index}`}
                         />
                         <TextField
                           size='small'
@@ -280,6 +289,7 @@ const CreateMetalakeDialog = props => {
                           label='Value'
                           value={item.value}
                           onChange={event => handleFormChange(index, event)}
+                          data-refer={`add-props-value-${index}`}
                         />
                         <Box className={'twc-min-w-[40px]'}>
                           <IconButton onClick={() => removeFields(index)}>
@@ -307,6 +317,7 @@ const CreateMetalakeDialog = props => {
                 size='small'
                 onClick={addFields}
                 variant='outlined'
+                data-refer='add-metalake-props'
                 startIcon={<Icon icon='mdi:plus-circle-outline' />}
               >
                 Add Property
@@ -315,7 +326,7 @@ const CreateMetalakeDialog = props => {
           </Grid>
         </DialogContent>
         <DialogActions className={' twc-px-5 md:twc-px-15 twc-pb-5 md:twc-pb-[12.5 0.25 rem]'}>
-          <Button variant='contained' type='submit'>
+          <Button variant='contained' type='submit' id='submitHandleMetalake'>
             {typeText === 'Edit' ? 'Update' : typeText}
           </Button>
           <Button variant='outlined' className={'twc-ml-1'} onClick={handleClose} type='reset'>

@@ -316,6 +316,26 @@ public class SparkIT extends SparkEnvIT {
   }
 
   @Test
+  void testAlterTableRenameColumn() {
+    String tableName = "test_rename_column";
+    dropTableIfExists(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    String oldColumnName = "col1";
+    String newColumnName = "col2";
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
+    sql(
+        String.format(
+            "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+    ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
+    renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
+    checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
+  }
+
+  @Test
   void testUpdateColumnPosition() {
     String tableName = "test_column_position";
     dropTableIfExists(tableName);
@@ -323,9 +343,9 @@ public class SparkIT extends SparkEnvIT {
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
 
     sql(
-        String.format(
-            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) USING PARQUET",
-            tableName));
+            String.format(
+                    "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) USING PARQUET",
+                    tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
