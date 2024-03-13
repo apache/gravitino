@@ -10,21 +10,15 @@ import com.google.common.collect.ImmutableList;
 import io.trino.spi.connector.ConnectorFactory;
 
 public class TestGravitinoPlugin extends GravitinoPlugin {
-  private TestGravitinoConnectorFactory factory;
-  private CatalogConnectorManager catalogConnectorManager;
+  private GravitinoConnectorFactory factory;
 
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
-    factory = new TestGravitinoConnectorFactory();
-    factory.setHook(this::init);
+    factory = new GravitinoConnectorFactory();
     return ImmutableList.of(factory);
   }
 
-  private void init() {
-    catalogConnectorManager = factory.getCatalogConnectorManager();
-  }
-
   public CatalogConnectorManager getCatalogConnectorManager() {
-    return catalogConnectorManager;
+    return factory.getCatalogConnectorManager();
   }
 }
