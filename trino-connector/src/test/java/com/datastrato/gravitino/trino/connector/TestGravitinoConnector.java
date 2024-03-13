@@ -269,7 +269,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertEquals(expectedResult.getRowCount(), 1);
     List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
     MaterializedRow row = expectedRows.get(0);
-    assertEquals(row.getField(0), "memory");
+    assertEquals(row.getField(0), "test.memory");
     assertEquals(row.getField(1), "memory");
     assertEquals(row.getField(2), Map.of("max_ttl", "10"));
   }
