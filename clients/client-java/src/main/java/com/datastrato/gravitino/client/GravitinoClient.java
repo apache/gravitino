@@ -14,8 +14,6 @@ import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.base.Preconditions;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,16 +63,6 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     return metaLake;
   }
 
-  /**
-   * Creates a new builder for constructing a GravitinoClient.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @return A new instance of the Builder class for constructing a GravitinoClient.
-   */
-  public static Builder builder(String uri) {
-    return new Builder(uri);
-  }
-
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     return getMetaLake().listCatalogs(namespace);
@@ -107,80 +95,35 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     return getMetaLake().dropCatalog(ident);
   }
 
-  /** Builder class for constructing a GravitinoClient. */
-  public static class Builder {
+  /**
+   * Creates a new builder for constructing a GravitinoClient.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @return A new instance of the Builder class for constructing a GravitinoClient.
+   */
+  public static Builder<GravitinoClient> builder(String uri) {
+    return new ClientBuilder(uri);
+  }
 
-    private String uri;
-    private AuthDataProvider authDataProvider;
-    private String metalakeName;
+  /** Builder class for constructing a GravitinoClient. */
+  static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 
     /**
      * The private constructor for the Builder class.
      *
      * @param uri The base URI for the Gravitino API.
      */
-    private Builder(String uri) {
-      this.uri = uri;
-    }
-
-    /**
-     * Set the default metalake name for this client.
-     *
-     * @param metalakeName The name of the metalake that the client is working on.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withMetalake(String metalakeName) {
-      this.metalakeName = metalakeName;
-      return this;
-    }
-
-    /**
-     * Sets the simple mode authentication for Gravitino
-     *
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withSimpleAuth() {
-      this.authDataProvider = new SimpleTokenProvider();
-      return this;
-    }
-
-    /**
-     * Sets OAuth2TokenProvider for the GravitinoClient.
-     *
-     * @param dataProvider The OAuth2TokenProvider used as the provider of authentication data for
-     *     GravitinoClient.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withOAuth(OAuth2TokenProvider dataProvider) {
-      this.authDataProvider = dataProvider;
-      return this;
-    }
-
-    /**
-     * Sets KerberosTokenProvider for the GravitinoClient.
-     *
-     * @param dataProvider The KerberosTokenProvider used as the provider of authentication data for
-     *     GravitinoClient.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withKerberosAuth(KerberosTokenProvider dataProvider) {
-      try {
-        if (uri != null) {
-          dataProvider.setHost(new URI(uri).getHost());
-        }
-      } catch (URISyntaxException ue) {
-        throw new IllegalArgumentException("URI has the wrong format", ue);
-      }
-      this.authDataProvider = dataProvider;
-      return this;
+    protected ClientBuilder(String uri) {
+      super(uri);
     }
 
     /**
      * Builds a new GravitinoClient instance.
      *
-     * @return A new instance of GravitinoClient with the specified base URI and metalake name.
-     * @throws IllegalArgumentException If the base URI or the metalake name is null or empty.
+     * @return A new instance of GravitinoClient with the specified base URI.
+     * @throws IllegalArgumentException If the base URI is null or empty.
      */
+    @Override
     public GravitinoClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");

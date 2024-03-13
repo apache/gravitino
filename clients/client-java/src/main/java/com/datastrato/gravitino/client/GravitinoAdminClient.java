@@ -163,64 +163,20 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param uri The base URI for the Gravitino API.
    * @return A new instance of the Builder class for constructing a GravitinoClient.
    */
-  public static Builder builder(String uri) {
-    return new Builder(uri);
+  public static Builder<GravitinoAdminClient> builder(String uri) {
+    return new AdminClientBuilder(uri);
   }
 
-  /** Builder class for constructing a GravitinoClient. */
-  public static class Builder {
-
-    private String uri;
-    private AuthDataProvider authDataProvider;
+  /** Builder class for constructing a GravitinoAdminClient. */
+  static class AdminClientBuilder extends GravitinoClientBase.Builder<GravitinoAdminClient> {
 
     /**
      * The private constructor for the Builder class.
      *
      * @param uri The base URI for the Gravitino API.
      */
-    private Builder(String uri) {
-      this.uri = uri;
-    }
-
-    /**
-     * Sets the simple mode authentication for Gravitino
-     *
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withSimpleAuth() {
-      this.authDataProvider = new SimpleTokenProvider();
-      return this;
-    }
-
-    /**
-     * Sets OAuth2TokenProvider for the GravitinoClient.
-     *
-     * @param dataProvider The OAuth2TokenProvider used as the provider of authentication data for
-     *     GravitinoClient.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withOAuth(OAuth2TokenProvider dataProvider) {
-      this.authDataProvider = dataProvider;
-      return this;
-    }
-
-    /**
-     * Sets KerberosTokenProvider for the GravitinoClient.
-     *
-     * @param dataProvider The KerberosTokenProvider used as the provider of authentication data for
-     *     GravitinoClient.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withKerberosAuth(KerberosTokenProvider dataProvider) {
-      try {
-        if (uri != null) {
-          dataProvider.setHost(new URI(uri).getHost());
-        }
-      } catch (URISyntaxException ue) {
-        throw new IllegalArgumentException("URI has the wrong format", ue);
-      }
-      this.authDataProvider = dataProvider;
-      return this;
+    protected AdminClientBuilder(String uri) {
+      super(uri);
     }
 
     /**
@@ -229,6 +185,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
      * @return A new instance of GravitinoClient with the specified base URI.
      * @throws IllegalArgumentException If the base URI is null or empty.
      */
+    @Override
     public GravitinoAdminClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
