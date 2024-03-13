@@ -38,4 +38,12 @@ public interface HasPropertyMetadata {
    * @throws UnsupportedOperationException if the entity does not support fileset properties.
    */
   PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException;
+
+  /**
+   * Returns the topic property metadata.
+   *
+   * @return The topic property metadata.
+   * @throws UnsupportedOperationException if the entity does not support topic properties.
+   */
+  PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException;
 }
