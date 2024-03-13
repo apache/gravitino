@@ -169,6 +169,7 @@ public abstract class GravitinoClientBase implements Closeable {
     /**
      * Builds a new instance. Subclasses should overwrite this method.
      *
+     * @return A new instance of Gravitino Client.
      * @throws IllegalArgumentException If the base URI is null or empty.
      * @throws UnsupportedOperationException If subclass has not implemented.
      */
