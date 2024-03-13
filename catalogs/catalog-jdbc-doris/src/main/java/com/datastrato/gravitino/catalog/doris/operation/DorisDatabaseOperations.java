@@ -21,6 +21,8 @@ import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for Doris. */
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
+  private static final String BACK_QUOTE = "`";
+
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
@@ -31,7 +33,7 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 
     // Append database name
-    sqlBuilder.append("`").append(databaseName).append("`");
+    sqlBuilder.append(BACK_QUOTE).append(databaseName).append(BACK_QUOTE);
 
     // Append properties
     sqlBuilder.append(DorisUtils.generatePropertiesSql(properties));
@@ -44,14 +46,14 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
     StringBuilder sqlBuilder = new StringBuilder("DROP DATABASE");
-    sqlBuilder.append("`").append(databaseName).append("`");
+    sqlBuilder.append(BACK_QUOTE).append(databaseName).append(BACK_QUOTE);
     if (cascade) {
       sqlBuilder.append(" FORCE");
       return sqlBuilder.toString();
     }
 
     try (final Connection connection = this.dataSource.getConnection()) {
-      String query = "SHOW TABLES IN " + databaseName;
+      String query = "SHOW TABLES IN " + BACK_QUOTE + databaseName + BACK_QUOTE;
       try (Statement statement = connection.createStatement()) {
         // Execute the query and check if there exists any tables in the database
         try (ResultSet resultSet = statement.executeQuery(query)) {

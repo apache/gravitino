@@ -31,9 +31,9 @@ dependencies {
 
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 

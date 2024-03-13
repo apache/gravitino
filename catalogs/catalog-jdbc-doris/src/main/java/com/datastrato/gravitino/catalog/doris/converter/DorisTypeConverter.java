@@ -88,6 +88,13 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
     } else if (type instanceof Types.VarCharType) {
       return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";
     } else if (type instanceof Types.FixedCharType) {
+      int length = ((Types.FixedCharType) type).length();
+      if (length < 1 || length > 255) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Type %s is invalid, length should be between 1 and 255", type.toString()));
+      }
+
       return CHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.StringType) {
       return STRING;

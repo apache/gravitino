@@ -22,7 +22,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -43,10 +42,10 @@ import org.apache.commons.lang3.StringUtils;
 
 /** Table operations for Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
-  public static final String BACK_QUOTE = "`";
-  public static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
+  private static final String BACK_QUOTE = "`";
+  private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
 
-  public static final String NEW_LINE = "\n";
+  private static final String NEW_LINE = "\n";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -142,37 +141,13 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private static void validateIncrementCol(JdbcColumn[] columns) {
-    // Check auto increment column
+    // Get all auto increment column
     List<JdbcColumn> autoIncrementCols =
         Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
-    String autoIncrementColsStr =
-        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
 
+    // Doris does not support auto increment column before version 2.1.0
     Preconditions.checkArgument(
-        autoIncrementCols.size() <= 1,
-        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
-            + autoIncrementColsStr);
-
-    // Check Auto increment column type
-    autoIncrementCols.forEach(
-        column -> {
-          Preconditions.checkArgument(
-              column.dataType().equals(Types.LongType.get()),
-              "Auto-increment column must be of type BIGINT. The column "
-                  + column.name()
-                  + " is of type "
-                  + column.dataType());
-        });
-
-    // Check auto increment column is nullable
-    autoIncrementCols.forEach(
-        column -> {
-          Preconditions.checkArgument(
-              !column.nullable(),
-              "Auto-increment column must be not nullable. The column "
-                  + column.name()
-                  + " is nullable");
-        });
+        autoIncrementCols.isEmpty(), "Doris does not support auto-increment column");
   }
 
   private static void validateDistribution(Distribution distribution, JdbcColumn[] columns) {
@@ -205,12 +180,11 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // validate indexes
     Arrays.stream(indexes)
-        .map(
+        .forEach(
             index -> {
               if (index.fieldNames().length > 1) {
                 throw new IllegalArgumentException("Index does not support multi fields in Doris");
               }
-              return index;
             });
 
     String indexSql =
@@ -266,7 +240,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     try {
       Connection connection = metaData.getConnection();
 
-      String sql = "SHOW INDEX FROM " + tableName + " FROM " + databaseName;
+      String sql = String.format("SHOW INDEX FROM `%s` FROM `%s`", tableName, databaseName);
+
       PreparedStatement preparedStatement = connection.prepareStatement(sql);
       ResultSet resultSet = preparedStatement.executeQuery();
       List<Index> indexes = new ArrayList<>();
@@ -510,13 +485,17 @@ public class DorisTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("MODIFY COLUMN ").append(col);
+    columnDefinition.append("MODIFY COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+      columnDefinition
+          .append("AFTER ")
+          .append(BACK_QUOTE)
+          .append(afterPosition.getColumn())
+          .append(BACK_QUOTE);
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
@@ -555,7 +534,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
+    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + BACK_QUOTE + col + BACK_QUOTE);
     JdbcColumn newColumn =
         new JdbcColumn.Builder()
             .withName(col)
