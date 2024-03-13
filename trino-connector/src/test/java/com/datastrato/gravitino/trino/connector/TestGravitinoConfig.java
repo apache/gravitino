@@ -42,7 +42,7 @@ public class TestGravitinoConfig {
       GravitinoConfig config = new GravitinoConfig(configMap);
       assertEquals(gravitinoUrl, config.getURI());
     } catch (TrinoException e) {
-      if (e.getErrorCode() != GRAVITINO_MISSING_CONFIG.toErrorCode()) {
+      if (!GRAVITINO_MISSING_CONFIG.toErrorCode().equals(e.getErrorCode())) {
         throw e;
       }
     }

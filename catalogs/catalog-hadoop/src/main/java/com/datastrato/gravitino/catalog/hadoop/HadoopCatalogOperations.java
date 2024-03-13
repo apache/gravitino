@@ -495,6 +495,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Hadoop fileset catalog doesn't support topic related operations");
+  }
+
+  @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     return CATALOG_PROPERTIES_METADATA;
   }

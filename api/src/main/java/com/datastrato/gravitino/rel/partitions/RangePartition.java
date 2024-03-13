@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.partitions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 
 /**
@@ -13,6 +14,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literal;
  *
  * its upper bound is "2020-03-22" and its lower bound is null.
  */
+@Evolving
 public interface RangePartition extends Partition {
 
   /** @return The upper bound of the partition. */

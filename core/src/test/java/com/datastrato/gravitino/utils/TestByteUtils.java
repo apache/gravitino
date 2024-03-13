@@ -16,7 +16,7 @@ public class TestByteUtils {
     byte[] b = ByteUtils.intToByte(v);
     Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x01, 0x02}, b);
     int v2 = ByteUtils.byteToInt(b);
-    assert v == v2;
+    Assertions.assertEquals(v, v2);
   }
 
   @Test
@@ -25,7 +25,7 @@ public class TestByteUtils {
     byte[] b = ByteUtils.longToByte(v);
     Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03}, b);
     long v2 = ByteUtils.byteToLong(b);
-    assert v == v2;
+    Assertions.assertEquals(v, v2);
   }
 
   @Test

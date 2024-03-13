@@ -6,22 +6,32 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * The service class for metalake metadata. It provides the basic database operations for metalake.
+ */
 public class MetalakeMetaService {
   private static final MetalakeMetaService INSTANCE = new MetalakeMetaService();
 
@@ -38,18 +48,36 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
-  public BaseMetalake getMetalakeByIdent(NameIdentifier ident) {
+  public Long getMetalakeIdByName(String metalakeName) {
+    Long metalakeId =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
+    if (metalakeId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
+    }
+    return metalakeId;
+  }
+
+  public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
+    NameIdentifier.checkMetalake(ident);
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (metalakePO == null) {
-      throw new NoSuchEntityException("No such entity: %s", ident.toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
   }
 
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
     try {
+      NameIdentifier.checkMetalake(baseMetalake.nameIdentifier());
       SessionUtils.doWithCommit(
           MetalakeMetaMapper.class,
           mapper -> {
@@ -61,28 +89,23 @@ public class MetalakeMetaService {
             }
           });
     } catch (RuntimeException re) {
-      if (re.getCause() != null
-          && re.getCause().getCause() != null
-          && re.getCause().getCause() instanceof SQLIntegrityConstraintViolationException) {
-        // TODO We should make more fine-grained exception judgments
-        // Usually throwing `SQLIntegrityConstraintViolationException` means that
-        // SQL violates the constraints of `primary key` and `unique key`.
-        // We simply think that the entity already exists at this time.
-        throw new EntityAlreadyExistsException(
-            String.format(
-                "Metalake entity: %s already exists", baseMetalake.nameIdentifier().name()));
-      }
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.METALAKE, baseMetalake.nameIdentifier().toString());
       throw re;
     }
   }
 
   public <E extends Entity & HasIdentifier> BaseMetalake updateMetalake(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
+    NameIdentifier.checkMetalake(ident);
     MetalakePO oldMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
     if (oldMetalakePO == null) {
-      throw new NoSuchEntityException("No such entity: %s", ident.toString());
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
     }
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
@@ -94,11 +117,18 @@ public class MetalakeMetaService {
         oldMetalakeEntity.id());
     MetalakePO newMetalakePO =
         POConverters.updateMetalakePOWithVersion(oldMetalakePO, newMetalakeEntity);
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              MetalakeMetaMapper.class,
+              mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLConstraintException(
+          re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
+      throw re;
+    }
 
-    Integer updateResult =
-        SessionUtils.doWithCommitAndFetchResult(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     if (updateResult > 0) {
       return newMetalakeEntity;
     } else {
@@ -107,9 +137,8 @@ public class MetalakeMetaService {
   }
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(ident.name()));
+    NameIdentifier.checkMetalake(ident);
+    Long metalakeId = getMetalakeIdByName(ident.name());
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
@@ -117,12 +146,34 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     MetalakeMetaMapper.class,
                     mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
-            () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the metalake
-            });
+            () ->
+                SessionUtils.doWithoutCommit(
+                    CatalogMetaMapper.class,
+                    mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TableMetaMapper.class,
+                    mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)));
       } else {
-        // TODO Check whether the sub-resources are empty. If the sub-resources are not empty,
-        //  deletion is not allowed.
+        List<CatalogEntity> catalogEntities =
+            CatalogMetaService.getInstance()
+                .listCatalogsByNamespace(Namespace.ofCatalog(ident.name()));
+        if (!catalogEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", ident);
+        }
         SessionUtils.doWithCommit(
             MetalakeMetaMapper.class,
             mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId));

@@ -12,27 +12,29 @@ import { useSearchParams } from 'next/navigation'
 import MetalakeView from '@/app/ui/metalakes/MetalakeView'
 
 const MetalakePage = () => {
-  const params = useSearchParams()
+  const searchParams = useSearchParams()
 
   const [routeParams, setRouteParams] = useState({})
 
+  const parameterSize = [...searchParams.keys()].length
+
   const getProps = () => {
-    if (params.size === 1 && params.has('metalake')) {
+    if (parameterSize === 1 && searchParams.get('metalake')) {
       return {
         page: 'metalakes',
         title: 'Catalogs'
       }
-    } else if (params.size === 2 && params.has('catalog')) {
+    } else if (parameterSize === 2 && searchParams.has('catalog')) {
       return {
         page: 'catalogs',
         title: 'Schemas'
       }
-    } else if (params.size === 3 && params.has('schema')) {
+    } else if (parameterSize === 3 && searchParams.has('schema')) {
       return {
         page: 'schemas',
         title: 'Tables'
       }
-    } else if (params.size === 4 && params.has('table')) {
+    } else if (parameterSize === 4 && searchParams.has('table')) {
       return {
         page: 'tables',
         title: 'Columns'
@@ -47,14 +49,14 @@ const MetalakePage = () => {
 
   useEffect(() => {
     const takeParams = {
-      metalake: params.get('metalake'),
-      catalog: params.get('catalog'),
-      schema: params.get('schema'),
-      table: params.get('table')
+      metalake: searchParams.get('metalake'),
+      catalog: searchParams.get('catalog'),
+      schema: searchParams.get('schema'),
+      table: searchParams.get('table')
     }
 
     setRouteParams(takeParams)
-  }, [params])
+  }, [searchParams])
 
   return <MetalakeView page={getProps().page} tableTitle={getProps().title} routeParams={routeParams} />
 }

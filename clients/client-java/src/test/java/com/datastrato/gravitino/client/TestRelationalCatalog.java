@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.client;
 
 import static com.datastrato.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import static com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
@@ -50,6 +51,7 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
@@ -372,7 +374,8 @@ public class TestRelationalCatalog extends TestBase {
     Table table =
         catalog
             .asTableCatalog()
-            .createTable(tableId, columns, "comment", Collections.emptyMap(), sortOrderDTOs);
+            .createTable(
+                tableId, fromDTOs(columns), "comment", Collections.emptyMap(), sortOrderDTOs);
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
     Assertions.assertEquals(expectedTable.properties(), table.properties());
@@ -388,13 +391,14 @@ public class TestRelationalCatalog extends TestBase {
     assertTableEquals(expectedTable, table);
 
     // test validate column default value
-    ColumnDTO[] errorColumns =
-        new ColumnDTO[] {
-          createMockColumn("col1", Types.ByteType.get(), "comment1"),
-          createMockColumn(
+    Column[] errorColumns =
+        new Column[] {
+          Column.of("col1", Types.ByteType.get(), "comment1"),
+          Column.of(
               "col2",
               Types.StringType.get(),
               "comment2",
+              false,
               false,
               new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
         };
@@ -420,7 +424,9 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(
             NoSuchSchemaException.class,
-            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, sortOrder));
+            () ->
+                tableCatalog.createTable(
+                    tableId, fromDTOs(columns), "comment", emptyMap, sortOrder));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
     // Test throw TableAlreadyExistsException
@@ -432,7 +438,9 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
-            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, sortOrder));
+            () ->
+                tableCatalog.createTable(
+                    tableId, fromDTOs(columns), "comment", emptyMap, sortOrder));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
@@ -474,7 +482,8 @@ public class TestRelationalCatalog extends TestBase {
     Table table =
         catalog
             .asTableCatalog()
-            .createTable(tableId, columns, "comment", Collections.emptyMap(), EMPTY_PARTITIONING);
+            .createTable(
+                tableId, fromDTOs(columns), "comment", Collections.emptyMap(), EMPTY_PARTITIONING);
     assertTableEquals(expectedTable, table);
 
     // Test partitioning
@@ -507,7 +516,8 @@ public class TestRelationalCatalog extends TestBase {
     table =
         catalog
             .asTableCatalog()
-            .createTable(tableId, columns, "comment", Collections.emptyMap(), partitioning);
+            .createTable(
+                tableId, fromDTOs(columns), "comment", Collections.emptyMap(), partitioning);
     assertTableEquals(expectedTable, table);
 
     // Test throw TableAlreadyExistsException
@@ -521,7 +531,9 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
-            () -> tableCatalog.createTable(tableId, columns, "comment", emptyMap, partitioning));
+            () ->
+                tableCatalog.createTable(
+                    tableId, fromDTOs(columns), "comment", emptyMap, partitioning));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
 
     // Test partitioning field not exist in table
@@ -530,7 +542,8 @@ public class TestRelationalCatalog extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                tableCatalog.createTable(tableId, columns, "comment", emptyMap, errorPartitioning));
+                tableCatalog.createTable(
+                    tableId, fromDTOs(columns), "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(ex2.getMessage().contains("not found in table"));
 
     // Test empty columns
@@ -539,7 +552,7 @@ public class TestRelationalCatalog extends TestBase {
             IllegalArgumentException.class,
             () ->
                 tableCatalog.createTable(
-                    tableId, new ColumnDTO[0], "comment", emptyMap, errorPartitioning));
+                    tableId, new Column[0], "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(
         ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
   }
@@ -598,7 +611,7 @@ public class TestRelationalCatalog extends TestBase {
             .asTableCatalog()
             .createTable(
                 tableId,
-                columns,
+                fromDTOs(columns),
                 "comment",
                 Collections.emptyMap(),
                 EMPTY_PARTITIONING,
@@ -621,7 +634,7 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 tableCatalog.createTable(
                     tableId,
-                    columns,
+                    fromDTOs(columns),
                     "comment",
                     emptyMap,
                     EMPTY_PARTITIONING,
@@ -807,6 +820,7 @@ public class TestRelationalCatalog extends TestBase {
             Types.StringType.get(),
             "comment2",
             TableChange.ColumnPosition.after("col1"),
+            false,
             false);
 
     testAlterTable(tableId, req, expectedTable);

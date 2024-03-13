@@ -10,6 +10,19 @@ plugins {
   id("idea")
 }
 
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
+}
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
@@ -29,6 +42,9 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.sqlite.jdbc)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
   compileOnly(libs.lombok)

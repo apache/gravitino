@@ -9,6 +9,11 @@ import Link from 'next/link'
 
 import { Box, Grid, Card, Typography, Portal, Tooltip } from '@mui/material'
 import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import {
+  VisibilityOutlined as ViewIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlined as DeleteIcon
+} from '@mui/icons-material'
 
 import Icon from '@/components/Icon'
 
@@ -102,6 +107,7 @@ const MetalakeList = () => {
     dispatch(setFilteredMetalakes(filteredData))
   }, [dispatch, store.metalakes, value])
 
+  /** @type {import('@mui/x-data-grid').GridColDef[]} */
   const columns = [
     {
       flex: 0.2,
@@ -177,12 +183,13 @@ const MetalakeList = () => {
       type: 'actions',
       headerName: 'Actions',
       field: 'actions',
-      getActions: ({ row }) => [
+      getActions: ({ id, row }) => [
         <GridActionsCellItem
           key='details'
           label='Details'
           title='Details'
-          icon={<Icon icon='bx:show-alt' />}
+          data-refer={`view-metalake-${row.name}`}
+          icon={<ViewIcon viewBox='0 0 24 22' />}
           onClick={handleShowDetails(row)}
           sx={{
             '& svg': {
@@ -194,7 +201,8 @@ const MetalakeList = () => {
           key='edit'
           label='Edit'
           title='Edit'
-          icon={<Icon icon='mdi:square-edit-outline' />}
+          data-refer={`edit-metalake-${row.name}`}
+          icon={<EditIcon />}
           onClick={handleShowEditDialog(row)}
           sx={{
             '& svg': {
@@ -204,9 +212,10 @@ const MetalakeList = () => {
         />,
         <GridActionsCellItem
           key='delete'
-          icon={<Icon icon='mdi:delete-outline' />}
+          icon={<DeleteIcon />}
           label='Delete'
           title='Delete'
+          data-refer={`delete-metalake-${row.name}`}
           onClick={handleDeleteMetalake(row.name)}
           sx={{
             '& svg': {
@@ -233,7 +242,6 @@ const MetalakeList = () => {
           <DataGrid
             disableColumnSelector
             disableDensitySelector
-            slots={{ toolbar: TableToolbar }}
             slotProps={{
               toolbar: {
                 printOptions: { disableToolbarButton: true },

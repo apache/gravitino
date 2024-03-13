@@ -125,7 +125,7 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.STREAM)
+            .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
@@ -182,14 +182,14 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.STREAM)
+            .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
-            catalogName, Catalog.Type.STREAM, provider, "comment", Collections.emptyMap());
+            catalogName, Catalog.Type.MESSAGING, provider, "comment", Collections.emptyMap());
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.POST, path, req1, resp1, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);
@@ -197,7 +197,7 @@ public class TestGravitinoMetalake extends TestBase {
 
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> metalake.createCatalog(id, Catalog.Type.STREAM, provider, "comment", emptyMap));
+        () -> metalake.createCatalog(id, Catalog.Type.MESSAGING, provider, "comment", emptyMap));
 
     // Test return NoSuchMetalakeException
     ErrorResponse errorResponse =
