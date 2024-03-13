@@ -10,8 +10,11 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
@@ -169,9 +172,14 @@ public class SchemaMetaService {
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
-            () -> {
-              // TODO We will cascade delete the metadata of sub-resources under the schema
-            });
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
@@ -181,6 +189,17 @@ public class SchemaMetaService {
                         identifier.namespace().level(1),
                         schemaName));
         if (!tableEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+        }
+        List<FilesetEntity> filesetEntities =
+            FilesetMetaService.getInstance()
+                .listFilesetsByNamespace(
+                    Namespace.ofFileset(
+                        identifier.namespace().level(0),
+                        identifier.namespace().level(1),
+                        schemaName));
+        if (!filesetEntities.isEmpty()) {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", identifier);
         }

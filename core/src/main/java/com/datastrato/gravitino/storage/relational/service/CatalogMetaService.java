@@ -13,6 +13,8 @@ import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
@@ -179,9 +181,14 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
-          () -> {
-            // TODO We will cascade delete the metadata of sub-resources under the catalog
-          });
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()

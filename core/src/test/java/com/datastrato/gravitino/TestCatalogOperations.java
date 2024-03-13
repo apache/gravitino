@@ -53,6 +53,8 @@ public class TestCatalogOperations
 
   private final BasePropertiesMetadata filesetPropertiesMetadata;
 
+  private final BasePropertiesMetadata topicPropertiesMetadata;
+
   private Map<String, String> config;
 
   public static final String FAIL_CREATE = "fail-create";
@@ -64,6 +66,7 @@ public class TestCatalogOperations
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
     filesetPropertiesMetadata = new TestFilesetPropertiesMetadata();
+    topicPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
@@ -384,6 +387,11 @@ public class TestCatalogOperations
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     return filesetPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return topicPropertiesMetadata;
   }
 
   @Override

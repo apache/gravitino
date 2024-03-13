@@ -511,4 +511,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     throw new UnsupportedOperationException(
         "Jdbc catalog doesn't support fileset related operations");
   }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Jdbc catalog doesn't support topic related operations");
+  }
 }

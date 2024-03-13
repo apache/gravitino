@@ -11,8 +11,8 @@ import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
-import com.datastrato.gravitino.spark.GravitinoSparkConfig;
-import com.datastrato.gravitino.spark.plugin.GravitinoSparkPlugin;
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -97,6 +97,12 @@ public class SparkEnvIT extends SparkUtilIT {
             .config("spark.plugins", GravitinoSparkPlugin.class.getName())
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
             .enableHiveSupport()
             .getOrCreate();
   }

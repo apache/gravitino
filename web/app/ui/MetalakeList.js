@@ -107,6 +107,7 @@ const MetalakeList = () => {
     dispatch(setFilteredMetalakes(filteredData))
   }, [dispatch, store.metalakes, value])
 
+  /** @type {import('@mui/x-data-grid').GridColDef[]} */
   const columns = [
     {
       flex: 0.2,
@@ -182,11 +183,12 @@ const MetalakeList = () => {
       type: 'actions',
       headerName: 'Actions',
       field: 'actions',
-      getActions: ({ row }) => [
+      getActions: ({ id, row }) => [
         <GridActionsCellItem
           key='details'
           label='Details'
           title='Details'
+          data-refer={`view-metalake-${row.name}`}
           icon={<ViewIcon viewBox='0 0 24 22' />}
           onClick={handleShowDetails(row)}
           sx={{
@@ -199,6 +201,7 @@ const MetalakeList = () => {
           key='edit'
           label='Edit'
           title='Edit'
+          data-refer={`edit-metalake-${row.name}`}
           icon={<EditIcon />}
           onClick={handleShowEditDialog(row)}
           sx={{
@@ -212,6 +215,7 @@ const MetalakeList = () => {
           icon={<DeleteIcon />}
           label='Delete'
           title='Delete'
+          data-refer={`delete-metalake-${row.name}`}
           onClick={handleDeleteMetalake(row.name)}
           sx={{
             '& svg': {
@@ -238,7 +242,6 @@ const MetalakeList = () => {
           <DataGrid
             disableColumnSelector
             disableDensitySelector
-            slots={{ toolbar: TableToolbar }}
             slotProps={{
               toolbar: {
                 printOptions: { disableToolbarButton: true },
