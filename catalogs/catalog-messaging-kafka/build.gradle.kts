@@ -17,14 +17,14 @@ dependencies {
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
+  val runtimeJars by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs_all")
+    into("build/libs")
   }
 
   val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs_all", "build/libs")
+    dependsOn(jar, runtimeJars)
+    from("build/libs")
     into("$rootDir/distribution/package/catalogs/messaging-kafka/libs")
   }
 
