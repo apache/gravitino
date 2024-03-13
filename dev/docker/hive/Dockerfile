@@ -38,9 +38,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   openssh-server \
   wget \
   sudo \
-  openjdk-8-jdk \
-  mysql-server \
-  && rm -rf /var/lib/apt/lists/*
+  openjdk-8-jdk
 
 #################################################################################
 ## setup ssh
@@ -125,6 +123,7 @@ ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 ENV MYSQL_PWD=ds123
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
 RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
+RUN apt-get install -y mysql-server
 
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql
@@ -152,6 +151,7 @@ RUN chown -R datastrato:hadoop /home/datastrato
 ################################################################################
 # removed install packages
 RUN rm -rf /tmp/packages
+RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port
