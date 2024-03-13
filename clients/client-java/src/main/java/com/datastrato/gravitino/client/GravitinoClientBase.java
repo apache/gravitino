@@ -10,6 +10,8 @@ import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import java.io.Closeable;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +94,86 @@ public abstract class GravitinoClientBase implements Closeable {
         // Swallow the exception
         LOG.warn("Failed to close the HTTP REST client", e);
       }
+    }
+  }
+
+  /** Builder class for constructing a GravitinoClient. */
+  public static class Builder<T> {
+
+    protected String uri;
+
+    protected String metalakeName;
+    protected AuthDataProvider authDataProvider;
+
+    /**
+     * The constructor for the Builder class.
+     *
+     * @param uri The base URI for the Gravitino API.
+     */
+    protected Builder(String uri) {
+      this.uri = uri;
+    }
+
+    /**
+     * Sets the simple mode authentication for Gravitino
+     *
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withSimpleAuth() {
+      this.authDataProvider = new SimpleTokenProvider();
+      return this;
+    }
+
+    /**
+     * Sets OAuth2TokenProvider for Gravitino.
+     *
+     * @param dataProvider The OAuth2TokenProvider used as the provider of authentication data for
+     *     Gravitino Client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withOAuth(OAuth2TokenProvider dataProvider) {
+      this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Sets KerberosTokenProvider for the Gravitino.
+     *
+     * @param dataProvider The KerberosTokenProvider used as the provider of authentication data for
+     *     Gravitino Client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withKerberosAuth(KerberosTokenProvider dataProvider) {
+      try {
+        if (uri != null) {
+          dataProvider.setHost(new URI(uri).getHost());
+        }
+      } catch (URISyntaxException ue) {
+        throw new IllegalArgumentException("URI has the wrong format", ue);
+      }
+      this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Optional, set the metalake name for this client.
+     *
+     * @param metalakeName The name of the metalake that the client is working on.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withMetalake(String metalakeName) {
+      this.metalakeName = metalakeName;
+      return this;
+    }
+
+    /**
+     * Builds a new instance. Subclasses should overwrite this method.
+     *
+     * @throws IllegalArgumentException If the base URI is null or empty.
+     * @throws UnsupportedOperationException If subclass has not implemented.
+     */
+    public T build() {
+      throw new UnsupportedOperationException();
     }
   }
 }
