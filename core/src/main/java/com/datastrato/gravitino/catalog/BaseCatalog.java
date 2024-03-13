@@ -125,6 +125,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private CatalogOperations loadCustomerOps(String className) {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     try {
+      // Class.forName use classloader of the caller class (BaseCatalog.class), it's global
+      // classloader not the catalog specific classloader, so we must specify the classloader
+      // explicitly.
       return (CatalogOperations)
           Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
