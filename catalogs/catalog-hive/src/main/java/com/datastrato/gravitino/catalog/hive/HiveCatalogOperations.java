@@ -1088,6 +1088,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive catalog does not support fileset properties metadata");
   }
 
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Hive catalog does not support topic properties metadata");
+  }
+
   CachedClientPool getClientPool() {
     return clientPool;
   }
