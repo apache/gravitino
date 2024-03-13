@@ -55,6 +55,11 @@ public class ExceptionHandlers {
     return FilesetExceptionHandler.INSTANCE.handle(op, fileset, schema, e);
   }
 
+  public static Response handleUserException(
+      OperationType op, String user, String metalake, Exception e) {
+    return UserExceptionHandler.INSTANCE.handle(op, user, metalake, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -252,6 +257,12 @@ public class ExceptionHandlers {
         return super.handle(op, fileset, schema, e);
       }
     }
+  }
+
+  private static class UserExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
+
   }
 
   @VisibleForTesting

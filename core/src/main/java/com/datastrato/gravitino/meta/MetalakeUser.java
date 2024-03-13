@@ -4,11 +4,7 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Auditable;
-import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.*;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -17,7 +13,7 @@ import lombok.ToString;
 
 /** A class representing a user metadata entity in Gravitino. */
 @ToString
-public class UserEntity implements Entity, Auditable, HasIdentifier {
+public class MetalakeUser implements User, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, " The unique id of the user entity.");
@@ -30,11 +26,10 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
 
   private Long id;
   private String name;
-  private Namespace namespace;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
 
-  private UserEntity() {}
+  private MetalakeUser() {}
 
   /**
    * Returns a map of fields and their corresponding values for this user entity.
@@ -60,16 +55,6 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
-  }
-
-  /**
-   * Returns the namespace of the user.
-   *
-   * @return The namespace of the user.
-   */
-  @Override
-  public Namespace namespace() {
-    return namespace;
   }
 
   /**
@@ -113,9 +98,9 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof UserEntity)) return false;
+    if (!(o instanceof MetalakeUser)) return false;
 
-    UserEntity that = (UserEntity) o;
+    MetalakeUser that = (MetalakeUser) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
@@ -132,10 +117,10 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
   }
 
   public static class Builder {
-    private final UserEntity user;
+    private final MetalakeUser metalakeUser;
 
     private Builder() {
-      this.user = new UserEntity();
+      this.metalakeUser = new MetalakeUser();
     }
 
     /**
@@ -144,8 +129,8 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
      * @param id The unique id of the user entity.
      * @return The builder instance.
      */
-    public UserEntity.Builder withId(Long id) {
-      user.id = id;
+    public Builder withId(Long id) {
+      metalakeUser.id = id;
       return this;
     }
 
@@ -155,19 +140,8 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
      * @param name The name of the user entity.
      * @return The builder instance.
      */
-    public UserEntity.Builder withName(String name) {
-      user.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the namespace of the user entity.
-     *
-     * @param namespace The namespace of the user entity.
-     * @return The builder instance.
-     */
-    public UserEntity.Builder withNamespace(Namespace namespace) {
-      user.namespace = namespace;
+    public Builder withName(String name) {
+      metalakeUser.name = name;
       return this;
     }
 
@@ -177,8 +151,8 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
      * @param properties The properties of the user entity.
      * @return The builder instance.
      */
-    public UserEntity.Builder withProperties(Map<String, String> properties) {
-      user.properties = properties;
+    public Builder withProperties(Map<String, String> properties) {
+      metalakeUser.properties = properties;
       return this;
     }
 
@@ -188,8 +162,8 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
      * @param auditInfo The audit details of the user entity.
      * @return The builder instance.
      */
-    public UserEntity.Builder withAuditInfo(AuditInfo auditInfo) {
-      user.auditInfo = auditInfo;
+    public Builder withAuditInfo(AuditInfo auditInfo) {
+      metalakeUser.auditInfo = auditInfo;
       return this;
     }
 
@@ -198,9 +172,9 @@ public class UserEntity implements Entity, Auditable, HasIdentifier {
      *
      * @return The built user entity.
      */
-    public UserEntity build() {
-      user.validate();
-      return user;
+    public MetalakeUser build() {
+      metalakeUser.validate();
+      return metalakeUser;
     }
   }
 }

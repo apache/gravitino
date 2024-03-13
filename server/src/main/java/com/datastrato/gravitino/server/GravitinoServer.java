@@ -21,6 +21,8 @@ import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
+
+import com.datastrato.gravitino.tenant.AccessControlManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -73,6 +75,7 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
+            bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
             bind(gravitinoEnv.catalogOperationDispatcher())
                 .to(CatalogOperationDispatcher.class)
                 .ranked(1);

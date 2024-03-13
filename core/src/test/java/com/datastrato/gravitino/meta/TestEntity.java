@@ -207,22 +207,22 @@ public class TestEntity {
 
   @Test
   public void testUser() {
-    UserEntity testUser =
-        UserEntity.builder()
+    MetalakeUser testMetalakeUser =
+        MetalakeUser.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withProperties(map)
             .build();
 
-    Map<Field, Object> fields = testUser.fields();
-    Assertions.assertEquals(userId, fields.get(UserEntity.ID));
-    Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
-    Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
-    Assertions.assertEquals(map, fields.get(UserEntity.PROPERTIES));
+    Map<Field, Object> fields = testMetalakeUser.fields();
+    Assertions.assertEquals(userId, fields.get(MetalakeUser.ID));
+    Assertions.assertEquals(userName, fields.get(MetalakeUser.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(MetalakeUser.AUDIT_INFO));
+    Assertions.assertEquals(map, fields.get(MetalakeUser.PROPERTIES));
 
-    UserEntity testUserWithoutFields =
-        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
-    Assertions.assertNull(testUserWithoutFields.properties());
+    MetalakeUser testMetalakeUserWithoutFields =
+        MetalakeUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    Assertions.assertNull(testMetalakeUserWithoutFields.properties());
   }
 }
