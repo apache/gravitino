@@ -4,14 +4,21 @@
  */
 package com.datastrato.gravitino.catalog.kafka;
 
+import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
+
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -21,14 +28,21 @@ import com.datastrato.gravitino.messaging.DataLayout;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.messaging.TopicChange;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.storage.IdGenerator;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
 
 public class KafkaCatalogOperations implements CatalogOperations, SupportsSchemas, TopicCatalog {
 
@@ -39,17 +53,47 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
 
+  private final CatalogEntity entity;
   private final EntityStore store;
   private CatalogEntity entity;
+  private final IdGenerator idGenerator;
+  private final String defaultSchemaName = "default";
+  @VisibleForTesting final NameIdentifier defaultSchemaIdent;
+  @VisibleForTesting Properties adminClientConfig;
 
-  public KafkaCatalogOperations() {
-    this.store = GravitinoEnv.getInstance().entityStore();
+  // For testing only.
+  KafkaCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
+    this.entity = entity;
+    this.store = store;
+    this.idGenerator = idGenerator;
+    this.defaultSchemaIdent =
+        NameIdentifier.of(entity.namespace().level(0), entity.name(), defaultSchemaName);
+  }
+
+  public KafkaCatalogOperations(CatalogEntity entity) {
+    this(
+        entity, GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().idGenerator());
   }
 
   @Override
   public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
     this.entity = entity;
-    // TODO: Implement Kafka catalog initialization, such as creating a default schema.
+    // Initialize the Kafka AdminClient configuration
+    adminClientConfig = new Properties();
+
+    Map<String, String> bypassConfigs =
+        config.entrySet().stream()
+            .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
+            .collect(
+                Collectors.toMap(
+                    e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
+                    Map.Entry::getValue));
+    adminClientConfig.putAll(bypassConfigs);
+    adminClientConfig.put(BOOTSTRAP_SERVERS, config.get(BOOTSTRAP_SERVERS));
+    // use gravitino catalog id as the admin client id
+    adminClientConfig.put("client.id", config.get(ID_KEY));
+
+    createDefaultSchema();
   }
 
   @Override
@@ -96,23 +140,48 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    throw new UnsupportedOperationException();
+    // It appears that the "default" schema suffices, so there is no need to support creating schema
+    // currently
+    throw new UnsupportedOperationException("Kafka catalog does not support schema creation");
   }
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    try {
+      SchemaEntity schema = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
+
+      return KafkaSchema.builder()
+          .withName(schema.name())
+          .withComment(schema.comment())
+          .withProperties(schema.properties())
+          .withAuditInfo(schema.auditInfo())
+          .build();
+
+    } catch (NoSuchEntityException exception) {
+      throw new NoSuchSchemaException(exception, "Schema %s does not exist", ident);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to load schema " + ident, ioe);
+    }
   }
 
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    if (ident.equals(defaultSchemaIdent)) {
+      throw new IllegalArgumentException("Cannot alter the default schema");
+    }
+
+    // TODO: Implement dropping schema after adding support for schema creation
+    throw new UnsupportedOperationException("Kafka catalog does not support schema alteration");
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    throw new UnsupportedOperationException();
+    if (ident.equals(defaultSchemaIdent)) {
+      throw new IllegalArgumentException("Cannot drop the default schema");
+    }
+    // TODO: Implement dropping schema after adding support for schema creation
+    throw new UnsupportedOperationException("Kafka catalog does not support schema deletion");
   }
 
   @Override
@@ -141,5 +210,44 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Kafka catalog does not support table operations");
+  }
+
+  private void createDefaultSchema() {
+    // If the default schema already exists, do nothing
+    try {
+      if (store.exists(defaultSchemaIdent, Entity.EntityType.SCHEMA)) {
+        return;
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to check if schema " + defaultSchemaIdent + " exists", e);
+    }
+
+    // Create the default schema
+    long uid = idGenerator.nextId();
+    ImmutableMap<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(ID_KEY, StringIdentifier.fromId(uid).toString())
+            .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
+            .build();
+
+    SchemaEntity defaultSchema =
+        SchemaEntity.builder()
+            .withName(defaultSchemaIdent.name())
+            .withId(idGenerator.nextId())
+            .withNamespace(Namespace.ofSchema(entity.namespace().level(0), entity.name()))
+            .withComment("The default schema of Kafka catalog including all topics")
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(entity.auditInfo().creator())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(defaultSchema, true /* overwrite */);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create default schema for Kafka catalog", ioe);
+    }
   }
 }
