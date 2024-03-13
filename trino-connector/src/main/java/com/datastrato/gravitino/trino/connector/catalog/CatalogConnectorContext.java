@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -21,7 +20,7 @@ import java.util.Map;
  */
 public class CatalogConnectorContext {
 
-  private final NameIdentifier catalogName;
+  private final GravitinoCatalog catalog;
   private final GravitinoMetaLake metalake;
 
   // Connector communicates with trino
@@ -33,20 +32,24 @@ public class CatalogConnectorContext {
   private final CatalogConnectorAdapter adapter;
 
   public CatalogConnectorContext(
-      NameIdentifier catalogName,
+      GravitinoCatalog catalog,
       GravitinoMetaLake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
-    this.catalogName = catalogName;
+    this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
 
-    this.connector = new GravitinoConnector(catalogName, this);
+    this.connector = new GravitinoConnector(catalog.geNameIdentifier(), this);
   }
 
   public GravitinoMetaLake getMetalake() {
     return metalake;
+  }
+
+  public GravitinoCatalog getCatalog() {
+    return catalog;
   }
 
   public GravitinoConnector getConnector() {
@@ -79,9 +82,9 @@ public class CatalogConnectorContext {
 
   static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
-    private NameIdentifier catalogName;
     private GravitinoMetaLake metalake;
     private Connector internalConnector;
+    private GravitinoCatalog catalog;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
@@ -100,22 +103,21 @@ public class CatalogConnectorContext {
       return this;
     }
 
-    Builder withCatalogName(NameIdentifier catalogName) {
-      this.catalogName = catalogName;
-      return this;
-    }
-
     Builder withInternalConnector(Connector internalConnector) {
       this.internalConnector = internalConnector;
       return this;
     }
 
+    Builder withCatalog(GravitinoCatalog catalog) {
+      this.catalog = catalog;
+      return this;
+    }
+
     CatalogConnectorContext build() {
-      Preconditions.checkArgument(catalogName != null, "catalogName is not null");
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
-      return new CatalogConnectorContext(
-          catalogName, metalake, internalConnector, connectorAdapter);
+      Preconditions.checkArgument(catalog != null, "catalog  ss not null");
+      return new CatalogConnectorContext(catalog, metalake, internalConnector, connectorAdapter);
     }
   }
 }

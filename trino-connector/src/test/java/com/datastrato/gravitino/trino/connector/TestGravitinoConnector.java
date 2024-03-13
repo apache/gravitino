@@ -20,6 +20,7 @@ import io.trino.testing.QueryRunner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -265,6 +266,12 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   @Test
   public void testSystemTable() throws Exception {
     MaterializedResult expectedResult = computeActual("select * from gravitino.system.catalog");
+    assertEquals(expectedResult.getRowCount(), 1);
+    List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
+    MaterializedRow row = expectedRows.get(0);
+    assertEquals(row.getField(0), "memory");
+    assertEquals(row.getField(1), "memory");
+    assertEquals(row.getField(2), Map.of("max_ttl", "10"));
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {

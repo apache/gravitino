@@ -11,6 +11,7 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
 import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
+import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
@@ -27,6 +28,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   private CatalogConnectorManager catalogConnectorManager;
+  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   @Override
   public String getName() {
@@ -56,7 +58,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogConnectorFactory catalogConnectorFactory =
               new CatalogConnectorFactory(catalogInjector);
 
-          catalogConnectorManager =
+          this.catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
 
@@ -66,6 +68,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
             GravitinoPlugin.catalogConnectorManager = catalogConnectorManager;
           }
           catalogConnectorManager.start();
+
+          this.gravitinoSystemTableFactory =
+              new GravitinoSystemTableFactory(catalogConnectorManager);
 
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);

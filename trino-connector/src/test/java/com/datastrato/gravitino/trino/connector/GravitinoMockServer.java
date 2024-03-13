@@ -201,6 +201,8 @@ public class GravitinoMockServer implements AutoCloseable {
     Catalog catalog = mock(Catalog.class);
     when(catalog.name()).thenReturn(catalogName.name());
     when(catalog.provider()).thenReturn(testCatalogProvider);
+    when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
 
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(catalogName));
 
