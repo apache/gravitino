@@ -99,10 +99,11 @@ public abstract class GravitinoClientBase implements Closeable {
 
   /** Builder class for constructing a GravitinoClient. */
   public static class Builder<T> {
-
+    /** The base URI for the Gravitino API. */
     protected String uri;
-
+    /** The name of the metalake that the client is working on. */
     protected String metalakeName;
+    /** The authentication provider. */
     protected AuthDataProvider authDataProvider;
 
     /**
