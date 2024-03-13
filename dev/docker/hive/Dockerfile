@@ -149,7 +149,7 @@ RUN mkdir /home/datastrato
 RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
-# removed install packages
+# removed install packages and cache
 RUN rm -rf /tmp/packages
 RUN rm -rf /var/lib/apt/lists/*
 
