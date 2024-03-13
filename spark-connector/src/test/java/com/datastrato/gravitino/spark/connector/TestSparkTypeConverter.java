@@ -15,10 +15,13 @@ import com.datastrato.gravitino.rel.types.Types.DoubleType;
 import com.datastrato.gravitino.rel.types.Types.FixedCharType;
 import com.datastrato.gravitino.rel.types.Types.FloatType;
 import com.datastrato.gravitino.rel.types.Types.IntegerType;
+import com.datastrato.gravitino.rel.types.Types.ListType;
 import com.datastrato.gravitino.rel.types.Types.LongType;
+import com.datastrato.gravitino.rel.types.Types.MapType;
 import com.datastrato.gravitino.rel.types.Types.NullType;
 import com.datastrato.gravitino.rel.types.Types.ShortType;
 import com.datastrato.gravitino.rel.types.Types.StringType;
+import com.datastrato.gravitino.rel.types.Types.StructType;
 import com.datastrato.gravitino.rel.types.Types.TimestampType;
 import com.datastrato.gravitino.rel.types.Types.VarCharType;
 import com.google.common.collect.ImmutableSet;
@@ -38,6 +41,16 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 public class TestSparkTypeConverter {
 
   private HashMap<Type, DataType> gravitinoToSparkTypeMapper = new HashMap<>();
+  private StructType gravitinoStructType =
+      StructType.of(
+          StructType.Field.of("col1", IntegerType.get(), true, null),
+          StructType.Field.of("col2", StringType.get(), true, null));
+  private org.apache.spark.sql.types.StructType sparkStructType =
+      DataTypes.createStructType(
+          new org.apache.spark.sql.types.StructField[] {
+            DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+            DataTypes.createStructField("col2", DataTypes.StringType, true)
+          });
   private Set<Type> notSupportGravitinoTypes = ImmutableSet.of(NullType.get());
 
   private Set<DataType> notSupportSparkTypes = ImmutableSet.of();
@@ -59,6 +72,44 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
     gravitinoToSparkTypeMapper.put(TimestampType.withTimeZone(), DataTypes.TimestampType);
     gravitinoToSparkTypeMapper.put(TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
+    gravitinoToSparkTypeMapper.put(
+        ListType.of(IntegerType.get(), true), DataTypes.createArrayType(DataTypes.IntegerType));
+    gravitinoToSparkTypeMapper.put(
+        MapType.of(IntegerType.get(), StringType.get(), true),
+        DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
+  }
+
+  private boolean checkSparkStructTypeConvertToGravitino(
+      StructType gravitinoType, org.apache.spark.sql.types.StructType sparkType) {
+    if (gravitinoType.fields().length != sparkType.fields().length) {
+      return false;
+    }
+    return java.util.stream.IntStream.range(0, gravitinoType.fields().length)
+        .allMatch(
+            i ->
+                gravitinoType.fields()[i].name().equals(sparkType.fields()[i].name())
+                    && gravitinoType.fields()[i].nullable() == sparkType.fields()[i].nullable()
+                    && gravitinoType
+                        .fields()[i]
+                        .type()
+                        .equals(
+                            SparkTypeConverter.toGravitinoType(sparkType.fields()[i].dataType())));
+  }
+
+  private boolean checkGravitinoStructTypeConvertToSpark(
+      StructType gravitinoType, org.apache.spark.sql.types.StructType sparkType) {
+    if (gravitinoType.fields().length != sparkType.fields().length) {
+      return false;
+    }
+    return java.util.stream.IntStream.range(0, gravitinoType.fields().length)
+        .allMatch(
+            i ->
+                gravitinoType.fields()[i].name().equals(sparkType.fields()[i].name())
+                    && gravitinoType.fields()[i].nullable() == sparkType.fields()[i].nullable()
+                    && sparkType
+                        .fields()[i]
+                        .dataType()
+                        .equals(SparkTypeConverter.toSparkType(gravitinoType.fields()[i].type())));
   }
 
   @Test
@@ -66,6 +117,8 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.forEach(
         (gravitinoType, sparkType) ->
             Assertions.assertEquals(sparkType, SparkTypeConverter.toSparkType(gravitinoType)));
+
+    checkGravitinoStructTypeConvertToSpark(gravitinoStructType, sparkStructType);
 
     notSupportGravitinoTypes.forEach(
         gravitinoType ->
@@ -79,6 +132,8 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.forEach(
         (gravitinoType, sparkType) ->
             Assertions.assertEquals(gravitinoType, SparkTypeConverter.toGravitinoType(sparkType)));
+
+    checkSparkStructTypeConvertToGravitino(gravitinoStructType, sparkStructType);
 
     notSupportSparkTypes.forEach(
         sparkType ->
