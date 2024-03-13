@@ -51,3 +51,5 @@ tasks {
     dependsOn(copyCatalogConfig, copyCatalogLibs)
   }
 }
+
+// TODO. add test task later on.
