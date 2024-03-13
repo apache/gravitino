@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.rel.types;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /** An interface representing all data types supported by Gravitino. */
+@Evolving
 public interface Type {
   /** @return The generic name of the type. */
   Name name();
@@ -73,7 +76,10 @@ public interface Type {
     UNION,
 
     /** The null type. A null type represents a value that is null. */
-    NULL
+    NULL,
+
+    /** The unparsed type. An unparsed type represents an unresolvable type. */
+    UNPARSED
   }
 
   /** The base type of all primitive types. */

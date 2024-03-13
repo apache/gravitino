@@ -13,6 +13,7 @@ import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createBaseMakeLake;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createCatalog;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createFilesetEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createSchemaEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createTableEntity;
 
@@ -26,12 +27,14 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.storage.kv.KvGarbageCollector.LogHelper;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +43,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@SuppressWarnings("DefaultCharset")
 class TestKvGarbageCollector {
   public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);
@@ -175,24 +179,28 @@ class TestKvGarbageCollector {
           createSchemaEntity(Namespace.of("metalake1", "catalog1"), "schema1", auditInfo);
       TableEntity tableEntity =
           createTableEntity(Namespace.of("metalake1", "catalog1", "schema1"), "table1", auditInfo);
+      FilesetEntity filesetEntity =
+          createFilesetEntity(
+              Namespace.of("metalake1", "catalog1", "schema1"), "fileset1", auditInfo);
 
       kvEntityStore.put(metalake1);
       kvEntityStore.put(catalog);
       kvEntityStore.put(schemaEntity);
       kvEntityStore.put(tableEntity);
+      kvEntityStore.put(filesetEntity);
 
       // now try to scan raw data from kv store
       KvBackend kvBackend = kvEntityStore.backend;
       List<Pair<byte[], byte[]>> data =
           kvBackend.scan(
               new KvRange.KvRangeBuilder()
-                  .start("_".getBytes())
-                  .end("z".getBytes())
+                  .start("_".getBytes(StandardCharsets.UTF_8))
+                  .end("z".getBytes(StandardCharsets.UTF_8))
                   .startInclusive(false)
                   .endInclusive(false)
                   .build());
 
-      Assertions.assertEquals(4, data.size());
+      Assertions.assertEquals(5, data.size());
 
       KvGarbageCollector kvGarbageCollector = kvEntityStore.kvGarbageCollector;
       for (Pair<byte[], byte[]> pair : data) {
@@ -214,6 +222,11 @@ class TestKvGarbageCollector {
           case TABLE:
             Assertions.assertEquals(
                 NameIdentifier.of("metalake1", "catalog1", "schema1", "table1"), helper.identifier);
+            break;
+          case FILESET:
+            Assertions.assertEquals(
+                NameIdentifier.of("metalake1", "catalog1", "schema1", "fileset1"),
+                helper.identifier);
             break;
           default:
             Assertions.fail();

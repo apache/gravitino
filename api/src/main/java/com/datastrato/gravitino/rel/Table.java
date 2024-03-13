@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMP
 
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -22,6 +23,7 @@ import javax.annotation.Nullable;
  * An interface representing a table in a {@link Namespace}. It defines the basic properties of a
  * table. A catalog implementation with {@link TableCatalog} should implement this interface.
  */
+@Evolving
 public interface Table extends Auditable {
 
   /** @return Name of the table. */

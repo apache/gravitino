@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -239,7 +240,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
    *
    * @param expectResult
    * @param result
-   * @return
+   * @return false if the expected result is empty or the actual result does not match the expected.
+   *     For {@literal <BLANK_LINE>} case, return true if the actual result is empty. For {@literal
+   *     <QUERY_FAILED>} case, replace the placeholder with "^Query \\w+ failed.*: " and do match.
    */
   static boolean match(String expectResult, String result) {
     if (expectResult.isEmpty()) {
@@ -266,7 +269,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     if (expectResult.startsWith("<QUERY_FAILED>")) {
       boolean match =
           Pattern.compile(
-                  "^Query \\w+ failed.*: " + expectResult.replace("<QUERY_FAILED>", "").trim())
+                  "^Query \\w+ failed.*: "
+                      + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
               .matcher(result)
               .find();
       return match;
@@ -363,10 +367,12 @@ public class TrinoQueryIT extends TrinoQueryITBase {
               () -> {
                 try {
                   runOneTestSetWithCatalog(testSetDirName, testCatalogs[finalI], testerFilter);
-                  LOG.debug(
-                      "Test set {}'s catalog {} run completed",
-                      simpleTesterName(testSetDirName),
-                      testCatalogs[finalI]);
+                  if (LOG.isDebugEnabled()) {
+                    LOG.debug(
+                        "Test set {}'s catalog {} run completed",
+                        simpleTesterName(testSetDirName),
+                        testCatalogs[finalI]);
+                  }
                   return finalI;
                 } catch (Exception e) {
                   String msg =
@@ -417,7 +423,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     boolean firstLine = true;
     while (sqlMatcher.find()) {
       if (!firstLine) {
-        outputStream.write("\n".getBytes());
+        outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
       }
       firstLine = false;
 
@@ -433,8 +439,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                 + "\nresult:\n"
                 + result);
       }
-      outputStream.write(result.getBytes());
-      outputStream.write("\n".getBytes());
+      outputStream.write(result.getBytes(StandardCharsets.UTF_8));
+      outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
     }
 
     outputStream.close();

@@ -44,7 +44,7 @@ public class ConvertUtil {
    * Convert the nested type of Iceberg to the type of gravitino.
    *
    * @param type Iceberg type of field.
-   * @return
+   * @return Gravitino type.
    */
   public static com.datastrato.gravitino.rel.types.Type formIcebergType(Type type) {
     return TypeUtil.visit(type, new FromIcebergType());
@@ -58,7 +58,6 @@ public class ConvertUtil {
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
     return new IcebergColumn.Builder()
-        .withId(nestedField.fieldId())
         .withName(nestedField.name())
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
@@ -83,4 +82,6 @@ public class ConvertUtil {
             .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new);
     return com.datastrato.gravitino.rel.types.Types.StructType.of(fields);
   }
+
+  private ConvertUtil() {}
 }

@@ -47,6 +47,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   public static final String COMMENT = "COMMENT";
   public static final String SPACE = " ";
 
+  public static final String MODIFY_COLUMN = "MODIFY COLUMN ";
+  public static final String AFTER = "AFTER ";
+
   protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
 
   protected DataSource dataSource;
@@ -142,8 +145,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       }
 
       if (!found) {
-        throw new NoSuchTableException(
-            String.format("Table %s does not exist in %s.", tableName, databaseName));
+        throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
       }
 
       // 2.Get column information
@@ -245,7 +247,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected ResultSet getTables(Connection connection) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
     String databaseName = connection.getSchema();
-    return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.TABLE_TYPES);
+    return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.getTableTypes());
   }
 
   protected ResultSet getTable(Connection connection, String databaseName, String tableName)
@@ -390,7 +392,7 @@ public abstract class JdbcTableOperations implements TableOperation {
             .orElseThrow(
                 () ->
                     new NoSuchColumnException(
-                        "Column " + colName + " does not exist in table " + jdbcTable.name()));
+                        "Column %s does not exist in table %s", colName, jdbcTable.name()));
   }
 
   protected Connection getConnection(String catalog) throws SQLException {

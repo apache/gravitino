@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.web.rest;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -27,10 +28,12 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   private static final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
   private static final String publicKey =
-      new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
+      new String(
+          Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
 
   private static String token;
 
+  @SuppressWarnings("JavaUtilDate")
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
@@ -41,7 +44,7 @@ public class OAuth2OperationsIT extends AbstractIT {
             .setAudience("service1")
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), publicKey);
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");

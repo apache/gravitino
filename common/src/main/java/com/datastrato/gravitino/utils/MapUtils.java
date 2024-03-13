@@ -11,6 +11,7 @@ import java.util.Map;
 
 /** Utility class for working with maps. */
 public class MapUtils {
+  private MapUtils() {}
 
   /**
    * Returns a map with all keys that start with the given prefix.

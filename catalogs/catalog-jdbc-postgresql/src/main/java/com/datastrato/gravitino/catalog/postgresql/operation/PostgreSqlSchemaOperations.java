@@ -34,13 +34,9 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
             {
               add("pg_toast");
               add("pg_catalog");
-              add("public");
               add("information_schema");
             }
           });
-
-  private static final String GET_SCHEMA_COMMENT_SQL_FORMAT =
-      "SELECT obj_description('%s'::regnamespace) as comment";
 
   private String database;
 
@@ -61,7 +57,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
         statement.setString(2, database);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (!resultSet.next()) {
-            throw new NoSuchSchemaException("No such schema: " + schema);
+            throw new NoSuchSchemaException("No such schema: %s", schema);
           }
           String schemaName = resultSet.getString(1);
           String comment = getSchemaComment(schema, connection);
@@ -142,7 +138,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   private String getShowSchemaCommentSql(String schema) {
-    return String.format(GET_SCHEMA_COMMENT_SQL_FORMAT, schema);
+    return String.format("SELECT obj_description('%s'::regnamespace) as comment", schema);
   }
 
   private String getSchemaComment(String schema, Connection connection) throws SQLException {

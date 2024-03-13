@@ -201,10 +201,12 @@ public class LockManager {
         if (treeNode.getReference() == 0) {
           parent.removeChild(treeNode.getName());
           long leftNodeCount = totalNodeCount.decrementAndGet();
-          LOG.trace(
-              "Evict stale tree lock node '{}', current left nodes '{}'",
-              treeNode.getName(),
-              leftNodeCount);
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(
+                "Evict stale tree lock node '{}', current left nodes '{}'",
+                treeNode.getName(),
+                leftNodeCount);
+          }
         }
       }
     }
@@ -216,6 +218,7 @@ public class LockManager {
    * @param identifier The identifier of the tree lock.
    * @return The created tree lock.
    */
+  @SuppressWarnings("ReferenceEquality")
   public TreeLock createTreeLock(NameIdentifier identifier) {
     checkTreeNodeIsFull();
 
@@ -225,6 +228,8 @@ public class LockManager {
       lockNode.addReference();
       treeLockNodes.add(lockNode);
 
+      // Avoid to use value equality instead of reference equality here.
+      // Otherwise, there will be an unexpected result when using NameIdentifier.of("/").
       if (identifier == ROOT) {
         // The lock tree root node
         return new TreeLock(treeLockNodes, identifier);

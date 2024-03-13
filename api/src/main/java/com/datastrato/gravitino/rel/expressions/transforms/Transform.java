@@ -20,6 +20,7 @@
 
 package com.datastrato.gravitino.rel.expressions.transforms;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import java.util.Objects;
  * <p>For example, the transform date(ts) is used to derive a date value from a timestamp column.
  * The transform name is "date" and its argument is a reference to the "ts" column.
  */
+@Evolving
 public interface Transform extends Expression {
   /** @return The transform function name. */
   String name();
@@ -74,7 +76,7 @@ public interface Transform extends Expression {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof SingleFieldTransform)) {
         return false;
       }
       SingleFieldTransform that = (SingleFieldTransform) o;

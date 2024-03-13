@@ -17,9 +17,10 @@ public abstract class JdbcExceptionConverter {
    * @return A best attempt at a corresponding connector exception or generic with the SQLException
    *     as the cause
    */
+  @SuppressWarnings("FormatStringAnnotation")
   public GravitinoRuntimeException toGravitinoException(final SQLException sqlException) {
     // TODO we need to transform specific SQL exceptions into our own exceptions, such as
     // SchemaAlreadyExistsException
-    return new GravitinoRuntimeException(sqlException.getMessage(), sqlException);
+    return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
   }
 }

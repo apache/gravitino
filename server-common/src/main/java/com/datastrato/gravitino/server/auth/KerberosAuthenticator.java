@@ -16,11 +16,14 @@ import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
+import com.google.common.base.Splitter;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Base64;
+import java.util.List;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
@@ -97,7 +100,7 @@ public class KerberosAuthenticator implements Authenticator {
       throw new UnauthorizedException("Empty token authorization header", AuthConstants.NEGOTIATE);
     }
 
-    String authData = new String(tokenData);
+    String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER)) {
       throw new UnauthorizedException(
@@ -135,7 +138,9 @@ public class KerberosAuthenticator implements Authenticator {
     GSSContext gssContext = null;
     GSSCredential gssCreds = null;
     try {
-      LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+      }
 
       gssCreds =
           this.gssManager.createCredential(
@@ -159,12 +164,13 @@ public class KerberosAuthenticator implements Authenticator {
       }
 
       // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
-      String[] principalComponents = gssContext.getSrcName().toString().split("@");
-      if (principalComponents.length != 2) {
+      List<String> principalComponents =
+          Splitter.on('@').splitToList(gssContext.getSrcName().toString());
+      if (principalComponents.size() != 2) {
         throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
       }
 
-      String user = principalComponents[0];
+      String user = principalComponents.get(0);
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,

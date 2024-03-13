@@ -4,12 +4,14 @@
  */
 package com.datastrato.gravitino.rel.expressions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Arrays;
 
 /**
  * The interface of a function expression. A function expression is an expression that takes a
  * function name and a list of arguments.
  */
+@Evolving
 public interface FunctionExpression extends Expression {
 
   /**

@@ -609,8 +609,8 @@ You can create a table by sending a `POST` request to the `/api/metalakes/{metal
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "exmaple_table",
-  "comment": "This is an exmaple table",
+  "name": "example_table",
+  "comment": "This is an example table",
   "columns": [
     {
       "name": "id",
@@ -756,7 +756,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "catalog", "schema", "exmaple_table"),
+  NameIdentifier.of("metalake", "catalog", "schema", "example_table"),
   new Column[] {
     Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
@@ -768,7 +768,7 @@ tableCatalog.createTable(
       ), "info column comment", true, false, null),
     Column.of("dt", Types.DateType.get(), "dt column comment", true, false, null)
   },
-  "This is an exmaple table",
+  "This is an example table",
   tablePropertiesMap,
   new Transform[] {Transforms.identity("id")},
   Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
@@ -823,6 +823,32 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
+##### Unparsed type
+
+Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
+The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+
+<Tabs>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "user-defined"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "user-defined"
+String unparsedValue = ((UnparsedType) type).unparsedType();
+```
+
+  </TabItem>
+</Tabs>
+
 #### Table column default value
 
 When defining a table column, you can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
@@ -831,22 +857,22 @@ The following is a table of the column default value that Gravitino supports for
 
 | Catalog provider    | Supported default value |
 |---------------------|-------------------------|
-| `hive`              | NO                      |
-| `lakehouse-iceberg` | NO                      |
-| `jdbc-mysql`        | YES                     |
-| `jdbc-postgresql`   | YES                     |
+| `hive`              | &#10008;                |
+| `lakehouse-iceberg` | &#10008;                |
+| `jdbc-mysql`        | &#10004;                |
+| `jdbc-postgresql`   | &#10004;                |
 
 #### Table column auto-increment
 
 Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
 The following table shows the column auto-increment that Gravitino supports for different catalogs:
 
-| Catalog provider    | Supported auto-increment                                                    |
-|---------------------|-----------------------------------------------------------------------------|
-| `hive`              | NO                                                                          |
-| `lakehouse-iceberg` | NO                                                                          |
-| `jdbc-mysql`        | YES with [limitations](./jdbc-mysql-catalog.md#table-column-auto-increment) |
-| `jdbc-postgresql`   | YES                                                                         |
+| Catalog provider    | Supported auto-increment                                                     |
+|---------------------|------------------------------------------------------------------------------|
+| `hive`              | &#10008;                                                                     |
+| `lakehouse-iceberg` | &#10008;                                                                     |
+| `jdbc-mysql`        | &#10004;([limitations](./jdbc-mysql-catalog.md#table-column-auto-increment)) |
+| `jdbc-postgresql`   | &#10004;                                                                     |
 
 #### Table property and type mapping
 
@@ -859,18 +885,18 @@ The following is the table property that Gravitino supports:
 | `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 
-#### Table partitioning, bucketing, sort ordering and indexing
+#### Table partitioning, bucketing, sort ordering and indexes
 
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                           | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.                 | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                             | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexing      | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations.   | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
+| Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
 
-For more information, please see the related document on [partitioning, bucketing, sorting, and indexing](table-partitioning-bucketing-sort-order-indexes.md).
+For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
 :::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
@@ -906,7 +932,8 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 
 ### Alter a table

@@ -20,10 +20,13 @@
 
 package com.datastrato.gravitino.rel.expressions.sorts;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 
 /** Represents a sort order in the public expression API. */
+@Evolving
 public interface SortOrder extends Expression {
+
   /** @return The sort expression. */
   Expression expression();
 

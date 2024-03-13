@@ -297,6 +297,7 @@
    Apache Yetus
    Apache Yetus - Audience Annotations
    Apache Kerby
+   Apache Kyuubi
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -329,6 +330,7 @@
    J2ObjC
    SQLite JDBC Driver
    Immutables
+   MyBatis
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1

@@ -4,7 +4,9 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -13,6 +15,7 @@ import java.util.Map;
  * The interface of a catalog. The catalog is the second level entity in the gravitino system,
  * containing a set of tables.
  */
+@Evolving
 public interface Catalog extends Auditable {
 
   /** The type of the catalog. */
@@ -20,11 +23,11 @@ public interface Catalog extends Auditable {
     /** Catalog Type for Relational Data Structure, like db.table, catalog.db.table. */
     RELATIONAL,
 
-    /** Catalog Type for File System (including HDFS, S3, etc.), like path/to/file */
-    FILE,
+    /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
+    FILESET,
 
     /** Catalog Type for Message Queue, like kafka://topic */
-    STREAM,
+    MESSAGING
   }
 
   /**
@@ -87,5 +90,13 @@ public interface Catalog extends Auditable {
    */
   default FilesetCatalog asFilesetCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support fileset operations");
+  }
+
+  /**
+   * @return the {@link TopicCatalog} if the catalog supports topic operations.
+   * @throws UnsupportedOperationException if the catalog does not support topic operations.
+   */
+  default TopicCatalog asTopicCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support topic operations");
   }
 }

@@ -154,6 +154,12 @@ public class TestJsonUtils {
             + "    ]\n"
             + "}";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+
+    type = Types.UnparsedType.of("user-defined");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n" + "    \"type\": \"unparsed\",\n" + "    \"unparsedType\": \"user-defined\"\n" + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
   }
 
   @Test

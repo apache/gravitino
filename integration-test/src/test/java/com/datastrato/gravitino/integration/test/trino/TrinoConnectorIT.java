@@ -4,23 +4,21 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
-import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.datastrato.gravitino.integration.test.container.TrinoContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -41,7 +39,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,7 +46,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -64,7 +60,6 @@ public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static HiveClientPool hiveClientPool;
 
   public static String metalakeName =
       GravitinoITUtils.genRandomName("TrinoIT_metalake").toLowerCase();
@@ -94,7 +89,6 @@ public class TrinoConnectorIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
-    hiveClientPool = closer.register(new HiveClientPool(1, hiveConf));
 
     // Currently must first create metalake and catalog then start trino container
     createMetalake();
@@ -103,7 +97,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.startTrinoContainer(
         trinoConfDir,
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
-        new InetSocketAddress(AbstractIT.getPrimaryNICIp(), getGravitinoServerPort()),
+        getGravitinoServerPort(),
         metalakeName);
     containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
 
@@ -118,11 +112,15 @@ public class TrinoConnectorIT extends AbstractIT {
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       String destPath = ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
+      String mysqlPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-mysql", "libs");
+      String pgPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-postgresql", "libs");
+
       JdbcDriverDownloader.downloadJdbcDriver(
           "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
-          destPath);
+          destPath,
+          mysqlPath);
       JdbcDriverDownloader.downloadJdbcDriver(
-          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath);
+          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath, pgPath);
     }
   }
 
@@ -151,8 +149,15 @@ public class TrinoConnectorIT extends AbstractIT {
     NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
     Schema schema = catalog.asSchemas().loadSchema(idSchema);
     Assertions.assertEquals(schema.name(), databaseName);
-    Database database = hiveClientPool.run(client -> client.getDatabase(databaseName));
-    Assertions.assertEquals(databaseName, database.getName());
+
+    ArrayList<ArrayList<String>> r =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show schemas from \"%s.%s\" like '%s'",
+                    metalakeName, catalogName, databaseName));
+    Assertions.assertEquals(r.get(0).get(0), databaseName);
   }
 
   @Test
@@ -185,16 +190,12 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table1 = catalog.asTableCatalog().loadTable(idTable1);
     Assertions.assertEquals(table1.name(), tab1Name);
 
-    // Verify in Hive Server
-    org.apache.hadoop.hive.metastore.api.Table hiveTab1 =
-        hiveClientPool.run(client -> client.getTable(databaseName, tab1Name));
-    Assertions.assertEquals(databaseName, hiveTab1.getDbName());
-    Assertions.assertEquals(tab1Name, hiveTab1.getTableName());
+    verifySchemaAndTable(databaseName, tab1Name);
 
     testShowTable();
   }
 
-  void testShowTable() {
+  private void testShowTable() {
     String sql =
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",
@@ -202,6 +203,27 @@ public class TrinoConnectorIT extends AbstractIT {
     ArrayList<ArrayList<String>> queryData =
         containerSuite.getTrinoContainer().executeQuerySQL(sql);
     Assertions.assertEquals(queryData.get(0).get(0), tab1Name);
+  }
+
+  private void verifySchemaAndTable(String dbName, String tableName) {
+    // Verify in Hive Server
+    ArrayList<ArrayList<String>> r =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show schemas from \"%s.%s\" like '%s'", metalakeName, catalogName, dbName));
+    Assertions.assertEquals(r.get(0).get(0), dbName);
+
+    // Compare table
+    r =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show create table \"%s.%s\".%s.%s",
+                    metalakeName, catalogName, dbName, tableName));
+    Assertions.assertTrue(r.get(0).get(0).contains(tableName));
   }
 
   public void testScenarioTable1() throws TException, InterruptedException {
@@ -230,11 +252,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table1 = catalog.asTableCatalog().loadTable(idTable1);
     Assertions.assertEquals(table1.name(), scenarioTab1Name);
 
-    // Verify in Hive Server
-    org.apache.hadoop.hive.metastore.api.Table hiveTab1 =
-        hiveClientPool.run(client -> client.getTable(databaseName, scenarioTab1Name));
-    Assertions.assertEquals(databaseName, hiveTab1.getDbName());
-    Assertions.assertEquals(scenarioTab1Name, hiveTab1.getTableName());
+    verifySchemaAndTable(databaseName, scenarioTab1Name);
 
     // Insert data to table1
     ArrayList<ArrayList<String>> table1Data = new ArrayList<>();
@@ -293,11 +311,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Table table2 = catalog.asTableCatalog().loadTable(idTable2);
     Assertions.assertEquals(table2.name(), scenarioTab2Name);
 
-    // Verify in Hive Server
-    org.apache.hadoop.hive.metastore.api.Table hiveTab2 =
-        hiveClientPool.run(client -> client.getTable(databaseName, scenarioTab2Name));
-    Assertions.assertEquals(databaseName, hiveTab2.getDbName());
-    Assertions.assertEquals(scenarioTab2Name, hiveTab2.getTableName());
+    verifySchemaAndTable(databaseName, scenarioTab2Name);
 
     // Insert data to table2
     ArrayList<ArrayList<String>> table2Data = new ArrayList<>();
@@ -525,30 +539,30 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   private Column[] createHiveFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
     Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimeType");
     // MySQL doesn't support timestamp time zone
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
 
   private Column[] createMySQLFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
     Set<String> unsupportedType =
         Sets.newHashSet("FixedType", "StringType", "TimestampType", "BooleanType");
     // MySQL doesn't support timestamp time zone
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
 
   private Column[] createIcebergFullTypeColumns() {
-    Column[] columnDTO = createFullTypeColumns();
+    Column[] columns = createFullTypeColumns();
 
     Set<String> unsupportedType =
         Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
-    return Arrays.stream(columnDTO)
+    return Arrays.stream(columns)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(Column[]::new);
   }
@@ -966,7 +980,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
-    LOG.info("create iceberg hive table sql is: " + data);
+    LOG.info("create iceberg hive table sql is: {}", data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
     Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
@@ -1073,8 +1087,12 @@ public class TrinoConnectorIT extends AbstractIT {
     final String sql1 =
         String.format("drop schema \"%s.%s\".%s cascade", metalakeName, catalogName, schemaName);
     // Will fail because the iceberg catalog does not support cascade drop
+    TrinoContainer trinoContainer = containerSuite.getTrinoContainer();
     Assertions.assertThrows(
-        RuntimeException.class, () -> containerSuite.getTrinoContainer().executeUpdateSQL(sql1));
+        RuntimeException.class,
+        () -> {
+          trinoContainer.executeUpdateSQL(sql1);
+        });
 
     final String sql2 =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
@@ -1215,9 +1233,9 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Create a table with primary key
-    Column[] columnDTOS = createMySQLFullTypeColumns();
-    columnDTOS =
-        Arrays.stream(columnDTOS)
+    Column[] columns = createMySQLFullTypeColumns();
+    columns =
+        Arrays.stream(columns)
             .map(
                 c -> {
                   if ("IntegerType".equals(c.name())) {
@@ -1232,7 +1250,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columnDTOS,
+            columns,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build(),
             new Transform[0],
@@ -1456,7 +1474,7 @@ public class TrinoConnectorIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
     LOG.debug("hiveMetastoreUris is {}", hiveMetastoreUris);
-    properties.put(METASTORE_URIS, hiveMetastoreUris);
+    properties.put("metastore.uris", hiveMetastoreUris);
 
     Catalog createdCatalog =
         metalake.createCatalog(

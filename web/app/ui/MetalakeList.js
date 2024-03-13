@@ -7,8 +7,13 @@ import { useEffect, useCallback, useState, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Grid, Card, IconButton, Typography, Portal, Tooltip } from '@mui/material'
-import { DataGrid, GridToolbar } from '@mui/x-data-grid'
+import { Box, Grid, Card, Typography, Portal, Tooltip } from '@mui/material'
+import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import {
+  VisibilityOutlined as ViewIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlined as DeleteIcon
+} from '@mui/icons-material'
 
 import Icon from '@/components/Icon'
 
@@ -26,7 +31,7 @@ function TableToolbar(props) {
     <>
       <Fragment>
         <Portal container={() => document.getElementById('filter-panel')}>
-          <Box className={`twc-w-full twc-justify-between twc-hidden`}>
+          <Box className={`twc-flex twc-w-full twc-justify-between`}>
             <GridToolbar {...props} />
           </Box>
         </Portal>
@@ -49,7 +54,7 @@ const MetalakeList = () => {
   const [openConfirmDelete, setOpenConfirmDelete] = useState(false)
   const [confirmCacheData, setConfirmCacheData] = useState(null)
 
-  const handleDeleteMetalake = name => {
+  const handleDeleteMetalake = name => () => {
     setOpenConfirmDelete(true)
     setConfirmCacheData(name)
   }
@@ -66,7 +71,7 @@ const MetalakeList = () => {
     setConfirmCacheData(null)
   }
 
-  const handleShowEditDialog = data => {
+  const handleShowEditDialog = data => () => {
     setDialogType('update')
     setOpenDialog(true)
     setDialogData(data)
@@ -76,7 +81,7 @@ const MetalakeList = () => {
     setValue(val)
   }, [])
 
-  const handleShowDetails = row => {
+  const handleShowDetails = row => () => {
     setDrawerData(row)
     setOpenDrawer(true)
   }
@@ -102,12 +107,14 @@ const MetalakeList = () => {
     dispatch(setFilteredMetalakes(filteredData))
   }, [dispatch, store.metalakes, value])
 
+  /** @type {import('@mui/x-data-grid').GridColDef[]} */
   const columns = [
     {
       flex: 0.2,
       minWidth: 230,
       disableColumnMenu: true,
       filterable: true,
+      type: 'string',
       field: 'name',
       headerName: 'Name',
       renderCell: ({ row }) => {
@@ -142,7 +149,9 @@ const MetalakeList = () => {
       flex: 0.15,
       minWidth: 150,
       disableColumnMenu: true,
+      type: 'string',
       field: 'createdBy',
+      valueGetter: params => `${params.row.audit?.creator}`,
       headerName: 'Created by',
       renderCell: ({ row }) => {
         return (
@@ -156,12 +165,13 @@ const MetalakeList = () => {
       flex: 0.15,
       minWidth: 150,
       disableColumnMenu: true,
-      valueGetter: params => `${params.row.audit?.createTime}`,
+      type: 'dateTime',
       field: 'createdAt',
+      valueGetter: params => new Date(params.row.audit?.createTime),
       headerName: 'Created at',
       renderCell: ({ row }) => {
         return (
-          <Typography noWrap sx={{ color: 'text.secondary' }}>
+          <Typography title={row.audit?.createTime} noWrap sx={{ color: 'text.secondary' }}>
             {formatToDateTime(row.audit?.createTime)}
           </Typography>
         )
@@ -170,40 +180,51 @@ const MetalakeList = () => {
     {
       flex: 0.1,
       minWidth: 90,
-      sortable: false,
-      disableColumnMenu: true,
-      field: 'actions',
+      type: 'actions',
       headerName: 'Actions',
-      renderCell: ({ row }) => (
-        <>
-          <IconButton
-            title='Details'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowDetails(row)}
-          >
-            <Icon icon='bx:show-alt' />
-          </IconButton>
-
-          <IconButton
-            title='Edit'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowEditDialog(row)}
-          >
-            <Icon icon='mdi:square-edit-outline' />
-          </IconButton>
-
-          <IconButton
-            title='Delete'
-            size='small'
-            sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDeleteMetalake(row.name)}
-          >
-            <Icon icon='mdi:delete-outline' />
-          </IconButton>
-        </>
-      )
+      field: 'actions',
+      getActions: ({ id, row }) => [
+        <GridActionsCellItem
+          key='details'
+          label='Details'
+          title='Details'
+          data-refer={`view-metalake-${row.name}`}
+          icon={<ViewIcon viewBox='0 0 24 22' />}
+          onClick={handleShowDetails(row)}
+          sx={{
+            '& svg': {
+              fontSize: '24px'
+            }
+          }}
+        />,
+        <GridActionsCellItem
+          key='edit'
+          label='Edit'
+          title='Edit'
+          data-refer={`edit-metalake-${row.name}`}
+          icon={<EditIcon />}
+          onClick={handleShowEditDialog(row)}
+          sx={{
+            '& svg': {
+              fontSize: '24px'
+            }
+          }}
+        />,
+        <GridActionsCellItem
+          key='delete'
+          icon={<DeleteIcon />}
+          label='Delete'
+          title='Delete'
+          data-refer={`delete-metalake-${row.name}`}
+          onClick={handleDeleteMetalake(row.name)}
+          sx={{
+            '& svg': {
+              fontSize: '24px',
+              color: theme => theme.palette.error.light
+            }
+          }}
+        />
+      ]
     }
   ]
 
@@ -221,7 +242,6 @@ const MetalakeList = () => {
           <DataGrid
             disableColumnSelector
             disableDensitySelector
-            slots={{ toolbar: TableToolbar }}
             slotProps={{
               toolbar: {
                 printOptions: { disableToolbarButton: true },
@@ -238,6 +258,8 @@ const MetalakeList = () => {
             rows={store.filteredMetalakes}
             columns={columns}
             disableRowSelectionOnClick
+            onCellClick={(params, event) => event.stopPropagation()}
+            onRowClick={(params, event) => event.stopPropagation()}
             pageSizeOptions={[10, 25, 50]}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}

@@ -14,6 +14,7 @@ import java.sql.SQLException;
 
 public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
 
+  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     if (null != se.getSQLState()) {

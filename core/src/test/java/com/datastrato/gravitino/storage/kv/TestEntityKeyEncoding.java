@@ -190,13 +190,12 @@ public class TestEntityKeyEncoding {
 
       // Unsupported operation
       Mockito.doReturn(10L).when(mockIdGenerator).nextId();
+      namespace = Namespace.of("metalake1", "catalog2", "schema3", "table1");
+      NameIdentifier id = NameIdentifier.of(namespace, "column1");
       Assertions.assertThrows(
           UnsupportedOperationException.class,
           () -> {
-            encoder.encode(
-                NameIdentifier.of(
-                    Namespace.of("metalake1", "catalog2", "schema3", "table1"), "column1"),
-                EntityType.COLUMN);
+            encoder.encode(id, EntityType.COLUMN);
           });
     }
   }
@@ -268,13 +267,10 @@ public class TestEntityKeyEncoding {
       Assertions.assertArrayEquals(expectKey, realKey);
 
       Mockito.doReturn(3L).when(mockIdGenerator).nextId();
+      namespace = Namespace.of("metalake1", "catalog2", "schema3", "table1");
+      NameIdentifier id = NameIdentifier.of(namespace, WILD_CARD);
       Assertions.assertThrows(
-          UnsupportedOperationException.class,
-          () ->
-              encoder.encode(
-                  NameIdentifier.of(
-                      Namespace.of("metalake1", "catalog2", "schema3", "table1"), WILD_CARD),
-                  EntityType.COLUMN));
+          UnsupportedOperationException.class, () -> encoder.encode(id, EntityType.COLUMN));
     }
   }
 

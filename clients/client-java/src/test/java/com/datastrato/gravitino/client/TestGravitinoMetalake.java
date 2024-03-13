@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -57,10 +58,11 @@ public class TestGravitinoMetalake extends TestBase {
 
     NameIdentifier ident1 = NameIdentifier.of(metalakeName, "mock");
     NameIdentifier ident2 = NameIdentifier.of(metalakeName, "mock2");
+    Namespace namespace = Namespace.of(metalakeName);
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {ident1, ident2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs = metalake.listCatalogs(Namespace.of(metalakeName));
+    NameIdentifier[] catalogs = metalake.listCatalogs(namespace);
 
     Assertions.assertEquals(2, catalogs.length);
     Assertions.assertEquals(ident1, catalogs[0]);
@@ -69,22 +71,20 @@ public class TestGravitinoMetalake extends TestBase {
     // Test return empty catalog list
     EntityListResponse resp1 = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs1 = metalake.listCatalogs(Namespace.of(metalakeName));
+    NameIdentifier[] catalogs1 = metalake.listCatalogs(namespace);
     Assertions.assertEquals(0, catalogs1.length);
 
     // Test return internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> metalake.listCatalogs(Namespace.of(metalakeName)));
+        Assertions.assertThrows(RuntimeException.class, () -> metalake.listCatalogs(namespace));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, path, null, "mock error", HttpStatus.SC_CONFLICT);
     Throwable ex1 =
-        Assertions.assertThrows(
-            RESTException.class, () -> metalake.listCatalogs(Namespace.of(metalakeName)));
+        Assertions.assertThrows(RESTException.class, () -> metalake.listCatalogs(namespace));
     Assertions.assertTrue(ex1.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -115,10 +115,9 @@ public class TestGravitinoMetalake extends TestBase {
     ErrorResponse errorResponse =
         ErrorResponse.notFound(NoSuchCatalogException.class.getSimpleName(), "mock error");
     buildMockResource(Method.GET, path, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);
     Throwable ex =
-        Assertions.assertThrows(
-            NoSuchCatalogException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+        Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return unsupported catalog type
@@ -126,32 +125,24 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.FILE)
+            .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> metalake.loadCatalog(id));
 
     // Test return internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Throwable ex1 =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+    Throwable ex1 = Assertions.assertThrows(RuntimeException.class, () -> metalake.loadCatalog(id));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, path, null, "mock error", HttpStatus.SC_CONFLICT);
-    Throwable ex2 =
-        Assertions.assertThrows(
-            RESTException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+    Throwable ex2 = Assertions.assertThrows(RESTException.class, () -> metalake.loadCatalog(id));
     Assertions.assertTrue(ex2.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -191,25 +182,22 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.FILE)
+            .withType(Catalog.Type.MESSAGING)
             .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
-            catalogName, Catalog.Type.FILE, provider, "comment", Collections.emptyMap());
+            catalogName, Catalog.Type.MESSAGING, provider, "comment", Collections.emptyMap());
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.POST, path, req1, resp1, HttpStatus.SC_OK);
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);
+    Map<String, String> emptyMap = Collections.emptyMap();
+
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () ->
-            metalake.createCatalog(
-                NameIdentifier.of(metalakeName, catalogName),
-                Catalog.Type.FILE,
-                provider,
-                "comment",
-                Collections.emptyMap()));
+        () -> metalake.createCatalog(id, Catalog.Type.MESSAGING, provider, "comment", emptyMap));
 
     // Test return NoSuchMetalakeException
     ErrorResponse errorResponse =
@@ -219,12 +207,7 @@ public class TestGravitinoMetalake extends TestBase {
         Assertions.assertThrows(
             NoSuchMetalakeException.class,
             () ->
-                metalake.createCatalog(
-                    NameIdentifier.of(metalakeName, catalogName),
-                    Catalog.Type.RELATIONAL,
-                    provider,
-                    "comment",
-                    Collections.emptyMap()));
+                metalake.createCatalog(id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return CatalogAlreadyExistsException
@@ -236,12 +219,7 @@ public class TestGravitinoMetalake extends TestBase {
         Assertions.assertThrows(
             CatalogAlreadyExistsException.class,
             () ->
-                metalake.createCatalog(
-                    NameIdentifier.of(metalakeName, catalogName),
-                    Catalog.Type.RELATIONAL,
-                    provider,
-                    "comment",
-                    Collections.emptyMap()));
+                metalake.createCatalog(id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return internal error
@@ -251,12 +229,7 @@ public class TestGravitinoMetalake extends TestBase {
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                metalake.createCatalog(
-                    NameIdentifier.of(metalakeName, catalogName),
-                    Catalog.Type.RELATIONAL,
-                    provider,
-                    "comment",
-                    Collections.emptyMap()));
+                metalake.createCatalog(id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex2.getMessage().contains("mock error"));
   }
 
@@ -285,8 +258,8 @@ public class TestGravitinoMetalake extends TestBase {
     CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(reqs);
 
     buildMockResource(Method.PUT, path, updatesRequest, resp, HttpStatus.SC_OK);
-    Catalog catalog =
-        metalake.alterCatalog(NameIdentifier.of(metalakeName, catalogName), change1, change2);
+    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);
+    Catalog catalog = metalake.alterCatalog(id, change1, change2);
     Assertions.assertEquals("mock1", catalog.name());
     Assertions.assertEquals("comment1", catalog.comment());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
@@ -297,10 +270,7 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.PUT, path, updatesRequest, errorResponse, HttpStatus.SC_NOT_FOUND);
     Throwable ex =
         Assertions.assertThrows(
-            NoSuchCatalogException.class,
-            () ->
-                metalake.alterCatalog(
-                    NameIdentifier.of(metalakeName, catalogName), change1, change2));
+            NoSuchCatalogException.class, () -> metalake.alterCatalog(id, change1, change2));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return IllegalArgumentException
@@ -308,10 +278,7 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.PUT, path, updatesRequest, errorResponse1, HttpStatus.SC_BAD_REQUEST);
     Throwable ex1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                metalake.alterCatalog(
-                    NameIdentifier.of(metalakeName, catalogName), change1, change2));
+            IllegalArgumentException.class, () -> metalake.alterCatalog(id, change1, change2));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return internal error
@@ -320,10 +287,7 @@ public class TestGravitinoMetalake extends TestBase {
         Method.PUT, path, updatesRequest, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex2 =
         Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                metalake.alterCatalog(
-                    NameIdentifier.of(metalakeName, catalogName), change1, change2));
+            RuntimeException.class, () -> metalake.alterCatalog(id, change1, change2));
     Assertions.assertTrue(ex2.getMessage().contains("mock error"));
   }
 

@@ -41,7 +41,7 @@ const RightContent = props => {
         <Box className={`twc-flex twc-items-center`}>
           <Box className={`twc-flex twc-items-center twc-justify-between`}>
             <Box className={`twc-flex twc-items-center`}>
-              <IconButton color='primary' component={Link} href='/' sx={{ mr: 2 }}>
+              <IconButton color='primary' component={Link} href='/' sx={{ mr: 2 }} data-refer='back-home-btn'>
                 <Icon icon='mdi:arrow-left' />
               </IconButton>
               <MetalakePath routeParams={routeParams} />
@@ -51,7 +51,12 @@ const RightContent = props => {
 
         {page === 'metalakes' && (
           <Box className={`twc-flex twc-items-center`}>
-            <Button variant='contained' startIcon={<Icon icon='mdi:plus-box' />} onClick={handleCreateCatalog}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateCatalog}
+              data-refer='create-catalog-btn'
+            >
               Create Catalog
             </Button>
             <CreateCatalogDialog open={open} setOpen={setOpen} routeParams={routeParams} />

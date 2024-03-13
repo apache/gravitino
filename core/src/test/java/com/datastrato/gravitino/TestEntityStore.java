@@ -6,9 +6,11 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -45,7 +47,9 @@ public class TestEntityStore {
     }
 
     @Override
-    public void initialize(Config config) throws RuntimeException {}
+    public void initialize(Config config) throws RuntimeException {
+      this.serde = Mockito.mock(EntitySerDe.class);
+    }
 
     @Override
     public void setSerDe(EntitySerDe entitySerDe) {
@@ -92,7 +96,7 @@ public class TestEntityStore {
           () -> {
             E e = (E) entityMap.get(ident);
             if (e == null) {
-              throw new NoSuchEntityException("Entity " + ident + " does not exist");
+              throw new NoSuchEntityException("Entity %s does not exist", ident);
             }
 
             E newE = updater.apply(e);
@@ -111,7 +115,7 @@ public class TestEntityStore {
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
+        throw new NoSuchEntityException("Entity %s does not exist", ident);
       }
 
       return e;
@@ -180,6 +184,16 @@ public class TestEntityStore {
             .withAuditInfo(auditInfo)
             .build();
 
+    FilesetEntity filesetEntity =
+        new FilesetEntity.Builder()
+            .withId(1L)
+            .withName("fileset")
+            .withFilesetType(Fileset.Type.MANAGED)
+            .withStorageLocation("file:/tmp")
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withAuditInfo(auditInfo)
+            .build();
+
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
     store.setSerDe(Mockito.mock(EntitySerDe.class));
@@ -188,6 +202,7 @@ public class TestEntityStore {
     store.put(catalog);
     store.put(schemaEntity);
     store.put(tableEntity);
+    store.put(filesetEntity);
 
     Metalake retrievedMetalake =
         store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -205,10 +220,14 @@ public class TestEntityStore {
         store.get(tableEntity.nameIdentifier(), EntityType.TABLE, TableEntity.class);
     Assertions.assertEquals(tableEntity, retrievedTable);
 
+    FilesetEntity retrievedFileset =
+        store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class);
+    Assertions.assertEquals(filesetEntity, retrievedFileset);
+
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
+    NameIdentifier id = metalake.nameIdentifier();
     Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+        NoSuchEntityException.class, () -> store.get(id, EntityType.METALAKE, BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
     store.close();

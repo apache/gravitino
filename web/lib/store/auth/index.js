@@ -4,13 +4,13 @@
  */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
+import toast from 'react-hot-toast'
 
-import { to, isProdEnv, loggerVersion } from '@/lib/utils'
+import { to, isProdEnv } from '@/lib/utils'
 
 import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
-import { getVersionApi } from '@/lib/api/version'
 
-import { setVersion as setStoreVersion } from '@/lib/store/sys'
+import { initialVersion } from '@/lib/store/sys'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
@@ -19,11 +19,14 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   let authType = null
   const [err, res] = await to(getAuthConfigsApi())
 
-  if (!err && res) {
-    oauthUrl = `${res['gravitino.authenticator.oauth.serverUri']}${res['gravitino.authenticator.oauth.tokenPath']}`
-
-    authType = res['gravitino.authenticator']
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  oauthUrl = `${res['gravitino.authenticator.oauth.serverUri']}${res['gravitino.authenticator.oauth.tokenPath']}`
+  authType = res['gravitino.authenticator']
+
+  localStorage.setItem('oauthUrl', oauthUrl)
 
   return { oauthUrl, authType }
 })
@@ -46,42 +49,39 @@ export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, {
 })
 
 export const loginAction = createAsyncThunk('auth/loginAction', async ({ params, router }, { getState, dispatch }) => {
-  const preLogin = new Promise(async resolve => {
-    dispatch(setAuthParams(params))
-    localStorage.setItem('authParams', JSON.stringify(params))
+  dispatch(setAuthParams(params))
+  localStorage.setItem('authParams', JSON.stringify(params))
 
-    const url = getState().auth.oauthUrl
+  const url = getState().auth.oauthUrl
 
-    const [err, res] = await to(loginApi(url, params))
+  const [err, res] = await to(loginApi(url, params))
 
-    if (err || !res) {
-      throw new Error(err)
-    }
+  if (err || !res) {
+    toast.error(err.response?.data?.err || err.message, { id: `global_error_message_status_${err.response?.status}` })
+    throw new Error(err)
+  }
 
-    const { access_token, expires_in } = res.data
+  const { access_token, expires_in } = res
 
-    localStorage.setItem('accessToken', access_token)
-    localStorage.setItem('expiredIn', expires_in)
-    dispatch(setAuthToken(access_token))
-    dispatch(setExpiredIn(expires_in))
+  localStorage.setItem('accessToken', access_token)
+  localStorage.setItem('expiredIn', expires_in)
+  dispatch(setAuthToken(access_token))
+  dispatch(setExpiredIn(expires_in))
 
-    resolve(access_token)
-  })
+  await dispatch(initialVersion())
 
-  preLogin.then(async token => {
-    if (!token) {
-      throw new Error('Token not found')
-    }
+  router.push('/')
 
-    const [verErr, resVer] = await to(getVersionApi())
-    const { version } = resVer
+  return { token: access_token, expired: expires_in }
+})
 
-    loggerVersion(version.version)
-    localStorage.setItem('version', JSON.stringify(version))
-    dispatch(setStoreVersion(version.version))
+export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('authParams')
+  dispatch(setAuthToken(''))
+  await router.push('/ui/login')
 
-    router.replace('/')
-  })
+  return { token: null }
 })
 
 export const setIntervalId = createAsyncThunk('auth/setIntervalId', async (expiredIn, { dispatch }) => {

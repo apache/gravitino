@@ -22,13 +22,16 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenAuthenticator {
 
   @Test
   public void testAuthentication() {
     OAuth2TokenAuthenticator auth2TokenAuthenticator = new OAuth2TokenAuthenticator();
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
-    String publicKey = new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
+    String publicKey =
+        new String(
+            Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
     Config config = new Config(false) {};
     config.set(OAuthConfig.SERVICE_AUDIENCE, "service1");
     Assertions.assertThrows(
@@ -43,17 +46,18 @@ public class TestOAuth2TokenAuthenticator {
         Assertions.assertThrows(
             UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(null));
     Assertions.assertEquals("Empty token authorization header", e.getMessage());
+    byte[] bytes = "Xx".getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
-            UnauthorizedException.class,
-            () -> auth2TokenAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
+            UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(bytes));
     Assertions.assertEquals("Invalid token authorization header", e.getMessage());
+    byte[] bytes2 = AuthConstants.AUTHORIZATION_BEARER_HEADER.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () ->
-                auth2TokenAuthenticator.authenticateToken(
-                    AuthConstants.AUTHORIZATION_BEARER_HEADER.getBytes(StandardCharsets.UTF_8)));
+            () -> {
+              auth2TokenAuthenticator.authenticateToken(bytes2);
+            });
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
         Jwts.builder()
@@ -61,13 +65,14 @@ public class TestOAuth2TokenAuthenticator {
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
+    String header1 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token1;
+    byte[] bytes3 = header1.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () ->
-                auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token1)
-                        .getBytes(StandardCharsets.UTF_8)));
+            () -> {
+              auth2TokenAuthenticator.authenticateToken(bytes3);
+            });
     Assertions.assertEquals("Found null Audience in token", e.getMessage());
 
     String token2 =
@@ -77,13 +82,11 @@ public class TestOAuth2TokenAuthenticator {
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
+    String header2 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token2;
+    byte[] bytes4 = header2.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
-            UnauthorizedException.class,
-            () ->
-                auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token2)
-                        .getBytes(StandardCharsets.UTF_8)));
+            UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(bytes4));
     Assertions.assertEquals(
         "Audience in the token [xxxx] doesn't contain service1", e.getMessage());
 
@@ -96,13 +99,11 @@ public class TestOAuth2TokenAuthenticator {
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
+    String header3 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token3;
+    byte[] bytes5 = header3.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
-            UnauthorizedException.class,
-            () ->
-                auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token3)
-                        .getBytes(StandardCharsets.UTF_8)));
+            UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(bytes5));
     Assertions.assertEquals(
         "Audiences in the token [x1, x2, x3] don't contain service1", e.getMessage());
 
@@ -118,13 +119,11 @@ public class TestOAuth2TokenAuthenticator {
             .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
+    String header4 = AuthConstants.AUTHORIZATION_BEARER_HEADER + token4;
+    byte[] bytes6 = header4.getBytes(StandardCharsets.UTF_8);
     e =
         Assertions.assertThrows(
-            UnauthorizedException.class,
-            () ->
-                auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token4)
-                        .getBytes(StandardCharsets.UTF_8)));
+            UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(bytes6));
     Assertions.assertEquals(
         "Audiences in token is not in expected format: {k1=v1, k2=v2}", e.getMessage());
 

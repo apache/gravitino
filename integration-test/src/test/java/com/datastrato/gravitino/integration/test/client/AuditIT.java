@@ -5,13 +5,13 @@
 
 package com.datastrato.gravitino.integration.test.client;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
+import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -26,15 +26,15 @@ public class AuditIT extends AbstractIT {
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(OAuthConfig.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
   }
 
   @Test
   public void testAuditMetalake() throws Exception {
-    String metalakeAuditName = GravitinoITUtils.genRandomName("metalakeAudit");
-    String newName = GravitinoITUtils.genRandomName("newmetaname");
+    String metalakeAuditName = RandomNameUtils.genRandomName("metalakeAudit");
+    String newName = RandomNameUtils.genRandomName("newmetaname");
 
     GravitinoMetaLake metaLake =
         client.createMetalake(

@@ -622,4 +622,6 @@ public class Transforms {
       return result;
     }
   }
+
+  private Transforms() {}
 }

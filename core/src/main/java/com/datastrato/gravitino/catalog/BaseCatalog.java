@@ -12,8 +12,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -30,8 +28,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
-
   private CatalogEntity entity;
 
   private Map<String, String> conf;
@@ -39,6 +35,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private volatile CatalogOperations ops;
 
   private volatile Map<String, String> properties;
+
+  private static String ENTITY_IS_NOT_SET = "entity is not set";
 
   // Any Gravitino configuration that starts with this prefix will be trim and passed to the
   // specific
@@ -73,6 +71,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     return ops().filesetPropertiesMetadata();
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().topicPropertiesMetadata();
   }
 
   /**
@@ -136,25 +139,25 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public String name() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.name();
   }
 
   @Override
   public Type type() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getType();
   }
 
   @Override
   public String provider() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getProvider();
   }
 
   @Override
   public String comment() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.getComment();
   }
 
@@ -163,12 +166,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (properties == null) {
       synchronized (this) {
         if (properties == null) {
-          Preconditions.checkArgument(entity != null, "entity is not set");
-          properties = Maps.newHashMap(entity.getProperties());
-          properties
+          Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
+          Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
+          tempProperties
               .entrySet()
               .removeIf(
                   entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+          properties = tempProperties;
         }
       }
     }
@@ -177,7 +181,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public Audit auditInfo() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
+    Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
     return entity.auditInfo();
   }
 

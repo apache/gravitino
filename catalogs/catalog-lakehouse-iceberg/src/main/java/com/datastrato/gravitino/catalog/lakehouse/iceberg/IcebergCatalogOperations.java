@@ -60,6 +60,8 @@ import org.slf4j.LoggerFactory;
 /** Operations for interacting with the Iceberg catalog in Gravitino. */
 public class IcebergCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
+  private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
   @VisibleForTesting IcebergTableOps icebergTableOps;
@@ -140,8 +142,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
-          "Failed to list all schemas (database) under namespace : " + namespace + " in Iceberg",
-          e);
+          e, "Failed to list all schemas (database) under namespace : %s in Iceberg", namespace);
     }
   }
 
@@ -183,13 +184,12 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       return createdSchema;
     } catch (org.apache.iceberg.exceptions.AlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
-          String.format("Iceberg schema (database) '%s' already exists", ident.name()), e);
+          e, "Iceberg schema (database) '%s' already exists", ident.name());
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
-          String.format(
-              "Iceberg schema (database) does not exist: %s in Gravitino store, This scenario occurs after the creation is completed and reloaded",
-              ident.name()),
-          e);
+          e,
+          "Iceberg schema (database) does not exist: %s in Gravitino store, This scenario occurs after the creation is completed and reloaded",
+          ident.name());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -222,9 +222,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
-          String.format(
-              "Iceberg schema (database) does not exist: %s in Gravitino store", ident.name()),
-          e);
+          e, "Iceberg schema (database) does not exist: %s in Gravitino store", ident.name());
     }
   }
 
@@ -285,7 +283,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
-          String.format("Iceberg schema (database) %s does not exist", ident.name()), e);
+          e, "Iceberg schema (database) %s does not exist", ident.name());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -308,9 +306,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       return true;
     } catch (NamespaceNotEmptyException e) {
       throw new NonEmptySchemaException(
-          String.format(
-              "Iceberg schema (database) %s is not empty. One or more tables exist.", ident.name()),
-          e);
+          e, "Iceberg schema (database) %s is not empty. One or more tables exist.", ident.name());
     } catch (NoSuchNamespaceException e) {
       LOG.warn("Iceberg schema (database) {} does not exist", ident.name());
       return false;
@@ -337,8 +333,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                   NameIdentifier.of(ArrayUtils.add(namespace.levels(), tableIdentifier.name())))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
-      throw new NoSuchSchemaException(
-          "Schema (database) does not exist " + namespace + " in Iceberg");
+      throw new NoSuchSchemaException("Schema (database) does not exist %s in Iceberg", namespace);
     }
   }
 
@@ -361,8 +356,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       LOG.info("Loaded Iceberg table {}", tableIdent.name());
       return icebergTable;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(
-          String.format("Iceberg table does not exist: %s", tableIdent.name()), e);
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
@@ -410,8 +404,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(
-          String.format("Iceberg table does not exist: %s", tableIdent.name()), e);
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
@@ -437,8 +430,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       icebergTableOps.renameTable(renameTableRequest);
       return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(
-          String.format("Iceberg table does not exist: %s", tableIdent.name()), e);
+      throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
   }
 
@@ -489,7 +481,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Iceberg schema (database) does not exist: {}", schemaIdent);
-        throw new NoSuchSchemaException("Iceberg Schema (database) does not exist " + schemaIdent);
+        throw new NoSuchSchemaException("Iceberg Schema (database) does not exist %s", schemaIdent);
       }
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
@@ -535,7 +527,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       LOG.info("Created Iceberg table {}", tableIdent.name());
       return createdTable;
     } catch (AlreadyExistsException e) {
-      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name(), e);
+      throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     }
   }
 
@@ -583,5 +575,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Iceberg catalog doesn't support fileset related operations");
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Iceberg catalog doesn't support topic related operations");
   }
 }

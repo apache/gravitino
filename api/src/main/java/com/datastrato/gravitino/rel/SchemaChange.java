@@ -20,9 +20,11 @@
 
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /** NamespaceChange class to set the property and value pairs for the namespace. */
+@Evolving
 public interface SchemaChange {
 
   /**

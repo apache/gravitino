@@ -4,13 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.utils;
 
+import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 public final class JdbcConnectorUtils {
-
-  public static final String[] TABLE_TYPES = {"TABLE"};
+  public static final ImmutableList<String> TABLE_TYPES = ImmutableList.of("TABLE");
 
   private JdbcConnectorUtils() {}
 
@@ -27,5 +27,9 @@ public final class JdbcConnectorUtils {
     try (final Statement statement = connection.createStatement()) {
       return statement.executeUpdate(sql);
     }
+  }
+
+  public static String[] getTableTypes() {
+    return TABLE_TYPES.toArray(new String[0]);
   }
 }

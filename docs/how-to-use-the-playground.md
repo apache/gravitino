@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 
 The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, and a `Gravitino` server.
 
-Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open <http://localhost:8090> in a browser to access the Gravitino Web UI.
+Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
 ## Prerequisites
 
@@ -20,12 +20,13 @@ You first need to install git and docker-compose.
 
 The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
-    | Docker container      | Ports used     |
-    | playground-gravitino  | 8090 9001      |
-    | playground-hive       | 3307 9000 9083 |
-    | playground-mysql      | 3306           |
-    | playground-postgresql | 5342           |
-    | playground-trino      | 8080           |
+| Docker container      | Ports used     |
+|-----------------------|----------------|
+| playground-gravitino  | 8090 9001      |
+| playground-hive       | 3307 9000 9083 |
+| playground-mysql      | 3306           |
+| playground-postgresql | 5342           |
+| playground-trino      | 8080           |
 
 ## Start playground
 
@@ -125,7 +126,7 @@ GROUP BY e.employee_id,  given_name, family_name;
 ### Using Iceberg REST service
 
 If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service, too. You can will use Spark to access REST catalog to write the table data.
+Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.
 Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):

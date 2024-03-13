@@ -61,7 +61,7 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
         NullOrder.NULLS_FIRST);
     org.apache.iceberg.SortOrder icebergSortOrder = sortOrderBuilder.build();
     SortOrder[] sortOrders = FromIcebergSortOrder.fromSortOrder(sortOrderBuilder.build());
-    Assertions.assertEquals(sortOrders.length, 7);
+    Assertions.assertEquals(7, sortOrders.length);
 
     Map<String, SortOrder> sortOrderByName =
         Arrays.stream(sortOrders)

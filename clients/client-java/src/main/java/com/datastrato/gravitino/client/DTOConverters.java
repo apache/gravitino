@@ -11,9 +11,11 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
+import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
 
@@ -57,7 +59,7 @@ class DTOConverters {
   static Catalog toCatalog(CatalogDTO catalog, RESTClient client) {
     switch (catalog.type()) {
       case RELATIONAL:
-        return new RelationalCatalog.Builder()
+        return RelationalCatalog.builder()
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())
@@ -67,8 +69,18 @@ class DTOConverters {
             .withRestClient(client)
             .build();
 
-      case FILE:
-      case STREAM:
+      case FILESET:
+        return FilesetCatalog.builder()
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
+
+      case MESSAGING:
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
@@ -135,6 +147,35 @@ class DTOConverters {
     } else if (change instanceof TableChange.ColumnChange) {
       return toColumnUpdateRequest((TableChange.ColumnChange) change);
 
+    } else if (change instanceof TableChange.AddIndex) {
+      return new TableUpdateRequest.AddTableIndexRequest(
+          ((TableChange.AddIndex) change).getType(),
+          ((TableChange.AddIndex) change).getName(),
+          ((TableChange.AddIndex) change).getFieldNames());
+    } else if (change instanceof TableChange.DeleteIndex) {
+      return new TableUpdateRequest.DeleteTableIndexRequest(
+          ((TableChange.DeleteIndex) change).getName(),
+          ((TableChange.DeleteIndex) change).isIfExists());
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static FilesetUpdateRequest toFilesetUpdateRequest(FilesetChange change) {
+    if (change instanceof FilesetChange.RenameFileset) {
+      return new FilesetUpdateRequest.RenameFilesetRequest(
+          ((FilesetChange.RenameFileset) change).getNewName());
+    } else if (change instanceof FilesetChange.UpdateFilesetComment) {
+      return new FilesetUpdateRequest.UpdateFilesetCommentRequest(
+          ((FilesetChange.UpdateFilesetComment) change).getNewComment());
+    } else if (change instanceof FilesetChange.SetProperty) {
+      return new FilesetUpdateRequest.SetFilesetPropertiesRequest(
+          ((FilesetChange.SetProperty) change).getProperty(),
+          ((FilesetChange.SetProperty) change).getValue());
+    } else if (change instanceof FilesetChange.RemoveProperty) {
+      return new FilesetUpdateRequest.RemoveFilesetPropertiesRequest(
+          ((FilesetChange.RemoveProperty) change).getProperty());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
@@ -149,7 +190,8 @@ class DTOConverters {
           addColumn.getDataType(),
           addColumn.getComment(),
           addColumn.getPosition(),
-          addColumn.isNullable());
+          addColumn.isNullable(),
+          addColumn.isAutoIncrement());
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -175,6 +217,9 @@ class DTOConverters {
     } else if (change instanceof TableChange.UpdateColumnNullability) {
       return new TableUpdateRequest.UpdateTableColumnNullabilityRequest(
           change.fieldName(), ((TableChange.UpdateColumnNullability) change).nullable());
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      return new TableUpdateRequest.UpdateColumnAutoIncrementRequest(
+          change.fieldName(), ((TableChange.UpdateColumnAutoIncrement) change).isAutoIncrement());
     } else {
       throw new IllegalArgumentException(
           "Unknown column change type: " + change.getClass().getSimpleName());
