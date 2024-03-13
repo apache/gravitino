@@ -123,8 +123,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   private CatalogOperations loadCustomerOps(String className) {
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     try {
-      return (CatalogOperations) Class.forName(className).getDeclaredConstructor().newInstance();
+      return (CatalogOperations)
+          Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       LOG.error("Failed to load custom catalog operations, {}", className, e);
       throw new RuntimeException(e);
