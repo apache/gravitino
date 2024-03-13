@@ -353,7 +353,8 @@ subprojects {
         "VarTypeName",
         "XorPower",
         "EqualsGetClass",
-        "DefaultCharset"
+        "DefaultCharset",
+        "InlineFormatString"
       )
     }
   }

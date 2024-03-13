@@ -31,9 +31,13 @@ import org.junit.platform.commons.util.StringUtils;
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class SparkIT extends SparkEnvIT {
+  private static String getSelectAllSql(String tableName) {
+    return String.format("SELECT * FROM %s", tableName);
+  }
 
-  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s";
-  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s VALUES (%s)";
+  private static String getInsertWithoutPartitionSql(String tableName, String values) {
+    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
+  }
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
@@ -352,7 +356,7 @@ public class SparkIT extends SparkEnvIT {
             .map(Object::toString)
             .collect(Collectors.joining(","));
 
-    sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, name, insertValues));
+    sql(getInsertWithoutPartitionSql(name, insertValues));
 
     // remove "'" from values, such as 'a' is trans to a
     String checkValues =
@@ -368,7 +372,7 @@ public class SparkIT extends SparkEnvIT {
             .collect(Collectors.joining(","));
 
     List<String> queryResult =
-        sql(String.format(SELECT_ALL_TEMPLATE, name)).stream()
+        sql(getSelectAllSql(name)).stream()
             .map(
                 line ->
                     Arrays.stream(line)
