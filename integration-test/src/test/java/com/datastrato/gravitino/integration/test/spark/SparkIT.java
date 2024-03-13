@@ -322,7 +322,10 @@ public class SparkIT extends SparkEnvIT {
 
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
 
-    createSimpleTable(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) USING PARQUET",
+            tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
