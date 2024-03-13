@@ -76,3 +76,11 @@ tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
 }
+
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-jdbc-postgresql:runtimeJars")
+  dependsOn(":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+  dependsOn(":catalogs:catalog-jdbc-mysql:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:runtimeJars")
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+}

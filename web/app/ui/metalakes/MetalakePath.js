@@ -52,6 +52,7 @@ const MetalakePath = props => {
             href={metalakeUrl}
             onClick={event => handleClick(event, metalakeUrl)}
             underline='hover'
+            data-refer='metalake-name-link'
           >
             <Text>{metalake}</Text>
           </MUILink>

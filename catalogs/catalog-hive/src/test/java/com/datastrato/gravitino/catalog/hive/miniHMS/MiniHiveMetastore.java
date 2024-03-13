@@ -210,6 +210,8 @@ public class MiniHiveMetastore {
       baseHandler.shutdown();
     }
     METASTORE_THREADS_SHUTDOWN.invoke();
+
+    System.clearProperty(HiveConf.ConfVars.METASTOREURIS.varname);
   }
 
   public HiveConf hiveConf() {

@@ -576,4 +576,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     throw new UnsupportedOperationException(
         "Iceberg catalog doesn't support fileset related operations");
   }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Iceberg catalog doesn't support topic related operations");
+  }
 }

@@ -47,8 +47,28 @@ public class TestDTOJsonSerDe {
   private final String columnJson =
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
-  private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}";
+  private String getExpectedTableJson(
+      String tableName,
+      String tableComment,
+      String columns,
+      String properties,
+      String audit,
+      String distribution,
+      String sortOrders,
+      String partitioning,
+      String indexes) {
+    return String.format(
+        "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}",
+        withQuotes(tableName),
+        withQuotes(tableComment),
+        columns,
+        properties,
+        audit,
+        distribution,
+        sortOrders,
+        partitioning,
+        indexes);
+  }
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";
@@ -259,10 +279,9 @@ public class TestDTOJsonSerDe {
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(table);
     String expectedJson =
-        String.format(
-            tableJson,
-            withQuotes(tableName),
-            withQuotes(tableComment),
+        getExpectedTableJson(
+            tableName,
+            tableComment,
             String.format(
                 columnJson,
                 withQuotes(name),

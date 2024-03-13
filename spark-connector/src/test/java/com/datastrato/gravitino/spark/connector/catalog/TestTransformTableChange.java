@@ -40,6 +40,25 @@ public class TestTransformTableChange {
   }
 
   @Test
+  void testTransformRenameColumn() {
+    String[] oldFiledsName = new String[] {"default_name"};
+    String newFiledName = "new_name";
+
+    TableChange.RenameColumn sparkRenameColumn =
+        (TableChange.RenameColumn) TableChange.renameColumn(oldFiledsName, newFiledName);
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkRenameColumn);
+
+    Assertions.assertTrue(
+        gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.RenameColumn);
+    com.datastrato.gravitino.rel.TableChange.RenameColumn gravitinoRenameColumn =
+        (com.datastrato.gravitino.rel.TableChange.RenameColumn) gravitinoChange;
+
+    Assertions.assertEquals(oldFiledsName, gravitinoRenameColumn.getFieldName());
+    Assertions.assertEquals(newFiledName, gravitinoRenameColumn.getNewName());
+  }
+
+  @Test
   void testTransformAddColumn() {
 
     TableChange.ColumnPosition first = TableChange.ColumnPosition.first();
@@ -121,5 +140,24 @@ public class TestTransformTableChange {
 
     Assertions.assertEquals(sparkDeleteColumn.fieldNames(), gravitinoDeleteColumn.fieldName());
     Assertions.assertEquals(sparkDeleteColumn.ifExists(), gravitinoDeleteColumn.getIfExists());
+  }
+
+  @Test
+  void testTransformUpdateColumnType() {
+    TableChange.UpdateColumnType sparkUpdateColumnType =
+        (TableChange.UpdateColumnType)
+            TableChange.updateColumnType(new String[] {"col1"}, DataTypes.StringType);
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkUpdateColumnType);
+
+    Assertions.assertTrue(
+        gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnType);
+    com.datastrato.gravitino.rel.TableChange.UpdateColumnType gravitinoUpdateColumnType =
+        (com.datastrato.gravitino.rel.TableChange.UpdateColumnType) gravitinoChange;
+
+    Assertions.assertEquals(
+        sparkUpdateColumnType.fieldNames(), gravitinoUpdateColumnType.fieldName());
+    Assertions.assertTrue(
+        "string".equalsIgnoreCase(gravitinoUpdateColumnType.getNewDataType().simpleString()));
   }
 }
