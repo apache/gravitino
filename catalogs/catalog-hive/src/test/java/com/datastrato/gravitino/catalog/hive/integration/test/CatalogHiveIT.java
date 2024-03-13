@@ -32,6 +32,8 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.catalog.BaseCatalog;
+import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -48,7 +50,6 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -75,7 +76,6 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,7 +101,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1369,24 +1368,21 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  // Couldn't run under embedded mode, because Iceberg package may not build yet.
-  @EnabledIf("isDeployMode")
   void testCustomCatalogOperations() {
     String catalogName = "custom_catalog";
-    Assertions.assertDoesNotThrow(() -> createCatalogWithCustomOperation(catalogName));
+    Assertions.assertDoesNotThrow(
+        () -> createCatalogWithCustomOperation(catalogName, HiveCatalogOperations.class.getName()));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class,
+        () ->
+            createCatalogWithCustomOperation(
+                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
   }
 
-  private static Catalog createCatalogWithCustomOperation(String catalogName) {
+  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
-    properties.put(
-        Catalog.CATALOG_OPERATION_CLASS_NAME,
-        "com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogOperations");
-    properties.put(Catalog.CATALOG_OPERATION_CLASS_PATH, getIcebergJarPath());
-
-    properties.put("catalog-backend", "memory");
-    properties.put("warehouse", "mock");
-    properties.put("uri", "mock");
+    properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
@@ -1394,19 +1390,5 @@ public class CatalogHiveIT extends AbstractIT {
         provider,
         "comment",
         properties);
-
-    return metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-  }
-
-  private static String getIcebergJarPath() {
-    if (ITUtils.getTestMode().equals(ITUtils.EMBEDDED_TEST_MODE)) {
-      return Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
-    } else {
-      return Paths.get("catalogs", "lakehouse-iceberg", "libs").toString();
-    }
-  }
-
-  private static boolean isDeployMode() {
-    return !ITUtils.getTestMode().equals(ITUtils.EMBEDDED_TEST_MODE);
   }
 }

@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.TestCatalog;
 import com.datastrato.gravitino.TestCatalogOperations;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -29,7 +28,7 @@ public class TestBaseCatalog {
         new TestCatalog()
             .withCatalogConf(
                 ImmutableMap.of(
-                    Catalog.CATALOG_OPERATION_CLASS_NAME, DummyCatalogOperations.class.getName()))
+                    BaseCatalog.CATALOG_OPERATION_IMPL, DummyCatalogOperations.class.getName()))
             .withCatalogEntity(entity);
     CatalogOperations dummyCatalogOperations = catalog2.ops();
     Assertions.assertTrue(dummyCatalogOperations instanceof DummyCatalogOperations);

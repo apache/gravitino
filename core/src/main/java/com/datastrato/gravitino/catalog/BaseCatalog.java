@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -29,8 +30,12 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
-
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+
+  // A hack way to inject custom operation to Gravitino, the object you used is not stable, don't
+  // use
+  // it unless you know what you are doing.
+  @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   private CatalogEntity entity;
 
@@ -112,18 +117,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {
-    String customCatalogOperationClass = conf.get(CATALOG_OPERATION_CLASS_NAME);
+    String customCatalogOperationClass = conf.get(CATALOG_OPERATION_IMPL);
     return Optional.ofNullable(customCatalogOperationClass)
         .map(className -> loadCustomerOps(className))
         .orElse(newOps(conf));
   }
 
   private CatalogOperations loadCustomerOps(String className) {
-    // Couldn't find package if not specifying classloader
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     try {
-      return (CatalogOperations)
-          Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
+      return (CatalogOperations) Class.forName(className).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       LOG.error("Failed to load custom catalog operations, {}", className, e);
       throw new RuntimeException(e);

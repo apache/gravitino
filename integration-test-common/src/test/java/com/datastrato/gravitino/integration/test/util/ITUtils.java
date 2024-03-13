@@ -53,11 +53,5 @@ public class ITUtils {
     }
   }
 
-  public static String getTestMode() {
-    return System.getProperty(ITUtils.TEST_MODE) == null
-        ? ITUtils.EMBEDDED_TEST_MODE
-        : System.getProperty(ITUtils.TEST_MODE);
-  }
-
   private ITUtils() {}
 }

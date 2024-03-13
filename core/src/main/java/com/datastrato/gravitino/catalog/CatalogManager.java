@@ -31,7 +31,6 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
-import com.datastrato.gravitino.utils.PathUtils;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -60,7 +59,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -564,11 +562,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> catalogProperties, String provider) {
     String pkgPath = buildPkgPath(catalogProperties, provider);
     String confPath = buildConfPath(provider);
-    Optional<String> customCatalogOperationPath =
-        buildCustomCatalogOperationPath(catalogProperties);
-    return customCatalogOperationPath
-        .map(path -> Arrays.asList(pkgPath, confPath, path))
-        .orElse(Arrays.asList(pkgPath, confPath));
+    return Arrays.asList(pkgPath, confPath);
   }
 
   /**
@@ -591,15 +585,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     return String.join(File.separator, gravitinoHome, "catalogs", provider, "conf");
-  }
-
-  private Optional<String> buildCustomCatalogOperationPath(Map<String, String> catalogProperties) {
-    String className = catalogProperties.get(Catalog.CATALOG_OPERATION_CLASS_NAME);
-    String path = catalogProperties.get(Catalog.CATALOG_OPERATION_CLASS_PATH);
-    if (StringUtils.isNotBlank(className) && StringUtils.isNotBlank(path)) {
-      return Optional.of(PathUtils.getAbsolutePath(path, System.getenv("GRAVITINO_HOME")));
-    }
-    return Optional.empty();
   }
 
   private String buildPkgPath(Map<String, String> conf, String provider) {

@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Catalog.CATALOG_OPERATION_CLASS_NAME;
-import static com.datastrato.gravitino.Catalog.CATALOG_OPERATION_CLASS_PATH;
 import static com.datastrato.gravitino.Catalog.PROPERTY_PACKAGE;
 
 import com.google.common.collect.ImmutableList;
@@ -21,20 +19,6 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
               PropertyEntry.stringImmutablePropertyEntry(
                   PROPERTY_PACKAGE,
                   "The path of the catalog-related classes and resources",
-                  false,
-                  null,
-                  false,
-                  false),
-              PropertyEntry.stringImmutablePropertyEntry(
-                  CATALOG_OPERATION_CLASS_NAME,
-                  "The custom catalog operation class name",
-                  false,
-                  null,
-                  false,
-                  false),
-              PropertyEntry.stringImmutablePropertyEntry(
-                  CATALOG_OPERATION_CLASS_PATH,
-                  "The custom catalog operation class path",
                   false,
                   null,
                   false,
