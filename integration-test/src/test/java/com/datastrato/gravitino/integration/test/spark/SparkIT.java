@@ -352,11 +352,11 @@ public class SparkIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING '') USING PARQUET",
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
             tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING '')", tableName));
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
     List<SparkColumnInfo> updateColumnPositionCol1 = new ArrayList<>(simpleTableColumns);
     updateColumnPositionCol1.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     checkTableColumns(tableName, updateColumnPositionCol1, getTableInfo(tableName));
@@ -367,7 +367,7 @@ public class SparkIT extends SparkEnvIT {
     updateColumnPositionFirst.addAll(simpleTableColumns);
     checkTableColumns(tableName, updateColumnPositionFirst, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col2 STRING '')", tableName));
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col2 STRING COMMENT '')", tableName));
     List<SparkColumnInfo> updateColumnPositionCol2 = new ArrayList<>();
     updateColumnPositionCol2.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     updateColumnPositionCol2.addAll(simpleTableColumns);
