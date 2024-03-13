@@ -36,5 +36,10 @@ public class DummyCatalogOperations implements CatalogOperations {
   }
 
   @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return null;
+  }
+
+  @Override
   public void close() throws IOException {}
 }
