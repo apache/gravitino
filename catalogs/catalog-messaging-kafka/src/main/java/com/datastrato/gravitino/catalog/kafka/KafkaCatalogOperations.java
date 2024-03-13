@@ -48,7 +48,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
     // TODO: Implement Kafka catalog initialization, such as creating a default schema.
   }
 
