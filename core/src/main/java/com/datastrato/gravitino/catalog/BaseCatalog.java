@@ -33,8 +33,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // A hack way to inject custom operation to Gravitino, the object you used is not stable, don't
-  // use
-  // it unless you know what you are doing.
+  // use it unless you know what you are doing.
   @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   private CatalogEntity entity;

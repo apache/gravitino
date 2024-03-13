@@ -39,6 +39,7 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -468,9 +469,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      List<String> catalogClassPath = buildCatalogClassPath(conf, provider);
-      LOG.info("Catalog {} classpath: {}", provider, catalogClassPath);
-      classLoader = IsolatedClassLoader.buildClassLoader(catalogClassPath);
+      String pkgPath = buildPkgPath(conf, provider);
+      String confPath = buildConfPath(provider);
+      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -556,13 +557,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     Map<String, String> mergedConf = conf != null ? Maps.newHashMap(conf) : Maps.newHashMap();
     Optional.ofNullable(properties).ifPresent(mergedConf::putAll);
     return Collections.unmodifiableMap(mergedConf);
-  }
-
-  private List<String> buildCatalogClassPath(
-      Map<String, String> catalogProperties, String provider) {
-    String pkgPath = buildPkgPath(catalogProperties, provider);
-    String confPath = buildConfPath(provider);
-    return Arrays.asList(pkgPath, confPath);
   }
 
   /**
