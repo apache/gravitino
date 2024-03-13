@@ -13,6 +13,7 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.tenant.AccessControlManager;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -34,6 +35,8 @@ public class GravitinoEnv {
   private CatalogOperationDispatcher catalogOperationDispatcher;
 
   private MetalakeManager metalakeManager;
+
+  private AccessControlManager accessControlManager;
 
   private IdGenerator idGenerator;
 
@@ -96,6 +99,9 @@ public class GravitinoEnv {
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.catalogOperationDispatcher =
         new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    // Create and initialize access control related modules
+    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
@@ -172,6 +178,15 @@ public class GravitinoEnv {
 
   public LockManager getLockManager() {
     return lockManager;
+  }
+
+  /**
+   * Get the AccessControlManager associated with the Gravitino environment.
+   *
+   * @return The AccessControlManager instance.
+   */
+  public AccessControlManager accessControlManager() {
+    return accessControlManager;
   }
 
   public void start() {

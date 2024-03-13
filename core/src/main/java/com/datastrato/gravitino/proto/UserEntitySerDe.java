@@ -4,27 +4,27 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.meta.UserEntity;
+import com.datastrato.gravitino.meta.MetalakeUser;
 
-public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
+public class UserEntitySerDe implements ProtoSerDe<MetalakeUser, com.datastrato.gravitino.proto.User> {
 
   @Override
-  public User serialize(UserEntity userEntity) {
-    User.Builder builder =
-        User.newBuilder()
-            .setId(userEntity.id())
-            .setName(userEntity.name())
-            .setAuditInfo(new AuditInfoSerDe().serialize(userEntity.auditInfo()));
-    if (userEntity.properties() != null && !userEntity.properties().isEmpty()) {
-      builder.putAllProperties(userEntity.properties());
+  public com.datastrato.gravitino.proto.User serialize(MetalakeUser metalakeUser) {
+    com.datastrato.gravitino.proto.User.Builder builder =
+        com.datastrato.gravitino.proto.User.newBuilder()
+            .setId(metalakeUser.id())
+            .setName(metalakeUser.name())
+            .setAuditInfo(new AuditInfoSerDe().serialize(metalakeUser.auditInfo()));
+    if (metalakeUser.properties() != null && !metalakeUser.properties().isEmpty()) {
+      builder.putAllProperties(metalakeUser.properties());
     }
     return builder.build();
   }
 
   @Override
-  public UserEntity deserialize(User user) {
-    UserEntity.Builder builder =
-        UserEntity.builder()
+  public MetalakeUser deserialize(com.datastrato.gravitino.proto.User user) {
+    MetalakeUser.Builder builder =
+        MetalakeUser.builder()
             .withId(user.getId())
             .withName(user.getName())
             .withAuditInfo(new AuditInfoSerDe().deserialize(user.getAuditInfo()));

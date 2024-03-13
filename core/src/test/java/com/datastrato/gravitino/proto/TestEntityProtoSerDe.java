@@ -6,6 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.meta.MetalakeUser;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -278,28 +279,28 @@ public class TestEntityProtoSerDe {
     // Test UserEntity
     Long userId = 1L;
     String userName = "user";
-    com.datastrato.gravitino.meta.UserEntity userEntity =
-        com.datastrato.gravitino.meta.UserEntity.builder()
+    MetalakeUser metalakeUser =
+        MetalakeUser.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withProperties(props)
             .build();
-    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
-    com.datastrato.gravitino.meta.UserEntity userEntityFromBytes =
-        protoEntitySerDe.deserialize(userBytes, com.datastrato.gravitino.meta.UserEntity.class);
-    Assertions.assertEquals(userEntity, userEntityFromBytes);
+    byte[] userBytes = protoEntitySerDe.serialize(metalakeUser);
+    MetalakeUser metalakeUserFromBytes =
+        protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
+    Assertions.assertEquals(metalakeUser, metalakeUserFromBytes);
 
-    com.datastrato.gravitino.meta.UserEntity userEntityWithoutFields =
-        com.datastrato.gravitino.meta.UserEntity.builder()
+    MetalakeUser metalakeUserWithoutFields =
+        MetalakeUser.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .build();
-    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
-    userEntityFromBytes =
-        protoEntitySerDe.deserialize(userBytes, com.datastrato.gravitino.meta.UserEntity.class);
-    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
-    Assertions.assertNull(userEntityFromBytes.properties());
+    userBytes = protoEntitySerDe.serialize(metalakeUserWithoutFields);
+    metalakeUserFromBytes =
+        protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
+    Assertions.assertEquals(metalakeUserWithoutFields, metalakeUserFromBytes);
+    Assertions.assertNull(metalakeUserFromBytes.properties());
   }
 }
