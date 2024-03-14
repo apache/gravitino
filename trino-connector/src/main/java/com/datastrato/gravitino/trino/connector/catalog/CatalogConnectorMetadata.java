@@ -55,7 +55,7 @@ public class CatalogConnectorMetadata {
       this.metalake = metalake;
       Catalog catalog = metalake.loadCatalog(catalogIdentifier);
       // Make sure the catalog support schema operations.
-      this.tableCatalog = (RelationalCatalog) catalog;
+      this.tableCatalog = (RelationalCatalog) catalog.asTableCatalog();
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     } catch (UnsupportedOperationException e) {
