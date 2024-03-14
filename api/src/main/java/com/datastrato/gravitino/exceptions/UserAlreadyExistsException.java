@@ -6,6 +6,7 @@ import com.google.errorprone.annotations.FormatString;
 public class UserAlreadyExistsException extends AlreadyExistsException {
 
 
+    @FormatMethod
     public UserAlreadyExistsException(@FormatString String message, Object... args) {
         super(message, args);
     }
