@@ -31,6 +31,12 @@ public class UserCreateRequest implements RESTRequest {
     this(null, null);
   }
 
+  /**
+   * Creates a new UserCreateRequest.
+   *
+   * @param name The name of the user.
+   * @param properties The properties of the user.
+   */
   public UserCreateRequest(String name, Map<String, String> properties) {
     super();
     this.name = name;
