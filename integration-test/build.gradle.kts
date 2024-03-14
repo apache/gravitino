@@ -42,13 +42,13 @@ dependencies {
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hadoop3.hdfs)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -71,7 +71,6 @@ dependencies {
     exclude("org.pentaho")
     exclude("org.slf4j")
   }
-
   testImplementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")

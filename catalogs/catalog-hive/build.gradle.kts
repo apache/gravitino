@@ -85,7 +85,7 @@ dependencies {
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hadoop3.hdfs)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
