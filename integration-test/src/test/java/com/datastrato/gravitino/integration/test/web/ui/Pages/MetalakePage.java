@@ -244,8 +244,8 @@ public class MetalakePage extends AbstractWebIT {
       if (!nextPageBtn.isEnabled()) {
         return false;
       }
-      nextPageBtn.click();
       Thread.sleep(500);
+      nextPageBtn.click();
 
       // Check if the previous page button is available
       return prevPageBtn.isEnabled() && performPrevPageAction();
@@ -256,8 +256,8 @@ public class MetalakePage extends AbstractWebIT {
 
   private boolean performPrevPageAction() {
     try {
-      prevPageBtn.click();
       Thread.sleep(500);
+      prevPageBtn.click();
       return true;
     } catch (Exception e) {
       return false;
@@ -266,12 +266,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyQueryMetalake(String name) {
     try {
+      Thread.sleep(sleepTimeMillis);
       setQueryInput(name);
-      WebDriverWait wait = new WebDriverWait(driver, 10);
-      List<WebElement> dataList =
-          wait.until(
-              ExpectedConditions.visibilityOfAllElementsLocatedBy(
-                  By.xpath(".//div[@data-field='name']")));
+      Thread.sleep(sleepTimeMillis);
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
       // Check if the text in the first row matches the search input
       boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
 
