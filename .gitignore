@@ -47,4 +47,6 @@ include web/.gitignore
 # node env
 .node
 
+# integration test
+integration-test/metastore_db
 catalogs/catalog-lakehouse-iceberg/spark-warehouse
