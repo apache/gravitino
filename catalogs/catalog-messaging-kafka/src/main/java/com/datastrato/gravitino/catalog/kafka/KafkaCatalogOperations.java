@@ -62,7 +62,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @VisibleForTesting Properties adminClientConfig;
   private CatalogEntity entity;
 
-  // For testing only.
+  @VisibleForTesting
   KafkaCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
     this.entity = entity;
     this.store = store;
