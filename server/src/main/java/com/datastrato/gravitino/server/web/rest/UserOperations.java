@@ -6,10 +6,13 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.dto.requests.UserCreateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.tenant.AccessControlManager;
@@ -47,8 +50,17 @@ public class UserOperations {
   @ResponseMetered(name = "load-user", absolute = true)
   public Response loadUser(@PathParam("metalake") String metalake, @PathParam("user") String user) {
     try {
-      return Utils.ok(
-          new UserResponse(DTOConverters.toDTO(accessControlManager.loadUser(metalake, user))));
+      NameIdentifier ident = NameIdentifier.of(metalake, user);
+      return Utils.doAs(
+          httpRequest,
+          () ->
+              Utils.ok(
+                  new UserResponse(
+                      DTOConverters.toDTO(
+                          TreeLockUtils.doWithTreeLock(
+                              ident,
+                              LockType.READ,
+                              () -> accessControlManager.loadUser(metalake, user))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.LOAD, user, metalake, e);
     }
@@ -60,11 +72,19 @@ public class UserOperations {
   @ResponseMetered(name = "create-user", absolute = true)
   public Response createUser(@PathParam("metalake") String metalake, UserCreateRequest request) {
     try {
-      return Utils.ok(
-          new UserResponse(
-              DTOConverters.toDTO(
-                  accessControlManager.createUser(
-                      metalake, request.getName(), request.getProperties()))));
+      NameIdentifier ident = NameIdentifier.of(metalake, request.getName());
+      return Utils.doAs(
+          httpRequest,
+          () ->
+              Utils.ok(
+                  new UserResponse(
+                      DTOConverters.toDTO(
+                          TreeLockUtils.doWithTreeLock(
+                              ident,
+                              LockType.WRITE,
+                              () ->
+                                  accessControlManager.createUser(
+                                      metalake, request.getName(), request.getProperties()))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.CREATE, request.getName(), metalake, e);
@@ -81,7 +101,10 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean dropped = accessControlManager.dropUser(metalake, user);
+            NameIdentifier ident = NameIdentifier.of(metalake, user);
+            boolean dropped =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.WRITE, () -> accessControlManager.dropUser(metalake, user));
             if (!dropped) {
               LOG.warn("Failed to drop table {} under metalkae {}", user, metalake);
             }
