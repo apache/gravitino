@@ -29,9 +29,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
-  private final String metalakeName;
-
-  private volatile GravitinoMetaLake metaLake = null;
+  private final GravitinoMetaLake metaLake;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -39,10 +37,11 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
     super(uri, authDataProvider);
-    this.metalakeName = metalakeName;
+    this.metaLake = loadMetalake(NameIdentifier.of(metalakeName));
   }
 
   /**
@@ -52,14 +51,6 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   public GravitinoMetaLake getMetaLake() {
-    if (this.metaLake == null) {
-      synchronized (GravitinoClient.class) {
-        if (this.metaLake == null) {
-          this.metaLake = loadMetalake(NameIdentifier.of(metalakeName));
-        }
-      }
-    }
-
     return metaLake;
   }
 
@@ -122,6 +113,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
      *
      * @return A new instance of GravitinoClient with the specified base URI.
      * @throws IllegalArgumentException If the base URI is null or empty.
+     * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
      */
     @Override
     public GravitinoClient build() {

@@ -49,10 +49,6 @@ public class TestGravitinoMetalake extends TestBase {
   public static void setUp() throws Exception {
     TestBase.setUp();
     createMetalake(client, metalakeName);
-    gravitinoClient =
-        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
-            .withMetalake(metalakeName)
-            .build();
 
     MetalakeDTO mockMetalake =
         new MetalakeDTO.Builder()
@@ -61,9 +57,14 @@ public class TestGravitinoMetalake extends TestBase {
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
-
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
+
+    gravitinoClient =
+        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
+            .withMetalake(metalakeName)
+            .build();
+
     NameIdentifier id = NameIdentifier.of(metalakeName);
     Assertions.assertEquals(metalakeName, gravitinoClient.getMetaLake().name());
   }
