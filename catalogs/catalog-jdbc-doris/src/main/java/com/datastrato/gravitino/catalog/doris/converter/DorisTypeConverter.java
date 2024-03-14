@@ -45,7 +45,7 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
       case DATE:
         return Types.DateType.get();
       case DATETIME:
-        return Types.TimeType.get();
+        return Types.TimestampType.withTimeZone();
       case CHAR:
         return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case VARCHAR:
@@ -83,7 +83,7 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
           + ")";
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimeType) {
+    } else if (type instanceof Types.TimestampType) {
       return DATETIME;
     } else if (type instanceof Types.VarCharType) {
       return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";

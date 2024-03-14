@@ -28,7 +28,7 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
       String databaseName, String comment, Map<String, String> properties) {
     if (StringUtils.isNotEmpty(comment)) {
       LOG.warn(
-          "Ignoring comment option on database create. doris does not support comment option on database create.");
+          "Ignoring comment option on database create. Doris does not support comment option on database create.");
     }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
 
