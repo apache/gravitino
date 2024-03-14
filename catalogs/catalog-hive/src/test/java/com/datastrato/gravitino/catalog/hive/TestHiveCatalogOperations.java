@@ -16,6 +16,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.catalog.BaseCatalog;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -67,9 +68,10 @@ class TestHiveCatalogOperations {
 
     Map<String, PropertyEntry<?>> propertyEntryMap =
         hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
-    Assertions.assertEquals(11, propertyEntryMap.size());
+    Assertions.assertEquals(12, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
 
