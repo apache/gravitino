@@ -6,7 +6,8 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.meta.MetalakeUser;
 
-public class UserEntitySerDe implements ProtoSerDe<MetalakeUser, com.datastrato.gravitino.proto.User> {
+public class UserEntitySerDe
+    implements ProtoSerDe<MetalakeUser, com.datastrato.gravitino.proto.User> {
 
   @Override
   public com.datastrato.gravitino.proto.User serialize(MetalakeUser metalakeUser) {

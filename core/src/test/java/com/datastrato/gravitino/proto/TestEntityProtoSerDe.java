@@ -292,14 +292,9 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(metalakeUser, metalakeUserFromBytes);
 
     MetalakeUser metalakeUserWithoutFields =
-        MetalakeUser.builder()
-            .withId(userId)
-            .withName(userName)
-            .withAuditInfo(auditInfo)
-            .build();
+        MetalakeUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
     userBytes = protoEntitySerDe.serialize(metalakeUserWithoutFields);
-    metalakeUserFromBytes =
-        protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
+    metalakeUserFromBytes = protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
     Assertions.assertEquals(metalakeUserWithoutFields, metalakeUserFromBytes);
     Assertions.assertNull(metalakeUserFromBytes.properties());
   }

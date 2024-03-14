@@ -4,7 +4,7 @@ import java.util.Map;
 
 public interface User extends Auditable {
 
-    String name();
+  String name();
 
-    Map<String, String> properties();
+  Map<String, String> properties();
 }
