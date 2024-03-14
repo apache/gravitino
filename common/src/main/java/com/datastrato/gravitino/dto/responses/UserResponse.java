@@ -1,6 +1,5 @@
 package com.datastrato.gravitino.dto.responses;
 
-import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.UserDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -15,34 +14,36 @@ import org.apache.commons.lang3.StringUtils;
 @EqualsAndHashCode(callSuper = true)
 public class UserResponse extends BaseResponse {
 
-    @JsonProperty("user")
-    private final UserDTO user;
+  @JsonProperty("user")
+  private final UserDTO user;
 
-    /**
-     * Constructor for UserResponse.
-     *
-     * @param user The user data transfer object.
-     */
-    public UserResponse(UserDTO user) {
-        super(0);
-        this.user = user;
-    }
+  /**
+   * Constructor for UserResponse.
+   *
+   * @param user The user data transfer object.
+   */
+  public UserResponse(UserDTO user) {
+    super(0);
+    this.user = user;
+  }
 
-    /** Default constructor for UserResponse. (Used for Jackson deserialization.) */
-    public UserResponse() {
-        super();
-        this.user = null;
-    }
+  /** Default constructor for UserResponse. (Used for Jackson deserialization.) */
+  public UserResponse() {
+    super();
+    this.user = null;
+  }
 
-    /**
-     * Validates the response data.
-     *
-     * @throws IllegalArgumentException if the name or audit is not set.
-     */
-    @Override
-    public void validate() throws IllegalArgumentException {
-        super.validate();
+  /**
+   * Validates the response data.
+   *
+   * @throws IllegalArgumentException if the name or audit is not set.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    super.validate();
 
-        Preconditions.checkArgument(user != null, "user must not be null");
-    }
+    Preconditions.checkArgument(user != null, "user must not be null");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(user.name()), "user 'name' must not be null and empty");
+  }
 }

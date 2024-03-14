@@ -4,7 +4,12 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.*;
+import com.datastrato.gravitino.Auditable;
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.Field;
+import com.datastrato.gravitino.HasIdentifier;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.User;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -28,6 +33,7 @@ public class MetalakeUser implements User, Entity, Auditable, HasIdentifier {
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
+  private String metalake;
 
   private MetalakeUser() {}
 
@@ -112,6 +118,11 @@ public class MetalakeUser implements User, Entity, Auditable, HasIdentifier {
     return Objects.hash(id, name, properties, auditInfo);
   }
 
+  @Override
+  public NameIdentifier nameIdentifier() {
+    return NameIdentifier.of(metalake, name);
+  }
+
   public static Builder builder() {
     return new Builder();
   }
@@ -164,6 +175,11 @@ public class MetalakeUser implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withAuditInfo(AuditInfo auditInfo) {
       metalakeUser.auditInfo = auditInfo;
+      return this;
+    }
+
+    public Builder withMetalake(String metalake) {
+      metalakeUser.metalake = metalake;
       return this;
     }
 

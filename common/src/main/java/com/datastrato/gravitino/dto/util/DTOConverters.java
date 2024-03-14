@@ -329,7 +329,14 @@ public class DTOConverters {
   }
 
   public static UserDTO toDTO(User user) {
-    return null;
+    if (user instanceof UserDTO) {
+      return (UserDTO) user;
+    }
+    return UserDTO.builder()
+        .withName(user.name())
+        .withAudit(toDTO(user.auditInfo()))
+        .withProperties(user.properties())
+        .build();
   }
 
   /**

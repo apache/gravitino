@@ -13,6 +13,7 @@ import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.annotations.VisibleForTesting;
 import javax.ws.rs.core.Response;
@@ -263,6 +264,32 @@ public class ExceptionHandlers {
 
     private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
 
+    private static String getUserErrorMsg(
+        String fileset, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
+          fileset, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String user, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(user) ? "" : " [" + user + "]";
+      String errorMsg = getUserErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UserAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, user, metalake, e);
+      }
+    }
   }
 
   @VisibleForTesting
