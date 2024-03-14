@@ -41,8 +41,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
               "com.datastrato.gravitino.meta.TopicEntity",
               "com.datastrato.gravitino.proto.TopicEntitySerDe")
           .put(
-              "com.datastrato.gravitino.meta.UserEntity",
-              "com.datastrato.gravitino.proto.UserEntitySerDe")
+              "com.datastrato.gravitino.meta.MetalakeUser",
+              "com.datastrato.gravitino.proto.MetalakeUserEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
