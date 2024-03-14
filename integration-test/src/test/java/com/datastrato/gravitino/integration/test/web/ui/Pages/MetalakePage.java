@@ -6,6 +6,8 @@
 package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import org.openqa.selenium.By;
@@ -17,12 +19,15 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
+  public int sleepTimeMillis = 1_000;
 
   @FindBy(
       xpath =
           "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
   public WebElement dataViewer;
 
+  @FindBy(xpath = "//div[@data-refer='metalake-table-grid']")
+  public WebElement metalakeTableGrid;
   @FindBy(xpath = "//*[@id='createMetalakeBtn']")
   public WebElement createMetalakeBtn;
 
@@ -120,7 +125,7 @@ public class MetalakePage extends AbstractWebIT {
   public void clickMetalakeLink(String name) {
     String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
-    WebDriverWait wait = new WebDriverWait(driver, 10);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
     wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
     metalakeLink.click();
   }
@@ -138,12 +143,17 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public boolean checkIsErrorName() {
-    String xpath = "//div[@data-refer='metalake-name-field']";
-    WebElement nameField = findElementByXPath(xpath);
-    List<WebElement> errorText =
-        nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
+    try {
+      String xpath = "//div[@data-refer='metalake-name-field']";
+      WebElement nameField = findElementByXPath(xpath);
+      List<WebElement> errorText =
+              nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
 
-    return !errorText.isEmpty();
+      return !errorText.isEmpty();
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
   }
 
   // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
@@ -211,6 +221,7 @@ public class MetalakePage extends AbstractWebIT {
 
       return isVisible && isText;
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     } finally {
       closeDetailsBtn.click();
@@ -218,10 +229,16 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public boolean verifyEmptyMetalake() {
-    String xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
-    WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
+    try {
+      String xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
+      WebElement noMetalakeRows = metalakeTableGrid.findElement(By.xpath(xpath));
 
-    return Objects.equals(noMetalakeRows.getText(), "No rows");
+      return Objects.equals(noMetalakeRows.getText(), "No rows");
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+
   }
 
   public boolean verifyChangePagination() {
@@ -230,6 +247,7 @@ public class MetalakePage extends AbstractWebIT {
         return false;
       }
       nextPageBtn.click();
+      Thread.sleep(500);
 
       // Check if the previous page button is available
       return prevPageBtn.isEnabled() && performPrevPageAction();
@@ -241,6 +259,7 @@ public class MetalakePage extends AbstractWebIT {
   private boolean performPrevPageAction() {
     try {
       prevPageBtn.click();
+      Thread.sleep(500);
       return true;
     } catch (Exception e) {
       return false;
@@ -250,8 +269,8 @@ public class MetalakePage extends AbstractWebIT {
   public boolean verifyQueryMetalake(String name) {
     try {
       setQueryInput(name);
-      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
-
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+      List<WebElement> dataList = wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(".//div[@data-field='name']")));
       // Check if the text in the first row matches the search input
       boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
 
@@ -263,6 +282,7 @@ public class MetalakePage extends AbstractWebIT {
         return false;
       }
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     }
   }
