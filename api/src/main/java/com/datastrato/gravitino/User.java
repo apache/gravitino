@@ -6,9 +6,7 @@ package com.datastrato.gravitino;
 
 import java.util.Map;
 
-/**
- * The interface of a user.
- */
+/** The interface of a user. The user is the entity which executes every operations. */
 public interface User extends Auditable {
 
   /**
