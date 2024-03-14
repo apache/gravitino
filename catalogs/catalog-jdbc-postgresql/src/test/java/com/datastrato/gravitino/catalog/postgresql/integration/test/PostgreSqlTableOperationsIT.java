@@ -17,6 +17,7 @@ import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -67,8 +68,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         JdbcColumn.builder()
             .withName("col_4")
             .withType(VARCHAR)
-            // TODO: uncomment this line when default value is supported
-            // .withDefaultValue("hello world")
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -104,11 +104,23 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withComment("new_add")
             .withNullable(true)
             .build();
+    JdbcColumn newColumn1 =
+        new JdbcColumn.Builder()
+            .withName("col_6")
+            .withType(Types.BooleanType.get())
+            .withComment("new_add")
+            .withDefaultValue(Literals.of("true", Types.BooleanType.get()))
+            .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         newName,
         TableChange.addColumn(
             new String[] {newColumn.name()}, newColumn.dataType(), newColumn.comment()),
+        TableChange.addColumn(
+            new String[] {newColumn1.name()},
+            newColumn1.dataType(),
+            newColumn1.comment(),
+            newColumn1.defaultValue()),
         TableChange.updateColumnComment(new String[] {columns.get(0).name()}, "test_new_comment"),
         TableChange.updateColumnType(
             new String[] {columns.get(1).name()}, Types.DecimalType.of(10, 2)),
@@ -132,6 +144,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
+    alterColumns.add(newColumn1);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     TABLE_OPERATIONS.alterTable(
@@ -158,6 +171,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
+    alterColumns.add(newColumn1);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // alter column Nullability
@@ -182,14 +196,19 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
+    alterColumns.add(newColumn1);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     // delete column
     TABLE_OPERATIONS.alterTable(
-        TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
+        TEST_DB_NAME,
+        newName,
+        TableChange.deleteColumn(new String[] {newColumn.name()}, true),
+        TableChange.deleteColumn(new String[] {newColumn1.name()}, true));
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.remove(newColumn);
+    alterColumns.remove(newColumn1);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
 
     TableChange deleteColumn = TableChange.deleteColumn(new String[] {newColumn.name()}, false);

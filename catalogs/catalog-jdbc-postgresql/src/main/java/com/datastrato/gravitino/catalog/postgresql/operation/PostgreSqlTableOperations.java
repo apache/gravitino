@@ -549,6 +549,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("NOT NULL ");
     }
 
+    // Append default value if available
+    if (!TableChange.AddColumn.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
+    }
+
     // Append position if available
     if (!(addColumn.getPosition() instanceof TableChange.Default)) {
       throw new IllegalArgumentException(
