@@ -25,7 +25,6 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
   }
-
   implementation(libs.hadoop3.client)
 
   implementation(libs.slf4j.api)
