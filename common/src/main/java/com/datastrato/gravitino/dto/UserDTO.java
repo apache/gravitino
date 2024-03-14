@@ -23,6 +23,13 @@ public class UserDTO implements User {
   /** Default constructor for Jackson deserialization. */
   protected UserDTO() {}
 
+  /**
+   * Creates a new instance of UserDTO.
+   *
+   * @param name The name of the User DTO.
+   * @param properties The properties of the User DTO.
+   * @param audit The audit information of the User DTO.
+   */
   protected UserDTO(String name, Map<String, String> properties, AuditDTO audit) {
     this.name = name;
     this.properties = properties;
@@ -52,25 +59,25 @@ public class UserDTO implements User {
   }
 
   /**
-   * Builder class for constructing a CatalogDTO instance.
+   * Builder class for constructing a UserDTO instance.
    *
    * @param <S> The type of the builder instance.
    */
   public static class Builder<S extends Builder> {
 
-    /** The name of the catalog. */
+    /** The name of the user. */
     protected String name;
 
-    /** The properties of the catalog. */
+    /** The properties of the user. */
     protected Map<String, String> properties;
 
-    /** The audit information of the catalog. */
+    /** The audit information of the user. */
     protected AuditDTO audit;
 
     /**
-     * Sets the name of the catalog.
+     * Sets the name of the user.
      *
-     * @param name The name of the catalog.
+     * @param name The name of the user.
      * @return The builder instance.
      */
     public S withName(String name) {
@@ -79,9 +86,9 @@ public class UserDTO implements User {
     }
 
     /**
-     * Sets the properties of the catalog.
+     * Sets the properties of the user.
      *
-     * @param properties The properties of the catalog.
+     * @param properties The properties of the user.
      * @return The builder instance.
      */
     public S withProperties(Map<String, String> properties) {
@@ -90,9 +97,9 @@ public class UserDTO implements User {
     }
 
     /**
-     * Sets the audit information of the catalog.
+     * Sets the audit information of the user.
      *
-     * @param audit The audit information of the catalog.
+     * @param audit The audit information of the user.
      * @return The builder instance.
      */
     public S withAudit(AuditDTO audit) {
@@ -100,6 +107,13 @@ public class UserDTO implements User {
       return (S) this;
     }
 
+
+    /**
+     * Builds an instance of UserDTO using the builder's properties.
+     *
+     * @return An instance of UserDTO.
+     * @throws IllegalArgumentException If the name or audit are not set.
+     */
     public UserDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
