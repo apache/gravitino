@@ -27,8 +27,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    IcebergCatalogOperations ops = new IcebergCatalogOperations(entity());
-    ops.initialize(config);
+    IcebergCatalogOperations ops = new IcebergCatalogOperations();
     return ops;
   }
 

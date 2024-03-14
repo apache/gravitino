@@ -22,6 +22,13 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   false,
                   null,
                   false,
+                  false),
+              PropertyEntry.stringImmutablePropertyEntry(
+                  BaseCatalog.CATALOG_OPERATION_IMPL,
+                  "The classname of custom catalog operation to replace the default implementation",
+                  false,
+                  null,
+                  false,
                   false)),
           PropertyEntry::getName);
 }

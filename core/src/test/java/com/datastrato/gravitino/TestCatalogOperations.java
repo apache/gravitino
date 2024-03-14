@@ -20,6 +20,7 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -71,7 +72,8 @@ public class TestCatalogOperations
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogEntity entity)
+      throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
