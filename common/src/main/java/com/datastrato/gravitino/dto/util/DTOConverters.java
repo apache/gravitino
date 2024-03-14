@@ -329,6 +329,12 @@ public class DTOConverters {
         .build();
   }
 
+  /**
+   * Converts a user implementation to a UserDTO.
+   *
+   * @param user The user implementation.
+   * @return The user DTO.
+   */
   public static UserDTO toDTO(User user) {
     if (user instanceof UserDTO) {
       return (UserDTO) user;

@@ -313,7 +313,6 @@ public class KvEntityStore implements EntityStore {
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
-        prefixes.add(replacePrefixTypeInfo(encode, USER.getShortName()));
         break;
       case CATALOG:
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
