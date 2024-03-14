@@ -4,8 +4,14 @@
  */
 package com.datastrato.gravitino.tenant;
 
-import com.datastrato.gravitino.*;
-import com.datastrato.gravitino.exceptions.*;
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
+import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.User;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.MetalakeUser;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -49,8 +55,8 @@ public class AccessControlManager implements SupportsUserManagement {
    * @throws RuntimeException If creating the User encounters storage issues.
    */
   @Override
-  public User createUser(
-      String metalake, String userName, Map<String, String> properties) throws UserAlreadyExistsException {
+  public User createUser(String metalake, String userName, Map<String, String> properties)
+      throws UserAlreadyExistsException {
     MetalakeUser metalakeUser =
         MetalakeUser.builder()
             .withId(idGenerator.nextId())
@@ -80,13 +86,11 @@ public class AccessControlManager implements SupportsUserManagement {
     }
   }
 
-
   /**
    * Deletes a User.
    *
    * @param metalake The Metalake of the User.
    * @param userName THe name of the User.
-   *
    * @return `true` if the User was successfully deleted, `false` otherwise.
    * @throws RuntimeException If deleting the User encounters storage issues.
    */
