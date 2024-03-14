@@ -6,8 +6,6 @@
 package com.datastrato.gravitino.integration.test.web.ui.Pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
-import java.util.List;
-import java.util.Objects;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
@@ -15,6 +13,9 @@ import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.util.List;
+import java.util.Objects;
 
 public class MetalakePage extends AbstractWebIT {
   public int sleepTimeMillis = 1_000;
@@ -229,7 +230,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyEmptyMetalake() {
     try {
-      String xpath = "//div[contains(@class, 'MuiDataGrid-overlay')]";
+      String xpath = ".//div[contains(@class, 'MuiDataGrid-overlay')]";
       WebElement noMetalakeRows = metalakeTableGrid.findElement(By.xpath(xpath));
 
       return Objects.equals(noMetalakeRows.getText(), "No rows");
