@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -48,6 +49,7 @@ public class DorisContainer extends BaseContainer {
   protected void setupContainer() {
     super.setupContainer();
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "DorisContainer")));
+    withStartupTimeout(Duration.ofMinutes(10));
   }
 
   @Override
