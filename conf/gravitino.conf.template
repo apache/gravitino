@@ -27,8 +27,9 @@ gravitino.server.webserver.requestHeaderSize = 131072
 gravitino.server.webserver.responseHeaderSize = 131072
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
-# The entity store to use
+# The entity store to use, kv or relational
 gravitino.entity.store = kv
+
 # The RocksDB entity store
 gravitino.entity.store.kv = RocksDBKvBackend
 # The storage path for RocksDB storage implementation, it supports both absolute and relative path,

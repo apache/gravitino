@@ -37,6 +37,7 @@ jobs:
               - meta/**
               - server/**
               - server-common/**
+              - spark-connector/**
               - trino-connector/**
               - web/**
               - docs/open-api/**

@@ -18,3 +18,4 @@ Gravitino connector index:
     - [MySQL](catalog-mysql.md)
     - [PostgreSQL](catalog-postgresql.md)
   - [Supported SQL](sql-support.md)
+  - [Development](development.md)

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Map;
  * Interface for supporting metalakes. It includes methods for listing, loading, creating, altering
  * and dropping metalakes.
  */
+@Evolving
 public interface SupportsMetalakes {
 
   /**

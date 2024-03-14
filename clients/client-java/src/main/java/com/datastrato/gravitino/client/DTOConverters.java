@@ -80,7 +80,7 @@ class DTOConverters {
             .withRestClient(client)
             .build();
 
-      case STREAM:
+      case MESSAGING:
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
@@ -147,6 +147,15 @@ class DTOConverters {
     } else if (change instanceof TableChange.ColumnChange) {
       return toColumnUpdateRequest((TableChange.ColumnChange) change);
 
+    } else if (change instanceof TableChange.AddIndex) {
+      return new TableUpdateRequest.AddTableIndexRequest(
+          ((TableChange.AddIndex) change).getType(),
+          ((TableChange.AddIndex) change).getName(),
+          ((TableChange.AddIndex) change).getFieldNames());
+    } else if (change instanceof TableChange.DeleteIndex) {
+      return new TableUpdateRequest.DeleteTableIndexRequest(
+          ((TableChange.DeleteIndex) change).getName(),
+          ((TableChange.DeleteIndex) change).isIfExists());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
@@ -181,7 +190,8 @@ class DTOConverters {
           addColumn.getDataType(),
           addColumn.getComment(),
           addColumn.getPosition(),
-          addColumn.isNullable());
+          addColumn.isNullable(),
+          addColumn.isAutoIncrement());
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -207,6 +217,9 @@ class DTOConverters {
     } else if (change instanceof TableChange.UpdateColumnNullability) {
       return new TableUpdateRequest.UpdateTableColumnNullabilityRequest(
           change.fieldName(), ((TableChange.UpdateColumnNullability) change).nullable());
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      return new TableUpdateRequest.UpdateColumnAutoIncrementRequest(
+          change.fieldName(), ((TableChange.UpdateColumnAutoIncrement) change).isAutoIncrement());
     } else {
       throw new IllegalArgumentException(
           "Unknown column change type: " + change.getClass().getSimpleName());

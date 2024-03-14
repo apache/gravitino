@@ -4,11 +4,13 @@
  */
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.partitions.Partition;
 
 /** Interface for tables that support partitions. */
+@Evolving
 public interface SupportsPartitions {
 
   /**

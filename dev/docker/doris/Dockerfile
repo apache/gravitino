@@ -5,9 +5,8 @@
 FROM ubuntu:22.04
 LABEL maintainer="support@datastrato.com"
 
-ARG DORIS_PACKAGE_NAME
-ARG DORIS_FILE_NAME
-ARG TARGET_ARCH
+ARG DORIS_VERSION
+ARG TARGETARCH
 
 WORKDIR /
 
@@ -42,9 +41,8 @@ RUN ARCH=$(uname -m) && \
 
 #################################################################################
 ## add files
-
-ADD packages/${DORIS_FILE_NAME} /opt
-RUN ln -s /opt/${DORIS_PACKAGE_NAME} ${DORIS_HOME}
+ADD packages/doris-${TARGETARCH}.tar.xz /opt/
+RUN ln -s /opt/apache-doris-${DORIS_VERSION}-bin-* ${DORIS_HOME} 
 
 COPY start.sh ${DORIS_HOME}
 

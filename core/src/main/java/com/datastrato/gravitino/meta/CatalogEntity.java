@@ -238,7 +238,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof CatalogEntity)) {
       return false;
     }
     CatalogEntity that = (CatalogEntity) o;

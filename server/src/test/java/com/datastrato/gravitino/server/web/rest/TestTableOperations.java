@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -11,6 +14,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
@@ -33,6 +38,7 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
@@ -42,6 +48,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -64,7 +72,9 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestTableOperations extends JerseyTest {
 
@@ -84,6 +94,15 @@ public class TestTableOperations extends JerseyTest {
   private final String catalog = "catalog1";
 
   private final String schema = "schema1";
+
+  @BeforeAll
+  public static void setup() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+  }
 
   @Override
   protected Application configure() {
@@ -530,6 +549,7 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.first(),
+            false,
             false);
     Column[] columns =
         new Column[] {
@@ -550,7 +570,8 @@ public class TestTableOperations extends JerseyTest {
             Types.StringType.get(),
             "mock comment",
             TableChange.ColumnPosition.after("col2"),
-            true);
+            true,
+            false);
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),
@@ -608,6 +629,48 @@ public class TestTableOperations extends JerseyTest {
     TableUpdateRequest.UpdateTableColumnPositionRequest req =
         new TableUpdateRequest.UpdateTableColumnPositionRequest(
             new String[] {"col1"}, TableChange.ColumnPosition.after("col2"));
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testAddTableIndex() {
+    TableUpdateRequest.AddTableIndexRequest req =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"col1"}});
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testDeleteTableIndex() {
+    TableUpdateRequest.DeleteTableIndexRequest req =
+        new TableUpdateRequest.DeleteTableIndexRequest("test", false);
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testUpdateColumnAutoIncrement() {
+    TableUpdateRequest.UpdateColumnAutoIncrementRequest req =
+        new TableUpdateRequest.UpdateColumnAutoIncrementRequest(new String[] {"test"}, false);
     Column[] columns =
         new Column[] {
           mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
@@ -762,6 +825,7 @@ public class TestTableOperations extends JerseyTest {
 
     Assertions.assertEquals(tableDTO.distribution(), updatedTable.distribution());
     Assertions.assertArrayEquals(tableDTO.sortOrder(), updatedTable.sortOrder());
+    Assertions.assertArrayEquals(tableDTO.index(), updatedTable.index());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
@@ -837,6 +901,7 @@ public class TestTableOperations extends JerseyTest {
     when(table.partitioning()).thenReturn(transforms);
     when(table.sortOrder()).thenReturn(new SortOrder[0]);
     when(table.distribution()).thenReturn(DistributionDTO.NONE);
+    when(table.index()).thenReturn(Indexes.EMPTY_INDEXES);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");

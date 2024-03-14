@@ -45,6 +45,9 @@ postgresql = "42.6.0"
 immutables-value = "2.10.0"
 selenium = "3.141.59"
 rauschig = "1.2.0"
+mybatis = "3.5.6"
+h2db = "1.4.200"
+kyuubi = "1.8.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -146,6 +149,8 @@ sun-activation = { group = "com.sun.activation", name = "javax.activation", vers
 
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }
+mybatis = { group = "org.mybatis", name = "mybatis", version.ref = "mybatis"}
+h2db = { group = "com.h2database", name = "h2", version.ref = "h2db"}
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

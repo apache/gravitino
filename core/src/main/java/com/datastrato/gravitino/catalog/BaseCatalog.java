@@ -73,6 +73,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops().filesetPropertiesMetadata();
   }
 
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().topicPropertiesMetadata();
+  }
+
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
    * instance if not already created.
@@ -162,11 +167,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       synchronized (this) {
         if (properties == null) {
           Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
-          properties = Maps.newHashMap(entity.getProperties());
-          properties
+          Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
+          tempProperties
               .entrySet()
               .removeIf(
                   entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+          properties = tempProperties;
         }
       }
     }

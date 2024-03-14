@@ -6,6 +6,8 @@ package com.datastrato.gravitino.dto.requests;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
@@ -120,6 +122,7 @@ public class TestTableUpdatesRequest {
             Types.StringType.get(),
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
+            false,
             false);
     String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
     String expected =
@@ -133,7 +136,8 @@ public class TestTableUpdatesRequest {
             + "  \"position\": {\n"
             + "    \"after\": \"afterColumn\"\n"
             + "  },\n"
-            + "  \"nullable\": false\n"
+            + "  \"nullable\": false,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -155,7 +159,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default nullability\",\n"
             + "  \"position\": \"first\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -181,7 +186,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default position\",\n"
             + "  \"position\": \"default\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -192,5 +198,37 @@ public class TestTableUpdatesRequest {
                     TableUpdateRequest.AddTableColumnRequest.class)
                 .getPosition()
             instanceof TableChange.Default);
+  }
+
+  @Test
+  public void testOperationTableIndexRequest() throws JsonProcessingException {
+    // check add index request
+    TableUpdateRequest tableUpdateRequest =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"column1"}});
+    String jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
+    String expected =
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"PRIMARY_KEY\",\"name\":\"PRIMARY\",\"fieldNames\":[[\"column1\"]]}}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    tableUpdateRequest =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.UNIQUE_KEY, "uk_2", new String[][] {{"column2"}});
+    jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
+    expected =
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"UNIQUE_KEY\",\"name\":\"uk_2\",\"fieldNames\":[[\"column2\"]]}}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    // check delete index request
+    TableUpdateRequest.DeleteTableIndexRequest deleteTableIndexRequest =
+        new TableUpdateRequest.DeleteTableIndexRequest("uk_2", true);
+    jsonString = JsonUtils.objectMapper().writeValueAsString(deleteTableIndexRequest);
+    expected = "{\"@type\":\"deleteTableIndex\",\"name\":\"uk_2\",\"ifExists\":true}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }
 }

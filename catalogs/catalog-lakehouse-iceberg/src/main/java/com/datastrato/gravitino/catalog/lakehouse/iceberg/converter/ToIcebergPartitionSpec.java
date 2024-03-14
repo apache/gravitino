@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -23,7 +22,6 @@ public class ToIcebergPartitionSpec {
    * @param icebergTable the iceberg table.
    * @return a PartitionSpec
    */
-  @VisibleForTesting
   public static PartitionSpec toPartitionSpec(IcebergTable icebergTable) {
     Schema schema = ConvertUtil.toIcebergSchema(icebergTable);
     return ToIcebergPartitionSpec.toPartitionSpec(schema, icebergTable.partitioning());
@@ -36,7 +34,6 @@ public class ToIcebergPartitionSpec {
    * @param partitioning Gravitino Transforms
    * @return a PartitionSpec
    */
-  @VisibleForTesting
   public static PartitionSpec toPartitionSpec(Schema schema, Transform[] partitioning) {
     if (partitioning == null || partitioning.length == 0) {
       return PartitionSpec.unpartitioned();

@@ -1,0 +1,85 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb01 (
+   id integer,
+   name char(20)
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb02 (
+   id integer,
+   name char(255)
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+<QUERY_FAILED> MySQL does not support the datatype CHAR with the length greater than 255
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb04 (
+   id integer,
+   name varchar(250)
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb05 (
+   id integer,
+   name varchar(256)
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb06 (
+   id integer,
+   name char(1)
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".varchar_db1.tb07 (
+   id integer,
+   name varchar
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

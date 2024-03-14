@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
+import static com.datastrato.gravitino.Entity.EntityType.FILESET;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
@@ -59,6 +60,9 @@ import org.slf4j.LoggerFactory;
  * interface
  */
 public class KvEntityStore implements EntityStore {
+
+  private static final String NO_SUCH_ENTITY_MSG = "No such entity:%s";
+
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
@@ -175,7 +179,7 @@ public class KvEntityStore implements EntityStore {
           byte[] key = entityKeyEncoder.encode(ident, entityType);
           byte[] value = transactionalKvBackend.get(key);
           if (value == null) {
-            throw new NoSuchEntityException("No such entity:%s", ident.toString());
+            throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
           }
 
           E e = serDe.deserialize(value, type);
@@ -270,12 +274,12 @@ public class KvEntityStore implements EntityStore {
             () -> {
               byte[] key = entityKeyEncoder.encode(ident, entityType, true);
               if (key == null) {
-                throw new NoSuchEntityException("No such entity:%s", ident.toString());
+                throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
               }
               return transactionalKvBackend.get(key);
             });
     if (value == null) {
-      throw new NoSuchEntityException("No such entity:%s", ident.toString());
+      throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
     }
     return serDe.deserialize(value, e);
   }
@@ -307,15 +311,19 @@ public class KvEntityStore implements EntityStore {
         prefixes.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case CATALOG:
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case SCHEMA:
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
         break;
       case TABLE:
+      case FILESET:
         break;
       default:
         LOG.warn("Currently unknown type: {}, please check it", type);
@@ -431,7 +439,7 @@ public class KvEntityStore implements EntityStore {
         return StorageLayoutVersion.V1;
       }
 
-      return StorageLayoutVersion.fromString(new String(bytes));
+      return StorageLayoutVersion.fromString(new String(bytes, StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new IllegalStateException("Failed to get/put layout version information", e);
     }
