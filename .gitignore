@@ -46,3 +46,5 @@ include web/.gitignore
 
 # node env
 .node
+
+catalogs/catalog-lakehouse-iceberg/spark-warehouse
