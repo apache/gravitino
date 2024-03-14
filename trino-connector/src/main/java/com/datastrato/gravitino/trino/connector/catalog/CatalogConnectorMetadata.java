@@ -18,15 +18,14 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.RelationalCatalog;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
@@ -48,8 +47,7 @@ public class CatalogConnectorMetadata {
 
   private final GravitinoMetaLake metalake;
   private final String catalogName;
-  private final SupportsSchemas schemaCatalog;
-  private final TableCatalog tableCatalog;
+  private final RelationalCatalog tableCatalog;
 
   public CatalogConnectorMetadata(GravitinoMetaLake metalake, NameIdentifier catalogIdentifier) {
     try {
@@ -57,8 +55,7 @@ public class CatalogConnectorMetadata {
       this.metalake = metalake;
       Catalog catalog = metalake.loadCatalog(catalogIdentifier);
       // Make sure the catalog support schema operations.
-      this.schemaCatalog = catalog.asSchemas();
-      this.tableCatalog = catalog.asTableCatalog();
+      this.tableCatalog = (RelationalCatalog) catalog;
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     } catch (UnsupportedOperationException e) {
@@ -71,10 +68,7 @@ public class CatalogConnectorMetadata {
 
   public List<String> listSchemaNames() {
     try {
-      return Arrays.stream(
-              schemaCatalog.listSchemas(Namespace.ofSchema(metalake.name(), catalogName)))
-          .map(NameIdentifier::name)
-          .toList();
+      return Arrays.stream(tableCatalog.listSchemas()).map(NameIdentifier::name).toList();
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     }
@@ -82,9 +76,7 @@ public class CatalogConnectorMetadata {
 
   public GravitinoSchema getSchema(String schemaName) {
     try {
-      Schema schema =
-          schemaCatalog.loadSchema(
-              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName));
+      Schema schema = tableCatalog.loadSchema(schemaName);
       return new GravitinoSchema(schema);
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -139,10 +131,7 @@ public class CatalogConnectorMetadata {
 
   public void createSchema(GravitinoSchema schema) {
     try {
-      schemaCatalog.createSchema(
-          NameIdentifier.ofSchema(metalake.name(), catalogName, schema.getName()),
-          schema.getComment(),
-          schema.getProperties());
+      tableCatalog.createSchema(schema.getName(), schema.getComment(), schema.getProperties());
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     } catch (TableAlreadyExistsException e) {
@@ -152,9 +141,7 @@ public class CatalogConnectorMetadata {
 
   public void dropSchema(String schemaName, boolean cascade) {
     try {
-      boolean success =
-          schemaCatalog.dropSchema(
-              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+      boolean success = tableCatalog.dropSchema(schemaName, cascade);
 
       if (!success) {
         throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");

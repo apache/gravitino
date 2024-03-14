@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.trino;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.RelationalCatalog;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
@@ -35,6 +36,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -73,7 +75,7 @@ public class TrinoConnectorIT extends AbstractIT {
       GravitinoITUtils.genRandomName("TrinoIT_table2").toLowerCase();
   public static String tab1Name = GravitinoITUtils.genRandomName("TrinoIT_table3").toLowerCase();
   private static GravitinoMetaLake metalake;
-  private static Catalog catalog;
+  private static RelationalCatalog catalog;
 
   @BeforeAll
   public static void startDockerContainer() throws IOException, TException, InterruptedException {
@@ -146,8 +148,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
-    NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
-    Schema schema = catalog.asSchemas().loadSchema(idSchema);
+    Schema schema = catalog.loadSchema(databaseName);
     Assertions.assertEquals(schema.name(), databaseName);
 
     ArrayList<ArrayList<String>> r =
@@ -388,8 +389,7 @@ public class TrinoConnectorIT extends AbstractIT {
             metalakeName, catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema =
-        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    Schema schema = catalog.loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -451,31 +451,28 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog =
-        createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            "hive",
-            "comment",
-            ImmutableMap.<String, String>builder()
-                .put(
-                    "metastore.uris",
-                    String.format(
-                        "thrift://%s:%s",
-                        containerSuite.getHiveContainer().getContainerIpAddress(),
-                        HiveContainer.HIVE_METASTORE_PORT))
-                .build());
-    Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
+    RelationalCatalog catalog =
+        (RelationalCatalog)
+            createdMetalake.createCatalog(
+                NameIdentifier.of(metalakeName, catalogName),
+                Catalog.Type.RELATIONAL,
+                "hive",
+                "comment",
                 ImmutableMap.<String, String>builder()
                     .put(
-                        "location",
-                        "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
+                        "metastore.uris",
+                        String.format(
+                            "thrift://%s:%s",
+                            containerSuite.getHiveContainer().getContainerIpAddress(),
+                            HiveContainer.HIVE_METASTORE_PORT))
                     .build());
+    Schema schema =
+        catalog.createSchema(
+            schemaName,
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder()
+                .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
+                .build());
 
     String sql =
         String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
@@ -698,28 +695,27 @@ public class TrinoConnectorIT extends AbstractIT {
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog =
-        createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            "hive",
-            "comment",
-            ImmutableMap.<String, String>builder()
-                .put(
-                    "metastore.uris",
-                    String.format(
-                        "thrift://%s:%s",
-                        containerSuite.getHiveContainer().getContainerIpAddress(),
-                        HiveContainer.HIVE_METASTORE_PORT))
-                .build());
+    RelationalCatalog catalog =
+        (RelationalCatalog)
+            createdMetalake.createCatalog(
+                NameIdentifier.of(metalakeName, catalogName),
+                Catalog.Type.RELATIONAL,
+                "hive",
+                "comment",
+                ImmutableMap.<String, String>builder()
+                    .put(
+                        "metastore.uris",
+                        String.format(
+                            "thrift://%s:%s",
+                            containerSuite.getHiveContainer().getContainerIpAddress(),
+                            HiveContainer.HIVE_METASTORE_PORT))
+                    .build());
 
     Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
-                ImmutableMap.<String, String>builder().build());
+        catalog.createSchema(
+            schemaName,
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 
@@ -917,30 +913,29 @@ public class TrinoConnectorIT extends AbstractIT {
 
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String hiveContainerIp = containerSuite.getHiveContainer().getContainerIpAddress();
-    Catalog catalog =
-        createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            "lakehouse-iceberg",
-            "comment",
-            ImmutableMap.<String, String>builder()
-                .put(
-                    "uri",
-                    String.format(
-                        "thrift://%s:%s", hiveContainerIp, HiveContainer.HIVE_METASTORE_PORT))
-                .put(
-                    "warehouse",
-                    String.format("hdfs://%s:9000/user/hive/warehouse", hiveContainerIp))
-                .put("catalog-backend", "hive")
-                .build());
+    RelationalCatalog catalog =
+        (RelationalCatalog)
+            createdMetalake.createCatalog(
+                NameIdentifier.of(metalakeName, catalogName),
+                Catalog.Type.RELATIONAL,
+                "lakehouse-iceberg",
+                "comment",
+                ImmutableMap.<String, String>builder()
+                    .put(
+                        "uri",
+                        String.format(
+                            "thrift://%s:%s", hiveContainerIp, HiveContainer.HIVE_METASTORE_PORT))
+                    .put(
+                        "warehouse",
+                        String.format("hdfs://%s:9000/user/hive/warehouse", hiveContainerIp))
+                    .put("catalog-backend", "hive")
+                    .build());
 
     Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
-                ImmutableMap.<String, String>builder().build());
+        catalog.createSchema(
+            schemaName,
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 
@@ -1061,7 +1056,9 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    RelationalCatalog catalog =
+        (RelationalCatalog)
+            createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
@@ -1073,12 +1070,8 @@ public class TrinoConnectorIT extends AbstractIT {
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
 
-    catalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
-            "Created by gravitino client",
-            ImmutableMap.<String, String>builder().build());
+    catalog.createSchema(
+        schemaName, "Created by gravitino client", ImmutableMap.<String, String>builder().build());
 
     sql =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
@@ -1102,10 +1095,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success =
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    success = catalog.dropSchema(schemaName, true);
     Assertions.assertFalse(success);
     final String sql3 =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
@@ -1186,7 +1176,9 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    RelationalCatalog catalog =
+        (RelationalCatalog)
+            createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
@@ -1199,12 +1191,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
 
     Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                null,
-                ImmutableMap.<String, String>builder().build());
+        catalog.createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 
@@ -1485,7 +1472,8 @@ public class TrinoConnectorIT extends AbstractIT {
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals(createdCatalog, loadCatalog);
-
-    catalog = loadCatalog;
+    Preconditions.checkArgument(
+        Catalog.Type.RELATIONAL.equals(loadCatalog.type()), "Only support relational catalog");
+    catalog = (RelationalCatalog) loadCatalog;
   }
 }
