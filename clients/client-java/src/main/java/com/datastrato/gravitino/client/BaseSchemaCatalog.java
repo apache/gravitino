@@ -192,6 +192,21 @@ abstract class BaseSchemaCatalog extends CatalogDTO {
     }
   }
 
+  /**
+   * Check if a schema exists.
+   *
+   * @param schemaName The name of the schema.
+   * @return True if the schema exists, false otherwise.
+   */
+  public boolean schemaExists(String schemaName) {
+    try {
+      loadSchema(schemaName);
+      return true;
+    } catch (NoSuchSchemaException e) {
+      return false;
+    }
+  }
+
   @VisibleForTesting
   static String formatSchemaRequestPath(Namespace ns) {
     return new StringBuilder()

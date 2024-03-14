@@ -37,6 +37,8 @@ import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.RelationalCatalog;
+import com.datastrato.gravitino.client.RelationalTable;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -51,7 +53,6 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -122,7 +123,7 @@ public class CatalogHiveIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
   private static GravitinoMetaLake metalake;
-  private static Catalog catalog;
+  private static RelationalCatalog catalog;
   private static SparkSession sparkSession;
   private static FileSystem hdfs;
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
@@ -221,7 +222,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterEach
   public void resetSchema() throws TException, InterruptedException {
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    catalog.dropSchema(schemaName, true);
     assertThrows(
         NoSuchObjectException.class,
         () -> hiveClientPool.run(client -> client.getDatabase(schemaName)));
@@ -251,7 +252,8 @@ public class CatalogHiveIT extends AbstractIT {
         "comment",
         properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog =
+        (RelationalCatalog) metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
   }
 
   private static void createSchema() throws TException, InterruptedException {
@@ -268,8 +270,8 @@ public class CatalogHiveIT extends AbstractIT {
             schemaName.toLowerCase()));
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.createSchema(ident.name(), comment, properties);
+    Schema loadSchema = catalog.loadSchema(ident.name());
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -576,7 +578,7 @@ public class CatalogHiveIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
-    catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
+    catalog.createSchema(schemaIdent.name(), "comment", properties);
 
     Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaIdent.name()));
     String actualSchemaLocation = actualSchema.getLocationUri();
@@ -662,22 +664,23 @@ public class CatalogHiveIT extends AbstractIT {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-    Table nonPartitionedTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(),
-                Transforms.EMPTY_TRANSFORM);
-    String[] result = nonPartitionedTable.supportPartitions().listPartitionNames();
+    RelationalTable nonPartitionedTable =
+        (RelationalTable)
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    nameIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    ImmutableMap.of(),
+                    Transforms.EMPTY_TRANSFORM);
+    String[] result = nonPartitionedTable.listPartitionNames();
     Assertions.assertEquals(0, result.length);
 
     // test partitioned table
-    Table createdTable = preparePartitionedTable();
+    RelationalTable createdTable = (RelationalTable) preparePartitionedTable();
 
-    String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
+    String[] partitionNames = createdTable.listPartitionNames();
     Assertions.assertArrayEquals(
         new String[] {"hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test"},
         partitionNames);
@@ -689,20 +692,21 @@ public class CatalogHiveIT extends AbstractIT {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-    Table nonPartitionedTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(),
-                Transforms.EMPTY_TRANSFORM);
-    Partition[] result = nonPartitionedTable.supportPartitions().listPartitions();
+    RelationalTable nonPartitionedTable =
+        (RelationalTable)
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    nameIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    ImmutableMap.of(),
+                    Transforms.EMPTY_TRANSFORM);
+    Partition[] result = nonPartitionedTable.listPartitions();
     Assertions.assertEquals(0, result.length);
 
     // test partitioned table
-    Table createdTable = preparePartitionedTable();
+    RelationalTable createdTable = (RelationalTable) preparePartitionedTable();
     String insertTemplate =
         "INSERT INTO TABLE %s.%s "
             + "PARTITION (hive_col_name2='2023-01-02', hive_col_name3='gravitino_it_test2') "
@@ -721,7 +725,7 @@ public class CatalogHiveIT extends AbstractIT {
             "ANALYZE TABLE %s.%s PARTITION (%s) COMPUTE STATISTICS",
             schemaName, createdTable.name(), partition2));
 
-    Partition[] partitions = createdTable.supportPartitions().listPartitions();
+    Partition[] partitions = createdTable.listPartitions();
     Assertions.assertEquals(2, partitions.length);
     String partition1Name = "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test";
     String partition2Name = "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2";
@@ -740,12 +744,11 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testGetPartition() throws TException, InterruptedException {
-    Table createdTable = preparePartitionedTable();
+    RelationalTable createdTable = (RelationalTable) preparePartitionedTable();
 
-    String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
+    String[] partitionNames = createdTable.listPartitionNames();
     Assertions.assertEquals(1, partitionNames.length);
-    IdentityPartition partition =
-        (IdentityPartition) createdTable.supportPartitions().getPartition(partitionNames[0]);
+    IdentityPartition partition = (IdentityPartition) createdTable.getPartition(partitionNames[0]);
 
     Assertions.assertEquals(
         "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test", partition.name());
@@ -764,7 +767,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testAddPartition() throws TException, InterruptedException {
-    Table createdTable = preparePartitionedTable();
+    RelationalTable createdTable = (RelationalTable) preparePartitionedTable();
 
     // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
     String[] field1 = new String[] {"hive_col_name2"};
@@ -774,8 +777,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     Partition identity =
         Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
-    IdentityPartition partitionAdded =
-        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
+    IdentityPartition partitionAdded = (IdentityPartition) createdTable.addPartition(identity);
 
     // Directly get partition from hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot =
@@ -1060,22 +1062,21 @@ public class CatalogHiveIT extends AbstractIT {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    Schema schema = catalog.asSchemas().loadSchema(ident);
+    RelationalCatalog catalog =
+        (RelationalCatalog) metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Schema schema = catalog.loadSchema(ident.name());
     Assertions.assertNull(schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     schema =
-        catalog
-            .asSchemas()
-            .alterSchema(
-                ident,
-                SchemaChange.removeProperty("key1"),
-                SchemaChange.setProperty("key2", "val2-alter"));
+        catalog.alterSchema(
+            ident.name(),
+            SchemaChange.removeProperty("key1"),
+            SchemaChange.setProperty("key2", "val2-alter"));
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
-    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
+    Map<String, String> properties2 = catalog.loadSchema(ident.name()).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
@@ -1088,7 +1089,8 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   void testLoadEntityWithSamePrefix() {
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    RelationalCatalog catalog =
+        (RelationalCatalog) metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertNotNull(catalog);
 
     for (int i = 1; i < metalakeName.length(); i++) {
@@ -1111,18 +1113,16 @@ public class CatalogHiveIT extends AbstractIT {
     final NameIdentifier idB = NameIdentifier.of(metalakeName, catalogName + "a");
     Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB));
 
-    SupportsSchemas schemas = catalog.asSchemas();
-
     for (int i = 1; i < schemaName.length(); i++) {
       // We can't get the schema by prefix
       final int length = i;
       final NameIdentifier id =
           NameIdentifier.of(metalakeName, catalogName, schemaName.substring(0, length));
-      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id));
+      Assertions.assertThrows(NoSuchSchemaException.class, () -> catalog.loadSchema(id.name()));
     }
 
     NameIdentifier idC = NameIdentifier.of(metalakeName, catalogName, schemaName + "a");
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> catalog.loadSchema(idC.name()));
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -1167,7 +1167,8 @@ public class CatalogHiveIT extends AbstractIT {
         "comment",
         ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
 
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    RelationalCatalog catalog =
+        (RelationalCatalog) metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
     NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
@@ -1181,16 +1182,13 @@ public class CatalogHiveIT extends AbstractIT {
 
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
-      catalog = metalake.loadCatalog(oldId);
+      catalog = (RelationalCatalog) metalake.loadCatalog(oldId);
       Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
     }
 
     // Schema does not have the rename operation.
     final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
-    catalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "", ImmutableMap.of());
+    catalog.createSchema(schemaName, "", ImmutableMap.of());
 
     final Catalog cata = catalog;
     // Now try to rename table

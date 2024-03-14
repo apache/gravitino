@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.hadoop.integration.test;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.client.FilesetCatalog;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -48,7 +49,7 @@ public class HadoopCatalogIT extends AbstractIT {
   public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
   private static final String provider = "hadoop";
   private static GravitinoMetaLake metalake;
-  private static Catalog catalog;
+  private static FilesetCatalog catalog;
   private static FileSystem hdfs;
   private static String defaultBaseLocation;
 
@@ -100,7 +101,7 @@ public class HadoopCatalogIT extends AbstractIT {
         "comment",
         ImmutableMap.of());
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = (FilesetCatalog) metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
   }
 
   private static void createSchema() {
@@ -111,8 +112,8 @@ public class HadoopCatalogIT extends AbstractIT {
     properties.put("location", defaultBaseLocation());
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.createSchema(ident.name(), comment, properties);
+    Schema loadSchema = catalog.loadSchema(ident.name());
     Assertions.assertEquals(schemaName, loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -121,9 +122,8 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   private static void dropSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    catalog.asSchemas().dropSchema(ident, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(ident));
+    catalog.dropSchema(schemaName, true);
+    Assertions.assertFalse(catalog.schemaExists(schemaName));
   }
 
   @Test
