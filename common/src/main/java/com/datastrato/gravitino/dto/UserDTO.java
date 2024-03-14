@@ -12,6 +12,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a User Data Transfer Object (DTO). */
 public class UserDTO implements User {
 
   @JsonProperty("name")
@@ -58,6 +59,11 @@ public class UserDTO implements User {
     return audit;
   }
 
+  /**
+   * Creates a new Builder for constructing an User DTO.
+   *
+   * @return A new Builder instance.
+   */
   public static Builder builder() {
     return new Builder();
   }

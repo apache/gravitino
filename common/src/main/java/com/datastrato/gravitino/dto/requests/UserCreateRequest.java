@@ -16,6 +16,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a user. */
 @Getter
 @EqualsAndHashCode
 @ToString
