@@ -236,8 +236,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyEmptyMetalake() {
     try {
+      Thread.sleep(sleepTimeMillis);
       String xpath = ".//div[contains(@class, 'MuiDataGrid-overlay')]";
       WebElement noMetalakeRows = metalakeTableGrid.findElement(By.xpath(xpath));
+      LOG.info(noMetalakeRows.getText());
 
       return Objects.equals(noMetalakeRows.getText(), "No rows");
     } catch (Exception e) {
