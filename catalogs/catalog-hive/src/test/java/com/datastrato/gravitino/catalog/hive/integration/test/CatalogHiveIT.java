@@ -32,6 +32,8 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.catalog.BaseCatalog;
+import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -1363,5 +1365,30 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  void testCustomCatalogOperations() {
+    String catalogName = "custom_catalog";
+    Assertions.assertDoesNotThrow(
+        () -> createCatalogWithCustomOperation(catalogName, HiveCatalogOperations.class.getName()));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class,
+        () ->
+            createCatalogWithCustomOperation(
+                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
+  }
+
+  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
+
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
   }
 }

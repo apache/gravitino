@@ -144,8 +144,8 @@ public class TestIcebergSchema {
 
     Map<String, String> conf = Maps.newHashMap();
 
-    try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
-      ops.initialize(conf);
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
+      ops.initialize(conf, entity);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
       PropertiesMetadata metadata = ops.schemaPropertiesMetadata();

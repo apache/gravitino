@@ -24,8 +24,7 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HadoopCatalogOperations ops = new HadoopCatalogOperations(entity());
-    ops.initialize(config);
+    HadoopCatalogOperations ops = new HadoopCatalogOperations();
     return ops;
   }
 

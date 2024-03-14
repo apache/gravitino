@@ -31,14 +31,12 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
     JdbcCatalogOperations ops =
         new JdbcCatalogOperations(
-            entity(),
             createExceptionConverter(),
             jdbcTypeConverter,
             createJdbcDatabaseOperations(),
             createJdbcTableOperations(),
             createJdbcTablePropertiesMetadata(),
             createJdbcColumnDefaultValueConverter());
-    ops.initialize(config);
     return ops;
   }
 

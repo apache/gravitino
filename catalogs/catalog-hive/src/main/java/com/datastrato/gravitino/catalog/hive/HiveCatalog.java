@@ -33,8 +33,7 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HiveCatalogOperations ops = new HiveCatalogOperations(entity());
-    ops.initialize(config);
+    HiveCatalogOperations ops = new HiveCatalogOperations();
     return ops;
   }
 
