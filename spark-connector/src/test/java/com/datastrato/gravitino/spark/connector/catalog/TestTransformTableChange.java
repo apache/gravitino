@@ -178,7 +178,7 @@ public class TestTransformTableChange {
     com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition gravitinoUpdateColumnFirst =
         (com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition) gravitinoChangeFirst;
 
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         sparkUpdateColumnFirst.fieldNames(), gravitinoUpdateColumnFirst.fieldName());
     Assertions.assertTrue(
         gravitinoUpdateColumnFirst.getPosition()
@@ -196,7 +196,7 @@ public class TestTransformTableChange {
     com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition gravitinoUpdateColumnAfter =
         (com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition) gravitinoChangeAfter;
 
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         sparkUpdateColumnAfter.fieldNames(), gravitinoUpdateColumnAfter.fieldName());
     Assertions.assertTrue(
         gravitinoUpdateColumnAfter.getPosition()
