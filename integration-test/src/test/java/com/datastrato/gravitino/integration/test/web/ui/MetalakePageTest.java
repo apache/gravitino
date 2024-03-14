@@ -38,22 +38,22 @@ public class MetalakePageTest extends AbstractWebIT {
     Assertions.assertEquals("Gravitino", title);
   }
 
-  //  @Test
-  //  @Order(1)
+  @Test
+  @Order(1)
   public void testCreateMetalake() {
     createMetalakeAction(metalakeName);
     Assertions.assertTrue(metalakePage.verifyCreateMetalake(metalakeName));
   }
 
-  //  @Test
-  //  @Order(2)
+  @Test
+  @Order(2)
   public void testViewMetalakeDetails() {
     metalakePage.clickViewMetalakeBtn(metalakeName);
     Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(metalakeName));
   }
 
-  //  @Test
-  //  @Order(3)
+  @Test
+  @Order(3)
   public void testEditMetalake() {
     metalakePage.clickEditMetalakeBtn(metalakeName);
     metalakePage.setMetalakeNameField(editedMetalakeName);
@@ -61,16 +61,16 @@ public class MetalakePageTest extends AbstractWebIT {
     Assertions.assertTrue(metalakePage.verifyEditedMetalake(editedMetalakeName));
   }
 
-  //  @Test
-  //  @Order(4)
+  @Test
+  @Order(4)
   public void testDeleteMetalake() {
     metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
     metalakePage.confirmDeleteBtn.click();
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
 
-  //  @Test
-  //  @Order(5)
+  @Test
+  @Order(5)
   public void testCreateMultipleMetalakes() {
     int twoPagesCount = 11;
 
@@ -87,16 +87,16 @@ public class MetalakePageTest extends AbstractWebIT {
     Assertions.assertTrue(metalakePage.verifyChangePagination());
   }
 
-  //  @Test
-  //  @Order(6)
+  @Test
+  @Order(6)
   public void testQueryMetalake() {
     String name = "query";
     createMetalakeAction(name);
     Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
   }
 
-  //  @Test
-  //  @Order(7)
+  @Test
+  @Order(7)
   public void testCreateInvalidMetalake() {
     String name = "1!@#$";
     metalakePage.createMetalakeBtn.click();
@@ -105,14 +105,14 @@ public class MetalakePageTest extends AbstractWebIT {
     Assertions.assertTrue(metalakePage.checkIsErrorName());
   }
 
-  //  https://github.com/datastrato/gravitino/issues/2512
-  //  @Test
-  //  @Order(7)
-  //  public void testLinkToCatalogsPage() {
-  //    String name = "a_link";
-  //    createMetalakeAction(true, name);
-  //    metalakePage.clickMetalakeLink(name);
-  //    metalakePage.waitLinkElementDisplayed(name);
-  //    Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
-  //  }
+  // https://github.com/datastrato/gravitino/issues/2512
+  // @Test
+  // @Order(7)
+  // public void testLinkToCatalogsPage() {
+  // String name = "a_link";
+  // createMetalakeAction(true, name);
+  // metalakePage.clickMetalakeLink(name);
+  // metalakePage.waitLinkElementDisplayed(name);
+  // Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
+  // }
 }
