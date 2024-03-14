@@ -16,6 +16,9 @@ import org.junit.jupiter.api.TestMethodOrder;
 public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
 
+  String metalakeName = "metalake_name";
+  String editedMetalakeName = metalakeName + "_edited";
+
   // Create a metalake by name, set the default comment and properties.
   public void createMetalakeAction(String name) {
     metalakePage.createMetalakeBtn.click();
@@ -38,32 +41,30 @@ public class MetalakePageTest extends AbstractWebIT {
   //  @Test
   //  @Order(1)
   public void testCreateMetalake() {
-    String name = "metalake_name";
-    createMetalakeAction(name);
-    Assertions.assertTrue(metalakePage.verifyCreateMetalake(name));
+    createMetalakeAction(metalakeName);
+    Assertions.assertTrue(metalakePage.verifyCreateMetalake(metalakeName));
   }
 
   //  @Test
   //  @Order(2)
   public void testViewMetalakeDetails() {
-    String name = "metalake_name";
-    metalakePage.clickViewMetalakeBtn(name);
-    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(name));
+    metalakePage.clickViewMetalakeBtn(metalakeName);
+    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(metalakeName));
   }
 
   //  @Test
   //  @Order(3)
   public void testEditMetalake() {
-    metalakePage.clickEditMetalakeBtn("metalake_name");
-    metalakePage.setMetalakeNameField("metalake_name_edited");
+    metalakePage.clickEditMetalakeBtn(metalakeName);
+    metalakePage.setMetalakeNameField(editedMetalakeName);
     metalakePage.submitHandleMetalakeBtn.click();
-    Assertions.assertTrue(metalakePage.verifyEditedMetalake("metalake_name_edited"));
+    Assertions.assertTrue(metalakePage.verifyEditedMetalake(editedMetalakeName));
   }
 
   //  @Test
   //  @Order(4)
   public void testDeleteMetalake() {
-    metalakePage.clickDeleteMetalakeBtn("metalake_name_edited");
+    metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
     metalakePage.confirmDeleteBtn.click();
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
@@ -74,6 +75,11 @@ public class MetalakePageTest extends AbstractWebIT {
     int twoPagesCount = 11;
 
     for (int i = 0; i < twoPagesCount; i++) {
+      try {
+        Thread.sleep(800);
+      } catch (Exception e) {
+        LOG.error(e.getMessage(), e);
+      }
       String name = "metalake_" + (i + 1);
       createMetalakeAction(name);
     }
