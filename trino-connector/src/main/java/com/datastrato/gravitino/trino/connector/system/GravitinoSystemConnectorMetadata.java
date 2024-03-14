@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** An implementation of System connector Metadata * */
+/** An implementation of Gravitino System connector Metadata * */
 public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
   @Override
@@ -76,7 +76,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
   }
 
   public static class SystemTableHandle implements ConnectorTableHandle {
-    SchemaTableName name;
+    private final SchemaTableName name;
 
     @JsonCreator
     public SystemTableHandle(@JsonProperty("name") SchemaTableName name) {
@@ -90,7 +90,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
   }
 
   public static class SystemColumnHandle implements ColumnHandle {
-    int index;
+    private final int index;
 
     @JsonCreator
     public SystemColumnHandle(@JsonProperty("index") int index) {

@@ -38,6 +38,7 @@ import io.trino.spi.type.TypeOperators;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,7 @@ import java.util.Set;
 /**
  * GravitinoSystemConnector is primarily used to drive the GravitinoCatalogManager to load catalog
  * connectors managed in the Gravitino server. After users configure the Gravitino connector through
- * Trino catalog configuration, a DummyGravitinoFConnector is initially created. And it provides
+ * Trino catalog configuration, a GravitinoSystemConnector is initially created. And it provides
  * some system tables and stored procedures of Gravitino connector.
  */
 public class GravitinoSystemConnector implements Connector {
@@ -152,7 +153,8 @@ public class GravitinoSystemConnector implements Connector {
         List<ColumnHandle> columns,
         DynamicFilter dynamicFilter) {
 
-      SchemaTableName tableName = ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).name;
+      SchemaTableName tableName =
+          ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
       return new SystemTablePageSource(GravitinoSystemTableFactory.loadPageData(tableName));
     }
   }
@@ -166,14 +168,15 @@ public class GravitinoSystemConnector implements Connector {
         ConnectorTableHandle connectorTableHandle,
         DynamicFilter dynamicFilter,
         Constraint constraint) {
+
       SchemaTableName tableName =
-          ((GravitinoSystemConnectorMetadata.SystemTableHandle) connectorTableHandle).name;
+          ((GravitinoSystemConnectorMetadata.SystemTableHandle) connectorTableHandle).getName();
       return new FixedSplitSource(new Split(tableName));
     }
   }
 
   public static class Split implements ConnectorSplit {
-    SchemaTableName tableName;
+    private final SchemaTableName tableName;
 
     @JsonCreator
     public Split(@JsonProperty("tableName") SchemaTableName tableName) {
@@ -192,7 +195,7 @@ public class GravitinoSystemConnector implements Connector {
 
     @Override
     public List<HostAddress> getAddresses() {
-      return List.of(HostAddress.fromParts("127.0.0.1", 8080));
+      return Collections.emptyList();
     }
 
     @Override

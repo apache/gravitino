@@ -36,7 +36,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino creates a connector. It creates DummyGravitinoConnector at first.
+   * This function call by trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
    * @param catalogName the connector name of catalog
@@ -58,7 +58,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogConnectorFactory catalogConnectorFactory =
               new CatalogConnectorFactory(catalogInjector);
 
-          this.catalogConnectorManager =
+          catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
 
@@ -69,8 +69,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           }
           catalogConnectorManager.start();
 
-          this.gravitinoSystemTableFactory =
-              new GravitinoSystemTableFactory(catalogConnectorManager);
+          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
 
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
@@ -87,7 +86,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
       return catalogConnectorContext.getConnector();
     } else {
-      // The static connector is an instance of DummyGravitinoConnector. It is loaded by Trino using
+      // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
+      // using
       // the connector configuration.
       String metalake = config.getMetalake();
       if (Strings.isNullOrEmpty(metalake)) {

@@ -199,8 +199,8 @@ public class CatalogConnectorManager {
     return catalogConnectors.get(catalogName);
   }
 
-  public List<String> getCatalogs() {
-    return Arrays.asList(catalogConnectors.keySet().toArray(new String[catalogConnectors.size()]));
+  public List<GravitinoCatalog> getCatalogs() {
+    return catalogConnectors.values().stream().map(CatalogConnectorContext::getCatalog).toList();
   }
 
   public void shutdown() {
