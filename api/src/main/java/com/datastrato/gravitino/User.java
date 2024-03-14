@@ -16,8 +16,7 @@ public interface User extends Auditable {
   String name();
 
   /**
-   * The properties of the user. Note, this method will return null if the properties are not
-   * set.
+   * The properties of the user. Note, this method will return null if the properties are not set.
    *
    * @return The properties of the user.
    */
