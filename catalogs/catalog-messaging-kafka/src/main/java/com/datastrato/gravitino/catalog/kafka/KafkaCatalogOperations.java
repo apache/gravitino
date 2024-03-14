@@ -36,6 +36,8 @@ import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -53,13 +55,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
 
-  private final CatalogEntity entity;
   private final EntityStore store;
-  private CatalogEntity entity;
   private final IdGenerator idGenerator;
-  private final String defaultSchemaName = "default";
+  private final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting final NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
+  private CatalogEntity entity;
 
   // For testing only.
   KafkaCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
@@ -67,7 +68,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     this.store = store;
     this.idGenerator = idGenerator;
     this.defaultSchemaIdent =
-        NameIdentifier.of(entity.namespace().level(0), entity.name(), defaultSchemaName);
+        NameIdentifier.of(entity.namespace().level(0), entity.name(), DEFAULT_SCHEMA_NAME);
   }
 
   public KafkaCatalogOperations(CatalogEntity entity) {
@@ -78,6 +79,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
     this.entity = entity;
+    Preconditions.checkArgument(
+        config.containsKey(BOOTSTRAP_SERVERS), "Missing configuration: %s", BOOTSTRAP_SERVERS);
+    Preconditions.checkArgument(config.containsKey(ID_KEY), "Missing configuration: %s", ID_KEY);
     // Initialize the Kafka AdminClient configuration
     adminClientConfig = new Properties();
 
@@ -233,7 +237,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     SchemaEntity defaultSchema =
         SchemaEntity.builder()
             .withName(defaultSchemaIdent.name())
-            .withId(idGenerator.nextId())
+            .withId(uid)
             .withNamespace(Namespace.ofSchema(entity.namespace().level(0), entity.name()))
             .withComment("The default schema of Kafka catalog including all topics")
             .withProperties(properties)
