@@ -241,10 +241,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyChangePagination() {
     try {
+      Thread.sleep(500);
       if (!nextPageBtn.isEnabled()) {
         return false;
       }
-      Thread.sleep(500);
       nextPageBtn.click();
 
       // Check if the previous page button is available
