@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
 
+import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -20,6 +21,7 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +39,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   @VisibleForTesting
-  CatalogConnectorManager getCatalogConnectorManager() {
+  public CatalogConnectorManager getCatalogConnectorManager() {
     return catalogConnectorManager;
   }
 
@@ -67,6 +69,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
+          catalogConnectorManager.setGravitinoClient(clientProvider().get());
           catalogConnectorManager.start();
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
@@ -96,5 +99,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
       return new GravitinoSystemConnector(metalake, catalogConnectorManager);
     }
+  }
+
+  @VisibleForTesting
+  Supplier<GravitinoClient> clientProvider() {
+    return () -> null;
   }
 }

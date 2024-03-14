@@ -56,6 +56,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
       TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin();
+      gravitinoPlugin.setGravitinoClient(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
       queryRunner.installPlugin(new MemoryPlugin());
 
