@@ -72,11 +72,12 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
-  //  public WebElement findElementByLink(String name) {
-  //    String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
+  // public WebElement findElementByLink(String name) {
+  // String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake="
+  // + name + "']";
   //
-  //    return driver.findElement(By.xpath(xpath));
-  //  }
+  // return driver.findElement(By.xpath(xpath));
+  // }
 
   public void setMetalakeNameField(String nameField) {
     metalakeNameField.sendKeys(
@@ -104,9 +105,15 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public void clickDeleteMetalakeBtn(String name) {
-    String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
-    WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
-    deleteMetalakeBtn.click();
+    try {
+      String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
+      WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
+      WebDriverWait wait = new WebDriverWait(driver, 10);
+      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+      deleteMetalakeBtn.click();
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void clickViewMetalakeBtn(String name) {
@@ -156,25 +163,25 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
-  //  public void waitLinkElementDisplayed(String name) {
-  //    int retry = 0;
-  //    int sleepTimeMillis = 1_000;
+  // public void waitLinkElementDisplayed(String name) {
+  // int retry = 0;
+  // int sleepTimeMillis = 1_000;
   //
-  //    while (retry++ < 5) {
-  //      try {
-  //        WebElement ele = findElementByLink(name);
-  //        Wait<WebDriver> wait =
-  //            new FluentWait<>(driver)
-  //                .withTimeout(Duration.ofSeconds(10))
-  //                .pollingEvery(Duration.ofMillis(300))
-  //                .ignoring(ElementNotInteractableException.class);
-  //        wait.until(d -> ele.isDisplayed());
-  //        Thread.sleep(sleepTimeMillis);
-  //      } catch (Exception e) {
-  //        LOG.error(e.getMessage(), e);
-  //      }
-  //    }
-  //  }
+  // while (retry++ < 5) {
+  // try {
+  // WebElement ele = findElementByLink(name);
+  // Wait<WebDriver> wait =
+  // new FluentWait<>(driver)
+  // .withTimeout(Duration.ofSeconds(10))
+  // .pollingEvery(Duration.ofMillis(300))
+  // .ignoring(ElementNotInteractableException.class);
+  // wait.until(d -> ele.isDisplayed());
+  // Thread.sleep(sleepTimeMillis);
+  // } catch (Exception e) {
+  // LOG.error(e.getMessage(), e);
+  // }
+  // }
+  // }
 
   public boolean verifyCreateMetalake(String name) {
     try {
@@ -287,31 +294,31 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   // ** comment for MetalakePageTest.java testLinkToCatalogsPage()
-  //  public boolean verifyLinkToCatalogsPage(String name) {
-  //    int sleepTimeMillis = 1_000;
-  //    try {
-  //      Thread.sleep(sleepTimeMillis);
-  //      String xpath = "//a[@data-refer='metalake-name-link']";
-  //      WebElement nameLink = driver.findElement(By.xpath(xpath));
+  // public boolean verifyLinkToCatalogsPage(String name) {
+  // int sleepTimeMillis = 1_000;
+  // try {
+  // Thread.sleep(sleepTimeMillis);
+  // String xpath = "//a[@data-refer='metalake-name-link']";
+  // WebElement nameLink = driver.findElement(By.xpath(xpath));
   //
-  //      Wait<WebDriver> wait =
-  //          new FluentWait<>(driver)
-  //              .withTimeout(Duration.ofSeconds(10))
-  //              .pollingEvery(Duration.ofMillis(300))
-  //              .ignoring(ElementNotInteractableException.class);
-  //      wait.until(d -> nameLink.isDisplayed());
+  // Wait<WebDriver> wait =
+  // new FluentWait<>(driver)
+  // .withTimeout(Duration.ofSeconds(10))
+  // .pollingEvery(Duration.ofMillis(300))
+  // .ignoring(ElementNotInteractableException.class);
+  // wait.until(d -> nameLink.isDisplayed());
   //
-  //      String url = driver.getCurrentUrl();
-  //      boolean isUrl = url.contains("/ui/metalakes?metalake=" + name);
+  // String url = driver.getCurrentUrl();
+  // boolean isUrl = url.contains("/ui/metalakes?metalake=" + name);
   //
-  //      return nameLink.isDisplayed() && isUrl;
-  //    } catch (Exception e) {
-  //      return false;
-  //    } finally {
-  //      // Back to homepage
-  //      String xpath = "//*[@data-refer='back-home-btn']";
-  //      WebElement backHomeBtn = driver.findElement(By.xpath(xpath));
-  //      backHomeBtn.click();
-  //    }
-  //  }
+  // return nameLink.isDisplayed() && isUrl;
+  // } catch (Exception e) {
+  // return false;
+  // } finally {
+  // // Back to homepage
+  // String xpath = "//*[@data-refer='back-home-btn']";
+  // WebElement backHomeBtn = driver.findElement(By.xpath(xpath));
+  // backHomeBtn.click();
+  // }
+  // }
 }
