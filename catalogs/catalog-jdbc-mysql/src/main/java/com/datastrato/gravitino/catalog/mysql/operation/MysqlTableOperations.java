@@ -534,6 +534,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
+    // Append default value if available
+    if (!TableChange.AddColumn.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
+    }
+
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");

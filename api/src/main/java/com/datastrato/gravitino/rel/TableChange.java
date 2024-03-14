@@ -21,6 +21,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
@@ -32,6 +33,8 @@ import java.util.Objects;
  */
 @Evolving
 public interface TableChange {
+  /** A default value that indicates the default value is not set. */
+  Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
 
   /**
    * Create a TableChange for renaming a table.
@@ -90,7 +93,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType) {
-    return new AddColumn(fieldName, dataType, null, null, true, false);
+    return new AddColumn(fieldName, dataType, null, null, true, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -106,7 +109,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, String comment) {
-    return new AddColumn(fieldName, dataType, comment, null, true, false);
+    return new AddColumn(fieldName, dataType, comment, null, true, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -122,7 +125,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, null, position, true, false);
+    return new AddColumn(fieldName, dataType, null, position, true, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -140,7 +143,8 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, comment, position, true, false);
+    return new AddColumn(
+        fieldName, dataType, comment, position, true, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -156,7 +160,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, boolean nullable) {
-    return new AddColumn(fieldName, dataType, null, null, nullable, false);
+    return new AddColumn(fieldName, dataType, null, null, nullable, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -170,7 +174,67 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, null, nullable, false);
+    return new AddColumn(
+        fieldName, dataType, comment, null, nullable, false, DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldName, Type dataType, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, String comment, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, ColumnPosition position, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, position, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, position, true, false, defaultValue);
   }
 
   /**
@@ -193,7 +257,8 @@ public interface TableChange {
       String comment,
       ColumnPosition position,
       boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, position, nullable, false);
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, false, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -218,7 +283,8 @@ public interface TableChange {
       ColumnPosition position,
       boolean nullable,
       boolean autoIncrement) {
-    return new AddColumn(fieldName, dataType, comment, position, nullable, autoIncrement);
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, autoIncrement, DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -830,8 +896,8 @@ public interface TableChange {
     private final String comment;
     private final ColumnPosition position;
     private final boolean nullable;
-
     private final boolean autoIncrement;
+    private final Expression defaultValue;
 
     private AddColumn(
         String[] fieldName,
@@ -839,13 +905,15 @@ public interface TableChange {
         String comment,
         ColumnPosition position,
         boolean nullable,
-        boolean autoIncrement) {
+        boolean autoIncrement,
+        Expression defaultValue) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
       this.autoIncrement = autoIncrement;
+      this.defaultValue = defaultValue;
     }
 
     /**
@@ -903,6 +971,15 @@ public interface TableChange {
     }
 
     /**
+     * Retrieves the default value of the new column.
+     *
+     * @return The default value of the column.
+     */
+    public Expression getDefaultValue() {
+      return defaultValue;
+    }
+
+    /**
      * Compares this AddColumn instance with another object for equality. The comparison is based on
      * the field name, data type, comment, position, and nullability.
      *
@@ -919,7 +996,8 @@ public interface TableChange {
           && Arrays.equals(fieldName, addColumn.fieldName)
           && Objects.equals(dataType, addColumn.dataType)
           && Objects.equals(comment, addColumn.comment)
-          && Objects.equals(position, addColumn.position);
+          && Objects.equals(position, addColumn.position)
+          && Objects.equals(defaultValue, addColumn.defaultValue);
     }
 
     /**
@@ -930,7 +1008,7 @@ public interface TableChange {
      */
     @Override
     public int hashCode() {
-      int result = Objects.hash(dataType, comment, position, nullable, autoIncrement);
+      int result = Objects.hash(dataType, comment, position, nullable, autoIncrement, defaultValue);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }
