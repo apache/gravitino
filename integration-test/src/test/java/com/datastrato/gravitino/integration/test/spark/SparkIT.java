@@ -380,13 +380,6 @@ public class SparkIT extends SparkEnvIT {
     updateColumnPositionAfter.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
     updateColumnPositionAfter.addAll(simpleTableColumns);
     checkTableColumns(tableName, updateColumnPositionAfter, getTableInfo(tableName));
-
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col2 col2 STRING", tableName));
-    List<SparkColumnInfo> updateColumnPositionDefault = new ArrayList<>();
-    updateColumnPositionDefault.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
-    updateColumnPositionDefault.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
-    updateColumnPositionDefault.addAll(simpleTableColumns);
-    checkTableColumns(tableName, updateColumnPositionDefault, getTableInfo(tableName));
   }
 
   private void checkTableColumns(
