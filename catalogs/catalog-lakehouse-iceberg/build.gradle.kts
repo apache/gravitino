@@ -168,3 +168,7 @@ tasks.test {
     init(this)
   }
 }
+
+tasks.clean {
+  delete("spark-warehouse")
+}
