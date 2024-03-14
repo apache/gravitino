@@ -6,7 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.meta.MetalakeUser;
 
-public class UserEntitySerDe
+public class MetalakeUserEntitySerDe
     implements ProtoSerDe<MetalakeUser, com.datastrato.gravitino.proto.User> {
 
   @Override
