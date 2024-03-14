@@ -16,7 +16,6 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
-
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
