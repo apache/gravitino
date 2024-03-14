@@ -6,6 +6,9 @@ package com.datastrato.gravitino;
 
 import java.util.Map;
 
+/**
+ * The interface of a user.
+ */
 public interface User extends Auditable {
 
   /**
