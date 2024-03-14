@@ -6,11 +6,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import toast from 'react-hot-toast'
 
-import { to, isProdEnv } from '@/src/lib/utils'
+import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/src/lib/api/auth'
+import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
 
-import { initialVersion } from '@/src/lib/store/sys'
+import { initialVersion } from '@/lib/store/sys'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 

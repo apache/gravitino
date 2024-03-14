@@ -7,7 +7,7 @@
 
 import { configureStore } from '@reduxjs/toolkit'
 
-import { isDevEnv } from '@/src/lib/utils'
+import { isDevEnv } from '@/lib/utils'
 
 import sys from './sys'
 import auth from './auth'

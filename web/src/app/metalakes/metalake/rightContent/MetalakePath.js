@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation'
 
 import { Link as MUILink, Breadcrumbs, Typography, Tooltip, styled } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
 const Text = styled(Typography)(({ theme }) => ({
   maxWidth: '120px',

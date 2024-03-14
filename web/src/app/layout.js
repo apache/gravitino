@@ -3,13 +3,13 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import '@/src/lib/styles/globals.css'
+import '@/lib/styles/globals.css'
 
 import { Suspense } from 'react'
 
 import { NavigationEvents } from './rootLayout/navigation-events'
 
-import Provider from '@/src/lib/provider'
+import Provider from '@/lib/provider'
 
 import Loading from './rootLayout/Loading'
 import Layout from './rootLayout/Layout'

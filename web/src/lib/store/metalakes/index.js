@@ -5,7 +5,7 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { to, extractPlaceholder, updateTreeData, findInTree } from '@/src/lib/utils'
+import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
 
 import _ from 'lodash-es'
 
@@ -15,7 +15,7 @@ import {
   deleteMetalakeApi,
   updateMetalakeApi,
   getMetalakeDetailsApi
-} from '@/src/lib/api/metalakes'
+} from '@/lib/api/metalakes'
 
 import {
   getCatalogsApi,
@@ -23,9 +23,9 @@ import {
   createCatalogApi,
   updateCatalogApi,
   deleteCatalogApi
-} from '@/src/lib/api/catalogs'
-import { getSchemasApi, getSchemaDetailsApi } from '@/src/lib/api/schemas'
-import { getTablesApi, getTableDetailsApi } from '@/src/lib/api/tables'
+} from '@/lib/api/catalogs'
+import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
+import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())

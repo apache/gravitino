@@ -20,18 +20,18 @@ import {
   FormHelperText
 } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
-import { useAppDispatch } from '@/src/lib/hooks/useStore'
-import { createMetalake } from '@/src/lib/store/metalakes'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { createMetalake } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
-import { genUpdates } from '@/src/lib/utils'
-import { nameRegex, keyRegex } from '@/src/lib/utils/regex'
+import { genUpdates } from '@/lib/utils'
+import { nameRegex, keyRegex } from '@/lib/utils/regex'
 
 const defaultValues = {
   name: '',

@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Box, Button, IconButton } from '@mui/material'
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
 import TabsContent from './tabsContent/TabsContent'

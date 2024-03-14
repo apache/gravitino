@@ -20,11 +20,11 @@ import {
   Tooltip
 } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
-import EmptyText from '@/src/components/EmptyText'
+import EmptyText from '@/components/EmptyText'
 
-import { formatToDateTime, isValidDate } from '@/src/lib/utils/date'
+import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 
 const DetailsDrawer = props => {
   const { openDrawer, setOpenDrawer, drawerData = {}, isMetalakePage } = props

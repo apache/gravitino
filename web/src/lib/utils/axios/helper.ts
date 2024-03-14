@@ -26,7 +26,7 @@ SOFTWARE.
  * Referred from src/utils/http/axios/helper.ts
  */
 
-import { isObject, isString } from '@/src/lib/utils/is'
+import { isObject, isString } from '@/lib/utils/is'
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 

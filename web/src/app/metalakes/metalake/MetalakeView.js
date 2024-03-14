@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 import { Box } from '@mui/material'
 
-import { useAppDispatch } from '@/src/lib/hooks/useStore'
+import { useAppDispatch } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import MetalakePageLeftBar from './MetalakePageLeftBar'
 import RightContent from './rightContent/RightContent'
@@ -23,7 +23,7 @@ import {
   getSchemaDetails,
   getTableDetails,
   setSelectedNodes
-} from '@/src/lib/store/metalakes'
+} from '@/lib/store/metalakes'
 
 const MetalakeView = () => {
   const dispatch = useAppDispatch()

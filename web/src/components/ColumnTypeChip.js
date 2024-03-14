@@ -4,9 +4,9 @@
  */
 
 import { Chip } from '@mui/material'
-import { ColumnTypeColorEnum } from '@/src/lib/enums/columnTypeEnum'
-import colors from '@/src/lib/theme/colors'
-import { alpha } from '@/src/lib/utils/color'
+import { ColumnTypeColorEnum } from '@/lib/enums/columnTypeEnum'
+import colors from '@/lib/theme/colors'
+import { alpha } from '@/lib/utils/color'
 import { isString } from 'lodash-es'
 
 const ColumnTypeChip = props => {

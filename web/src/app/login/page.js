@@ -14,8 +14,8 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
-import { useAppDispatch } from '@/src/lib/hooks/useStore'
-import { loginAction } from '@/src/lib/store/auth'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { loginAction } from '@/lib/store/auth'
 
 const defaultValues = {
   grant_type: 'client_credentials',

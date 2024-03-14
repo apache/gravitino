@@ -7,10 +7,10 @@
 
 import { Box, Grid, Typography, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from '@mui/material'
 
-import EmptyText from '@/src/components/EmptyText'
+import EmptyText from '@/components/EmptyText'
 
-import { formatToDateTime, isValidDate } from '@/src/lib/utils/date'
-import { useAppSelector } from '@/src/lib/hooks/useStore'
+import { formatToDateTime, isValidDate } from '@/lib/utils/date'
+import { useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 
 const DetailsView = () => {

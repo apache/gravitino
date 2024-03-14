@@ -11,8 +11,8 @@ import { StyledEngineProvider, ThemeProvider as MuiThemeProvider, CssBaseline } 
 
 import { useLocalStorage } from 'react-use'
 
-import { settings as settingsConfig } from '@/src/lib/settings'
-import createMuiTheme from '@/src/lib/theme/mui'
+import { settings as settingsConfig } from '@/lib/settings'
+import createMuiTheme from '@/lib/theme/mui'
 
 const ThemeContext = createContext()
 

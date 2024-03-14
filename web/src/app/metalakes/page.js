@@ -17,20 +17,14 @@ import {
   DeleteOutlined as DeleteIcon
 } from '@mui/icons-material'
 
-import { useAppDispatch, useAppSelector } from '@/src/lib/hooks/useStore'
-import {
-  fetchMetalakes,
-  setFilteredMetalakes,
-  deleteMetalake,
-  updateMetalake,
-  resetTree
-} from '@/src/lib/store/metalakes'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake, resetTree } from '@/lib/store/metalakes'
 
-import { formatToDateTime } from '@/src/lib/utils/date'
+import { formatToDateTime } from '@/lib/utils/date'
 import TableHeader from './TableHeader'
-import DetailsDrawer from '@/src/components/DetailsDrawer'
+import DetailsDrawer from '@/components/DetailsDrawer'
 import CreateMetalakeDialog from './CreateMetalakeDialog'
-import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog'
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 
 function TableToolbar(props) {
   return (

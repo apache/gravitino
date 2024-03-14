@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 
 import { Box, Fab } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
 import AppBar from './AppBar'
 import Footer from './Footer'

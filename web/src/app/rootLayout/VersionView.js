@@ -6,7 +6,7 @@
 
 import { Typography } from '@mui/material'
 
-import { useAppSelector } from '@/src/lib/hooks/useStore'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const VersionView = () => {
   const store = useAppSelector(state => state.sys)

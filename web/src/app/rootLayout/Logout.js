@@ -9,9 +9,9 @@ import { useRouter } from 'next/navigation'
 
 import { Box, IconButton } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
-import { useAppDispatch, useAppSelector } from '@/src/lib/hooks/useStore'
-import { logoutAction } from '@/src/lib/store/auth'
+import Icon from '@/components/Icon'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { logoutAction } from '@/lib/store/auth'
 
 const LogoutButton = () => {
   const router = useRouter()

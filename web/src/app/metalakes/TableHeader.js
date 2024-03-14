@@ -5,7 +5,7 @@
 
 import { Box, Button, TextField } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
 const TableHeader = props => {
   const { handleFilter, value, setOpenDialog, setDialogData, setDialogType } = props

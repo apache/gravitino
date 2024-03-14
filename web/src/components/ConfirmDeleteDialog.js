@@ -5,7 +5,7 @@
 
 import { Box, Button, Typography, Dialog, DialogContent, DialogActions } from '@mui/material'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
 const ConfirmDeleteDialog = props => {
   const { open, setOpen, handleConfirmDeleteSubmit } = props

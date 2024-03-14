@@ -9,8 +9,8 @@ import { createContext, useEffect, useState, useContext } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import { useAppDispatch } from '@/src/lib/hooks/useStore'
-import { initialVersion } from '@/src/lib/store/sys'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { initialVersion } from '@/lib/store/sys'
 
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'

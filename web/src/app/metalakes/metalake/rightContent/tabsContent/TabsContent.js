@@ -17,7 +17,7 @@ import { useSearchParams } from 'next/navigation'
 import TableView from './tableView/TableView'
 import DetailsView from './detailsView/DetailsView'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 
 const CustomTab = props => {
   const { icon, label, value, ...others } = props

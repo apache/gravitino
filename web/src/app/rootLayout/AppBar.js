@@ -13,7 +13,7 @@ import { Box, AppBar as MuiAppBar, Toolbar, Stack, Typography } from '@mui/mater
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
 
-const AppBar = props => {
+const AppBar = () => {
   return (
     <MuiAppBar
       elevation={6}
@@ -26,7 +26,12 @@ const AppBar = props => {
         <Toolbar className={'navbar-content-container twc-mx-auto [@media(min-width:1440px)]:twc-max-w-[1440px]'}>
           <Box className={'app-bar-content twc-w-full twc-flex twc-items-center twc-justify-between'}>
             <Link href='/' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
-              <Image src='/ui/icons/gravitino.svg' width={32} height={32} alt='logo' />
+              <Image
+                src={process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'}
+                width={32}
+                height={32}
+                alt='logo'
+              />
               <Typography
                 variant='h5'
                 className={

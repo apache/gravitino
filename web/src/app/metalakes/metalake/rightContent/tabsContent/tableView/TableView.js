@@ -17,16 +17,16 @@ import {
   DeleteOutlined as DeleteIcon
 } from '@mui/icons-material'
 
-import ColumnTypeChip from '@/src/components/ColumnTypeChip'
-import DetailsDrawer from '@/src/components/DetailsDrawer'
-import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog'
+import ColumnTypeChip from '@/components/ColumnTypeChip'
+import DetailsDrawer from '@/components/DetailsDrawer'
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from '../../CreateCatalogDialog'
 
-import { useAppSelector, useAppDispatch } from '@/src/lib/hooks/useStore'
-import { updateCatalog, deleteCatalog } from '@/src/lib/store/metalakes'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
 
-import { to } from '@/src/lib/utils'
-import { getCatalogDetailsApi } from '@/src/lib/api/catalogs'
+import { to } from '@/lib/utils'
+import { getCatalogDetailsApi } from '@/lib/api/catalogs'
 import { useSearchParams } from 'next/navigation'
 
 const EmptyText = () => {

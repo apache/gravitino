@@ -12,10 +12,10 @@ import { useRouter } from 'next/navigation'
 import { IconButton, Typography } from '@mui/material'
 import { Tree } from 'antd'
 
-import Icon from '@/src/components/Icon'
+import Icon from '@/components/Icon'
 import clsx from 'clsx'
 
-import { useAppDispatch, useAppSelector } from '@/src/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import {
   setExpandedNodes,
   setIntoTreeNodeWithFetch,
@@ -23,9 +23,9 @@ import {
   setSelectedNodes,
   setLoadedNodes,
   getTableDetails
-} from '@/src/lib/store/metalakes'
+} from '@/lib/store/metalakes'
 
-import { extractPlaceholder } from '@/src/lib/utils'
+import { extractPlaceholder } from '@/lib/utils'
 
 const MetalakeTree = props => {
   const { height: offsetHeight } = props

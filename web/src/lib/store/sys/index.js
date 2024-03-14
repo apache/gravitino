@@ -5,9 +5,9 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { loggerVersion, to } from '@/src/lib/utils'
+import { loggerVersion, to } from '@/lib/utils'
 
-import { getVersionApi } from '@/src/lib/api/version'
+import { getVersionApi } from '@/lib/api/version'
 
 export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params, { getState }) => {
   let version = null

@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { defHttp } from '@/src/lib/utils/axios'
+import { defHttp } from '@/lib/utils/axios'
 
 export const getAuthConfigsApi = () => {
   return defHttp.get({
