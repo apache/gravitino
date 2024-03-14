@@ -48,9 +48,7 @@ dependencies {
   testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.hadoop3.client) {
-    exclude("*")
-  }
+  testImplementation(libs.hadoop3.client)
   testImplementation(libs.hadoop3.hdfs)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
