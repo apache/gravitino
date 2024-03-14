@@ -98,6 +98,7 @@ hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hiv
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
+hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
 hadoop3-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop3"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
 airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
