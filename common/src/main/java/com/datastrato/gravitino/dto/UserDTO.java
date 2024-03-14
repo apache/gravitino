@@ -107,7 +107,6 @@ public class UserDTO implements User {
       return (S) this;
     }
 
-
     /**
      * Builds an instance of UserDTO using the builder's properties.
      *
