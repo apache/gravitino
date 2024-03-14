@@ -345,15 +345,15 @@ public class SparkIT extends SparkEnvIT {
     dropTableIfExists(tableName);
 
     List<SparkColumnInfo> simpleTableColumns =
-            Arrays.asList(
-                    SparkColumnInfo.of("id", DataTypes.StringType, ""),
-                    SparkColumnInfo.of("name", DataTypes.StringType, ""),
-                    SparkColumnInfo.of("age", DataTypes.StringType, ""));
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.StringType, ""),
+            SparkColumnInfo.of("name", DataTypes.StringType, ""),
+            SparkColumnInfo.of("age", DataTypes.StringType, ""));
 
     sql(
-            String.format(
-                    "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
-                    tableName));
+        String.format(
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
+            tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
