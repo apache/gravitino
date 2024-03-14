@@ -118,11 +118,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private CatalogOperations createOps(Map<String, String> conf) {
     String customCatalogOperationClass = conf.get(CATALOG_OPERATION_IMPL);
     return Optional.ofNullable(customCatalogOperationClass)
-        .map(className -> loadCustomerOps(className))
+        .map(className -> loadCustomOps(className))
         .orElse(newOps(conf));
   }
 
-  private CatalogOperations loadCustomerOps(String className) {
+  private CatalogOperations loadCustomOps(String className) {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     try {
       // Class.forName use classloader of the caller class (BaseCatalog.class), it's global
