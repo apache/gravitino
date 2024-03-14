@@ -339,6 +339,49 @@ public class SparkIT extends SparkEnvIT {
     checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
   }
 
+  @Test
+  void testUpdateColumnPosition() {
+    String tableName = "test_column_position";
+    dropTableIfExists(tableName);
+
+    List<SparkColumnInfo> simpleTableColumns =
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.StringType, ""),
+            SparkColumnInfo.of("name", DataTypes.StringType, ""),
+            SparkColumnInfo.of("age", DataTypes.StringType, ""));
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
+            tableName));
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
+    List<SparkColumnInfo> updateColumnPositionCol1 = new ArrayList<>(simpleTableColumns);
+    updateColumnPositionCol1.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    checkTableColumns(tableName, updateColumnPositionCol1, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 STRING FIRST", tableName));
+    List<SparkColumnInfo> updateColumnPositionFirst = new ArrayList<>();
+    updateColumnPositionFirst.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionFirst.addAll(simpleTableColumns);
+    checkTableColumns(tableName, updateColumnPositionFirst, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col2 STRING COMMENT '')", tableName));
+    List<SparkColumnInfo> updateColumnPositionCol2 = new ArrayList<>();
+    updateColumnPositionCol2.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionCol2.addAll(simpleTableColumns);
+    updateColumnPositionCol2.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
+    checkTableColumns(tableName, updateColumnPositionCol2, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col2 col2 STRING AFTER col1", tableName));
+    List<SparkColumnInfo> updateColumnPositionAfter = new ArrayList<>();
+    updateColumnPositionAfter.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionAfter.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
+    updateColumnPositionAfter.addAll(simpleTableColumns);
+    checkTableColumns(tableName, updateColumnPositionAfter, getTableInfo(tableName));
+  }
+
   private void checkTableColumns(
       String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
