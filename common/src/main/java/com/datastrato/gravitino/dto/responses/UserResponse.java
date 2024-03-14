@@ -8,7 +8,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 
-/** Represents a response for a table. */
+/** Represents a response for a user. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -45,5 +45,6 @@ public class UserResponse extends BaseResponse {
     Preconditions.checkArgument(user != null, "user must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(user.name()), "user 'name' must not be null and empty");
+    Preconditions.checkArgument(user.auditInfo() != null, "user 'auditInfo' must not be null");
   }
 }

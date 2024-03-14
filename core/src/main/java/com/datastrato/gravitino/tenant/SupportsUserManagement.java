@@ -6,9 +6,9 @@ import java.util.Map;
 /** The interface for the user management. */
 public interface SupportsUserManagement {
 
-  public User createUser(String metalake, String userName, Map<String, String> properties);
+  User createUser(String metalake, String userName, Map<String, String> properties);
 
-  public boolean dropUser(String metalake, String userName);
+  boolean dropUser(String metalake, String userName);
 
-  public User loadUser(String metalake, String userName);
+  User loadUser(String metalake, String userName);
 }
