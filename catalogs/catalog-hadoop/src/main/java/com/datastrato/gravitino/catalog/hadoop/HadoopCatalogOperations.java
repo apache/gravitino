@@ -68,7 +68,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_METADATA =
       new HadoopFilesetPropertiesMetadata();
 
-  private final CatalogEntity entity;
+  private CatalogEntity entity;
 
   private final EntityStore store;
 
@@ -77,17 +77,17 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
   // For testing only.
-  HadoopCatalogOperations(CatalogEntity entity, EntityStore store) {
-    this.entity = entity;
+  HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
 
-  public HadoopCatalogOperations(CatalogEntity entity) {
-    this(entity, GravitinoEnv.getInstance().entityStore());
+  public HadoopCatalogOperations() {
+    this(GravitinoEnv.getInstance().entityStore());
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
+    this.entity = entity;
     // Initialize Hadoop Configuration.
     this.hadoopConf = new Configuration();
     Map<String, String> bypassConfigs =

@@ -39,16 +39,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
 
-  private final CatalogEntity entity;
   private final EntityStore store;
+  private CatalogEntity entity;
 
-  public KafkaCatalogOperations(CatalogEntity entity) {
-    this.entity = entity;
+  public KafkaCatalogOperations() {
     this.store = GravitinoEnv.getInstance().entityStore();
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
+    this.entity = entity;
     // TODO: Implement Kafka catalog initialization, such as creating a default schema.
   }
 

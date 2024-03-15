@@ -70,7 +70,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
 
-  private final CatalogEntity entity;
+  private CatalogEntity entity;
 
   private final JdbcExceptionConverter exceptionConverter;
 
@@ -87,7 +87,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
-   * @param entity The catalog entity associated with this operations instance.
    * @param exceptionConverter The exception converter to be used by the operations.
    * @param jdbcTypeConverter The type converter to be used by the operations.
    * @param databaseOperation The database operations to be used by the operations.
@@ -95,14 +94,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param jdbcTablePropertiesMetadata The table properties metadata to be used by the operations.
    */
   public JdbcCatalogOperations(
-      CatalogEntity entity,
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
       JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
-    this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
@@ -115,10 +112,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Initializes the Jdbc catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Jdbc catalog operations.
+   * @param entity The catalog entity associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf) throws RuntimeException {
+  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
+    this.entity = entity;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 

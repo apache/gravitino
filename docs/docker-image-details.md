@@ -82,6 +82,9 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.9
+  - Remove cache after installing packages.
+
 - gravitino-ci-hive:0.1.8
   - Change the value of `hive.server2.enable.doAs` to `true`
 

@@ -21,8 +21,7 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    KafkaCatalogOperations ops = new KafkaCatalogOperations(entity());
-    ops.initialize(config);
+    KafkaCatalogOperations ops = new KafkaCatalogOperations();
     return ops;
   }
 
