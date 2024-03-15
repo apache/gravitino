@@ -155,7 +155,7 @@ public class CatalogConnectorManager {
                     entry.getValue().getMetalake().name().equals(metalake.name()))
         .forEach(
             (entry) -> {
-              catalogInjector.removeCatalogConnector(entry.getKey());
+              catalogInjector.removeCatalogConnector(simplified(entry.getKey()));
               catalogConnectors.remove(entry.getKey());
               LOG.info(
                   "Remove catalog '{}' in metalake {} successfully.",
@@ -181,7 +181,7 @@ public class CatalogConnectorManager {
                         catalogConnectorFactory.loadCatalogConnector(metalake, gravitinoCatalog);
 
                     catalogConnectors.put(catalogName, catalogConnectorContext);
-                    catalogInjector.injectCatalogConnector(catalogName);
+                    catalogInjector.injectCatalogConnector(simplified(catalogName));
                     LOG.info(
                         "Load catalog {} in metalake {} successfully.",
                         catalogName,
@@ -196,7 +196,25 @@ public class CatalogConnectorManager {
   }
 
   public CatalogConnectorContext getCatalogConnector(String catalogName) {
-    return catalogConnectors.get(catalogName);
+    CatalogConnectorContext connectorContext = catalogConnectors.get(catalogName);
+    if (connectorContext == null) {
+      connectorContext = catalogConnectors.get(canonical(catalogName));
+    }
+    return connectorContext;
+  }
+
+  private String simplified(String catalogName) {
+    if (config.simplifyCatalogNames() && catalogName.startsWith(config.getMetalake() + ".")) {
+      return catalogName.substring(config.getMetalake().length() + 1);
+    }
+    return catalogName;
+  }
+
+  private String canonical(String catalogName) {
+    if (config.simplifyCatalogNames() && !catalogName.startsWith(config.getMetalake() + ".")) {
+      return config.getMetalake() + "." + catalogName;
+    }
+    return catalogName;
   }
 
   public List<GravitinoCatalog> getCatalogs() {
