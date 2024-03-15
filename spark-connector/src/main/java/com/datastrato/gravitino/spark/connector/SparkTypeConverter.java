@@ -150,9 +150,11 @@ public class SparkTypeConverter {
                           f.name(),
                           toSparkType(f.type()),
                           f.nullable(),
-                          new MetadataBuilder()
-                              .putString(ConnectorConstants.COMMENT, f.comment())
-                              .build()))
+                          f.comment() == null
+                              ? new MetadataBuilder().build()
+                              : new MetadataBuilder()
+                                  .putString(ConnectorConstants.COMMENT, f.comment())
+                                  .build()))
               .collect(Collectors.toList());
       return DataTypes.createStructType(fields);
     }
