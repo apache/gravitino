@@ -15,13 +15,14 @@ import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.RelationalCatalog;
+import com.datastrato.gravitino.client.RelationalTable;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -63,14 +64,14 @@ public class ProxyCatalogHiveIT extends AbstractIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static GravitinoMetaLake metalake;
-  private static Catalog catalog;
+  private static RelationalCatalog catalog;
   private static HiveClientPool hiveClientPool;
 
   private static String HIVE_METASTORE_URIS;
   private static FileSystem hdfs;
   private static String originHadoopUser;
   private static GravitinoAdminClient anotherClient;
-  private static Catalog anotherCatalog;
+  private static RelationalCatalog anotherCatalog;
 
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
@@ -146,10 +147,9 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             anotherSchemaName.toLowerCase()));
-    SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
+            RuntimeException.class, () -> anotherCatalog.createSchema(anotherIdent.name(), comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -209,7 +209,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    catalog.createSchema(ident.name(), comment, properties);
   }
 
   @Test
@@ -229,8 +229,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     // create a partitioned table
     Column[] columns = createColumns();
 
-    Table table =
-        catalog
+    RelationalTable table =
+            (RelationalTable)catalog
             .asTableCatalog()
             .createTable(
                 nameIdentifier,
@@ -251,7 +251,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             new String[][] {field1, field2},
             new Literal<?>[] {primaryPartition, secondaryPartition});
 
-    Partition partition = table.supportPartitions().addPartition(identity);
+    Partition partition = table.addPartition(identity);
 
     org.apache.hadoop.hive.metastore.api.Partition partitionGot =
         hiveClientPool.run(client -> client.getPartition(schemaName, tableName, partition.name()));
@@ -316,12 +316,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         "comment",
         properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    catalog = (RelationalCatalog)metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
   }
 
   private static void loadCatalogWithAnotherClient() {
     GravitinoMetaLake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
-    anotherCatalog = metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    anotherCatalog = (RelationalCatalog)metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
   }
 
   public static void setEnv(String key, String value) {
