@@ -9,11 +9,9 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -326,23 +324,6 @@ public class DTOConverters {
         .withIndexType(index.type())
         .withName(index.name())
         .withFieldNames(index.fieldNames())
-        .build();
-  }
-
-  /**
-   * Converts a user implementation to a UserDTO.
-   *
-   * @param user The user implementation.
-   * @return The user DTO.
-   */
-  public static UserDTO toDTO(User user) {
-    if (user instanceof UserDTO) {
-      return (UserDTO) user;
-    }
-    return UserDTO.builder()
-        .withName(user.name())
-        .withAudit(toDTO(user.auditInfo()))
-        .withProperties(user.properties())
         .build();
   }
 

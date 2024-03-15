@@ -14,7 +14,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.UserDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
@@ -223,20 +222,5 @@ public class TestResponses {
   void testOAuthErrorException() throws IllegalArgumentException {
     OAuth2ErrorResponse response = new OAuth2ErrorResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
-  }
-
-  @Test
-  void testUserResponse() throws IllegalArgumentException {
-    AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
-    UserResponse response = new UserResponse(user);
-    response.validate(); // No exception thrown
-  }
-
-  @Test
-  void testUserResponseException() throws IllegalArgumentException {
-    UserResponse user = new UserResponse();
-    assertThrows(IllegalArgumentException.class, () -> user.validate());
   }
 }

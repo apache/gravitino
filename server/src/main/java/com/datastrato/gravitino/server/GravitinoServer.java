@@ -18,7 +18,6 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
-import com.datastrato.gravitino.tenant.AccessControlManager;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
@@ -74,7 +73,6 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
-            bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
             bind(gravitinoEnv.catalogOperationDispatcher())
                 .to(CatalogOperationDispatcher.class)
                 .ranked(1);
