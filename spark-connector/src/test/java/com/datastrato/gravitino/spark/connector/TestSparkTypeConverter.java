@@ -71,6 +71,33 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
   }
 
+  @Test
+  void testConvertGravitinoTypeToSpark() {
+    gravitinoToSparkTypeMapper.forEach(
+        (gravitinoType, sparkType) ->
+            Assertions.assertEquals(sparkType, SparkTypeConverter.toSparkType(gravitinoType)));
+
+    notSupportGravitinoTypes.forEach(
+        gravitinoType ->
+            Assertions.assertThrowsExactly(
+                UnsupportedOperationException.class,
+                () -> SparkTypeConverter.toSparkType(gravitinoType)));
+  }
+
+  @Test
+  void testConvertSparkTypeToGravitino() {
+    gravitinoToSparkTypeMapper.forEach(
+        (gravitinoType, sparkType) ->
+            Assertions.assertEquals(gravitinoType, SparkTypeConverter.toGravitinoType(sparkType)));
+
+    notSupportSparkTypes.forEach(
+        sparkType ->
+            Assertions.assertThrowsExactly(
+                UnsupportedOperationException.class,
+                () -> SparkTypeConverter.toGravitinoType(sparkType)));
+  }
+
+  /** Create a Gravitino StructType for testing. */
   private static StructType createGravitinoStructType() {
     return StructType.of(
         StructType.Field.of("col1", IntegerType.get(), true, null),
@@ -89,6 +116,7 @@ public class TestSparkTypeConverter {
         StructType.Field.of("col7", IntegerType.get(), true, "This is a comment"));
   }
 
+  /** Create a Spark StructType for testing. */
   private static org.apache.spark.sql.types.StructType createSparkStructType() {
     return DataTypes.createStructType(
         new org.apache.spark.sql.types.StructField[] {
@@ -117,31 +145,5 @@ public class TestSparkTypeConverter {
                   .putString(ConnectorConstants.COMMENT, "This is a comment")
                   .build())
         });
-  }
-
-  @Test
-  void testConvertGravitinoTypeToSpark() {
-    gravitinoToSparkTypeMapper.forEach(
-        (gravitinoType, sparkType) ->
-            Assertions.assertEquals(sparkType, SparkTypeConverter.toSparkType(gravitinoType)));
-
-    notSupportGravitinoTypes.forEach(
-        gravitinoType ->
-            Assertions.assertThrowsExactly(
-                UnsupportedOperationException.class,
-                () -> SparkTypeConverter.toSparkType(gravitinoType)));
-  }
-
-  @Test
-  void testConvertSparkTypeToGravitino() {
-    gravitinoToSparkTypeMapper.forEach(
-        (gravitinoType, sparkType) ->
-            Assertions.assertEquals(gravitinoType, SparkTypeConverter.toGravitinoType(sparkType)));
-
-    notSupportSparkTypes.forEach(
-        sparkType ->
-            Assertions.assertThrowsExactly(
-                UnsupportedOperationException.class,
-                () -> SparkTypeConverter.toGravitinoType(sparkType)));
   }
 }
