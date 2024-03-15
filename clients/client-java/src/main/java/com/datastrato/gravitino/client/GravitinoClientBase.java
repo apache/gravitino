@@ -101,8 +101,6 @@ public abstract class GravitinoClientBase implements Closeable {
   public static class Builder<T> {
     /** The base URI for the Gravitino API. */
     protected String uri;
-    /** The name of the metalake that the client is working on. */
-    protected String metalakeName;
     /** The authentication provider. */
     protected AuthDataProvider authDataProvider;
 
@@ -153,17 +151,6 @@ public abstract class GravitinoClientBase implements Closeable {
         throw new IllegalArgumentException("URI has the wrong format", ue);
       }
       this.authDataProvider = dataProvider;
-      return this;
-    }
-
-    /**
-     * Optional, set the metalake name for this client.
-     *
-     * @param metalakeName The name of the metalake that the client is working on.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder<T> withMetalake(String metalakeName) {
-      this.metalakeName = metalakeName;
       return this;
     }
 

@@ -50,7 +50,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @return the {@link GravitinoMetaLake} object
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  public GravitinoMetaLake getMetaLake() {
+  private GravitinoMetaLake getMetaLake() {
     return metaLake;
   }
 
@@ -92,13 +92,15 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @param uri The base URI for the Gravitino API.
    * @return A new instance of the Builder class for constructing a GravitinoClient.
    */
-  public static Builder<GravitinoClient> builder(String uri) {
+  public static ClientBuilder builder(String uri) {
     return new ClientBuilder(uri);
   }
 
   /** Builder class for constructing a GravitinoClient. */
-  static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
+  public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 
+    /** The name of the metalake that the client is working on. */
+    protected String metalakeName;
     /**
      * The private constructor for the Builder class.
      *
@@ -106,6 +108,17 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
      */
     protected ClientBuilder(String uri) {
       super(uri);
+    }
+
+    /**
+     * Optional, set the metalake name for this client.
+     *
+     * @param metalakeName The name of the metalake that the client is working on.
+     * @return This Builder instance for method chaining.
+     */
+    public ClientBuilder withMetalake(String metalakeName) {
+      this.metalakeName = metalakeName;
+      return this;
     }
 
     /**

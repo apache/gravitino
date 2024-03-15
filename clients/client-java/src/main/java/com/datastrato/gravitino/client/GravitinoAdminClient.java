@@ -161,12 +161,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param uri The base URI for the Gravitino API.
    * @return A new instance of the Builder class for constructing a GravitinoClient.
    */
-  public static Builder<GravitinoAdminClient> builder(String uri) {
+  public static AdminClientBuilder builder(String uri) {
     return new AdminClientBuilder(uri);
   }
 
   /** Builder class for constructing a GravitinoAdminClient. */
-  static class AdminClientBuilder extends GravitinoClientBase.Builder<GravitinoAdminClient> {
+  public static class AdminClientBuilder extends GravitinoClientBase.Builder<GravitinoAdminClient> {
 
     /**
      * The private constructor for the Builder class.
