@@ -116,7 +116,7 @@ public class CatalogConnectorContext {
     CatalogConnectorContext build() {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
-      Preconditions.checkArgument(catalog != null, "catalog  ss not null");
+      Preconditions.checkArgument(catalog != null, "catalog is not null");
       return new CatalogConnectorContext(catalog, metalake, internalConnector, connectorAdapter);
     }
   }

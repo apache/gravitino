@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** An implementation of Gravitino System connector Metadata * */
+/** An implementation of Gravitino System connector Metadata */
 public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
   @Override
@@ -32,7 +32,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
   @Override
   public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName) {
-    return GravitinoSystemTableFactory.systemTableDefines.keySet().stream().toList();
+    return GravitinoSystemTableFactory.SYSTEM_TABLES.keySet().stream().toList();
   }
 
   @Override
@@ -41,7 +41,7 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
       SchemaTableName tableName,
       Optional<ConnectorTableVersion> startVersion,
       Optional<ConnectorTableVersion> endVersion) {
-    return GravitinoSystemTableFactory.systemTableDefines.get(tableName) != null
+    return GravitinoSystemTableFactory.SYSTEM_TABLES.get(tableName) != null
         ? new SystemTableHandle(tableName)
         : null;
   }
