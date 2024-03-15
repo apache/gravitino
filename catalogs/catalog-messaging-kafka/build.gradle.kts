@@ -14,6 +14,14 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
   implementation(project(":common"))
+
+  implementation(libs.guava)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.commons.io)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
