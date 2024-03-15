@@ -149,7 +149,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             anotherSchemaName.toLowerCase()));
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> anotherCatalog.createSchema(anotherIdent.name(), comment, properties));
+            RuntimeException.class,
+            () -> anotherCatalog.createSchema(anotherIdent.name(), comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -230,16 +231,17 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Column[] columns = createColumns();
 
     RelationalTable table =
-            (RelationalTable)catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                "comment",
-                createProperties(),
-                new Transform[] {
-                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
-                });
+        (RelationalTable)
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    nameIdentifier,
+                    columns,
+                    "comment",
+                    createProperties(),
+                    new Transform[] {
+                      Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
+                    });
 
     // add partition "col2=2023-01-02/col3=gravitino_it_test2" by user datastrato
     String[] field1 = new String[] {"col2"};
@@ -271,9 +273,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                tableCatalog
-                    .loadTable(nameIdentifier)
-                    .supportPartitions()
+                ((RelationalTable) tableCatalog.loadTable(nameIdentifier))
                     .addPartition(anotherIdentity));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
@@ -316,12 +316,14 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         "comment",
         properties);
 
-    catalog = (RelationalCatalog)metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    catalog =
+        (RelationalCatalog) metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
   }
 
   private static void loadCatalogWithAnotherClient() {
     GravitinoMetaLake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
-    anotherCatalog = (RelationalCatalog)metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    anotherCatalog =
+        (RelationalCatalog) metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
   }
 
   public static void setEnv(String key, String value) {
