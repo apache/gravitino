@@ -84,8 +84,8 @@ public class TestKafkaCatalogOperations {
                     .build())
             .build();
 
-    kafkaCatalogOperations = new KafkaCatalogOperations(kafkaCatalogEntity, store, idGenerator);
-    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES);
+    kafkaCatalogOperations = new KafkaCatalogOperations(store, idGenerator);
+    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity);
   }
 
   @AfterAll
@@ -110,10 +110,10 @@ public class TestKafkaCatalogOperations {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-    KafkaCatalogOperations ops = new KafkaCatalogOperations(catalogEntity, store, idGenerator);
+    KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
 
-    ops.initialize(MOCK_CATALOG_PROPERTIES);
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity);
     Assertions.assertNotNull(ops.adminClientConfig);
     Assertions.assertEquals(2, ops.adminClientConfig.size());
     Assertions.assertEquals(
@@ -139,8 +139,8 @@ public class TestKafkaCatalogOperations {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-    KafkaCatalogOperations ops = new KafkaCatalogOperations(catalogEntity, store, idGenerator);
-    ops.initialize(MOCK_CATALOG_PROPERTIES);
+    KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity);
 
     Assertions.assertNotNull(ops.defaultSchemaIdent);
     Assertions.assertEquals("default", ops.defaultSchemaIdent.name());

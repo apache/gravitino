@@ -57,30 +57,29 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private final EntityStore store;
   private final IdGenerator idGenerator;
   private final String DEFAULT_SCHEMA_NAME = "default";
-  @VisibleForTesting final NameIdentifier defaultSchemaIdent;
+  @VisibleForTesting NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
   private CatalogEntity entity;
 
   @VisibleForTesting
-  KafkaCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
-    this.entity = entity;
+  KafkaCatalogOperations(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-    this.defaultSchemaIdent =
-        NameIdentifier.of(entity.namespace().level(0), entity.name(), DEFAULT_SCHEMA_NAME);
   }
 
-  public KafkaCatalogOperations(CatalogEntity entity) {
-    this(
-        entity, GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().idGenerator());
+  public KafkaCatalogOperations() {
+    this(GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().idGenerator());
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {this.entity = entity;
-    this.entity = entity;
+  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
     Preconditions.checkArgument(
         config.containsKey(BOOTSTRAP_SERVERS), "Missing configuration: %s", BOOTSTRAP_SERVERS);
     Preconditions.checkArgument(config.containsKey(ID_KEY), "Missing configuration: %s", ID_KEY);
+
+    this.entity = entity;
+    this.defaultSchemaIdent =
+        NameIdentifier.of(entity.namespace().level(0), entity.name(), DEFAULT_SCHEMA_NAME);
 
     // Initialize the Kafka AdminClient configuration
     adminClientConfig = new Properties();
