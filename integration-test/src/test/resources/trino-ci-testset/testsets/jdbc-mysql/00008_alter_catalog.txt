@@ -1,0 +1,17 @@
+CALL
+
+"test.gt_mysql_xxx1","jdbc-mysql","{jdbc-url=jdbc:mysql://127.0.0.1/?useSSL=false, jdbc-user=trino, jdbc-password=ds123, jdbc-driver=com.mysql.cj.jdbc.Driver}"
+
+CALL
+
+"test.gt_mysql_xxx1","jdbc-mysql","{join-pushdown.strategy=EAGER, test_key=test_value, jdbc-url=jdbc:mysql://127.0.0.1/?useSSL=false, jdbc-user=trino, jdbc-password=ds123, jdbc-driver=com.mysql.cj.jdbc.Driver}"
+
+CALL
+
+"test.gt_mysql_xxx1","jdbc-mysql","{test_key=test_value, jdbc-url=jdbc:mysql://127.0.0.1/?useSSL=false, jdbc-user=trino, jdbc-password=ds123, jdbc-driver=com.mysql.cj.jdbc.Driver}"
+
+CALL
+
+"test.gt_mysql_xxx1","jdbc-mysql","{join-pushdown.strategy=EAGER, jdbc-url=jdbc:mysql://127.0.0.1/?useSSL=false, jdbc-user=trino, jdbc-password=ds123, jdbc-driver=com.mysql.cj.jdbc.Driver}"
+
+CALL
