@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.web.ui.utils;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
@@ -22,12 +24,16 @@ public class WebDriverManager {
 
     WebDriverProvider provide = new ChromeWebDriverProvider();
     WebDriver driver = generateWebDriver(provide);
-    driver.manage().timeouts().implicitlyWait(AbstractWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS);
+    driver
+        .manage()
+        .timeouts()
+        .implicitlyWait(
+            Duration.ofSeconds(AbstractWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS.ordinal()));
     driver.get(url);
 
     // wait for webpage load compiled.
     try {
-      (new WebDriverWait(driver, AbstractWebIT.MAX_IMPLICIT_WAIT))
+      (new WebDriverWait(driver, Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS)))
           .until(
               d -> {
                 String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();

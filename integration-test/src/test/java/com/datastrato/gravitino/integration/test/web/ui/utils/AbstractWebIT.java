@@ -28,12 +28,12 @@ public class AbstractWebIT extends AbstractIT {
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
 
-  protected static final long MAX_TIMEOUT = 30;
+  protected static final long MAX_TIMEOUT = 20;
 
-  protected boolean waitShowText(final String txt, final By locator) {
+  protected boolean waitShowText(final String text, final By locator) {
     try {
       WebElement element = pollingWait(locator);
-      return txt.equals(element.getText());
+      return text.equals(element.getText());
     } catch (TimeoutException e) {
       return false;
     }
@@ -42,7 +42,7 @@ public class AbstractWebIT extends AbstractIT {
   protected WebElement pollingWait(final By locator) {
     Wait<WebDriver> wait =
         new FluentWait<>(driver)
-            .withTimeout(Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS))
+            .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
             .pollingEvery(Duration.of(1, ChronoUnit.SECONDS))
             .ignoring(NoSuchElementException.class);
 

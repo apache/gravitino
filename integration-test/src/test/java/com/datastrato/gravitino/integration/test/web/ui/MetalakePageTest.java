@@ -66,11 +66,6 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testDeleteMetalake() {
     metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
     metalakePage.confirmDeleteBtn.click();
-    try {
-      Thread.sleep(1_200);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
 

@@ -6,6 +6,8 @@
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import org.openqa.selenium.By;
@@ -108,9 +110,11 @@ public class MetalakePage extends AbstractWebIT {
     try {
       String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
       WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, 10);
+      WebDriverWait wait =
+          new WebDriverWait(driver, Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS));
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       deleteMetalakeBtn.click();
+      Thread.sleep(sleepTimeMillis);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -131,7 +135,8 @@ public class MetalakePage extends AbstractWebIT {
   public void clickMetalakeLink(String name) {
     String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
-    WebDriverWait wait = new WebDriverWait(driver, 10);
+    WebDriverWait wait =
+        new WebDriverWait(driver, Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS));
     wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
     metalakeLink.click();
   }
@@ -239,13 +244,16 @@ public class MetalakePage extends AbstractWebIT {
       Thread.sleep(sleepTimeMillis);
       String xpath =
           "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
-      //      WebDriverWait wait = new WebDriverWait(driver, 10);
-      //      wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
-      WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
-      //            Objects.equals(noMetalakeRows.getText(), "No rows");
-      LOG.info(noMetalakeRows.getText(), noMetalakeRows);
 
-      return waitShowText("No rows", By.xpath(xpath));
+      boolean isNoRows = waitShowText("No rows", By.xpath(xpath));
+
+      if (!isNoRows) {
+        WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
+        LOG.error(noMetalakeRows.getText(), noMetalakeRows);
+        return false;
+      }
+
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
