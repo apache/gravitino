@@ -199,7 +199,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test throw NoSuchCatalogException
+    // Test throw NoSuchUserException
     doThrow(new NoSuchUserException("mock error")).when(manager).loadUser(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/users/user1")
@@ -255,7 +255,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(0, dropResponse.getCode());
     Assertions.assertTrue(dropResponse.dropped());
 
-    // Test when failed to drop catalog
+    // Test when failed to drop user
     when(manager.dropUser(any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/users/user1")
