@@ -43,6 +43,7 @@ public class MySQLCatalogOperations extends JdbcCatalogOperations {
     // Close thread AbandonedConnectionCleanupThread
     try {
       Class.forName(CONNECTION_CLEAN_UP_THREAD).getMethod("uncheckedShutdown").invoke(null);
+      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
     } catch (Exception e) {
       // Ignore
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread", e);
