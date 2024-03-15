@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.web.ui;
 
-import com.datastrato.gravitino.integration.test.web.ui.Pages.MetalakePage;
+import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
@@ -66,6 +66,11 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testDeleteMetalake() {
     metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
     metalakePage.confirmDeleteBtn.click();
+    try {
+      Thread.sleep(1_200);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
 

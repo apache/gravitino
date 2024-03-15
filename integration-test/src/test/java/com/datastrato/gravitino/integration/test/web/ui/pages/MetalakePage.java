@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.integration.test.web.ui.Pages;
+package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import java.util.List;
@@ -237,11 +237,15 @@ public class MetalakePage extends AbstractWebIT {
   public boolean verifyEmptyMetalake() {
     try {
       Thread.sleep(sleepTimeMillis);
-      String xpath = ".//div[contains(@class, 'MuiDataGrid-overlay')]";
-      WebElement noMetalakeRows = metalakeTableGrid.findElement(By.xpath(xpath));
-      LOG.info(noMetalakeRows.getText());
+      String xpath =
+          "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
+      //      WebDriverWait wait = new WebDriverWait(driver, 10);
+      //      wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
+      WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
+      //            Objects.equals(noMetalakeRows.getText(), "No rows");
+      LOG.info(noMetalakeRows.getText(), noMetalakeRows);
 
-      return Objects.equals(noMetalakeRows.getText(), "No rows");
+      return waitShowText("No rows", By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
