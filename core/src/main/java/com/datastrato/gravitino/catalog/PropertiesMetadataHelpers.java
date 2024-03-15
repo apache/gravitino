@@ -58,12 +58,7 @@ public class PropertiesMetadataHelpers {
       String key = entry.getKey();
       String value = entry.getValue();
       if (propertiesMetadata.containsProperty(key)) {
-        try {
-          propertiesMetadata.propertyEntries().get(key).decode(value);
-        } catch (Exception e) {
-          throw new IllegalArgumentException(
-              String.format("Invalid value: '%s' for property: '%s'", value, key));
-        }
+        checkValueFormat(key, value, propertiesMetadata.propertyEntries().get(key)::decode);
       }
     }
   }

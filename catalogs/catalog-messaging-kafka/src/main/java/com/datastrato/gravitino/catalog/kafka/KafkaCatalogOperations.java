@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
