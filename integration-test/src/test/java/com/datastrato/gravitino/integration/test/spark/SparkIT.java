@@ -411,22 +411,22 @@ public class SparkIT extends SparkEnvIT {
     dropTableIfExists(tableName);
 
     sql(
-            String.format(
-                    "CREATE TABLE %s (col1 ARRAY<int> COMMENT 'array', col2 MAP<string, string> COMMENT 'map', col3 STRUCT<col1: int, col2: string> COMMENT 'struct')",
-                    tableName));
+        String.format(
+            "CREATE TABLE %s (col1 ARRAY<int> COMMENT 'array', col2 MAP<string, string> COMMENT 'map', col3 STRUCT<col1: int, col2: string> COMMENT 'struct')",
+            tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
     List<SparkColumnInfo> expectedSparkInfo =
-            Arrays.asList(
-                    SparkColumnInfo.of("col1", DataTypes.createArrayType(DataTypes.IntegerType), "array"),
-                    SparkColumnInfo.of(
-                            "col2", DataTypes.createMapType(DataTypes.StringType, DataTypes.StringType), "map"),
-                    SparkColumnInfo.of(
-                            "col3",
-                            DataTypes.createStructType(
-                                    Arrays.asList(
-                                            DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-                                            DataTypes.createStructField("col2", DataTypes.StringType, true))),
-                            "struct"));
+        Arrays.asList(
+            SparkColumnInfo.of("col1", DataTypes.createArrayType(DataTypes.IntegerType), "array"),
+            SparkColumnInfo.of(
+                "col2", DataTypes.createMapType(DataTypes.StringType, DataTypes.StringType), "map"),
+            SparkColumnInfo.of(
+                "col3",
+                DataTypes.createStructType(
+                    Arrays.asList(
+                        DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                        DataTypes.createStructField("col2", DataTypes.StringType, true))),
+                "struct"));
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
   }
 
