@@ -407,7 +407,7 @@ public class SparkIT extends SparkEnvIT {
 
   @Test
   void testComplexType() {
-    String tableName = "test_complex_type";
+    String tableName = "complex_type_table";
     dropTableIfExists(tableName);
 
     sql(
@@ -430,6 +430,8 @@ public class SparkIT extends SparkEnvIT {
                         DataTypes.createStructField("col2", DataTypes.StringType, true))),
                 "struct"));
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
+
+    checkTableReadWrite(tableInfo);
   }
 
   private void checkTableColumns(
