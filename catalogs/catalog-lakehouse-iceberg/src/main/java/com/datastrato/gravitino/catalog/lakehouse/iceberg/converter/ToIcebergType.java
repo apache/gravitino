@@ -34,10 +34,12 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     return nextId++;
   }
 
+  @SuppressWarnings("ReferenceEquality")
   @Override
   public Type struct(com.datastrato.gravitino.rel.types.Types.StructType struct, List<Type> types) {
     com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields = struct.fields();
     List<Types.NestedField> newFields = Lists.newArrayListWithExpectedSize(fields.length);
+    // Comparing the root node by reference equality.
     boolean isRoot = root == struct;
     for (int i = 0; i < fields.length; i += 1) {
       com.datastrato.gravitino.rel.types.Types.StructType.Field field = fields[i];

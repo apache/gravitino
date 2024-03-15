@@ -89,7 +89,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting HiveConf hiveConf;
 
-  private final CatalogEntity entity;
+  private CatalogEntity entity;
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
@@ -112,22 +112,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
 
   /**
-   * Constructs a new instance of HiveCatalogOperations.
-   *
-   * @param entity The catalog entity associated with this operations instance.
-   */
-  public HiveCatalogOperations(CatalogEntity entity) {
-    this.entity = entity;
-  }
-
-  /**
    * Initializes the Hive catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Hive catalog operations.
+   * @param entity The catalog entity associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf) throws RuntimeException {
+  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
+    this.entity = entity;
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
     this.schemaPropertiesMetadata = new HiveSchemaPropertiesMetadata();
@@ -1086,6 +1079,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Hive catalog does not support fileset properties metadata");
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Hive catalog does not support topic properties metadata");
   }
 
   CachedClientPool getClientPool() {

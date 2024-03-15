@@ -32,6 +32,8 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.catalog.BaseCatalog;
+import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -126,9 +128,18 @@ public class CatalogHiveIT extends AbstractIT {
   private static SparkSession sparkSession;
   private static FileSystem hdfs;
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
-  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
-  private static final String INSERT_WITH_PARTITION_TEMPLATE =
-      "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)";
+
+  private static String getInsertWithoutPartitionSql(
+      String dbName, String tableName, String values) {
+    return String.format("INSERT INTO %s.%s VALUES (%s)", dbName, tableName, values);
+  }
+
+  private static String getInsertWithPartitionSql(
+      String dbName, String tableName, String partitionExpressions, String values) {
+    return String.format(
+        "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)",
+        dbName, tableName, partitionExpressions, values);
+  }
 
   private static final Map<String, String> typeConstant =
       ImmutableMap.of(
@@ -292,15 +303,13 @@ public class CatalogHiveIT extends AbstractIT {
             .map(Object::toString)
             .collect(Collectors.joining(","));
     if (table.getPartitionKeys().isEmpty()) {
-      sparkSession.sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, dbName, tableName, values));
+      sparkSession.sql(getInsertWithoutPartitionSql(dbName, tableName, values));
     } else {
       String partitionExpressions =
           table.getPartitionKeys().stream()
               .map(f -> f.getName() + "=" + typeConstant.get(f.getType()))
               .collect(Collectors.joining(","));
-      sparkSession.sql(
-          String.format(
-              INSERT_WITH_PARTITION_TEMPLATE, dbName, tableName, partitionExpressions, values));
+      sparkSession.sql(getInsertWithPartitionSql(dbName, tableName, partitionExpressions, values));
     }
     Assertions.assertEquals(
         count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
@@ -1356,5 +1365,30 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  void testCustomCatalogOperations() {
+    String catalogName = "custom_catalog";
+    Assertions.assertDoesNotThrow(
+        () -> createCatalogWithCustomOperation(catalogName, HiveCatalogOperations.class.getName()));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class,
+        () ->
+            createCatalogWithCustomOperation(
+                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
+  }
+
+  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
+
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
   }
 }

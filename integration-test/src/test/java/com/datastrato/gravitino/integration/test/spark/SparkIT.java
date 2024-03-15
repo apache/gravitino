@@ -31,9 +31,13 @@ import org.junit.platform.commons.util.StringUtils;
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class SparkIT extends SparkEnvIT {
+  private static String getSelectAllSql(String tableName) {
+    return String.format("SELECT * FROM %s", tableName);
+  }
 
-  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s";
-  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s VALUES (%s)";
+  private static String getInsertWithoutPartitionSql(String tableName, String values) {
+    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
+  }
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
@@ -315,6 +319,92 @@ public class SparkIT extends SparkEnvIT {
     checkTableColumns(tableName, updateColumns, getTableInfo(tableName));
   }
 
+  @Test
+  void testAlterTableRenameColumn() {
+    String tableName = "test_rename_column";
+    dropTableIfExists(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    String oldColumnName = "col1";
+    String newColumnName = "col2";
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
+    sql(
+        String.format(
+            "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+    ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
+    renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
+    checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
+  }
+
+  @Test
+  void testUpdateColumnPosition() {
+    String tableName = "test_column_position";
+    dropTableIfExists(tableName);
+
+    List<SparkColumnInfo> simpleTableColumns =
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.StringType, ""),
+            SparkColumnInfo.of("name", DataTypes.StringType, ""),
+            SparkColumnInfo.of("age", DataTypes.StringType, ""));
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
+            tableName));
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
+    List<SparkColumnInfo> updateColumnPositionCol1 = new ArrayList<>(simpleTableColumns);
+    updateColumnPositionCol1.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    checkTableColumns(tableName, updateColumnPositionCol1, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 STRING FIRST", tableName));
+    List<SparkColumnInfo> updateColumnPositionFirst = new ArrayList<>();
+    updateColumnPositionFirst.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionFirst.addAll(simpleTableColumns);
+    checkTableColumns(tableName, updateColumnPositionFirst, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S ADD COLUMNS (col2 STRING COMMENT '')", tableName));
+    List<SparkColumnInfo> updateColumnPositionCol2 = new ArrayList<>();
+    updateColumnPositionCol2.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionCol2.addAll(simpleTableColumns);
+    updateColumnPositionCol2.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
+    checkTableColumns(tableName, updateColumnPositionCol2, getTableInfo(tableName));
+
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col2 col2 STRING AFTER col1", tableName));
+    List<SparkColumnInfo> updateColumnPositionAfter = new ArrayList<>();
+    updateColumnPositionAfter.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
+    updateColumnPositionAfter.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
+    updateColumnPositionAfter.addAll(simpleTableColumns);
+    checkTableColumns(tableName, updateColumnPositionAfter, getTableInfo(tableName));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnComment() {
+    String tableName = "test_update_column_comment";
+    dropTableIfExists(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
+
+    String oldColumnComment = "col1_comment";
+    String newColumnComment = "col1_new_comment";
+
+    sql(
+        String.format(
+            "ALTER TABLE %S ADD COLUMNS (col1 int comment '%s')", tableName, oldColumnComment));
+    sql(
+        String.format(
+            "ALTER TABLE %S CHANGE COLUMN col1 col1 int comment '%s'",
+            tableName, newColumnComment));
+    ArrayList<SparkColumnInfo> updateCommentColumns = new ArrayList<>(simpleTableColumns);
+    updateCommentColumns.add(SparkColumnInfo.of("col1", DataTypes.IntegerType, newColumnComment));
+    checkTableColumns(tableName, updateCommentColumns, getTableInfo(tableName));
+  }
+
   private void checkTableColumns(
       String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
@@ -332,7 +422,7 @@ public class SparkIT extends SparkEnvIT {
             .map(Object::toString)
             .collect(Collectors.joining(","));
 
-    sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, name, insertValues));
+    sql(getInsertWithoutPartitionSql(name, insertValues));
 
     // remove "'" from values, such as 'a' is trans to a
     String checkValues =
@@ -348,7 +438,7 @@ public class SparkIT extends SparkEnvIT {
             .collect(Collectors.joining(","));
 
     List<String> queryResult =
-        sql(String.format(SELECT_ALL_TEMPLATE, name)).stream()
+        sql(getSelectAllSql(name)).stream()
             .map(
                 line ->
                     Arrays.stream(line)

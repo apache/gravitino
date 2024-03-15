@@ -36,7 +36,7 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
     IcebergCatalog icebergCatalog =
         new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
-    CatalogOperations catalogOperations = icebergCatalog.newOps(Maps.newHashMap());
+    CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
     IcebergTableOps icebergTableOps =
@@ -63,8 +63,8 @@ public class TestIcebergCatalog {
 
     Map<String, String> conf = Maps.newHashMap();
 
-    try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
-      ops.initialize(conf);
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
+      ops.initialize(conf, entity);
       Map<String, String> map1 = Maps.newHashMap();
       map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
       PropertiesMetadata metadata = ops.catalogPropertiesMetadata();

@@ -114,6 +114,6 @@ tasks {
     environment("GRAVITINO_TEST", "true")
   }
   clean {
-    delete("$propertiesFile")
+    delete(file(propertiesFile).getParentFile())
   }
 }

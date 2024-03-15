@@ -8,10 +8,13 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -27,6 +30,11 @@ import java.util.Optional;
  */
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+
+  // A hack way to inject custom operation to Gravitino, the object you used is not stable, don't
+  // use it unless you know what you are doing.
+  @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   private CatalogEntity entity;
 
@@ -73,6 +81,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops().filesetPropertiesMetadata();
   }
 
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().topicPropertiesMetadata();
+  }
+
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
    * instance if not already created.
@@ -86,7 +99,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         if (ops == null) {
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
-          CatalogOperations newOps = newOps(conf);
+          CatalogOperations newOps = createOps(conf);
+          newOps.initialize(conf, entity);
           ops =
               newProxyPlugin(conf)
                   .map(
@@ -99,6 +113,27 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  private CatalogOperations createOps(Map<String, String> conf) {
+    String customCatalogOperationClass = conf.get(CATALOG_OPERATION_IMPL);
+    return Optional.ofNullable(customCatalogOperationClass)
+        .map(className -> loadCustomOps(className))
+        .orElse(newOps(conf));
+  }
+
+  private CatalogOperations loadCustomOps(String className) {
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    try {
+      // Class.forName use classloader of the caller class (BaseCatalog.class), it's global
+      // classloader not the catalog specific classloader, so we must specify the classloader
+      // explicitly.
+      return (CatalogOperations)
+          Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      LOG.error("Failed to load custom catalog operations, {}", className, e);
+      throw new RuntimeException(e);
+    }
   }
 
   /**

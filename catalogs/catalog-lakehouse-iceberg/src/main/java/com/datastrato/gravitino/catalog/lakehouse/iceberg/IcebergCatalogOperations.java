@@ -72,27 +72,20 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private IcebergSchemaPropertiesMetadata icebergSchemaPropertiesMetadata;
 
-  private final CatalogEntity entity;
+  private CatalogEntity entity;
 
   private IcebergTableOpsHelper icebergTableOpsHelper;
-
-  /**
-   * Constructs a new instance of IcebergCatalogOperations.
-   *
-   * @param entity The catalog entity associated with this operations instance.
-   */
-  public IcebergCatalogOperations(CatalogEntity entity) {
-    this.entity = entity;
-  }
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Iceberg catalog operations.
+   * @param entity The catalog entity associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf) throws RuntimeException {
+  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
+    this.entity = entity;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -575,5 +568,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Iceberg catalog doesn't support fileset related operations");
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Iceberg catalog doesn't support topic related operations");
   }
 }
