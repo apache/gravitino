@@ -41,7 +41,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
     metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations()) {
-      ops.initialize(conf, entity);
+      ops.initialize(conf, entity.toCatalogInfo());
       List<String> dbs = ops.clientPool.run(IMetaStoreClient::getAllDatabases);
       Assertions.assertEquals(2, dbs.size());
       Assertions.assertTrue(dbs.contains("default"));
@@ -70,7 +70,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
     metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations()) {
-      ops.initialize(conf, entity);
+      ops.initialize(conf, entity.toCatalogInfo());
       PropertiesMetadata metadata = ops.catalogPropertiesMetadata();
 
       Assertions.assertDoesNotThrow(

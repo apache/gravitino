@@ -5,9 +5,9 @@
 package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       }
 
       @Override
-      public void initialize(Map<String, String> config, CatalogEntity entity)
+      public void initialize(Map<String, String> config, CatalogInfo info)
           throws RuntimeException {}
 
       @Override

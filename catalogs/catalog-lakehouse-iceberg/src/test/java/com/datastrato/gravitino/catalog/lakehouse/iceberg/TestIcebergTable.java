@@ -503,7 +503,7 @@ public class TestIcebergTable {
   public void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(Maps.newHashMap(), entity);
+      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo());
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");

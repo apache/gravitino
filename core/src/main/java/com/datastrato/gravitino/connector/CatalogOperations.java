@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.Closeable;
@@ -26,8 +25,8 @@ public interface CatalogOperations extends Closeable, HasPropertyMetadata {
    * if the initialization failed.
    *
    * @param config The configuration of this Catalog.
-   * @param entity The catalog entity associated with this operations instance.
+   * @param info The information of this Catalog.
    * @throws RuntimeException if the initialization failed.
    */
-  void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException;
+  void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException;
 }

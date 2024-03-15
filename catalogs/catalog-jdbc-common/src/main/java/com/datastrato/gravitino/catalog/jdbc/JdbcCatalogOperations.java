@@ -18,6 +18,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -27,7 +28,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -70,7 +70,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
 
-  private CatalogEntity entity;
+  private CatalogInfo info;
 
   private final JdbcExceptionConverter exceptionConverter;
 
@@ -112,12 +112,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Initializes the Jdbc catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Jdbc catalog operations.
-   * @param entity The catalog entity associated with this operations instance.
+   * @param info The catalog info associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
-    this.entity = entity;
+  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 

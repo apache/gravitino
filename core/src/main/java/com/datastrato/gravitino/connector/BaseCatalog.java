@@ -116,7 +116,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
-          newOps.initialize(conf, entity);
+          newOps.initialize(conf, entity.toCatalogInfo());
           ops =
               newProxyPlugin(conf)
                   .map(

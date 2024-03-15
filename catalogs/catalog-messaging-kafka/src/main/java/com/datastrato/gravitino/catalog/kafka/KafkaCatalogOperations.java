@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 
 import com.datastrato.gravitino.Entity;
@@ -14,9 +14,10 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -29,7 +30,6 @@ import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -59,7 +59,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
-  private CatalogEntity entity;
+  private CatalogInfo info;
 
   @VisibleForTesting
   KafkaCatalogOperations(EntityStore store, IdGenerator idGenerator) {
@@ -72,14 +72,14 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
     Preconditions.checkArgument(
         config.containsKey(BOOTSTRAP_SERVERS), "Missing configuration: %s", BOOTSTRAP_SERVERS);
     Preconditions.checkArgument(config.containsKey(ID_KEY), "Missing configuration: %s", ID_KEY);
 
-    this.entity = entity;
+    this.info = info;
     this.defaultSchemaIdent =
-        NameIdentifier.of(entity.namespace().level(0), entity.name(), DEFAULT_SCHEMA_NAME);
+        NameIdentifier.of(info.namespace().level(0), info.name(), DEFAULT_SCHEMA_NAME);
 
     // Initialize the Kafka AdminClient configuration
     adminClientConfig = new Properties();
@@ -239,12 +239,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         SchemaEntity.builder()
             .withName(defaultSchemaIdent.name())
             .withId(uid)
-            .withNamespace(Namespace.ofSchema(entity.namespace().level(0), entity.name()))
+            .withNamespace(Namespace.ofSchema(info.namespace().level(0), info.name()))
             .withComment("The default schema of Kafka catalog including all topics")
             .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
-                    .withCreator(entity.auditInfo().creator())
+                    .withCreator(info.auditInfo().creator())
                     .withCreateTime(Instant.now())
                     .build())
             .build();

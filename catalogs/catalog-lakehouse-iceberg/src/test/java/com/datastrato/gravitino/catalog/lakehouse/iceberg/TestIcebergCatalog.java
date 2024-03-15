@@ -65,7 +65,7 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(conf, entity);
+      ops.initialize(conf, entity.toCatalogInfo());
       Map<String, String> map1 = Maps.newHashMap();
       map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
       PropertiesMetadata metadata = ops.catalogPropertiesMetadata();

@@ -5,15 +5,16 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import java.io.IOException;
 import java.util.Map;
 
 public class DummyCatalogOperations implements CatalogOperations {
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity)
-      throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
