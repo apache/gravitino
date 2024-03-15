@@ -8,10 +8,12 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Group;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
+import com.datastrato.gravitino.dto.GroupDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
@@ -342,6 +344,24 @@ public class DTOConverters {
         .withName(user.name())
         .withAudit(toDTO(user.auditInfo()))
         .withProperties(user.properties())
+        .build();
+  }
+
+  /**
+   * Converts a group implementation to a GroupDTO.
+   *
+   * @param group The group implementation.
+   * @return The group DTO.
+   */
+  public static GroupDTO toDTO(Group group) {
+    if (group instanceof GroupDTO) {
+      return (GroupDTO) group;
+    }
+    return GroupDTO.builder()
+        .withName(group.name())
+        .withAudit(toDTO(group.auditInfo()))
+        .withProperties(group.properties())
+        .withUsers(group.users())
         .build();
   }
 

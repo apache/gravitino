@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.kv;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
+import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
@@ -334,18 +335,22 @@ public class KvEntityStore implements EntityStore {
     return prefixes;
   }
 
-  void deleteUserEntitiesIfNecessary(NameIdentifier ident, EntityType type) throws IOException {
+  void deleteAccessControlEntitiesIfNecessary(NameIdentifier ident, EntityType type)
+      throws IOException {
     if (type != METALAKE) {
       return;
     }
     byte[] encode = entityKeyEncoder.encode(ident, type, true);
-    byte[] prefix = replacePrefixTypeInfo(encode, USER.getShortName());
-    transactionalKvBackend.deleteRange(
-        new KvRange.KvRangeBuilder()
-            .start(prefix)
-            .startInclusive(true)
-            .end(Bytes.increment(Bytes.wrap(prefix)).get())
-            .build());
+    List<String> entityPrefixes = Lists.newArrayList(USER.getShortName(), GROUP.getShortName());
+    for (String prefix : entityPrefixes) {
+      byte[] encodedPrefix = replacePrefixTypeInfo(encode, prefix);
+      transactionalKvBackend.deleteRange(
+          new KvRange.KvRangeBuilder()
+              .start(encodedPrefix)
+              .startInclusive(true)
+              .end(Bytes.increment(Bytes.wrap(encodedPrefix)).get())
+              .build());
+    }
   }
 
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
@@ -371,7 +376,7 @@ public class KvEntityStore implements EntityStore {
           List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
           if (subEntityPrefix.isEmpty()) {
             // has no sub-entities
-            deleteUserEntitiesIfNecessary(ident, entityType);
+            deleteAccessControlEntitiesIfNecessary(ident, entityType);
             return transactionalKvBackend.delete(dataKey);
           }
 
@@ -407,7 +412,7 @@ public class KvEntityStore implements EntityStore {
                     .build());
           }
 
-          deleteUserEntitiesIfNecessary(ident, entityType);
+          deleteAccessControlEntitiesIfNecessary(ident, entityType);
           return transactionalKvBackend.delete(dataKey);
         });
   }

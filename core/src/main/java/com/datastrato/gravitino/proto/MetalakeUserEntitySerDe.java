@@ -11,7 +11,7 @@ public class MetalakeUserEntitySerDe
 
   @Override
   public com.datastrato.gravitino.proto.User serialize(MetalakeUser metalakeUser) {
-    com.datastrato.gravitino.proto.User.Builder builder =
+    User.Builder builder =
         com.datastrato.gravitino.proto.User.newBuilder()
             .setId(metalakeUser.id())
             .setName(metalakeUser.name())

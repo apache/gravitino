@@ -31,11 +31,13 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.MetalakeGroup;
 import com.datastrato.gravitino.meta.MetalakeUser;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.StorageLayoutVersion;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -128,6 +130,16 @@ public class TestKvEntityStorage {
         .withNamespace(namespace)
         .withFilesetType(Fileset.Type.MANAGED)
         .withStorageLocation("/tmp")
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static MetalakeGroup createGroup(String metalake, String name, AuditInfo auditInfo) {
+    return MetalakeGroup.builder()
+        .withId(1L)
+        .withName(name)
+        .withUsers(Lists.newArrayList("user"))
+        .withMetalake(metalake)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -619,7 +631,7 @@ public class TestKvEntityStorage {
   }
 
   @Test
-  public void testUserEntityDelete() throws IOException {
+  public void testAccessControlEntityDelete() throws IOException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
@@ -644,8 +656,11 @@ public class TestKvEntityStorage {
       store.put(oneUser);
       MetalakeUser anotherUser = createUser("metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
+      MetalakeGroup oneGroup = createGroup("metalake", "group", auditInfo);
+      store.put(oneGroup);
       Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), EntityType.USER));
       Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), EntityType.USER));
+      Assertions.assertTrue(store.exists(oneGroup.nameIdentifier(), EntityType.GROUP));
       store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
       Assertions.assertFalse(store.exists(oneUser.nameIdentifier(), EntityType.USER));
       Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), EntityType.USER));

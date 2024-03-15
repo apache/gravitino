@@ -6,9 +6,12 @@ package com.datastrato.gravitino.tenant;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.Group;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.User;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -16,6 +19,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -35,7 +39,7 @@ public class TestAccessControlManager {
   private static String metalake = "metalake";
 
   private static BaseMetalake metalakeEntity =
-      new BaseMetalake.Builder()
+      BaseMetalake.builder()
           .withId(1L)
           .withName(metalake)
           .withAuditInfo(
@@ -108,6 +112,60 @@ public class TestAccessControlManager {
 
     // Test drop non-existed user
     boolean dropped1 = accessControlManager.dropUser("metalake", "no-exist");
+    Assertions.assertFalse(dropped1);
+  }
+
+  @Test
+  public void testCreateGroup() {
+    Map<String, String> props = ImmutableMap.of("key1", "value1");
+
+    Group group =
+        accessControlManager.createGroup("metalake", "create", Lists.newArrayList("user1"), props);
+    Assertions.assertEquals("create", group.name());
+    testProperties(props, group.properties());
+    Assertions.assertTrue(group.users().contains("user1"));
+    Assertions.assertEquals(1, group.users().size());
+
+    // Test with GroupAlreadyExistsException
+    Assertions.assertThrows(
+        GroupAlreadyExistsException.class,
+        () ->
+            accessControlManager.createGroup(
+                "metalake", "create", Lists.newArrayList("user1"), props));
+  }
+
+  @Test
+  public void testLoadGroup() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+    accessControlManager.createGroup("metalake", "loadGroup", Lists.newArrayList("user1"), props);
+
+    Group group = accessControlManager.loadGroup("metalake", "loadGroup");
+    Assertions.assertEquals("loadGroup", group.name());
+    testProperties(props, group.properties());
+    Assertions.assertTrue(group.users().contains("user1"));
+    Assertions.assertEquals(1, group.users().size());
+
+    // Test load non-existed group
+    Throwable exception =
+        Assertions.assertThrows(
+            NoSuchGroupException.class,
+            () -> accessControlManager.loadGroup("metalake", "not-exist"));
+    Assertions.assertTrue(exception.getMessage().contains("Group not-exist does not exist"));
+  }
+
+  @Test
+  public void testDropGroup() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+    accessControlManager.createGroup("metalake", "testDrop", Lists.newArrayList("user1"), props);
+
+    // Test drop group
+    boolean dropped = accessControlManager.dropGroup("metalake", "testDrop");
+    Assertions.assertTrue(dropped);
+
+    // Test drop non-existed group
+    boolean dropped1 = accessControlManager.dropGroup("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
   }
 

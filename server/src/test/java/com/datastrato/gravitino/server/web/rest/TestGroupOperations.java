@@ -14,22 +14,23 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.User;
-import com.datastrato.gravitino.dto.UserDTO;
-import com.datastrato.gravitino.dto.requests.UserCreateRequest;
+import com.datastrato.gravitino.Group;
+import com.datastrato.gravitino.dto.GroupDTO;
+import com.datastrato.gravitino.dto.requests.GroupCreateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.UserResponse;
+import com.datastrato.gravitino.dto.responses.GroupResponse;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchUserException;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.MetalakeUser;
+import com.datastrato.gravitino.meta.MetalakeGroup;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.tenant.AccessControlManager;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import javax.servlet.http.HttpServletRequest;
@@ -46,7 +47,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestUserOperations extends JerseyTest {
+public class TestGroupOperations extends JerseyTest {
 
   private final AccessControlManager manager = mock(AccessControlManager.class);
 
@@ -78,7 +79,7 @@ public class TestUserOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(UserOperations.class);
+    resourceConfig.register(GroupOperations.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -92,14 +93,16 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateUser() {
-    UserCreateRequest req = new UserCreateRequest("user1", ImmutableMap.of("key", "value"));
-    User user = buildUser("user1");
+  public void testCreateGroup() {
+    GroupCreateRequest req =
+        new GroupCreateRequest(
+            "group", Lists.newArrayList("user"), ImmutableMap.of("key", "value"));
+    Group group = buildGroup("group");
 
-    when(manager.createUser(any(), any(), any())).thenReturn(user);
+    when(manager.createGroup(any(), any(), any(), any())).thenReturn(group);
 
     Response resp =
-        target("/metalakes/metalake1/users")
+        target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -107,19 +110,19 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    UserResponse userResponse = resp.readEntity(UserResponse.class);
-    Assertions.assertEquals(0, userResponse.getCode());
+    GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
+    Assertions.assertEquals(0, groupResponse.getCode());
 
-    UserDTO userDTO = userResponse.getUser();
-    Assertions.assertEquals("user1", userDTO.name());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), userDTO.properties());
+    GroupDTO groupDTO = groupResponse.getGroup();
+    Assertions.assertEquals("group", groupDTO.name());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), groupDTO.properties());
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createUser(any(), any(), any());
+        .createGroup(any(), any(), any(), any());
     Response resp1 =
-        target("/metalakes/metalake1/users")
+        target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -131,12 +134,12 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test throw UserAlreadyExistsException
-    doThrow(new UserAlreadyExistsException("mock error"))
+    // Test throw GroupAlreadyExistsException
+    doThrow(new GroupAlreadyExistsException("mock error"))
         .when(manager)
-        .createUser(any(), any(), any());
+        .createGroup(any(), any(), any(), any());
     Response resp2 =
-        target("/metalakes/metalake1/users")
+        target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -146,12 +149,14 @@ public class TestUserOperations extends JerseyTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse1.getCode());
     Assertions.assertEquals(
-        UserAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
+        GroupAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).createUser(any(), any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .createGroup(any(), any(), any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/users")
+        target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -165,30 +170,28 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadUser() {
-
-    User user = buildUser("user1");
-
-    when(manager.loadUser(any(), any())).thenReturn(user);
+  public void testLoadGroup() {
+    Group group = buildGroup("group");
+    when(manager.loadGroup(any(), any())).thenReturn(group);
 
     Response resp =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
-    UserResponse userResponse = resp.readEntity(UserResponse.class);
-    Assertions.assertEquals(0, userResponse.getCode());
-    UserDTO userDTO = userResponse.getUser();
-    Assertions.assertEquals("user1", userDTO.name());
-    Assertions.assertEquals(ImmutableMap.of("key", "value"), userDTO.properties());
+    GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
+    Assertions.assertEquals(0, groupResponse.getCode());
+    GroupDTO groupDTO = groupResponse.getGroup();
+    Assertions.assertEquals("group", groupDTO.name());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), groupDTO.properties());
 
     // Test throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).loadUser(any(), any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).loadGroup(any(), any());
     Response resp1 =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
@@ -199,10 +202,10 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test throw NoSuchUserException
-    doThrow(new NoSuchUserException("mock error")).when(manager).loadUser(any(), any());
+    // Test throw NoSuchGroupException
+    doThrow(new NoSuchGroupException("mock error")).when(manager).loadGroup(any(), any());
     Response resp2 =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
@@ -211,12 +214,12 @@ public class TestUserOperations extends JerseyTest {
 
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse1.getCode());
-    Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse1.getType());
+    Assertions.assertEquals(NoSuchGroupException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).loadUser(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).loadGroup(any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
@@ -229,23 +232,12 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private User buildUser(String user) {
-    return MetalakeUser.builder()
-        .withId(1L)
-        .withName(user)
-        .withMetalake("metalake1")
-        .withProperties(ImmutableMap.of("key", "value"))
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
-  }
-
   @Test
-  public void testDropUser() {
-    when(manager.dropUser(any(), any())).thenReturn(true);
+  public void testDropGroup() {
+    when(manager.dropGroup(any(), any())).thenReturn(true);
 
     Response resp =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -256,9 +248,9 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertTrue(dropResponse.dropped());
 
     // Test when failed to drop group
-    when(manager.dropUser(any(), any())).thenReturn(false);
+    when(manager.dropGroup(any(), any())).thenReturn(false);
     Response resp2 =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -268,9 +260,9 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(0, dropResponse2.getCode());
     Assertions.assertFalse(dropResponse2.dropped());
 
-    doThrow(new RuntimeException("mock error")).when(manager).dropUser(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).dropGroup(any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/users/user1")
+        target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -281,5 +273,17 @@ public class TestUserOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  private Group buildGroup(String group) {
+    return MetalakeGroup.builder()
+        .withId(1L)
+        .withName(group)
+        .withMetalake("metalake")
+        .withProperties(ImmutableMap.of("key", "value"))
+        .withUsers(Lists.newArrayList("user"))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }
