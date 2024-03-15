@@ -37,7 +37,6 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -77,11 +76,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {this.entity = entity;
     this.entity = entity;
     Preconditions.checkArgument(
         config.containsKey(BOOTSTRAP_SERVERS), "Missing configuration: %s", BOOTSTRAP_SERVERS);
     Preconditions.checkArgument(config.containsKey(ID_KEY), "Missing configuration: %s", ID_KEY);
+
     // Initialize the Kafka AdminClient configuration
     adminClientConfig = new Properties();
 
@@ -146,7 +146,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     // It appears that the "default" schema suffices, so there is no need to support creating schema
     // currently
-    throw new UnsupportedOperationException("Kafka catalog does not support schema creation");
+    throw new UnsupportedOperationException(
+        "Kafka catalog does not support schema creation "
+            + "because the \"default\" schema already includes all topics");
   }
 
   @Override
@@ -175,7 +177,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       throw new IllegalArgumentException("Cannot alter the default schema");
     }
 
-    // TODO: Implement dropping schema after adding support for schema creation
+    // TODO: Implement altering schema after adding support for schema creation
     throw new UnsupportedOperationException("Kafka catalog does not support schema alteration");
   }
 

@@ -161,7 +161,8 @@ public class TestKafkaCatalogOperations {
             UnsupportedOperationException.class,
             () -> kafkaCatalogOperations.createSchema(ident, null, null));
     Assertions.assertEquals(
-        "Kafka catalog does not support schema creation", exception.getMessage());
+        "Kafka catalog does not support schema creation because the \"default\" schema already includes all topics",
+        exception.getMessage());
   }
 
   @Test

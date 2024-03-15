@@ -19,7 +19,7 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.hadoop2.common)
+  testImplementation(libs.commons.io)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
