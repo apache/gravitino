@@ -412,7 +412,7 @@ public class SparkIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (col1 ARRAY<int> COMMENT 'array', col2 MAP<string, string> COMMENT 'map', col3 STRUCT<col1: int, col2: string> COMMENT 'struct')",
+            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: INT, col2: STRING> COMMENT 'struct')",
             tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
     List<SparkColumnInfo> expectedSparkInfo =

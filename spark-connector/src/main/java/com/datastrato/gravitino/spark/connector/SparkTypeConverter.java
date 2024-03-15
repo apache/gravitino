@@ -133,10 +133,11 @@ public class SparkTypeConverter {
       return DataTypes.TimestampNTZType;
     } else if (gravitinoType instanceof Types.ListType) {
       Types.ListType listType = (Types.ListType) gravitinoType;
-      return ArrayType.apply(toSparkType(listType.elementType()), listType.elementNullable());
+      return DataTypes.createArrayType(
+          toSparkType(listType.elementType()), listType.elementNullable());
     } else if (gravitinoType instanceof Types.MapType) {
       Types.MapType mapType = (Types.MapType) gravitinoType;
-      return MapType.apply(
+      return DataTypes.createMapType(
           toSparkType(mapType.keyType()),
           toSparkType(mapType.valueType()),
           mapType.valueNullable());
