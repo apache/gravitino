@@ -68,49 +68,55 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(
         MapType.of(IntegerType.get(), StringType.get(), true),
         DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
-    gravitinoToSparkTypeMapper.put(
-        StructType.of(
-            StructType.Field.of("col1", IntegerType.get(), true, null),
-            StructType.Field.of("col2", StringType.get(), true, null),
-            StructType.Field.of(
-                "col3",
-                StructType.of(
-                    StructType.Field.of("col3_1", IntegerType.get(), true, null),
-                    StructType.Field.of("col3_2", StringType.get(), true, null)),
-                true,
-                null),
-            StructType.Field.of(
-                "col4", MapType.of(IntegerType.get(), StringType.get(), true), true, null),
-            StructType.Field.of("col5", ListType.of(IntegerType.get(), true), true, null),
-            StructType.Field.of("col6", IntegerType.get(), false, null),
-            StructType.Field.of("col7", IntegerType.get(), true, "This is a comment")),
-        DataTypes.createStructType(
-            new org.apache.spark.sql.types.StructField[] {
-              DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-              DataTypes.createStructField("col2", DataTypes.StringType, true),
-              DataTypes.createStructField(
-                  "col3",
-                  DataTypes.createStructType(
-                      new org.apache.spark.sql.types.StructField[] {
-                        DataTypes.createStructField("col3_1", DataTypes.IntegerType, true),
-                        DataTypes.createStructField("col3_2", DataTypes.StringType, true)
-                      }),
-                  true),
-              DataTypes.createStructField(
-                  "col4",
-                  DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType, true),
-                  true),
-              DataTypes.createStructField(
-                  "col5", DataTypes.createArrayType(DataTypes.IntegerType), true),
-              DataTypes.createStructField("col6", DataTypes.IntegerType, false),
-              DataTypes.createStructField(
-                  "col7",
-                  DataTypes.IntegerType,
-                  true,
-                  new MetadataBuilder()
-                      .putString(ConnectorConstants.COMMENT, "This is a comment")
-                      .build())
-            }));
+    gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
+  }
+
+  private static StructType createGravitinoStructType() {
+    return StructType.of(
+        StructType.Field.of("col1", IntegerType.get(), true, null),
+        StructType.Field.of("col2", StringType.get(), true, null),
+        StructType.Field.of(
+            "col3",
+            StructType.of(
+                StructType.Field.of("col3_1", IntegerType.get(), true, null),
+                StructType.Field.of("col3_2", StringType.get(), true, null)),
+            true,
+            null),
+        StructType.Field.of(
+            "col4", MapType.of(IntegerType.get(), StringType.get(), true), true, null),
+        StructType.Field.of("col5", ListType.of(IntegerType.get(), true), true, null),
+        StructType.Field.of("col6", IntegerType.get(), false, null),
+        StructType.Field.of("col7", IntegerType.get(), true, "This is a comment"));
+  }
+
+  private static org.apache.spark.sql.types.StructType createSparkStructType() {
+    return DataTypes.createStructType(
+        new org.apache.spark.sql.types.StructField[] {
+          DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+          DataTypes.createStructField("col2", DataTypes.StringType, true),
+          DataTypes.createStructField(
+              "col3",
+              DataTypes.createStructType(
+                  new org.apache.spark.sql.types.StructField[] {
+                    DataTypes.createStructField("col3_1", DataTypes.IntegerType, true),
+                    DataTypes.createStructField("col3_2", DataTypes.StringType, true)
+                  }),
+              true),
+          DataTypes.createStructField(
+              "col4",
+              DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType, true),
+              true),
+          DataTypes.createStructField(
+              "col5", DataTypes.createArrayType(DataTypes.IntegerType), true),
+          DataTypes.createStructField("col6", DataTypes.IntegerType, false),
+          DataTypes.createStructField(
+              "col7",
+              DataTypes.IntegerType,
+              true,
+              new MetadataBuilder()
+                  .putString(ConnectorConstants.COMMENT, "This is a comment")
+                  .build())
+        });
   }
 
   @Test

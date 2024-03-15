@@ -419,7 +419,9 @@ public class SparkIT extends SparkEnvIT {
         Arrays.asList(
             SparkColumnInfo.of("col1", DataTypes.createArrayType(DataTypes.IntegerType), "array"),
             SparkColumnInfo.of(
-                "col2", DataTypes.createMapType(DataTypes.StringType, DataTypes.StringType), "map"),
+                "col2",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                "map"),
             SparkColumnInfo.of(
                 "col3",
                 DataTypes.createStructType(
