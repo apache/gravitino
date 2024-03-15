@@ -11,8 +11,8 @@ import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Map;
 
 /**
- * CatalogInfo exposes all the information about a catalog to the connector interface. This class
- * is corresponding to CatalogEntity that is used internally.
+ * CatalogInfo exposes all the information about a catalog to the connector interface. This class is
+ * corresponding to CatalogEntity that is used internally.
  *
  * <p>This class object will be passed in through {@link CatalogOperations#initialize(Map,
  * CatalogInfo)}, users can leverage this object to get the information about the catalog.
