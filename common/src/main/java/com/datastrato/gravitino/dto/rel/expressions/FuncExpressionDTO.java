@@ -69,6 +69,9 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Builds the function expression.
      *

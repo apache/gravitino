@@ -206,7 +206,7 @@ public class DTOConverters {
    * @return The table DTO.
    */
   public static TableDTO toDTO(Table table) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
@@ -235,7 +235,7 @@ public class DTOConverters {
       return (DistributionDTO) distribution;
     }
 
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(distribution.strategy())
         .withNumber(distribution.number())
         .withArgs(
@@ -341,7 +341,7 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
-      return new LiteralDTO.Builder()
+      return LiteralDTO.builder()
           .withValue((((Literal) expression).value().toString()))
           .withDataType(((Literal) expression).dataType())
           .build();
@@ -350,7 +350,7 @@ public class DTOConverters {
           .withFieldName(((NamedReference.FieldReference) expression).fieldName())
           .build();
     } else if (expression instanceof FunctionExpression) {
-      return new FuncExpressionDTO.Builder()
+      return FuncExpressionDTO.builder()
           .withFunctionName(((FunctionExpression) expression).functionName())
           .withFunctionArgs(
               Arrays.stream(((FunctionExpression) expression).arguments())

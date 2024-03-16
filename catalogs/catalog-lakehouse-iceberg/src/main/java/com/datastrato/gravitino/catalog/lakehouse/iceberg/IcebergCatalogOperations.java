@@ -156,7 +156,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     try {
       String currentUser = currentUser();
       IcebergSchema createdSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
@@ -201,7 +201,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       GetNamespaceResponse response =
           icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(
                   Optional.of(response)
@@ -257,7 +257,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
               .orElse(null);
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)

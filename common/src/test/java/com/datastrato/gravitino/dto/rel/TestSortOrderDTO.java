@@ -54,7 +54,7 @@ public class TestSortOrderDTO {
     dto =
         SortOrderDTO.builder()
             .withSortTerm(
-                new FuncExpressionDTO.Builder()
+                FuncExpressionDTO.builder()
                     .withFunctionName("date")
                     .withFunctionArgs(FieldReferenceDTO.of("field1"))
                     .build())

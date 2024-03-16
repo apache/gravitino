@@ -400,7 +400,7 @@ public class TestRelationalCatalog extends TestBase {
               "comment2",
               false,
               false,
-              new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
+              LiteralDTO.builder().withValue(null).withDataType(Types.NullType.get()).build())
         };
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -953,7 +953,7 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(
@@ -1113,7 +1113,7 @@ public class TestRelationalCatalog extends TestBase {
 
   protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
-    return new SchemaDTO.Builder()
+    return SchemaDTO.builder()
         .withName(name)
         .withComment(comment)
         .withProperties(props)

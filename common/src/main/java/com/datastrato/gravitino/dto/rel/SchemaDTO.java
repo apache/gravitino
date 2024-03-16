@@ -82,7 +82,7 @@ public class SchemaDTO implements Schema {
     protected AuditDTO audit;
 
     /** Constructs a new Builder instance. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Sets the name of the schema.
