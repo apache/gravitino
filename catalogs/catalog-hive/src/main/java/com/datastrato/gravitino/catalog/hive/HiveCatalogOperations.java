@@ -786,6 +786,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           if (change instanceof TableChange.AddColumn) {
             TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
             validateNullable(String.join(".", addColumn.fieldName()), addColumn.isNullable());
+            validateColumnDefaultValue(
+                String.join(".", addColumn.fieldName()), addColumn.getDefaultValue());
             doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {

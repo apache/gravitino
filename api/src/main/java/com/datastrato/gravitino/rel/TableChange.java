@@ -34,7 +34,7 @@ import java.util.Objects;
 @Evolving
 public interface TableChange {
   /** A default value that indicates the default value is not set. */
-  Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+  Expression DEFAULT_VALUE_NOT_SET = Column.DEFAULT_VALUE_NOT_SET;
 
   /**
    * Create a TableChange for renaming a table.
@@ -285,6 +285,34 @@ public interface TableChange {
       boolean autoIncrement) {
     return new AddColumn(
         fieldName, dataType, comment, position, nullable, autoIncrement, DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @param autoIncrement The new column's autoIncrement.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
   }
 
   /**
