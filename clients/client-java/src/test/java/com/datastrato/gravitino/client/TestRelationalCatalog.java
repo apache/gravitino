@@ -93,18 +93,14 @@ public class TestRelationalCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
-<<<<<<< HEAD
-        new CatalogDTO.Builder()
-=======
         CatalogDTO.builder()
->>>>>>> 00fd2c9c (draft2)
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
             .withProvider(provider)
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "k2"))
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     CatalogCreateRequest catalogCreateRequest =
@@ -967,7 +963,7 @@ public class TestRelationalCatalog extends TestBase {
 
   private SortOrderDTO[] createMockSortOrderDTO(String columnName, SortDirection direction) {
     return new SortOrderDTO[] {
-      new SortOrderDTO.Builder()
+      SortOrderDTO.builder()
           .withDirection(direction)
           .withNullOrder(direction.defaultNullOrdering())
           .withSortTerm(
@@ -1121,12 +1117,7 @@ public class TestRelationalCatalog extends TestBase {
         .withName(name)
         .withComment(comment)
         .withProperties(props)
-<<<<<<< HEAD
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
-=======
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
->>>>>>> 00fd2c9c (draft2)
         .build();
   }
 
@@ -1183,19 +1174,14 @@ public class TestRelationalCatalog extends TestBase {
       DistributionDTO distributionDTO,
       SortOrderDTO[] sortOrderDTOs,
       IndexDTO[] indexDTOS) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(name)
         .withColumns(columns)
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(distributionDTO)
         .withSortOrders(sortOrderDTOs)
-<<<<<<< HEAD
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
-=======
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
->>>>>>> 00fd2c9c (draft2)
         .withPartitioning(partitioning)
         .withIndex(indexDTOS)
         .build();
