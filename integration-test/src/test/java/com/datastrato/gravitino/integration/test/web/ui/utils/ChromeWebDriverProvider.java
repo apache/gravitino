@@ -89,6 +89,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     if (SystemUtils.IS_OS_MAC_OSX) {
       chromeOptions.setBinary(
           ITUtils.joinPath(downLoadDir, chromeBinName, "Contents", "MacOS", "Chromium"));
+      chromeOptions.addArguments("--headless");
     } else {
       chromeOptions.setBinary(ITUtils.joinPath(downLoadDir, chromeBinName));
       chromeOptions.addArguments("--headless");

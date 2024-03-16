@@ -6,8 +6,6 @@
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import org.openqa.selenium.By;
@@ -110,8 +108,7 @@ public class MetalakePage extends AbstractWebIT {
     try {
       String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
       WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait =
-          new WebDriverWait(driver, Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS));
+      WebDriverWait wait = new WebDriverWait(driver, AbstractWebIT.MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       deleteMetalakeBtn.click();
       Thread.sleep(sleepTimeMillis);
@@ -135,8 +132,7 @@ public class MetalakePage extends AbstractWebIT {
   public void clickMetalakeLink(String name) {
     String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
     WebElement metalakeLink = driver.findElement(By.xpath(xpath));
-    WebDriverWait wait =
-        new WebDriverWait(driver, Duration.of(AbstractWebIT.MAX_TIMEOUT, ChronoUnit.SECONDS));
+    WebDriverWait wait = new WebDriverWait(driver, AbstractWebIT.MAX_TIMEOUT);
     wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
     metalakeLink.click();
   }
