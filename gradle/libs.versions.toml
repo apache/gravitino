@@ -16,6 +16,7 @@ mockito = "4.11.0"
 airlift-units = "1.8"
 airlift-log = "231"
 hive2 = "2.3.9"
+hadoop2 = "2.10.2"
 hadoop3 = "3.1.0"
 hadoop-minikdc = "3.3.6"
 httpclient5 = "5.2.1"
@@ -96,6 +97,9 @@ mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mo
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
+hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
+hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
