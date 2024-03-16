@@ -2,8 +2,9 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.rel;
+package com.datastrato.gravitino.connector;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Schema;
 import java.util.Map;
@@ -11,6 +12,7 @@ import javax.annotation.Nullable;
 import lombok.ToString;
 
 /** An abstract class representing a base schema in a relational database. */
+@Evolving
 @ToString
 public abstract class BaseSchema implements Schema {
 
@@ -142,6 +144,12 @@ public abstract class BaseSchema implements Schema {
       return (SELF) this;
     }
 
+    /**
+     * Builds the concrete instance of the schema with the provided attributes.
+     *
+     * @return The built schema instance.
+     */
+    @Evolving
     protected abstract T internalBuild();
   }
 }

@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import static com.datastrato.gravitino.catalog.PropertyEntry.stringOptionalPropertyEntry;
+import static com.datastrato.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;

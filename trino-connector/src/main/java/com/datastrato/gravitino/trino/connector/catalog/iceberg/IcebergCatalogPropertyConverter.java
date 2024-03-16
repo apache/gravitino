@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;

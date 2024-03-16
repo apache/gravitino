@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.lang.reflect.InvocationHandler;

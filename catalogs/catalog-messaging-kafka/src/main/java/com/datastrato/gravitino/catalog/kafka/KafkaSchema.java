@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.kafka;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 
 public class KafkaSchema extends BaseSchema {
 

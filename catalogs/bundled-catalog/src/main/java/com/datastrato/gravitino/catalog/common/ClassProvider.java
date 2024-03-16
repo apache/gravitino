@@ -3,11 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.catalog.common;
+package com.datastrato.gravitino.catalog.common;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -16,6 +13,9 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogProperti
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import java.util.HashSet;
 import java.util.Set;
 
