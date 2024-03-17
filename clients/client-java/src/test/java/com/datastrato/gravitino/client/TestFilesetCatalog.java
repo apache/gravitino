@@ -44,7 +44,7 @@ public class TestFilesetCatalog extends TestBase {
 
   protected static Catalog catalog;
 
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
 
   protected static final String metalakeName = "testMetalake";
 

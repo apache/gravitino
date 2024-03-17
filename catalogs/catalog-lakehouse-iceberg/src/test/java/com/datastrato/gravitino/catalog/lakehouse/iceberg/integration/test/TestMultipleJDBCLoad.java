@@ -12,7 +12,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
@@ -87,7 +87,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
   public void testCreateMultipleJdbcInIceberg() throws URISyntaxException {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_postgresql");
-    GravitinoMetaLake metalake =
+    GravitinoMetalake metalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
 
     Map<String, String> icebergPgConf = Maps.newHashMap();

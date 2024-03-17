@@ -9,7 +9,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
@@ -36,7 +36,7 @@ public class AuditIT extends AbstractIT {
     String metalakeAuditName = RandomNameUtils.genRandomName("metalakeAudit");
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
-    GravitinoMetaLake metaLake =
+    GravitinoMetalake metaLake =
         client.createMetalake(
             NameIdentifier.parse(metalakeAuditName), "metalake A comment", Collections.emptyMap());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
