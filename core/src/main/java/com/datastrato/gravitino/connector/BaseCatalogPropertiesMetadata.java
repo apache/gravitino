@@ -3,14 +3,16 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.connector;
 
 import static com.datastrato.gravitino.Catalog.PROPERTY_PACKAGE;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.Map;
 
+@Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
 
   protected static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =

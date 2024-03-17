@@ -2,10 +2,11 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.rel;
+package com.datastrato.gravitino.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.time.Instant;
 import java.util.HashMap;

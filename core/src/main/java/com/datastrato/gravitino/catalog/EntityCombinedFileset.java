@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.file;
+package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.file.Fileset;

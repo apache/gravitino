@@ -3,10 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.catalog.property;
+package com.datastrato.gravitino.catalog.property;
 
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;

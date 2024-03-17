@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.TableOperations;
-import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.TableOperations;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)

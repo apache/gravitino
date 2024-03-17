@@ -3,8 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.rel;
+package com.datastrato.gravitino.connector;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
@@ -13,6 +14,7 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /** An abstract class representing a base column in a relational database. */
+@Evolving
 @ToString
 @EqualsAndHashCode
 public abstract class BaseColumn implements Column {
@@ -87,6 +89,7 @@ public abstract class BaseColumn implements Column {
    * @param <T> The type of the column being built.
    */
   interface Builder<SELF extends BaseColumn.Builder<SELF, T>, T extends BaseColumn> {
+
     SELF withName(String name);
 
     SELF withComment(String comment);
@@ -205,6 +208,12 @@ public abstract class BaseColumn implements Column {
       return (SELF) this;
     }
 
+    /**
+     * Builds the concrete instance of the column with the provided attributes.
+     *
+     * @return The built column instance.
+     */
+    @Evolving
     protected abstract T internalBuild();
   }
 }
