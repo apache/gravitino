@@ -162,7 +162,7 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  void testDeleteRange_isStartExclusiveTrue() throws IOException {
+  void testDeleteRangeWhenIsStartExclusiveTrue() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
@@ -199,7 +199,7 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  void testDeleteRange_isEndExclusiveTrue() throws IOException {
+  void testDeleteRangeWhenIsEndExclusiveTrue() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
@@ -283,7 +283,7 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  void testScanWithBrokenRocksDB_isStartExclusiveTrue() throws IOException {
+  void testScanWithBrokenRocksDWhenIsStartExclusiveTrue() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
@@ -331,7 +331,7 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
-  void testScanWithBrokenRocksDB_isEndExclusiveTrue() throws IOException {
+  void testScanWithBrokenRocksDBWhenIsEndExclusiveTrue() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
         "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
