@@ -8,7 +8,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import java.sql.SQLException;
 
-/** Exception converter to gravitino exception for Doris. */
+/** Exception converter to Gravitino exception for Doris. */
 public class DorisExceptionConverter extends JdbcExceptionConverter {
   @SuppressWarnings("FormatStringAnnotation")
   @Override
