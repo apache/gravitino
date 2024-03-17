@@ -14,7 +14,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
@@ -88,7 +88,7 @@ public class CatalogMysqlIT extends AbstractIT {
   public String MYSQL_COL_NAME4 = "mysql_col_name4";
   public String MYSQL_COL_NAME5 = "mysql_col_name5";
 
-  private GravitinoMetaLake metalake;
+  private GravitinoMetalake metalake;
 
   protected Catalog catalog;
 
@@ -151,12 +151,12 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

@@ -32,18 +32,18 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
- * as sub-level metadata collections. With {@link GravitinoMetaLake}, users can list, create, load,
+ * as sub-level metadata collections. With {@link GravitinoMetalake}, users can list, create, load,
  * alter and drop a catalog with specified identifier.
  */
-public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
+public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetaLake.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
 
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
 
   private final RESTClient restClient;
 
-  GravitinoMetaLake(
+  GravitinoMetalake(
       String name,
       String comment,
       Map<String, String> properties,
@@ -203,12 +203,12 @@ public class GravitinoMetaLake extends MetalakeDTO implements SupportsCatalogs {
     }
 
     @Override
-    public GravitinoMetaLake build() {
+    public GravitinoMetalake build() {
       Preconditions.checkNotNull(restClient, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new GravitinoMetaLake(name, comment, properties, audit, restClient);
+      return new GravitinoMetalake(name, comment, properties, audit, restClient);
     }
   }
 }

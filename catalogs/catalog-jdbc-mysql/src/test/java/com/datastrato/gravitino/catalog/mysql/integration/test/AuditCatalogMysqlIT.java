@@ -12,7 +12,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
@@ -50,7 +50,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
   private static MysqlService mysqlService;
   private static MySQLContainer<?> MYSQL_CONTAINER;
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
 
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
@@ -162,12 +162,12 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
     metalake = loadMetalake;
   }
