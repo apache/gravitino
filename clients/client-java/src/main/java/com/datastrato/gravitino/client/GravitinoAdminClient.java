@@ -48,10 +48,10 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Retrieves a list of Metalakes from the Gravitino API.
    *
-   * @return An array of GravitinoMetaLake objects representing the Metalakes.
+   * @return An array of GravitinoMetalake objects representing the Metalakes.
    */
   @Override
-  public GravitinoMetaLake[] listMetalakes() {
+  public GravitinoMetalake[] listMetalakes() {
     MetalakeListResponse resp =
         restClient.get(
             API_METALAKES_LIST_PATH,
@@ -62,7 +62,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     return Arrays.stream(resp.getMetalakes())
         .map(o -> DTOConverters.toMetaLake(o, restClient))
-        .toArray(GravitinoMetaLake[]::new);
+        .toArray(GravitinoMetalake[]::new);
   }
 
   /**
@@ -71,12 +71,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param ident The identifier of the new Metalake.
    * @param comment The comment for the new Metalake.
    * @param properties The properties of the new Metalake.
-   * @return A GravitinoMetaLake instance representing the newly created Metalake.
+   * @return A GravitinoMetalake instance representing the newly created Metalake.
    * @throws MetalakeAlreadyExistsException If a Metalake with the specified identifier already
    *     exists.
    */
   @Override
-  public GravitinoMetaLake createMetalake(
+  public GravitinoMetalake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
     NameIdentifier.checkMetalake(ident);
@@ -101,12 +101,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param ident The identifier of the Metalake to be altered.
    * @param changes The changes to be applied to the Metalake.
-   * @return A GravitinoMetaLake instance representing the updated Metalake.
+   * @return A GravitinoMetalake instance representing the updated Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    * @throws IllegalArgumentException If the provided changes are invalid or not applicable.
    */
   @Override
-  public GravitinoMetaLake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
+  public GravitinoMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     NameIdentifier.checkMetalake(ident);
 

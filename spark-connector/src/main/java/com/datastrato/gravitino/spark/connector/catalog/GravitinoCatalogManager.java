@@ -9,7 +9,7 @@ import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -28,7 +28,7 @@ public class GravitinoCatalogManager {
   private volatile boolean isClosed = false;
   private final Cache<String, Catalog> gravitinoCatalogs;
   private final String metalakeName;
-  private final GravitinoMetaLake metalake;
+  private final GravitinoMetalake metalake;
   private final GravitinoAdminClient gravitinoClient;
 
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {

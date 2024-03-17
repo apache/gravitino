@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.trino.connector.catalog;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.base.Preconditions;
@@ -20,7 +20,7 @@ import java.util.Map;
  * connectors.
  */
 public class CatalogConnectorContext {
-  private final GravitinoMetaLake metalake;
+  private final GravitinoMetalake metalake;
 
   // Connector communicates with trino
   private final GravitinoConnector connector;
@@ -32,7 +32,7 @@ public class CatalogConnectorContext {
 
   public CatalogConnectorContext(
       NameIdentifier catalogName,
-      GravitinoMetaLake metalake,
+      GravitinoMetalake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
     this.metalake = metalake;
@@ -42,7 +42,7 @@ public class CatalogConnectorContext {
     this.connector = new GravitinoConnector(catalogName, this);
   }
 
-  public GravitinoMetaLake getMetalake() {
+  public GravitinoMetalake getMetalake() {
     return metalake;
   }
 
@@ -77,7 +77,7 @@ public class CatalogConnectorContext {
   static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
     private NameIdentifier catalogName;
-    private GravitinoMetaLake metalake;
+    private GravitinoMetalake metalake;
     private Connector internalConnector;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
@@ -92,7 +92,7 @@ public class CatalogConnectorContext {
       return connectorAdapter.buildInternalConnectorConfig(catalog);
     }
 
-    Builder withMetalake(GravitinoMetaLake metalake) {
+    Builder withMetalake(GravitinoMetalake metalake) {
       this.metalake = metalake;
       return this;
     }

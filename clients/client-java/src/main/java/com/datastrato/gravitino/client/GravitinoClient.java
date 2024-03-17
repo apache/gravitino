@@ -29,7 +29,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
-  private final GravitinoMetaLake metalake;
+  private final GravitinoMetalake metalake;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -47,10 +47,10 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   /**
    * Get the current metalake object
    *
-   * @return the {@link GravitinoMetaLake} object
+   * @return the {@link GravitinoMetalake} object
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  private GravitinoMetaLake getMetalake() {
+  private GravitinoMetalake getMetalake() {
     return metalake;
   }
 

@@ -13,7 +13,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.GravitinoConfig;
@@ -105,7 +105,7 @@ public class CatalogConnectorManager {
   void loadMetalake() {
     try {
       for (String usedMetalake : usedMetalakes) {
-        GravitinoMetaLake metalake;
+        GravitinoMetalake metalake;
         try {
           metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
         } catch (NoSuchMetalakeException noSuchMetalakeException) {
@@ -126,7 +126,7 @@ public class CatalogConnectorManager {
   }
 
   @VisibleForTesting
-  public void loadCatalogs(GravitinoMetaLake metalake) {
+  public void loadCatalogs(GravitinoMetalake metalake) {
     NameIdentifier[] catalogNames;
     try {
       catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
@@ -220,7 +220,7 @@ public class CatalogConnectorManager {
     }
 
     try {
-      GravitinoMetaLake metalake =
+      GravitinoMetalake metalake =
           gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(catalog.namespace().toString()));
       metalake.createCatalog(
           catalog, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
@@ -245,7 +245,7 @@ public class CatalogConnectorManager {
 
   public void dropCatalog(String metalakeName, String catalogName, boolean ignoreNotExist) {
     try {
-      GravitinoMetaLake metalake =
+      GravitinoMetalake metalake =
           gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
 
       NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);

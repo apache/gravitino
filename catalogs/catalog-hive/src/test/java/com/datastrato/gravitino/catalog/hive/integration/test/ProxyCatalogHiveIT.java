@@ -14,7 +14,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -62,7 +62,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static HiveClientPool hiveClientPool;
 
@@ -286,12 +286,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -320,7 +320,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   private static void loadCatalogWithAnotherClient() {
-    GravitinoMetaLake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    GravitinoMetalake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
     anotherCatalog = metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
   }
 

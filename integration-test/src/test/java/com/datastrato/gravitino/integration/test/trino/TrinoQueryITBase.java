@@ -10,7 +10,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
@@ -52,7 +52,7 @@ public class TrinoQueryITBase {
   protected static TrinoQueryRunner trinoQueryRunner;
 
   protected static final String metalakeName = "test";
-  protected static GravitinoMetaLake metalake;
+  protected static GravitinoMetalake metalake;
 
   private static void setEnv() throws Exception {
     if (autoStart) {
@@ -118,7 +118,7 @@ public class TrinoQueryITBase {
           return;
         }
 
-        GravitinoMetaLake createdMetalake =
+        GravitinoMetalake createdMetalake =
             gravitinoClient.createMetalake(
                 NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
         Assertions.assertNotNull(createdMetalake);

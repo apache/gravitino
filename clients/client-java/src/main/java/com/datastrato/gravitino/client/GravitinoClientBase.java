@@ -50,10 +50,10 @@ public abstract class GravitinoClientBase implements Closeable {
    * Loads a specific Metalake from the Gravitino API.
    *
    * @param ident The identifier of the Metalake to be loaded.
-   * @return A GravitinoMetaLake instance representing the loaded Metalake.
+   * @return A GravitinoMetalake instance representing the loaded Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    */
-  public GravitinoMetaLake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+  public GravitinoMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     NameIdentifier.checkMetalake(ident);
 
     MetalakeResponse resp =

@@ -333,7 +333,7 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertFalse(dropped1);
   }
 
-  static GravitinoMetaLake createMetalake(GravitinoAdminClient client, String metalakeName)
+  static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)
       throws JsonProcessingException {
     MetalakeDTO mockMetalake =
         new MetalakeDTO.Builder()
