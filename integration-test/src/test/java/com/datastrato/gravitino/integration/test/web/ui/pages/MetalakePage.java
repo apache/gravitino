@@ -237,6 +237,8 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyEmptyMetalake() {
     try {
+      // To prevent errors in actions, it is necessary to wait for the completion of frontend delay
+      // animations before proceeding with the next step of operation verification.
       Thread.sleep(sleepTimeMillis);
       String xpath =
           "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
