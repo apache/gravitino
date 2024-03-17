@@ -69,7 +69,7 @@ public class MysqlService {
               "Database %s could not be found in information_schema.SCHEMATA", databaseName);
         }
         String schemaName = resultSet.getString("SCHEMA_NAME");
-        return new JdbcSchema.Builder().withName(schemaName).withAuditInfo(AuditInfo.EMPTY).build();
+        return JdbcSchema.builder().withName(schemaName).withAuditInfo(AuditInfo.EMPTY).build();
       }
     } catch (final SQLException se) {
       throw new RuntimeException(se);

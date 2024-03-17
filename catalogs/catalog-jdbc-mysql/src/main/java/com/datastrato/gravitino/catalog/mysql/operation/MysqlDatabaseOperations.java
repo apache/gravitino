@@ -112,7 +112,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
           properties.put("COLLATE", collationName);
 
           JdbcSchema.Builder builder =
-              new JdbcSchema.Builder()
+              JdbcSchema.builder()
                   .withName(schemaName)
                   .withProperties(properties)
                   .withAuditInfo(AuditInfo.EMPTY);

@@ -957,7 +957,7 @@ public class TestRelationalCatalog extends TestBase {
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(
-            new FunctionArg[] {new FieldReferenceDTO.Builder().withColumnName(columnName).build()})
+            new FunctionArg[] {FieldReferenceDTO.builder().withColumnName(columnName).build()})
         .build();
   }
 
@@ -967,7 +967,7 @@ public class TestRelationalCatalog extends TestBase {
           .withDirection(direction)
           .withNullOrder(direction.defaultNullOrdering())
           .withSortTerm(
-              new FieldReferenceDTO.Builder().withFieldName(new String[] {columnName}).build())
+              FieldReferenceDTO.builder().withFieldName(new String[] {columnName}).build())
           .build()
     };
   }

@@ -383,7 +383,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           "Auto increment is not allowed, type: " + column.dataType());
     }
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
@@ -416,7 +416,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(change.nullable())
@@ -480,7 +480,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
@@ -565,7 +565,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
                 + newColumnName
                 + BACK_QUOTE);
     JdbcColumn newColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(newColumnName)
             .withType(column.dataType())
             .withComment(column.comment())
@@ -631,7 +631,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
     JdbcColumn newColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())

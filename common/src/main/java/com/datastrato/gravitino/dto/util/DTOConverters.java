@@ -346,7 +346,7 @@ public class DTOConverters {
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
-      return new FieldReferenceDTO.Builder()
+      return FieldReferenceDTO.builder()
           .withFieldName(((NamedReference.FieldReference) expression).fieldName())
           .build();
     } else if (expression instanceof FunctionExpression) {

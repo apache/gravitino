@@ -320,7 +320,7 @@ public class DynMethods {
       }
 
       try {
-        this.method = new DynConstructors.Builder().impl(targetClass, argClasses).buildChecked();
+        this.method = DynConstructors.builder().impl(targetClass, argClasses).buildChecked();
       } catch (NoSuchMethodException e) {
         // not the right implementation
       }
@@ -334,7 +334,7 @@ public class DynMethods {
       }
 
       try {
-        this.method = new DynConstructors.Builder().impl(className, argClasses).buildChecked();
+        this.method = DynConstructors.builder().impl(className, argClasses).buildChecked();
       } catch (NoSuchMethodException e) {
         // not the right implementation
       }

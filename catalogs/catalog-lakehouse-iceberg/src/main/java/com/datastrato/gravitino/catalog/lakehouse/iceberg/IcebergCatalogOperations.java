@@ -486,7 +486,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                         column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
                         "Iceberg does not support column default value. Illegal column: "
                             + column.name());
-                    return new IcebergColumn.Builder()
+                    return IcebergColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
                         .withComment(column.comment())
@@ -496,7 +496,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
-          new IcebergTable.Builder()
+          IcebergTable.builder()
               .withName(tableIdent.name())
               .withColumns(icebergColumns)
               .withComment(comment)

@@ -65,6 +65,9 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Build the field reference.
      *
