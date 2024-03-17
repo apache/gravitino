@@ -94,7 +94,7 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
@@ -122,7 +122,7 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.MESSAGING)
@@ -152,7 +152,7 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName(catalogName)
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
@@ -179,7 +179,7 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.MESSAGING)
@@ -239,7 +239,7 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName("mock1")
             .withComment("comment1")
             .withType(Catalog.Type.RELATIONAL)

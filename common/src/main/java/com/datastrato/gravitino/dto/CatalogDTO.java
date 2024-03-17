@@ -108,6 +108,15 @@ public class CatalogDTO implements Catalog {
   }
 
   /**
+   * Creates a new Builder to build a Catalog DTO.
+   *
+   * @return A new Builder instance.
+   */
+  public static CatalogDTO.Builder Builder() {
+
+    return new Builder();
+  }
+  /**
    * Get the properties of the catalog.
    *
    * @return The properties of the catalog.

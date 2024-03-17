@@ -106,7 +106,7 @@ public class TestResponses {
     AuditDTO audit =
         new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName("CatalogA")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)

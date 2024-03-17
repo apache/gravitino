@@ -153,7 +153,7 @@ public class DTOConverters {
    * @return The catalog DTO.
    */
   public static CatalogDTO toDTO(Catalog catalog) {
-    return new CatalogDTO.Builder()
+    return CatalogDTO.Builder()
         .withName(catalog.name())
         .withType(catalog.type())
         .withProvider(catalog.provider())

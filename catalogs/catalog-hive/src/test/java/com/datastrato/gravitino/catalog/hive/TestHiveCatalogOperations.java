@@ -106,4 +106,15 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
     Assertions.assertEquals("v4", op.hiveConf.get("c.d"));
   }
+
+  @Test
+  void testInitializeVerifyKerbosIfNecessary() throws NoSuchFieldException, IllegalAccessException {
+    Map<String, String> maps = Maps.newHashMap();
+    maps.put(CLIENT_POOL_SIZE, "10");
+    maps.put("GSSAPI", "hadoop-user-kerberos");
+    HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
+    hiveCatalogOperations.initialize(maps, null);
+    String v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
+    Assertions.assertEquals("10", v);
+  }
 }

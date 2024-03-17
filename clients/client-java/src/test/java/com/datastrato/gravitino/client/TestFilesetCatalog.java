@@ -59,7 +59,7 @@ public class TestFilesetCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.Builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.FILESET)
             .withProvider(provider)
