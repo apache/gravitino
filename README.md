@@ -14,13 +14,6 @@
 [![Last Committed](https://img.shields.io/github/last-commit/datastrato/gravitino)](https://github.com/datastrato/gravitino/commits/main/)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8358/badge)](https://www.bestpractices.dev/projects/8358)
 
-
-[![License](https://img.shields.io/github/license/datastrato/gravitino)](https://github.com/datastrato/gravitino/blob/main/LICENSE)
-[![Contributors](https://img.shields.io/github/contributors/datastrato/gravitino)](https://github.com/datastrato/gravitino/graphs/contributors)
-[![Release](https://img.shields.io/github/v/release/datastrato/gravitino)](https://github.com/datastrato/gravitino/releases)
-[![Open Issues](https://img.shields.io/github/issues-raw/datastrato/gravitino)](https://github.com/datastrato/gravitino/issues)
-[![Last Committed](https://img.shields.io/github/last-commit/datastrato/gravitino)](https://github.com/datastrato/gravitino/commits/main/)
-
 ## Introduction
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
