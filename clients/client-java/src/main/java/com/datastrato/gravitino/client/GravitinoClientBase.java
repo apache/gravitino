@@ -98,7 +98,7 @@ public abstract class GravitinoClientBase implements Closeable {
   }
 
   /** Builder class for constructing a GravitinoClient. */
-  public static class Builder<T> {
+  public abstract static class Builder<T> {
     /** The base URI for the Gravitino API. */
     protected String uri;
     /** The authentication provider. */
@@ -161,8 +161,6 @@ public abstract class GravitinoClientBase implements Closeable {
      * @throws IllegalArgumentException If the base URI is null or empty.
      * @throws UnsupportedOperationException If subclass has not implemented.
      */
-    public T build() {
-      throw new UnsupportedOperationException();
-    }
+    public abstract T build();
   }
 }

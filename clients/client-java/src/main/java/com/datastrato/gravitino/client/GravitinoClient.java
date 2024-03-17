@@ -29,7 +29,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
-  private final GravitinoMetaLake metaLake;
+  private final GravitinoMetaLake metalake;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -41,7 +41,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    */
   private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
     super(uri, authDataProvider);
-    this.metaLake = loadMetalake(NameIdentifier.of(metalakeName));
+    this.metalake = loadMetalake(NameIdentifier.of(metalakeName));
   }
 
   /**
@@ -50,18 +50,18 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @return the {@link GravitinoMetaLake} object
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  private GravitinoMetaLake getMetaLake() {
-    return metaLake;
+  private GravitinoMetaLake getMetalake() {
+    return metalake;
   }
 
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetaLake().listCatalogs(namespace);
+    return getMetalake().listCatalogs(namespace);
   }
 
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return getMetaLake().loadCatalog(ident);
+    return getMetalake().loadCatalog(ident);
   }
 
   @Override
@@ -72,18 +72,18 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetaLake().createCatalog(ident, type, provider, comment, properties);
+    return getMetalake().createCatalog(ident, type, provider, comment, properties);
   }
 
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return getMetaLake().alterCatalog(ident, changes);
+    return getMetalake().alterCatalog(ident, changes);
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    return getMetaLake().dropCatalog(ident);
+    return getMetalake().dropCatalog(ident);
   }
 
   /**
@@ -101,6 +101,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
     /** The name of the metalake that the client is working on. */
     protected String metalakeName;
+
     /**
      * The private constructor for the Builder class.
      *
