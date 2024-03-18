@@ -51,7 +51,7 @@ public class GravitinoConfig {
     // 'isDynamicConnector' indicates whether the connector is user-configured within Trino or
     // loaded from the Gravitino server.
     // When a connector is loaded via Trino configuration,
-    // it is static and will always create an instance of DummyGravitinoConnector.
+    // it is static and will always create an instance of GravitinoSystemConnector.
     // Otherwise, it is dynamically loaded from the Gravitino server,
     // in which case the connector's configuration is set to '__gravitino.dynamic.connector=true'.
     // It is dynamic and will create an instance of GravitinoConnector.

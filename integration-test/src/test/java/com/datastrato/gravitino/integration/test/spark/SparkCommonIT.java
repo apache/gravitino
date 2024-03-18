@@ -39,7 +39,20 @@ public class SparkCommonIT extends SparkEnvIT {
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
-      ImmutableMap.of(DataTypes.IntegerType, "2", DataTypes.StringType, "'gravitino_it_test'");
+      ImmutableMap.of(
+          DataTypes.IntegerType,
+          "2",
+          DataTypes.StringType,
+          "'gravitino_it_test'",
+          DataTypes.createArrayType(DataTypes.IntegerType),
+          "array(1, 2, 3)",
+          DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+          "map('a', 1)",
+          DataTypes.createStructType(
+              Arrays.asList(
+                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
+          "struct(1, 'a')");
 
   protected String getDefaultDatabase() {
     return "default_db";
@@ -385,6 +398,35 @@ public class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, updateCommentColumns, getTableInfo(tableName));
   }
 
+  @Test
+  void testComplexType() {
+    String tableName = "complex_type_table";
+    dropTableIfExists(tableName);
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: INT, col2: STRING> COMMENT 'struct')",
+            tableName));
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    List<SparkColumnInfo> expectedSparkInfo =
+        Arrays.asList(
+            SparkColumnInfo.of("col1", DataTypes.createArrayType(DataTypes.IntegerType), "array"),
+            SparkColumnInfo.of(
+                "col2",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                "map"),
+            SparkColumnInfo.of(
+                "col3",
+                DataTypes.createStructType(
+                    Arrays.asList(
+                        DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                        DataTypes.createStructField("col2", DataTypes.StringType, true))),
+                "struct"));
+    checkTableColumns(tableName, expectedSparkInfo, tableInfo);
+
+    checkTableReadWrite(tableInfo);
+  }
+
   private void checkTableColumns(
       String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
@@ -404,15 +446,33 @@ public class SparkCommonIT extends SparkEnvIT {
 
     sql(getInsertWithoutPartitionSql(name, insertValues));
 
-    // remove "'" from values, such as 'a' is trans to a
+    // do something to match the query result:
+    // 1. remove "'" from values, such as 'a' is trans to a
+    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
+    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
+    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
     String checkValues =
         table.getColumns().stream()
             .map(columnInfo -> typeConstant.get(columnInfo.getType()))
             .map(Object::toString)
             .map(
                 s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.removeEnd(s, "'");
-                  tmp = org.apache.commons.lang3.StringUtils.removeStart(tmp, "'");
+                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
+                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
+                    return tmp;
+                  } else if (tmp.startsWith("array")) {
+                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
+                  } else if (tmp.startsWith("map")) {
+                    return tmp.replace("map", "")
+                        .replace("(", "{")
+                        .replace(")", "}")
+                        .replace(", ", "=");
+                  } else if (tmp.startsWith("struct")) {
+                    return tmp.replace("struct", "")
+                        .replace("(", "")
+                        .replace(")", "")
+                        .replace(", ", ",");
+                  }
                   return tmp;
                 })
             .collect(Collectors.joining(","));
@@ -422,7 +482,16 @@ public class SparkCommonIT extends SparkEnvIT {
             .map(
                 line ->
                     Arrays.stream(line)
-                        .map(item -> item.toString())
+                        .map(
+                            item -> {
+                              if (item instanceof Object[]) {
+                                return Arrays.stream((Object[]) item)
+                                    .map(Object::toString)
+                                    .collect(Collectors.joining(","));
+                              } else {
+                                return item.toString();
+                              }
+                            })
                         .collect(Collectors.joining(",")))
             .collect(Collectors.toList());
     Assertions.assertTrue(

@@ -174,15 +174,19 @@ public class CatalogConnectorManager {
                 if (!catalogConnectors.containsKey(catalogName)) {
                   Catalog catalog = metalake.loadCatalog(nameIdentifier);
 
-                  GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(catalog);
-                  CatalogConnectorContext catalogConnectorContext =
-                      catalogConnectorFactory.loadCatalogConnector(
-                          nameIdentifier, metalake, gravitinoCatalog);
+                  if (catalog.type() == Catalog.Type.RELATIONAL) {
+                    GravitinoCatalog gravitinoCatalog =
+                        new GravitinoCatalog(metalake.name(), catalog);
+                    CatalogConnectorContext catalogConnectorContext =
+                        catalogConnectorFactory.loadCatalogConnector(metalake, gravitinoCatalog);
 
-                  catalogConnectors.put(catalogName, catalogConnectorContext);
-                  catalogInjector.injectCatalogConnector(catalogName);
-                  LOG.info(
-                      "Load catalog {} in metalake {} successfully.", catalogName, metalake.name());
+                    catalogConnectors.put(catalogName, catalogConnectorContext);
+                    catalogInjector.injectCatalogConnector(catalogName);
+                    LOG.info(
+                        "Load catalog {} in metalake {} successfully.",
+                        catalogName,
+                        metalake.name());
+                  }
                 }
               } catch (Exception e) {
                 LOG.error(
@@ -195,8 +199,8 @@ public class CatalogConnectorManager {
     return catalogConnectors.get(catalogName);
   }
 
-  public List<String> getCatalogs() {
-    return Arrays.asList(catalogConnectors.keySet().toArray(new String[catalogConnectors.size()]));
+  public List<GravitinoCatalog> getCatalogs() {
+    return catalogConnectors.values().stream().map(CatalogConnectorContext::getCatalog).toList();
   }
 
   public void shutdown() {
