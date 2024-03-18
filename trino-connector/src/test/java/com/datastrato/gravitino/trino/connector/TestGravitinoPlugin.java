@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.connector.ConnectorFactory;
@@ -12,7 +12,7 @@ import io.trino.spi.connector.ConnectorFactory;
 public class TestGravitinoPlugin extends GravitinoPlugin {
   private TestGravitinoConnectorFactory factory;
 
-  private GravitinoClient gravitinoClient;
+  private GravitinoAdminClient gravitinoClient;
 
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
@@ -21,7 +21,7 @@ public class TestGravitinoPlugin extends GravitinoPlugin {
     return ImmutableList.of(factory);
   }
 
-  public void setGravitinoClient(GravitinoClient client) {
+  public void setGravitinoClient(GravitinoAdminClient client) {
     this.gravitinoClient = client;
   }
 

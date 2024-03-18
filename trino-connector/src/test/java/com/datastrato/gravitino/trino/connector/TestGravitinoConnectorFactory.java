@@ -4,18 +4,18 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import java.util.function.Supplier;
 
 public class TestGravitinoConnectorFactory extends GravitinoConnectorFactory {
-  private GravitinoClient gravitinoClient;
+  private GravitinoAdminClient gravitinoClient;
 
-  public void setGravitinoClient(GravitinoClient client) {
+  public void setGravitinoClient(GravitinoAdminClient client) {
     this.gravitinoClient = client;
   }
 
   @Override
-  Supplier<GravitinoClient> clientProvider() {
+  Supplier<GravitinoAdminClient> clientProvider() {
     return () -> gravitinoClient;
   }
 }

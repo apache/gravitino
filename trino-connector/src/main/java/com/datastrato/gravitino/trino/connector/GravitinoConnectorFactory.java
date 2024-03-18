@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
 
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -102,7 +102,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   @VisibleForTesting
-  Supplier<GravitinoClient> clientProvider() {
+  Supplier<GravitinoAdminClient> clientProvider() {
     return () -> null;
   }
 }
