@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static com.datastrato.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
-import static com.datastrato.gravitino.catalog.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
+import static com.datastrato.gravitino.connector.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;

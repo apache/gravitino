@@ -14,7 +14,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -83,7 +83,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   public String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
   private final String provider = "jdbc-postgresql";
 
-  private GravitinoMetaLake metalake;
+  private GravitinoMetalake metalake;
 
   private Catalog catalog;
 
@@ -140,12 +140,12 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

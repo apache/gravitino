@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import lombok.ToString;
 
 /** Represents a Jdbc Schema (Database) entity in the Jdbc schema. */

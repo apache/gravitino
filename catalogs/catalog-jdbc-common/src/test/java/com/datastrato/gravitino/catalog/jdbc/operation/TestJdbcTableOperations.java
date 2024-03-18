@@ -12,7 +12,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueC
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import com.datastrato.gravitino.connector.BaseColumn;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
