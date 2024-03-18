@@ -466,7 +466,11 @@ public class SparkIT extends SparkEnvIT {
 
     sql(getInsertWithoutPartitionSql(name, insertValues));
 
-    // remove "'" from values, such as 'a' is trans to a
+    // do something to match the query result:
+    // 1. remove "'" from values, such as 'a' is trans to a
+    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
+    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
+    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
     String checkValues =
         table.getColumns().stream()
             .map(columnInfo -> typeConstant.get(columnInfo.getType()))
