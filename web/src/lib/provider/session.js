@@ -49,7 +49,7 @@ const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
       const { authType } = resAuthConfigs.payload
-      
+
       if (authType === 'simple') {
         dispatch(initialVersion())
         goToMetalakeListPage()
