@@ -590,6 +590,23 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
+  @Test
+  void testTableOptions() {
+    String tableName = "options_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += " OPTIONS('a'='b')";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(ImmutableMap.of("a", "b"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
   protected void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     boolean isPartitionTable = table.isPartitionTable();
@@ -686,5 +703,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return table.getPartitionedColumns().stream()
         .map(column -> column.getName() + "=" + typeConstant.get(column.getType()))
         .collect(Collectors.joining(delimiter));
+  }
+
+  protected void checkParquetFile(SparkTableInfo tableInfo) {
+    String location = tableInfo.getTableLocation();
+    Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
   }
 }

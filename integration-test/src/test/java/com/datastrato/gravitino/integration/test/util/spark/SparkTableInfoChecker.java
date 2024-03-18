@@ -9,6 +9,7 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.Spark
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
@@ -34,6 +35,7 @@ public class SparkTableInfoChecker {
     PARTITION,
     BUCKET,
     COMMENT,
+    TABLE_PROPERTY,
   }
 
   public SparkTableInfoChecker withName(String name) {
@@ -82,6 +84,12 @@ public class SparkTableInfoChecker {
     return this;
   }
 
+  public SparkTableInfoChecker withTableProperties(Map<String, String> properties) {
+    this.expectedTableInfo.setTableProperties(properties);
+    this.checkFields.add(CheckField.TABLE_PROPERTY);
+    return this;
+  }
+
   public void check(SparkTableInfo realTableInfo) {
     checkFields.stream()
         .forEach(
@@ -105,6 +113,17 @@ public class SparkTableInfoChecker {
                 case COMMENT:
                   Assertions.assertEquals(
                       expectedTableInfo.getComment(), realTableInfo.getComment());
+                  break;
+                case TABLE_PROPERTY:
+                  Map<String, String> realTableProperties = realTableInfo.getTableProperties();
+                  expectedTableInfo
+                      .getTableProperties()
+                      .forEach(
+                          (k, v) -> {
+                            Assertions.assertTrue(
+                                realTableProperties.containsKey(k), k + " not exits");
+                            Assertions.assertEquals(v, realTableProperties.get(k));
+                          });
                   break;
                 default:
                   Assertions.fail(checkField + " not checked");

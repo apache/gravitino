@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.hive.HivePropertyConstants;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +44,10 @@ public class SparkTableInfo {
     return tableName;
   }
 
+  public String getTableLocation() {
+    return tableProperties.get(HivePropertyConstants.GRAVITINO_HIVE_LOCATION);
+  }
+
   // Include database name and table name
   public String getTableIdentifier() {
     if (StringUtils.isNotBlank(database)) {
@@ -50,10 +55,6 @@ public class SparkTableInfo {
     } else {
       return tableName;
     }
-  }
-
-  public String getTableLocation() {
-    return tableProperties.get(ConnectorConstants.LOCATION);
   }
 
   public boolean isPartitionTable() {
