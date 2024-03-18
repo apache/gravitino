@@ -79,6 +79,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         tableComment,
         properties,
         null,
+        null,
         Indexes.EMPTY_INDEXES);
 
     // list table
@@ -304,6 +305,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         tableComment,
         Collections.emptyMap(),
         null,
+        null,
         Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
@@ -358,6 +360,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         null,
         null,
         null,
+        null,
         Indexes.EMPTY_INDEXES);
 
     List<String> tableNames = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -383,6 +386,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
               .withNullable(true)
               .build()
         },
+        null,
         null,
         null,
         null,
@@ -437,6 +441,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         tableComment,
         properties,
         null,
+        null,
         Indexes.EMPTY_INDEXES);
 
     // list table
@@ -477,6 +482,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
                   jdbcColumns,
                   tableComment,
                   properties,
+                  null,
                   null,
                   Indexes.EMPTY_INDEXES);
             });
@@ -536,6 +542,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         tableComment,
         properties,
         null,
+        null,
         indexes);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
@@ -560,6 +567,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
                   jdbcColumns,
                   tableComment,
                   properties,
+                  null,
                   null,
                   primaryIndex);
             });
