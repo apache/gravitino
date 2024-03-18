@@ -28,6 +28,7 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
     this.metalake = metalake;
   }
 
+  @Override
   public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
     // call gravitino.system.create_catalog(catalog, provider, properties, ignore_exist)
     MethodHandle createCatalog =

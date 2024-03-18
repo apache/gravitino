@@ -42,7 +42,7 @@ public class CatalogConnectorFactory {
   }
 
   public CatalogConnectorContext loadCatalogConnector(
-      GravitinoCatalog catalog, GravitinoMetalake metalake) {
+      GravitinoMetalake metalake, GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
     if (builder == null) {

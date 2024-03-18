@@ -34,7 +34,7 @@ public class GravitinoStoredProcedureFactory {
   private void registerStoredProcedure() {
     procedures.add(new CreateCatalogStoredProcedure(catalogConnectorManager, metalake));
     procedures.add(new DropCatalogStoredProcedure(catalogConnectorManager, metalake));
-    procedures.add(new AlterCatalogPropertiesStoredProcedure(catalogConnectorManager, metalake));
+    procedures.add(new AlterCatalogStoredProcedure(catalogConnectorManager, metalake));
   }
 
   public Set<Procedure> getStoredProcedures() {

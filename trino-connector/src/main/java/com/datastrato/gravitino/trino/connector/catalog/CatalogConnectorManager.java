@@ -195,7 +195,7 @@ public class CatalogConnectorManager {
     catalogConnectors.remove(catalog.getFullName());
 
     CatalogConnectorContext catalogConnectorContext =
-        catalogConnectorFactory.loadCatalogConnector(catalog, metalake);
+        catalogConnectorFactory.loadCatalogConnector(metalake, catalog);
 
     catalogConnectors.put(catalogFullName, catalogConnectorContext);
     catalogInjector.injectCatalogConnector(catalogFullName);
@@ -204,7 +204,7 @@ public class CatalogConnectorManager {
 
   private void loadCatalog(GravitinoMetalake metalake, GravitinoCatalog catalog) {
     CatalogConnectorContext catalogConnectorContext =
-        catalogConnectorFactory.loadCatalogConnector(catalog, metalake);
+        catalogConnectorFactory.loadCatalogConnector(metalake, catalog);
 
     catalogConnectors.put(catalog.getFullName(), catalogConnectorContext);
     catalogInjector.injectCatalogConnector(catalog.getFullName());

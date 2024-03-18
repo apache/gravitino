@@ -19,24 +19,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class AlterCatalogPropertiesStoredProcedure extends GravitinoStoredProcedure {
+public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
 
-  public AlterCatalogPropertiesStoredProcedure(
+  public AlterCatalogStoredProcedure(
       CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
     this.metalake = metalake;
   }
 
+  @Override
   public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
     // call gravitino.system.alter_catalog(catalogName, set_properties, remove_properties
 
     MethodHandle dropCatalog =
         MethodHandles.lookup()
             .unreflect(
-                AlterCatalogPropertiesStoredProcedure.class.getMethod(
+                AlterCatalogStoredProcedure.class.getMethod(
                     "alterCatalog", String.class, Map.class, List.class))
             .bindTo(this);
     List<Procedure.Argument> arguments =

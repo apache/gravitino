@@ -25,6 +25,7 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
     this.metalake = metalake;
   }
 
+  @Override
   public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
     // call gravitino.system.drop_catalog(catalog, ignore_not_exist)
     MethodHandle dropCatalog =
