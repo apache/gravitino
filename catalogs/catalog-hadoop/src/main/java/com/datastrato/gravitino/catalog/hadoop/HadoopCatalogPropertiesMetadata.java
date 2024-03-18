@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 

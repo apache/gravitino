@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.catalog.kafka;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import java.util.Map;

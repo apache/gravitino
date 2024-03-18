@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;

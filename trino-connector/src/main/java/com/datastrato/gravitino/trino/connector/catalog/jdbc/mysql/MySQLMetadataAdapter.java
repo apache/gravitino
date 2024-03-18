@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;

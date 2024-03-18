@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;

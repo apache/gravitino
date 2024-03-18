@@ -15,7 +15,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -96,7 +96,7 @@ public class CatalogIcebergIT extends AbstractIT {
   private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
 
   private static Catalog catalog;
 
@@ -160,12 +160,12 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

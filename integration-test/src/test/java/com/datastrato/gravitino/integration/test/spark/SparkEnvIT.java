@@ -7,7 +7,7 @@ package com.datastrato.gravitino.integration.test.spark;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
@@ -62,7 +62,7 @@ public class SparkEnvIT extends SparkUtilIT {
 
   private void initMetalakeAndCatalogs() {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
 

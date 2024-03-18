@@ -11,7 +11,7 @@ import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PRE
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
-  protected static GravitinoClient client;
+  protected static GravitinoAdminClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
 
@@ -133,23 +133,23 @@ public class AbstractIT {
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
-      client = GravitinoClient.builder(uri).withOAuth(mockDataProvider).build();
+      client = GravitinoAdminClient.builder(uri).withOAuth(mockDataProvider).build();
     } else if (AuthenticatorType.SIMPLE
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
-      client = GravitinoClient.builder(uri).withSimpleAuth().build();
+      client = GravitinoAdminClient.builder(uri).withSimpleAuth().build();
     } else if (AuthenticatorType.KERBEROS
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       uri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client =
-          GravitinoClient.builder(uri)
+          GravitinoAdminClient.builder(uri)
               .withKerberosAuth(KerberosProviderHelper.getProvider())
               .build();
     } else {
-      client = GravitinoClient.builder(uri).build();
+      client = GravitinoAdminClient.builder(uri).build();
     }
   }
 
@@ -168,7 +168,7 @@ public class AbstractIT {
     LOG.info("Tearing down Gravitino Server");
   }
 
-  public static GravitinoClient getGravitinoClient() {
+  public static GravitinoAdminClient getGravitinoClient() {
     return client;
   }
 
