@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
 package com.datastrato.gravitino.storage;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
