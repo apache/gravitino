@@ -53,16 +53,6 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     return metalake;
   }
 
-  /**
-   * Creates a new builder for constructing a GravitinoClient.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @return A new instance of the Builder class for constructing a GravitinoClient.
-   */
-  public static ClientBuilder builder(String uri) {
-    return new ClientBuilder(uri);
-  }
-
   @Override
   public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
     return getMetalake().listCatalogs();
@@ -98,6 +88,16 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   @Override
   public boolean dropCatalog(String catalogName) {
     return getMetalake().dropCatalog(catalogName);
+  }
+
+  /**
+   * Creates a new builder for constructing a GravitinoClient.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @return A new instance of the Builder class for constructing a GravitinoClient.
+   */
+  public static ClientBuilder builder(String uri) {
+    return new ClientBuilder(uri);
   }
 
   /** Builder class for constructing a GravitinoClient. */
