@@ -484,7 +484,10 @@ public class SparkIT extends SparkEnvIT {
                         .replace(")", "}")
                         .replace(", ", "=");
                   } else if (tmp.startsWith("struct")) {
-                    return tmp.replace("struct", "").replace("(", "").replace(")", "");
+                    return tmp.replace("struct", "")
+                        .replace("(", "")
+                        .replace(")", "")
+                        .replace(", ", ",");
                   }
                   return tmp;
                 })
