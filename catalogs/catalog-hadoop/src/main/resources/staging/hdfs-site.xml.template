@@ -1,0 +1,509 @@
+<!--
+  ~ Copyright 2024 Datastrato Pvt Ltd.
+  ~ This software is licensed under the Apache License version 2.
+  -->
+<configuration>
+  <property>
+    <name>configuration.service</name>
+    <value>org.apache.hadoop.fs.NameServiceConfigurationService</value>
+  </property>
+
+  <property>
+    <name>configuration.service.name.team.id</name>
+    <value>CL7202</value>
+  </property>
+
+  <property>
+    <name>dfs.balancer.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.balancer.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.block.access.token.enable</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.block.local-path-access.user</name>
+    <value>work, hbase, hbase_srv, hbase_tst, hbase_prc, impala, sql_prc</value>
+  </property>
+
+  <property>
+    <name>dfs.block.size</name>
+    <value>128m</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.availability.quick-detect.interval</name>
+    <value>5000</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.availability.testfile</name>
+    <value>hdfs_canary/.file_for_availability_test</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.availability.testfile.data-size</name>
+    <value>1024</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.failover.max.retries</name>
+    <value>3</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.read.timeout</name>
+    <value>5000</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.retry.interval</name>
+    <value>500</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.rpc.max.retries</name>
+    <value>3</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.rpc.timeout</name>
+    <value>1000</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.sink.class</name>
+    <value>com.xiaomi.infra.hadoop.FalconSink</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.testfile.data-size</name>
+    <value>4194304</value>
+  </property>
+
+  <property>
+    <name>dfs.canary.testfile.path.base</name>
+    <value>/hdfs_canary/.health_monitoring_canary_</value>
+  </property>
+
+  <property>
+    <name>dfs.client.failover.proxy.provider.tjwqstaging-hdd</name>
+    <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+  </property>
+
+  <property>
+    <name>dfs.client.read.shortcircuit</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.client.read.shortcircuit.skip.auth</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.client.slow.log.threshold.ms</name>
+    <value>10000</value>
+  </property>
+
+  <property>
+    <name>dfs.cluster.administrators</name>
+    <value>hdfs_tst_admin</value>
+  </property>
+
+  <property>
+    <name>dfs.content-summary.limit</name>
+    <value>10000</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.address</name>
+    <value>0.0.0.0:12402</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.balance.bandwidthPerSec</name>
+    <value>10485760</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>/home/work/hdd1/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd2/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd3/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd4/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd5/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd6/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd7/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd8/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd9/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd10/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd11/hdfs/tjwqstaging-hdd/datanode,/home/work/hdd12/hdfs/tjwqstaging-hdd/datanode</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.data.dir.perm</name>
+    <value>700</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.failed.volumes.tolerated</name>
+    <value>0</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.http.address</name>
+    <value>0.0.0.0:12401</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.ipc.address</name>
+    <value>0.0.0.0:12400</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.max.xcievers</name>
+    <value>4096</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.scan.period.hours</name>
+    <value>-1</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.sync.behind.writes</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.synconclose</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.domain.socket.path</name>
+    <value>/home/work/app/hdfs/tjwqstaging-hdd/datanode/dn_socket</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.automatic-failover.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.fencing.methods</name>
+    <value>sshfence&#xA;shell(/bin/true)</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.fencing.ssh.connect-timeout</name>
+    <value>2000</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.fencing.ssh.private-key-files</name>
+    <value>/home/work/.ssh/id_rsa</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.namenodes.tjwqstaging-hdd</name>
+    <value>host0</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.zkfc.port</name>
+    <value>12300</value>
+  </property>
+
+  <property>
+    <name>dfs.hosts.exclude</name>
+    <value>/home/work/app/hdfs/tjwqstaging-hdd/namenode/excludes</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.edits.dir</name>
+    <value>/home/work/hdd/hdfs/tjwqstaging-hdd/journalnode</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.http-address</name>
+    <value>0.0.0.0:12101</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.kerberos.internal.spnego.principal</name>
+    <value>HTTP/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.journalnode.rpc-address</name>
+    <value>0.0.0.0:12100</value>
+  </property>
+
+  <property>
+    <name>dfs.metrics.percentiles.intervals</name>
+    <value>60,300,900</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.acls.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.avoid.read.stale.datanode</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.avoid.write.stale.datanode</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.handler.count</name>
+    <value>64</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.rpc-address.tjwqstaging-hdd.host0</name>
+    <value>tjwqstaging-hdd.router.hadoop.srv:12500</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.kerberos.internal.spnego.principal</name>
+    <value>HTTP/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>/home/work/hdd/hdfs/tjwqstaging-hdd/namenode</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.replication.min</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.safemode.threshold-pct</name>
+    <value>0.99f</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.shared.edits.dir</name>
+    <value>qjournal://tj-hadoop-staging-zk01.kscn:12100;tj-hadoop-staging-zk02.kscn:12100;tj-hadoop-staging-zk03.kscn:12100;tj-hadoop-staging-zk04.kscn:12100;tj-hadoop-staging-zk05.kscn:12100/tjwqstaging-hdd</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.upgrade.permission</name>
+    <value>0777</value>
+  </property>
+
+  <property>
+    <name>dfs.permissions</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.permissions.superuser</name>
+    <value>hdfs_tst_admin</value>
+  </property>
+
+  <property>
+    <name>dfs.permissions.superusergroup</name>
+    <value>supergroup</value>
+  </property>
+
+  <property>
+    <name>dfs.secondary.namenode.kerberos.internal.spnego.principal</name>
+    <value>HTTP/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.secondary.namenode.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.secondary.namenode.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.ttlmanager.kerberos.internal.spnego.principal</name>
+    <value>HTTP/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.ttlmanager.kerberos.principal</name>
+    <value>hdfs_tst/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.ttlmanager.keytab.file</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.web.authentication.kerberos.keytab</name>
+    <value>/etc/hadoop/conf/hdfs_tst.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.web.authentication.kerberos.principal</name>
+    <value>HTTP/hadoop@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+    <name>dfs.web.ugi</name>
+    <value>hdfs,supergroup</value>
+  </property>
+
+  <property>
+    <name>fs.permissions.umask-mode</name>
+    <value>022</value>
+  </property>
+
+  <property>
+    <name>fs.trash.checkpoint.interval</name>
+    <value>1440</value>
+  </property>
+
+  <property>
+    <name>fs.trash.interval</name>
+    <value>10080</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.group.mapping</name>
+    <value>org.apache.hadoop.security.ConfigurationBasedGroupsMapping</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.group.mapping.file.name</name>
+    <value>/home/work/app/hdfs/tjwqstaging-hdd/namenode/hadoop-groups.conf</value>
+  </property>
+
+  <property>
+    <name>ignore.secure.ports.for.testing</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>net.topology.node.switch.mapping.impl</name>
+    <value>org.apache.hadoop.net.TableMapping</value>
+  </property>
+
+  <property>
+    <name>net.topology.table.file.name</name>
+    <value>/home/work/app/hdfs/tjwqstaging-hdd/namenode/rackinfo.txt</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.FederatedHdfs</value>
+  </property>
+
+  <property>
+    <name>fs.hdfs.impl</name>
+    <value>org.apache.hadoop.hdfs.FederatedDFSFileSystem</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.tjwqstaging-hdd.link./</name>
+    <value>hdfs://tjwqstaging-hdd-0/</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.tjwqstaging-hdd.link./tmp</name>
+    <value>hdfs://tjwqstaging-hdd-1/tmp</value>
+  </property>
+
+  <property>
+    <name>dfs.client.failover.proxy.provider.tjwqstaging-hdd-0</name>
+    <value>org.apache.hadoop.hdfs.server.namenode.ha.ZkConfiguredFailoverProxyProvider</value>
+  </property>
+
+  <property>
+    <name>dfs.client.failover.proxy.provider.tjwqstaging-hdd-1</name>
+    <value>org.apache.hadoop.hdfs.server.namenode.ha.ZkConfiguredFailoverProxyProvider</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.namenodes.tjwqstaging-hdd-0</name>
+    <value>host0,host1</value>
+  </property>
+
+  <property>
+    <name>dfs.ha.namenodes.tjwqstaging-hdd-1</name>
+    <value>host0,host1</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.rpc-address.tjwqstaging-hdd-0.host0</name>
+    <value>tj-hadoop-staging-zk02.kscn:12200</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.rpc-address.tjwqstaging-hdd-0.host1</name>
+    <value>tj-hadoop-staging-zk03.kscn:12200</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.rpc-address.tjwqstaging-hdd-1.host0</name>
+    <value>tj-hadoop-staging-zk04.kscn:12210</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.rpc-address.tjwqstaging-hdd-1.host1</name>
+    <value>tj-hadoop-staging-zk05.kscn:12210</value>
+  </property>
+
+  <property>
+    <name>dfs.nameservices</name>
+    <value>tjwqstaging-hdd-0,tjwqstaging-hdd-1,tjwqstaging-hdd</value>
+  </property>
+
+  <property>
+    <name>dfs.federation.client.is-router-fs.tjwqstaging-hdd</name>
+    <value>true</value>
+  </property>
+</configuration>

@@ -1,0 +1,103 @@
+<!--
+  ~ Copyright 2024 Datastrato Pvt Ltd.
+  ~ This software is licensed under the Apache License version 2.
+  -->
+<configuration>
+
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://tjwqstaging-hdd</value>
+  </property>
+
+  <property>
+    <name>ha.zookeeper.quorum</name>
+    <value>tj-hadoop-staging-zk01.kscn:11000,tj-hadoop-staging-zk02.kscn:11000,tj-hadoop-staging-zk03.kscn:11000,tj-hadoop-staging-zk04.kscn:11000,tj-hadoop-staging-zk05.kscn:11000</value>
+  </property>
+
+  <property>
+    <name>hadoop.http.staticuser.user</name>
+    <value>hdfs</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hue.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hue.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.authentication</name>
+    <value>kerberos</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.authorization</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.use-weak-http-crypto</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop</value>
+  </property>
+
+  <property>
+    <name>hue.kerberos.principal.shortname</name>
+    <value>hue</value>
+  </property>
+
+  <property>
+    <name>io.file.buffer.size</name>
+    <value>131072</value>
+  </property>
+
+  <property>
+    <name>ipc.client.connect.max.retries</name>
+    <value>5</value>
+  </property>
+
+  <property>
+    <name>ipc.client.connect.max.retries.on.timeouts</name>
+    <value>5</value>
+  </property>
+
+  <property>
+    <name>ipc.client.connect.timeout</name>
+    <value>5000</value>
+  </property>
+
+  <property>
+    <name>ipc.client.ping</name>
+    <value>false</value>
+  </property>
+
+  <property>
+      <name>hadoop.client.kerberos.principal</name>
+      <value>h_data_platform@XIAOMI.HADOOP</value>
+  </property>
+
+  <property>
+      <name>hadoop.client.keytab.file</name>
+      <value>/etc/hadoop/conf/h_data_platform.keytab</value>
+  </property>
+
+  <property>
+    <name>fs.AbstractFileSystem.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.FederatedHdfs</value>
+  </property>
+
+  <property>
+    <name>fs.hdfs.impl</name>
+    <value>org.apache.hadoop.hdfs.FederatedDFSFileSystem</value>
+  </property>
+
+</configuration>
+

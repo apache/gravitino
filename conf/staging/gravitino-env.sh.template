@@ -1,0 +1,13 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+# Debug Gravitino server
+# export GRAVITINO_DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8000 -Dlog4j2.debug=true"
+
+# export JAVA_HOME
+# export GRAVITINO_HOME
+# export GRAVITINO_CONF_DIR
+# export GRAVITINO_LOG_DIR     # Where log files are stored.  PWD by default.
+# export GRAVITINO_MEM         # Gravitino jvm mem options Default -Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m

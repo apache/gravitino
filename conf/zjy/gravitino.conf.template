@@ -1,0 +1,53 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+# THE CONFIGURATION FOR Gravitino SERVER
+gravitino.server.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR Gravitino WEB SERVER
+# The host name of the built-in web server
+gravitino.server.webserver.host = 0.0.0.0
+# The http port number of the built-in web server
+gravitino.server.webserver.httpPort = 8090
+# The min thread size of the built-in web server
+gravitino.server.webserver.minThreads = 24
+# The max thread size of the built-in web server
+gravitino.server.webserver.maxThreads = 200
+# The stop timeout of the built-in web server
+gravitino.server.webserver.stopTimeout = 30000
+# The timeout of idle connections
+gravitino.server.webserver.idleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+gravitino.server.webserver.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+gravitino.server.webserver.requestHeaderSize = 131072
+# The response header size of the built-in web server
+gravitino.server.webserver.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR Gravitino ENTITY STORE
+# The entity store to use, kv or relational
+gravitino.entity.store = kv
+
+# The RocksDB entity store
+gravitino.entity.store.kv = RocksDBKvBackend
+# The storage path for RocksDB storage implementation, it supports both absolute and relative path,
+# If the value is a relative path, the final path is "${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}", default value
+# is "${GRAVITINO_HOME}/data/rocksdb", please uncomment and change it in your production environment.
+# gravitino.entity.store.kv.rocksdbPath = data/rocksdb
+
+# THE CONFIGURATION FOR Gravitino CATALOG
+# The interval in milliseconds to evict the catalog cache
+gravitino.catalog.cache.evictionIntervalMs = 3600000
+
+# THE CONFIGURATION FOR AUXILIARY SERVICE
+# Auxiliary service names, separate by ','
+gravitino.auxService.names = iceberg-rest
+# Iceberg REST service classpath
+gravitino.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
+# Iceberg REST service host
+gravitino.auxService.iceberg-rest.host = 0.0.0.0
+# Iceberg REST service http port
+gravitino.auxService.iceberg-rest.httpPort = 9001
+

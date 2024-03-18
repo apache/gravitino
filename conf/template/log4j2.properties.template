@@ -1,0 +1,37 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+status = warn
+
+# Log files location
+property.basePath = ${sys:gravitino.log.path}
+
+# RollingFileAppender name, pattern, path and rollover policy
+appender.rolling.type = RollingFile
+appender.rolling.name = fileLogger
+appender.rolling.fileName = ${basePath}/gravitino-server.log
+appender.rolling.filePattern = ${basePath}/gravitino-server_%d{yyyyMMdd}.log.gz
+appender.rolling.layout.type = PatternLayout
+appender.rolling.layout.pattern = %d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n
+appender.rolling.policies.type = Policies
+
+# RollingFileAppender rotation policy
+appender.rolling.policies.size.type = SizeBasedTriggeringPolicy
+appender.rolling.policies.size.size = 10MB
+appender.rolling.policies.time.type = TimeBasedTriggeringPolicy
+appender.rolling.policies.time.interval = 1
+appender.rolling.policies.time.modulate = true
+appender.rolling.strategy.type = DefaultRolloverStrategy
+appender.rolling.strategy.delete.type = Delete
+appender.rolling.strategy.delete.basePath = ${basePath}
+appender.rolling.strategy.delete.maxDepth = 10
+appender.rolling.strategy.delete.ifLastModified.type = IfLastModified
+
+# Delete all files older than 30 days
+appender.rolling.strategy.delete.ifLastModified.age = 30d
+
+# Configure root logger
+rootLogger.level = info
+rootLogger.appenderRef.rolling.ref = fileLogger
