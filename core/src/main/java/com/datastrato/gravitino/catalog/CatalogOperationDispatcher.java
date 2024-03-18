@@ -166,7 +166,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
             NoSuchSchemaException.class);
 
     SchemaEntity schemaEntity =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -311,7 +311,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
                     SchemaEntity.class,
                     SCHEMA,
                     schemaEntity ->
-                        new SchemaEntity.Builder()
+                        SchemaEntity.builder()
                             .withId(schemaEntity.id())
                             .withName(schemaEntity.name())
                             .withNamespace(ident.namespace())
@@ -486,7 +486,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
             NoSuchTableException.class);
 
     TableEntity tableEntity =
-        new TableEntity.Builder()
+        TableEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -573,7 +573,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
                               .reduce((c1, c2) -> c2)
                               .orElse(tableEntity.name());
 
-                      return new TableEntity.Builder()
+                      return TableEntity.builder()
                           .withId(tableEntity.id())
                           .withName(newName)
                           .withNamespace(ident.namespace())

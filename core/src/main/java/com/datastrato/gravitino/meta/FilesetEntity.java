@@ -182,7 +182,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
     private final FilesetEntity fileset;
 
-    public Builder() {
+    private Builder() {
       fileset = new FilesetEntity();
     }
 
@@ -285,5 +285,14 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
       fileset.validate();
       return fileset;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

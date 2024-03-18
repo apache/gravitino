@@ -109,7 +109,7 @@ public class HiveTable extends BaseTable {
                 sd.getCols().stream()
                     .map(
                         f ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(f.getName())
                                 .withType(FromHiveType.convert(f.getType()))
                                 .withComment(f.getComment())
@@ -117,14 +117,14 @@ public class HiveTable extends BaseTable {
                 table.getPartitionKeys().stream()
                     .map(
                         p ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(p.getName())
                                 .withType(FromHiveType.convert(p.getType()))
                                 .withComment(p.getComment())
                                 .build()))
             .toArray(Column[]::new);
 
-    return new HiveTable.Builder()
+    return HiveTable.builder()
         .withName(table.getTableName())
         .withComment(table.getParameters().get(COMMENT))
         .withProperties(buildTableProperties(table))
@@ -359,6 +359,9 @@ public class HiveTable extends BaseTable {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Internal method to build a HiveTable instance using the provided values.
      *
@@ -387,5 +390,14 @@ public class HiveTable extends BaseTable {
 
       return hiveTable;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

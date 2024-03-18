@@ -77,7 +77,7 @@ public class SortOrderDTO implements SortOrder {
     private NullOrdering nullOrdering;
 
     /** Default constructor. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Set the sort term.
@@ -127,5 +127,10 @@ public class SortOrderDTO implements SortOrder {
       Preconditions.checkNotNull(this.sortTerm, "expression cannot be null");
       return new SortOrderDTO(sortTerm, direction, nullOrdering);
     }
+  }
+
+  /** @return the builder for creating a new instance of SortOrderDTO. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

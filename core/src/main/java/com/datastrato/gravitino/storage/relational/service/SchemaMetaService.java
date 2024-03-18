@@ -94,7 +94,7 @@ public class SchemaMetaService {
     try {
       NameIdentifier.checkSchema(schemaEntity.nameIdentifier());
 
-      SchemaPO.Builder builder = new SchemaPO.Builder();
+      SchemaPO.Builder builder = SchemaPO.builder();
       fillSchemaPOBuilderParentEntityId(builder, schemaEntity.namespace());
 
       SessionUtils.doWithCommit(

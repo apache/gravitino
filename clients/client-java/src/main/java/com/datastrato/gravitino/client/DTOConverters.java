@@ -24,7 +24,7 @@ class DTOConverters {
   private DTOConverters() {}
 
   static GravitinoMetalake toMetaLake(MetalakeDTO metalake, RESTClient client) {
-    return new GravitinoMetalake.Builder()
+    return GravitinoMetalake.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -57,6 +57,8 @@ class DTOConverters {
     }
   }
 
+
+  @SuppressWarnings("unchecked")
   static Catalog toCatalog(String metalake, CatalogDTO catalog, RESTClient client) {
     Namespace namespace = Namespace.ofCatalog(metalake);
     switch (catalog.type()) {

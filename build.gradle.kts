@@ -338,6 +338,7 @@ subprojects {
         "SelfComparison",
         "SelfEquals",
         "SizeGreaterThanOrEqualsZero",
+        "StaticGuardedByInstance",
         "StreamToString",
         "StringBuilderInitWithChar",
         "SubstringOfZero",
