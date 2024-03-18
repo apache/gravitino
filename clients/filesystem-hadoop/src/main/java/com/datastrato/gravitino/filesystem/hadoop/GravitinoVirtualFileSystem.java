@@ -7,7 +7,7 @@ package com.datastrato.gravitino.filesystem.hadoop;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
 import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
@@ -43,7 +43,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Path workingDirectory;
   private URI uri;
   private GravitinoClient client;
-  private GravitinoMetaLake metalake;
+  private GravitinoMetalake metalake;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
   private Cache<NameIdentifier, FilesetMeta> filesetCache;
 
@@ -86,7 +86,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         StringUtils.isNotBlank(metalakeName), "Gravitino metalake is not set in the configuration");
 
     // TODO Need support more authentication types, now we only support simple auth
-    this.client = GravitinoClient.builder(serverUri).withSimpleAuth().build();
+    this.client =
+        GravitinoClient.builder(serverUri).withMetalake(metalakeName).withSimpleAuth().build();
     this.metalake = client.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
 
     // Close the gvfs cache to achieve tenant isolation based on different user tokens in the
@@ -172,6 +173,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public boolean rename(Path src, Path dst) throws IOException {
     // There are two cases that cannot be renamed:
     // 1. Fileset identifier is not allowed to be renamed, only its subdirectories can be renamed
@@ -272,6 +274,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return filesetPrefix;
   }
 
+  @SuppressWarnings("deprecation")
   private Path resolvePathByIdentifier(NameIdentifier identifier, FilesetMeta meta, Path path) {
     String originPath = path.toString();
     if (!originPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {

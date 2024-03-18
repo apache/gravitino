@@ -8,10 +8,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(libs.hadoop2.common)
+  compileOnly(libs.hadoop3.common)
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
-  testImplementation(libs.hadoop2.common)
+  testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

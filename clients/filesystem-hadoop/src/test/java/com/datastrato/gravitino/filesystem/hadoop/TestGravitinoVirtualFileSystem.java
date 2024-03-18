@@ -156,7 +156,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
         localSingleFilePath.toString());
     FileSystemTestUtils.create(filesetMountPath, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(filesetMountPath));
-    assertTrue(gravitinoFileSystem.isFile(filesetMountPath));
+    assertTrue(gravitinoFileSystem.getFileStatus(filesetMountPath).isFile());
     gravitinoFileSystem.delete(filesetMountPath, true);
     assertFalse(localFileSystem.exists(localSingleFilePath));
   }
@@ -169,7 +169,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     FileSystemTestUtils.create(appendFile, gravitinoFileSystem);
     FileSystemTestUtils.append(appendFile, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(appendFile));
-    assertTrue(gravitinoFileSystem.isFile(appendFile));
+    assertTrue(gravitinoFileSystem.getFileStatus(appendFile).isFile());
     assertEquals(
         "Hello, World!",
         new String(
@@ -204,7 +204,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
     FileSystemTestUtils.create(filesetMountPath, gravitinoFileSystem);
     FileSystemTestUtils.append(filesetMountPath, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(filesetMountPath));
-    assertTrue(gravitinoFileSystem.isFile(filesetMountPath));
+    assertTrue(gravitinoFileSystem.getFileStatus(filesetMountPath).isFile());
     gravitinoFileSystem.delete(filesetMountPath, true);
     assertFalse(localFileSystem.exists(localSingleFilePath));
   }
@@ -213,7 +213,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
   public void testRename() throws IOException {
     Path srcRenamePath = new Path(gvfsPath + "/rename_src");
     gravitinoFileSystem.mkdirs(srcRenamePath);
-    assertTrue(gravitinoFileSystem.isDirectory(srcRenamePath));
+    assertTrue(gravitinoFileSystem.getFileStatus(srcRenamePath).isDirectory());
     assertTrue(gravitinoFileSystem.exists(srcRenamePath));
 
     // cannot rename the identifier
@@ -246,7 +246,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
         FileSystemTestUtils.createLocalFilePath(catalogName + "/files/test.txt");
     FileSystemTestUtils.create(localSingleFilePath, localFileSystem);
     assertTrue(localFileSystem.exists(localSingleFilePath));
-    assertTrue(localFileSystem.isFile(localSingleFilePath));
+    assertTrue(localFileSystem.getFileStatus(localSingleFilePath).isFile());
 
     Path filesetPath =
         FileSystemTestUtils.createGvfsPrefix(catalogName, schemaName, "fileset_tst1");
@@ -254,7 +254,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
         metalakeName, catalogName, schemaName, "fileset_tst1", localSingleFilePath.toString());
     FileSystemTestUtils.create(filesetPath, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(filesetPath));
-    assertTrue(gravitinoFileSystem.isFile(filesetPath));
+    assertTrue(gravitinoFileSystem.getFileStatus(filesetPath).isFile());
     Path dstPath = new Path(filesetPath + "/files/test1.txt");
     assertThrows(RuntimeException.class, () -> gravitinoFileSystem.rename(filesetPath, dstPath));
     localFileSystem.delete(localSingleFilePath, true);
@@ -320,14 +320,14 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
   public void testListStatus() throws IOException {
     FileSystemTestUtils.mkdirs(gvfsPath, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(gvfsPath));
-    assertTrue(gravitinoFileSystem.isDirectory(gvfsPath));
+    assertTrue(gravitinoFileSystem.getFileStatus(gvfsPath).isDirectory());
     assertTrue(localFileSystem.exists(localPath));
 
     for (int i = 0; i < 5; i++) {
       Path subPath = new Path(gvfsPath + "/sub" + i);
       FileSystemTestUtils.mkdirs(subPath, gravitinoFileSystem);
       assertTrue(gravitinoFileSystem.exists(subPath));
-      assertTrue(gravitinoFileSystem.isDirectory(subPath));
+      assertTrue(gravitinoFileSystem.getFileStatus(subPath).isDirectory());
     }
 
     List<FileStatus> gravitinoStatuses =
@@ -358,7 +358,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
   public void testMkdirs() throws IOException {
     FileSystemTestUtils.mkdirs(gvfsPath, gravitinoFileSystem);
     assertTrue(gravitinoFileSystem.exists(gvfsPath));
-    assertTrue(gravitinoFileSystem.isDirectory(gvfsPath));
+    assertTrue(gravitinoFileSystem.getFileStatus(gvfsPath).isDirectory());
 
     FileStatus gravitinoStatus = gravitinoFileSystem.getFileStatus(gvfsPath);
     FileStatus localStatus = localFileSystem.getFileStatus(localPath);
