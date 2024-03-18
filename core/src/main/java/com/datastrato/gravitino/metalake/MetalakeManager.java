@@ -105,7 +105,7 @@ public class MetalakeManager implements SupportsMetalakes {
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(uid)
             .withName(ident.name())
             .withComment(comment)
@@ -150,7 +150,7 @@ public class MetalakeManager implements SupportsMetalakes {
           EntityType.METALAKE,
           metalake -> {
             BaseMetalake.Builder builder =
-                new BaseMetalake.Builder()
+                BaseMetalake.builder()
                     .withId(metalake.id())
                     .withName(metalake.name())
                     .withComment(metalake.comment())

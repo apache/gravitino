@@ -108,7 +108,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(new HashMap<>(properties))
@@ -126,7 +126,7 @@ public class TestCatalogOperations
       tables.put(ident, table);
     }
 
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
@@ -171,7 +171,7 @@ public class TestCatalogOperations
     }
 
     TestTable updatedTable =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
@@ -181,7 +181,7 @@ public class TestCatalogOperations
             .build();
 
     tables.put(ident, updatedTable);
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(table.comment())
         .withProperties(new HashMap<>(newProps))
@@ -215,7 +215,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestSchema schema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -272,7 +272,7 @@ public class TestCatalogOperations
     }
 
     TestSchema updatedSchema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(schema.comment())
             .withProperties(newProps)
@@ -422,7 +422,7 @@ public class TestCatalogOperations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     TestFileset fileset =
-        new TestFileset.Builder()
+        TestFileset.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -472,7 +472,7 @@ public class TestCatalogOperations
     }
 
     TestFileset updatedFileset =
-        new TestFileset.Builder()
+        TestFileset.builder()
             .withName(ident.name())
             .withComment(fileset.comment())
             .withProperties(newProps)

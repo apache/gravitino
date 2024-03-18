@@ -69,6 +69,9 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Builds the function expression.
      *
@@ -77,5 +80,10 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     public FuncExpressionDTO build() {
       return new FuncExpressionDTO(functionName, functionArgs);
     }
+  }
+
+  /** @return the builder for creating a new instance of FuncExpressionDTO. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

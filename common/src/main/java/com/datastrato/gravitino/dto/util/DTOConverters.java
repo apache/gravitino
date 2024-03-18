@@ -93,7 +93,7 @@ public class DTOConverters {
    * @return The metalake DTO.
    */
   public static MetalakeDTO toDTO(Metalake metalake) {
-    return new MetalakeDTO.Builder()
+    return MetalakeDTO.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -153,7 +153,7 @@ public class DTOConverters {
    * @return The catalog DTO.
    */
   public static CatalogDTO toDTO(Catalog catalog) {
-    return new CatalogDTO.Builder()
+    return CatalogDTO.builder()
         .withName(catalog.name())
         .withType(catalog.type())
         .withProvider(catalog.provider())
@@ -170,7 +170,7 @@ public class DTOConverters {
    * @return The schema DTO.
    */
   public static SchemaDTO toDTO(Schema schema) {
-    return new SchemaDTO.Builder()
+    return SchemaDTO.builder()
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
@@ -185,7 +185,7 @@ public class DTOConverters {
    * @return The column DTO.
    */
   public static ColumnDTO toDTO(Column column) {
-    return new ColumnDTO.Builder()
+    return ColumnDTO.builder()
         .withName(column.name())
         .withDataType(column.dataType())
         .withComment(column.comment())
@@ -206,7 +206,7 @@ public class DTOConverters {
    * @return The table DTO.
    */
   public static TableDTO toDTO(Table table) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
@@ -235,7 +235,7 @@ public class DTOConverters {
       return (DistributionDTO) distribution;
     }
 
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(distribution.strategy())
         .withNumber(distribution.number())
         .withArgs(
@@ -255,7 +255,8 @@ public class DTOConverters {
     if (sortOrder instanceof SortOrderDTO) {
       return (SortOrderDTO) sortOrder;
     }
-    return new SortOrderDTO.Builder()
+
+    return SortOrderDTO.builder()
         .withSortTerm(toFunctionArg(sortOrder.expression()))
         .withDirection(sortOrder.direction())
         .withNullOrder(sortOrder.nullOrdering())
@@ -340,16 +341,16 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
-      return new LiteralDTO.Builder()
+      return LiteralDTO.builder()
           .withValue((((Literal) expression).value().toString()))
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
-      return new FieldReferenceDTO.Builder()
+      return FieldReferenceDTO.builder()
           .withFieldName(((NamedReference.FieldReference) expression).fieldName())
           .build();
     } else if (expression instanceof FunctionExpression) {
-      return new FuncExpressionDTO.Builder()
+      return FuncExpressionDTO.builder()
           .withFunctionName(((FunctionExpression) expression).functionName())
           .withFunctionArgs(
               Arrays.stream(((FunctionExpression) expression).arguments())

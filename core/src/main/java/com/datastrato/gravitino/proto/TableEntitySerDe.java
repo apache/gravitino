@@ -18,7 +18,7 @@ public class TableEntitySerDe implements ProtoSerDe<TableEntity, Table> {
 
   @Override
   public TableEntity deserialize(Table p) {
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(p.getId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))

@@ -15,7 +15,8 @@ public class JdbcColumn extends BaseColumn {
 
   /** A builder class for constructing JdbcColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, JdbcColumn> {
-
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
     /**
      * Internal method to build a JdbcColumn instance using the provided values.
      *
@@ -35,5 +36,14 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.autoIncrement = autoIncrement;
       return jdbcColumn;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

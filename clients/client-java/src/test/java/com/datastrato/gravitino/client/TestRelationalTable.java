@@ -157,15 +157,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     String partitionPath =
         withSlash(((RelationalTable) partitionedTable).getPartitionRequestPath());
@@ -197,15 +191,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     RelationalTable table = (RelationalTable) partitionedTable;
     String partitionPath =

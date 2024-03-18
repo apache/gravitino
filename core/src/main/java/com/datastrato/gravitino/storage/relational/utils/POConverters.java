@@ -43,7 +43,7 @@ public class POConverters {
    */
   public static MetalakePO initializeMetalakePOWithVersion(BaseMetalake baseMetalake) {
     try {
-      return new MetalakePO.Builder()
+      return MetalakePO.builder()
           .withMetalakeId(baseMetalake.id())
           .withMetalakeName(baseMetalake.name())
           .withMetalakeComment(baseMetalake.comment())
@@ -73,7 +73,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new MetalakePO.Builder()
+      return MetalakePO.builder()
           .withMetalakeId(newMetalake.id())
           .withMetalakeName(newMetalake.name())
           .withMetalakeComment(newMetalake.comment())
@@ -98,7 +98,7 @@ public class POConverters {
    */
   public static BaseMetalake fromMetalakePO(MetalakePO metalakePO) {
     try {
-      return new BaseMetalake.Builder()
+      return BaseMetalake.builder()
           .withId(metalakePO.getMetalakeId())
           .withName(metalakePO.getMetalakeName())
           .withComment(metalakePO.getMetalakeComment())
@@ -134,7 +134,7 @@ public class POConverters {
   public static CatalogPO initializeCatalogPOWithVersion(
       CatalogEntity catalogEntity, Long metalakeId) {
     try {
-      return new CatalogPO.Builder()
+      return CatalogPO.builder()
           .withCatalogId(catalogEntity.id())
           .withCatalogName(catalogEntity.name())
           .withMetalakeId(metalakeId)
@@ -166,7 +166,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new CatalogPO.Builder()
+      return CatalogPO.builder()
           .withCatalogId(newCatalog.id())
           .withCatalogName(newCatalog.name())
           .withMetalakeId(metalakeId)
@@ -260,7 +260,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new SchemaPO.Builder()
+      return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())
           .withSchemaName(newSchema.name())
           .withMetalakeId(oldSchemaPO.getMetalakeId())
@@ -286,7 +286,7 @@ public class POConverters {
    */
   public static SchemaEntity fromSchemaPO(SchemaPO schemaPO, Namespace namespace) {
     try {
-      return new SchemaEntity.Builder()
+      return SchemaEntity.builder()
           .withId(schemaPO.getSchemaId())
           .withName(schemaPO.getSchemaName())
           .withNamespace(namespace)
@@ -347,7 +347,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new TablePO.Builder()
+      return TablePO.builder()
           .withTableId(oldTablePO.getTableId())
           .withTableName(newTable.name())
           .withMetalakeId(oldTablePO.getMetalakeId())
@@ -372,7 +372,7 @@ public class POConverters {
    */
   public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
     try {
-      return new TableEntity.Builder()
+      return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
           .withNamespace(namespace)
@@ -407,7 +407,7 @@ public class POConverters {
       FilesetEntity filesetEntity, FilesetPO.Builder builder) {
     try {
       FilesetVersionPO filesetVersionPO =
-          new FilesetVersionPO.Builder()
+          FilesetVersionPO.builder()
               .withMetalakeId(builder.getFilesetMetalakeId())
               .withCatalogId(builder.getFilesetCatalogId())
               .withSchemaId(builder.getFilesetSchemaId())
@@ -452,7 +452,7 @@ public class POConverters {
         lastVersion++;
         currentVersion = lastVersion;
         newFilesetVersionPO =
-            new FilesetVersionPO.Builder()
+            FilesetVersionPO.builder()
                 .withMetalakeId(oldFilesetPO.getMetalakeId())
                 .withCatalogId(oldFilesetPO.getCatalogId())
                 .withSchemaId(oldFilesetPO.getSchemaId())
@@ -468,7 +468,7 @@ public class POConverters {
         currentVersion = oldFilesetPO.getCurrentVersion();
         newFilesetVersionPO = oldFilesetPO.getFilesetVersionPO();
       }
-      return new FilesetPO.Builder()
+      return FilesetPO.builder()
           .withFilesetId(newFileset.id())
           .withFilesetName(newFileset.name())
           .withMetalakeId(oldFilesetPO.getMetalakeId())
@@ -512,7 +512,7 @@ public class POConverters {
    */
   public static FilesetEntity fromFilesetPO(FilesetPO filesetPO, Namespace namespace) {
     try {
-      return new FilesetEntity.Builder()
+      return FilesetEntity.builder()
           .withId(filesetPO.getFilesetId())
           .withName(filesetPO.getFilesetName())
           .withNamespace(namespace)

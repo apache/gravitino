@@ -18,7 +18,7 @@ public class TestDistributionDTO {
   void test() throws JsonProcessingException {
 
     DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
+        DistributionDTO.builder()
             .withNumber(10)
             .withStrategy(Strategy.HASH)
             .withArgs(FieldReferenceDTO.of("a"))
@@ -44,9 +44,9 @@ public class TestDistributionDTO {
         JsonUtils.objectMapper().readTree(stringValue));
 
     distributionDTO =
-        new DistributionDTO.Builder()
+        DistributionDTO.builder()
             .withArgs(
-                new FuncExpressionDTO.Builder()
+                FuncExpressionDTO.builder()
                     .withFunctionName("date")
                     .withFunctionArgs(FieldReferenceDTO.of("a"))
                     .build())

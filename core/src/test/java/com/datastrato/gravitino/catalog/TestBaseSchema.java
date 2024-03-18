@@ -18,6 +18,8 @@ final class BaseSchemaExtension extends BaseSchema {
   private BaseSchemaExtension() {}
 
   public static class Builder extends BaseSchemaBuilder<Builder, BaseSchemaExtension> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected BaseSchemaExtension internalBuild() {
@@ -28,6 +30,14 @@ final class BaseSchemaExtension extends BaseSchema {
       schema.auditInfo = auditInfo;
       return schema;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }
 
@@ -42,7 +52,7 @@ public class TestBaseSchema {
         AuditInfo.builder().withCreator("Justin").withCreateTime(Instant.now()).build();
 
     BaseSchema schema =
-        new BaseSchemaExtension.Builder()
+        BaseSchemaExtension.builder()
             .withName("testSchemaName")
             .withComment("testSchemaComment")
             .withProperties(properties)

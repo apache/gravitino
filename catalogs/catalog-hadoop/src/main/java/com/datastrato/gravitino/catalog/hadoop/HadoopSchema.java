@@ -9,6 +9,8 @@ import com.datastrato.gravitino.connector.BaseSchema;
 public class HadoopSchema extends BaseSchema {
 
   public static class Builder extends BaseSchemaBuilder<Builder, HadoopSchema> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected HadoopSchema internalBuild() {
@@ -19,5 +21,14 @@ public class HadoopSchema extends BaseSchema {
       schema.auditInfo = auditInfo;
       return schema;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }
