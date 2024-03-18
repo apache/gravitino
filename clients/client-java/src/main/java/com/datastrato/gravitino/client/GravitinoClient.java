@@ -8,6 +8,8 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.client.api.SupportsCatalog;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -24,7 +26,8 @@ import org.slf4j.LoggerFactory;
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
  * API.
  */
-public class GravitinoClient extends GravitinoClientBase implements SupportsCatalog {
+public class GravitinoClient extends GravitinoClientBase
+    implements SupportsCatalogs, SupportsCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
@@ -51,6 +54,38 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    */
   private GravitinoMetalake getMetalake() {
     return metalake;
+  }
+
+  @Override
+  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+    return getMetalake().listCatalogs(namespace);
+  }
+
+  @Override
+  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    return getMetalake().loadCatalog(ident);
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return getMetalake().createCatalog(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+      throws NoSuchCatalogException, IllegalArgumentException {
+    return getMetalake().alterCatalog(ident, changes);
+  }
+
+  @Override
+  public boolean dropCatalog(NameIdentifier ident) {
+    return getMetalake().dropCatalog(ident);
   }
 
   @Override
