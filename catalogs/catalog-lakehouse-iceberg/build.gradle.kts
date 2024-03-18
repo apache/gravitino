@@ -72,7 +72,6 @@ dependencies {
     exclude("com.github.spotbugs")
   }
   implementation(libs.hadoop2.hdfs)
-  implementation(libs.hadoop2.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
