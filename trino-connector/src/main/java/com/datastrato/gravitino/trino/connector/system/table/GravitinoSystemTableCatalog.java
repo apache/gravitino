@@ -53,7 +53,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     MapBlockBuilder propertyColumnBuilder = STRING_MAPTYPE.createBlockBuilder(null, size);
 
     for (GravitinoCatalog catalog : catalogs) {
-      Preconditions.checkNotNull(catalog, "catalog not be null");
+      Preconditions.checkNotNull(catalog, "catalog should not be null");
 
       VARCHAR.writeString(nameColumnBuilder, catalog.getFullName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());
