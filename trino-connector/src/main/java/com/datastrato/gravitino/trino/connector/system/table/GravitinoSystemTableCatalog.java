@@ -76,6 +76,6 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
   @Override
   public ConnectorTableMetadata getTableMetaData() {
-    return null;
+    return TABLE_METADATA;
   }
 }
