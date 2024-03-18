@@ -1,0 +1,23 @@
+name: 'Python CI'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python: [ '3.8', '3.9', '3.10', '3.11' ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          cd clients/client-python
+          pip install -i requirements.txt
+      - name: Unit tests
+        run: pytest
