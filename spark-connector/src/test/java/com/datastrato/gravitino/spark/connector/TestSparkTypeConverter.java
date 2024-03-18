@@ -15,10 +15,13 @@ import com.datastrato.gravitino.rel.types.Types.DoubleType;
 import com.datastrato.gravitino.rel.types.Types.FixedCharType;
 import com.datastrato.gravitino.rel.types.Types.FloatType;
 import com.datastrato.gravitino.rel.types.Types.IntegerType;
+import com.datastrato.gravitino.rel.types.Types.ListType;
 import com.datastrato.gravitino.rel.types.Types.LongType;
+import com.datastrato.gravitino.rel.types.Types.MapType;
 import com.datastrato.gravitino.rel.types.Types.NullType;
 import com.datastrato.gravitino.rel.types.Types.ShortType;
 import com.datastrato.gravitino.rel.types.Types.StringType;
+import com.datastrato.gravitino.rel.types.Types.StructType;
 import com.datastrato.gravitino.rel.types.Types.TimestampType;
 import com.datastrato.gravitino.rel.types.Types.VarCharType;
 import com.google.common.collect.ImmutableSet;
@@ -27,6 +30,7 @@ import java.util.Set;
 import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.VarcharType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -59,6 +63,12 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
     gravitinoToSparkTypeMapper.put(TimestampType.withTimeZone(), DataTypes.TimestampType);
     gravitinoToSparkTypeMapper.put(TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
+    gravitinoToSparkTypeMapper.put(
+        ListType.of(IntegerType.get(), true), DataTypes.createArrayType(DataTypes.IntegerType));
+    gravitinoToSparkTypeMapper.put(
+        MapType.of(IntegerType.get(), StringType.get(), true),
+        DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
+    gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
   }
 
   @Test
@@ -85,5 +95,55 @@ public class TestSparkTypeConverter {
             Assertions.assertThrowsExactly(
                 UnsupportedOperationException.class,
                 () -> SparkTypeConverter.toGravitinoType(sparkType)));
+  }
+
+  /** Create a Gravitino StructType for testing. */
+  private static StructType createGravitinoStructType() {
+    return StructType.of(
+        StructType.Field.of("col1", IntegerType.get(), true, null),
+        StructType.Field.of("col2", StringType.get(), true, null),
+        StructType.Field.of(
+            "col3",
+            StructType.of(
+                StructType.Field.of("col3_1", IntegerType.get(), true, null),
+                StructType.Field.of("col3_2", StringType.get(), true, null)),
+            true,
+            null),
+        StructType.Field.of(
+            "col4", MapType.of(IntegerType.get(), StringType.get(), true), true, null),
+        StructType.Field.of("col5", ListType.of(IntegerType.get(), true), true, null),
+        StructType.Field.of("col6", IntegerType.get(), false, null),
+        StructType.Field.of("col7", IntegerType.get(), true, "This is a comment"));
+  }
+
+  /** Create a Spark StructType for testing. */
+  private static org.apache.spark.sql.types.StructType createSparkStructType() {
+    return DataTypes.createStructType(
+        new org.apache.spark.sql.types.StructField[] {
+          DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+          DataTypes.createStructField("col2", DataTypes.StringType, true),
+          DataTypes.createStructField(
+              "col3",
+              DataTypes.createStructType(
+                  new org.apache.spark.sql.types.StructField[] {
+                    DataTypes.createStructField("col3_1", DataTypes.IntegerType, true),
+                    DataTypes.createStructField("col3_2", DataTypes.StringType, true)
+                  }),
+              true),
+          DataTypes.createStructField(
+              "col4",
+              DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType, true),
+              true),
+          DataTypes.createStructField(
+              "col5", DataTypes.createArrayType(DataTypes.IntegerType), true),
+          DataTypes.createStructField("col6", DataTypes.IntegerType, false),
+          DataTypes.createStructField(
+              "col7",
+              DataTypes.IntegerType,
+              true,
+              new MetadataBuilder()
+                  .putString(ConnectorConstants.COMMENT, "This is a comment")
+                  .build())
+        });
   }
 }

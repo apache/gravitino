@@ -7,6 +7,10 @@ package com.datastrato.gravitino.spark.connector;
 
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.BooleanType;
 import org.apache.spark.sql.types.ByteType;
@@ -19,8 +23,12 @@ import org.apache.spark.sql.types.DoubleType;
 import org.apache.spark.sql.types.FloatType;
 import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.LongType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.ShortType;
 import org.apache.spark.sql.types.StringType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.types.VarcharType;
@@ -61,6 +69,28 @@ public class SparkTypeConverter {
       return Types.TimestampType.withTimeZone();
     } else if (sparkType instanceof TimestampNTZType) {
       return Types.TimestampType.withoutTimeZone();
+    } else if (sparkType instanceof ArrayType) {
+      ArrayType arrayType = (ArrayType) sparkType;
+      return Types.ListType.of(toGravitinoType(arrayType.elementType()), arrayType.containsNull());
+    } else if (sparkType instanceof MapType) {
+      MapType mapType = (MapType) sparkType;
+      return Types.MapType.of(
+          toGravitinoType(mapType.keyType()),
+          toGravitinoType(mapType.valueType()),
+          mapType.valueContainsNull());
+    } else if (sparkType instanceof StructType) {
+      StructType structType = (StructType) sparkType;
+      Types.StructType.Field[] fields =
+          Arrays.stream(structType.fields())
+              .map(
+                  f ->
+                      Types.StructType.Field.of(
+                          f.name(),
+                          toGravitinoType(f.dataType()),
+                          f.nullable(),
+                          f.getComment().isDefined() ? f.getComment().get() : null))
+              .toArray(Types.StructType.Field[]::new);
+      return Types.StructType.of(fields);
     }
     throw new UnsupportedOperationException("Not support " + sparkType.toString());
   }
@@ -101,6 +131,33 @@ public class SparkTypeConverter {
     } else if (gravitinoType instanceof Types.TimestampType
         && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
       return DataTypes.TimestampNTZType;
+    } else if (gravitinoType instanceof Types.ListType) {
+      Types.ListType listType = (Types.ListType) gravitinoType;
+      return DataTypes.createArrayType(
+          toSparkType(listType.elementType()), listType.elementNullable());
+    } else if (gravitinoType instanceof Types.MapType) {
+      Types.MapType mapType = (Types.MapType) gravitinoType;
+      return DataTypes.createMapType(
+          toSparkType(mapType.keyType()),
+          toSparkType(mapType.valueType()),
+          mapType.valueNullable());
+    } else if (gravitinoType instanceof Types.StructType) {
+      Types.StructType structType = (Types.StructType) gravitinoType;
+      List<StructField> fields =
+          Arrays.stream(structType.fields())
+              .map(
+                  f ->
+                      DataTypes.createStructField(
+                          f.name(),
+                          toSparkType(f.type()),
+                          f.nullable(),
+                          f.comment() == null
+                              ? new MetadataBuilder().build()
+                              : new MetadataBuilder()
+                                  .putString(ConnectorConstants.COMMENT, f.comment())
+                                  .build()))
+              .collect(Collectors.toList());
+      return DataTypes.createStructType(fields);
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }
