@@ -24,6 +24,7 @@ plugins {
   id("java")
   id("idea")
   id("jacoco")
+  id("com.jfrog.artifactory") version "5.2.0"
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.node) apply false
 
@@ -97,11 +98,39 @@ licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
-repositories { mavenCentral() }
+repositories {
+  maven {
+    name = "remoteVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-remote-virtual/")
+  }
+  maven {
+    name = "releaseVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-release-virtual/")
+  }
+  maven {
+    name = "snapshotVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-snapshot-virtual/")
+  }
+  mavenCentral()
+}
 
 allprojects {
   apply(plugin = "com.diffplug.spotless")
+  apply(plugin = "com.jfrog.artifactory")
   repositories {
+
+    maven {
+      name = "remoteVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-remote-virtual/")
+    }
+    maven {
+      name = "releaseVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-release-virtual/")
+    }
+    maven {
+      name = "snapshotVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-snapshot-virtual/")
+    }
     mavenCentral()
     mavenLocal()
   }
@@ -215,8 +244,21 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+  apply(plugin = "com.jfrog.artifactory")
 
   repositories {
+    maven {
+      name = "remoteVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-remote-virtual/")
+    }
+    maven {
+      name = "releaseVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-release-virtual/")
+    }
+    maven {
+      name = "snapshotVirtual"
+      url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-snapshot-virtual/")
+    }
     mavenCentral()
     mavenLocal()
   }
@@ -227,10 +269,9 @@ subprojects {
       // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
       // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
       // Trino-connector on macOS.
+
+      vendor.set(JvmVendorSpec.AMAZON)
       if (project.name == "trino-connector") {
-        if (OperatingSystem.current().isMacOsX) {
-          vendor.set(JvmVendorSpec.AMAZON)
-        }
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
@@ -440,6 +481,32 @@ subprojects {
     sign(publishing.publications)
   }
 
+  configure<org.jfrog.gradle.plugin.artifactory.dsl.ArtifactoryPluginConvention> {
+    clientConfig.isIncludeEnvVars = true
+
+    setContextUrl("https://pkgs.d.xiaomi.net/artifactory")
+    publish {
+      repository {
+        repoKey = if (version.toString().contains("SNAPSHOT")) "snapshots" else "releases"
+        username = System.getenv("artifactory_user").takeUnless { it.isNullOrEmpty() }
+          ?: extra["artifactory_user"].toString()
+        password = System.getenv("artifactory_password").takeUnless { it.isNullOrEmpty() }
+          ?: extra["artifactory_password"].toString()
+        ivy {
+          ivyLayout = "[organization]/[module]/ivy-[revision].xml"
+          artifactLayout = "[organization]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]"
+          mavenCompatible = true
+        }
+      }
+
+      defaults {
+        setPublishArtifacts(true)
+        setPublishPom(true)
+        publications("MavenJava")
+      }
+    }
+  }
+
   tasks.configureEach<Test> {
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
@@ -556,11 +623,24 @@ tasks {
   val compileDistribution by registering {
     dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
 
+    val cluster = if (project.hasProperty("cluster")) {
+      project.property("cluster") as String
+    } else {
+      println("Has no cluster property, use default cluster: staging")
+      "staging"
+    }
+
+    println("Current cluster is : $cluster")
+
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
-        from(projectDir.dir("conf")) { into("package/conf") }
+        when (cluster) {
+          "staging" -> from(projectDir.dir("conf/staging")) { into("package/conf") }
+          "zjy" -> from(projectDir.dir("conf/zjy")) { into("package/conf") }
+          else -> from(projectDir.dir("conf/template")) { into("package/conf") }
+        }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         into(outputDir)

@@ -35,7 +35,7 @@ if [[ -z "${GRAVITINO_CONF_DIR}" ]]; then
 fi
 
 if [[ -z "${GRAVITINO_LOG_DIR}" ]]; then
-  export GRAVITINO_LOG_DIR="${GRAVITINO_HOME}/logs"
+  export GRAVITINO_LOG_DIR="/home/work/logs/gravitino"
 fi
 
 if [[ -f "${GRAVITINO_CONF_DIR}/gravitino-env.sh" ]]; then

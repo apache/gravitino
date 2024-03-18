@@ -6,3 +6,7 @@
 tasks.all {
     enabled = false
 }
+
+project.afterEvaluate {
+    project.tasks.artifactoryPublish.get().skip = true
+}

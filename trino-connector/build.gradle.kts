@@ -9,6 +9,18 @@ plugins {
 }
 
 repositories {
+  maven {
+    name = "remoteVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-remote-virtual/")
+  }
+  maven {
+    name = "releaseVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-release-virtual/")
+  }
+  maven {
+    name = "snapshotVirtual"
+    url = uri("https://pkgs.d.xiaomi.net:443/artifactory/maven-snapshot-virtual/")
+  }
   mavenCentral()
 }
 

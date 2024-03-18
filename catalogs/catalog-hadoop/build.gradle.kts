@@ -56,7 +56,21 @@ tasks {
   }
 
   val copyCatalogConfig by registering(Copy::class) {
-    from("src/main/resources")
+    val cluster = if (project.hasProperty("cluster")) {
+      project.property("cluster") as String
+    } else {
+      "template"
+    }
+
+    when (cluster) {
+      "staging" ->
+        from("src/main/resources/staging")
+      "zjy" ->
+        from("src/main/resources/zjy")
+      else ->
+        from("src/main/resources/template")
+    }
+
     into("$rootDir/distribution/package/catalogs/hadoop/conf")
 
     include("hadoop.conf")
