@@ -20,8 +20,6 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -30,7 +28,7 @@ import org.junit.platform.commons.util.StringUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
-public class SparkIT extends SparkEnvIT {
+public class SparkCommonIT extends SparkEnvIT {
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
@@ -43,32 +41,14 @@ public class SparkIT extends SparkEnvIT {
   private static final Map<DataType, String> typeConstant =
       ImmutableMap.of(DataTypes.IntegerType, "2", DataTypes.StringType, "'gravitino_it_test'");
 
-  // Use a custom database not the original default database because SparkIT couldn't read&write
-  // data to tables in default database. The main reason is default database location is
-  // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
-  // not real HDFS address. The location of tables created under default database is like
-  // hdfs://localhost:9000/xxx which couldn't read write data from SparkIT. Will use default
-  // database after spark connector support Alter database xx set location command.
-  @BeforeAll
-  void initDefaultDatabase() {
-    sql("USE " + hiveCatalogName);
-    createDatabaseIfNotExists(getDefaultDatabase());
-  }
-
-  @BeforeEach
-  void init() {
-    sql("USE " + hiveCatalogName);
-    sql("USE " + getDefaultDatabase());
-  }
-
-  private String getDefaultDatabase() {
+  protected String getDefaultDatabase() {
     return "default_db";
   }
 
   @Test
   void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
-    Assertions.assertTrue(catalogs.contains(hiveCatalogName));
+    Assertions.assertTrue(catalogs.contains(catalogName));
   }
 
   @Test

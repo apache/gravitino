@@ -19,16 +19,16 @@ import java.util.Map;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
+/** Setup Datasource, Gravitino, Spark, Metalake environment to execute SparkSQL. */
 public class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  protected final String hiveCatalogName = "hive";
+  protected String catalogName = null;
+  private String provider = null;
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
@@ -41,9 +41,10 @@ public class SparkEnvIT extends SparkUtilIT {
     return sparkSession;
   }
 
-  @BeforeAll
-  void startUp() {
-    initHiveEnv();
+  void startUp(String catalogName, String provider) {
+    this.catalogName = catalogName;
+    this.provider = provider;
+    initDatasourceEnv();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
     initSparkEnv();
@@ -67,9 +68,9 @@ public class SparkEnvIT extends SparkUtilIT {
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
 
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, hiveCatalogName),
+        NameIdentifier.of(metalakeName, catalogName),
         Catalog.Type.RELATIONAL,
-        "hive",
+        provider,
         "",
         properties);
   }
@@ -80,7 +81,7 @@ public class SparkEnvIT extends SparkUtilIT {
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
   }
 
-  private void initHiveEnv() {
+  private void initDatasourceEnv() {
     containerSuite.startHiveContainer();
     hiveMetastoreUri =
         String.format(
