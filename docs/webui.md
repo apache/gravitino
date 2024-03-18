@@ -303,7 +303,13 @@ Test cases can be found in the project directory: `integration-test/src/test/jav
 The root directory contains the actual steps for the test cases.
 
 :::tip
- While writing test cases, running them in a local environment may not pose any issues. However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
- 
- To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`. This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
+ While writing test cases, running them in a local environment may not pose any issues.
+
+ However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
+
+ To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
+
+ This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
+
+ It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/) methods inherent to Selenium as a substitute for `Thread.sleep()`.
 :::
