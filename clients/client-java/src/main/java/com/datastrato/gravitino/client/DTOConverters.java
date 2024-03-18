@@ -22,8 +22,8 @@ import com.datastrato.gravitino.rel.TableChange;
 class DTOConverters {
   private DTOConverters() {}
 
-  static GravitinoMetaLake toMetaLake(MetalakeDTO metalake, RESTClient client) {
-    return new GravitinoMetaLake.Builder()
+  static GravitinoMetalake toMetaLake(MetalakeDTO metalake, RESTClient client) {
+    return new GravitinoMetalake.Builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())

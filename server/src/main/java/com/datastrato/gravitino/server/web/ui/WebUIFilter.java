@@ -22,7 +22,7 @@ public class WebUIFilter implements Filter {
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     String path = httpRequest.getRequestURI();
     String lastPathSegment = path.substring(path.lastIndexOf("/") + 1);
-    if (path.equals("/")) {
+    if (path.equals("/") || path.equals("/ui") || path.equals("/ui/")) {
       // Redirect to the index page.
       httpRequest.getRequestDispatcher("/ui/index.html").forward(request, response);
     } else if (path.startsWith("/ui/") && !lastPathSegment.contains(".")) {

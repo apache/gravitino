@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_PARTITIONING_PROPERTY;
 import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_SORTED_BY_PROPERTY;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;

@@ -88,8 +88,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       return catalogConnectorContext.getConnector();
     } else {
       // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
-      // using
-      // the connector configuration.
+      // using the connector configuration.
       String metalake = config.getMetalake();
       if (Strings.isNullOrEmpty(metalake)) {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");

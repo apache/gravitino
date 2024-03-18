@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector.system.table;
 import io.trino.spi.Page;
 import io.trino.spi.connector.ConnectorTableMetadata;
 
-/** Gravitino System table interfaces * */
+/** Gravitino System table interfaces */
 public abstract class GravitinoSystemTable {
 
   public static final String SYSTEM_TABLE_SCHEMA_NAME = "system";

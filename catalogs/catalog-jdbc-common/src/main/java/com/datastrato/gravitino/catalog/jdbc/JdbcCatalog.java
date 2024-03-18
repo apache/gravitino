@@ -4,14 +4,14 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Collections;
@@ -31,14 +31,12 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
     JdbcCatalogOperations ops =
         new JdbcCatalogOperations(
-            entity(),
             createExceptionConverter(),
             jdbcTypeConverter,
             createJdbcDatabaseOperations(),
             createJdbcTableOperations(),
             createJdbcTablePropertiesMetadata(),
             createJdbcColumnDefaultValueConverter());
-    ops.initialize(config);
     return ops;
   }
 

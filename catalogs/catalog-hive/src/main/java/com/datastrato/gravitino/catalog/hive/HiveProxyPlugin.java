@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.ProxyPlugin;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.utils.Executable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;

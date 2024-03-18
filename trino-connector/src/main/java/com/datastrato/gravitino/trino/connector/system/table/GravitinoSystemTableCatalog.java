@@ -21,7 +21,7 @@ import io.trino.spi.type.MapType;
 import io.trino.spi.type.TypeOperators;
 import java.util.List;
 
-/** An implementation of the catalog system table * */
+/** An implementation of the catalog system table */
 public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
   public static final SchemaTableName TABLE_NAME =
@@ -45,14 +45,15 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
   @Override
   public Page loadPageData() {
-    int size = catalogConnectorManager.getCatalogs().size();
+    List<GravitinoCatalog> catalogs = catalogConnectorManager.getCatalogs();
+    int size = catalogs.size();
 
     BlockBuilder nameColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     BlockBuilder providerColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     MapBlockBuilder propertyColumnBuilder = STRING_MAPTYPE.createBlockBuilder(null, size);
 
-    for (GravitinoCatalog catalog : catalogConnectorManager.getCatalogs()) {
-      Preconditions.checkNotNull(catalog, "catalog not be null");
+    for (GravitinoCatalog catalog : catalogs) {
+      Preconditions.checkNotNull(catalog, "catalog should not be null");
 
       VARCHAR.writeString(nameColumnBuilder, catalog.getFullName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());

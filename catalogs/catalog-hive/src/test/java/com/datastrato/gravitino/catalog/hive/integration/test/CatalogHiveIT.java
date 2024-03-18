@@ -32,11 +32,13 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -121,7 +123,7 @@ public class CatalogHiveIT extends AbstractIT {
   private static final String provider = "hive";
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static SparkSession sparkSession;
   private static FileSystem hdfs;
@@ -229,12 +231,12 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -1059,7 +1061,7 @@ public class CatalogHiveIT extends AbstractIT {
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Schema schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertNull(schema.auditInfo().lastModifier());
@@ -1087,7 +1089,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   void testLoadEntityWithSamePrefix() {
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertNotNull(catalog);
 
@@ -1142,7 +1144,7 @@ public class CatalogHiveIT extends AbstractIT {
   void testAlterEntityName() {
     String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
     client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
-    final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    final GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
     // Test rename metalake
@@ -1363,5 +1365,30 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  void testCustomCatalogOperations() {
+    String catalogName = "custom_catalog";
+    Assertions.assertDoesNotThrow(
+        () -> createCatalogWithCustomOperation(catalogName, HiveCatalogOperations.class.getName()));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class,
+        () ->
+            createCatalogWithCustomOperation(
+                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
+  }
+
+  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
+
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
   }
 }

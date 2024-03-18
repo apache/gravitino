@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
@@ -20,6 +22,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -358,8 +362,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           f -> {
             Pair<Map<String, String>, Map<String, String>> alterProperty =
                 getCatalogAlterProperty(changes);
-            f.catalogPropertiesMetadata()
-                .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
+            validatePropertyForAlter(
+                f.catalogPropertiesMetadata(), alterProperty.getLeft(), alterProperty.getRight());
             return null;
           });
     } catch (IllegalArgumentException e1) {
@@ -493,7 +497,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         cl -> {
           Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
-          catalog.ops().catalogPropertiesMetadata().validatePropertyForCreate(configWithoutId);
+          validatePropertyForCreate(catalog.ops().catalogPropertiesMetadata(), configWithoutId);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the

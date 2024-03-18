@@ -12,11 +12,11 @@ import io.trino.spi.connector.SchemaTableName;
 import java.util.HashMap;
 import java.util.Map;
 
-/* This class managed all the system tables */
+/** This class managed all the system tables */
 public class GravitinoSystemTableFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
-  public static Map<SchemaTableName, GravitinoSystemTable> systemTableDefines = new HashMap<>();
+  public static final Map<SchemaTableName, GravitinoSystemTable> SYSTEM_TABLES = new HashMap<>();
 
   public GravitinoSystemTableFactory(CatalogConnectorManager catalogConnectorManager) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -26,18 +26,18 @@ public class GravitinoSystemTableFactory {
 
   /** Register all the system tables */
   private void registerSystemTables() {
-    systemTableDefines.put(
+    SYSTEM_TABLES.put(
         GravitinoSystemTableCatalog.TABLE_NAME,
         new GravitinoSystemTableCatalog(catalogConnectorManager));
   }
 
   public static Page loadPageData(SchemaTableName tableName) {
-    Preconditions.checkArgument(systemTableDefines.containsKey(tableName), "table does not exist");
-    return systemTableDefines.get(tableName).loadPageData();
+    Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
+    return SYSTEM_TABLES.get(tableName).loadPageData();
   }
 
   public static ConnectorTableMetadata getTableMetaData(SchemaTableName tableName) {
-    Preconditions.checkArgument(systemTableDefines.containsKey(tableName), "table does not exist");
-    return systemTableDefines.get(tableName).getTableMetaData();
+    Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
+    return SYSTEM_TABLES.get(tableName).getTableMetaData();
   }
 }
