@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python: [ '3.8', '3.9', '3.10', '3.11' ]
@@ -20,7 +20,7 @@ jobs:
           python --version
           python -m pip install --upgrade pip
           python -m pip list
-          python -m pip install -i clients/client-python/requirements.txt
+          python -m pip install -i ${{ github.workspace }}/clients/client-python/requirements.txt
           python -m pip list
       - name: Unit tests
-        run: pytest clients/client-python/tests
+        run: pytest ${{ github.workspace }}/clients/client-python/tests
