@@ -51,11 +51,11 @@ public class TestGravitinoMetalake extends TestBase {
     createMetalake(client, metalakeName);
 
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(metalakeName)
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
