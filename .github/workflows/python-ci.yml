@@ -20,8 +20,6 @@ jobs:
           python --version
           python -m pip install --upgrade pip
           python -m pip list
-          echo ${{ github.workspace }}/clients/client-python/requirements.txt
-          cat ${{ github.workspace }}/clients/client-python/requirements.txt
           python -m pip install -r ${{ github.workspace }}/clients/client-python/requirements.txt
           python -m pip list
       - name: Unit tests
