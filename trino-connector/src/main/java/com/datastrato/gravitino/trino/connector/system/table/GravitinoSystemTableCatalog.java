@@ -4,11 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector.system.table;
 
+import static io.trino.spi.block.MapValueBuilder.buildMapValue;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.Page;
+import io.trino.spi.block.Block;
+import io.trino.spi.block.BlockBuilder;
+import io.trino.spi.block.MapBlockBuilder;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -43,31 +48,30 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     List<GravitinoCatalog> catalogs = catalogConnectorManager.getCatalogs();
     int size = catalogs.size();
 
-    //    BlockBuilder nameColumnBuilder = VARCHAR.createBlockBuilder(null, size);
-    //    BlockBuilder providerColumnBuilder = VARCHAR.createBlockBuilder(null, size);
-    //    MapBlockBuilder propertyColumnBuilder = STRING_MAPTYPE.createBlockBuilder(null, size);
-    //
-    //    for (GravitinoCatalog catalog : catalogs) {
-    //      Preconditions.checkNotNull(catalog, "catalog should not be null");
-    //
-    //      VARCHAR.writeString(nameColumnBuilder, catalog.getFullName());
-    //      VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());
-    //      Block mapValue =
-    //          buildMapValue(
-    //              STRING_MAPTYPE,
-    //              catalog.getProperties().size(),
-    //              (keyBuilder, valueBuilder) ->
-    //                  catalog
-    //                      .getProperties()
-    //                      .forEach(
-    //                          (key, value) -> {
-    //                            VARCHAR.writeString(keyBuilder, key);
-    //                            VARCHAR.writeString(valueBuilder, value);
-    //                          }));
-    //      STRING_MAPTYPE.writeObject(propertyColumnBuilder, mapValue);
-    //    }
-    //    return new Page(size, nameColumnBuilder, providerColumnBuilder, propertyColumnBuilder);
-    return null;
+    BlockBuilder nameColumnBuilder = VARCHAR.createBlockBuilder(null, size);
+    BlockBuilder providerColumnBuilder = VARCHAR.createBlockBuilder(null, size);
+    MapBlockBuilder propertyColumnBuilder = STRING_MAPTYPE.createBlockBuilder(null, size);
+
+    for (GravitinoCatalog catalog : catalogs) {
+      Preconditions.checkNotNull(catalog, "catalog should not be null");
+
+      VARCHAR.writeString(nameColumnBuilder, catalog.getFullName());
+      VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());
+      Block mapValue =
+          buildMapValue(
+              STRING_MAPTYPE,
+              catalog.getProperties().size(),
+              (keyBuilder, valueBuilder) ->
+                  catalog
+                      .getProperties()
+                      .forEach(
+                          (key, value) -> {
+                            VARCHAR.writeString(keyBuilder, key);
+                            VARCHAR.writeString(valueBuilder, value);
+                          }));
+      STRING_MAPTYPE.writeObject(propertyColumnBuilder, mapValue);
+    }
+    return new Page(size, nameColumnBuilder, providerColumnBuilder, propertyColumnBuilder);
   }
 
   @Override
