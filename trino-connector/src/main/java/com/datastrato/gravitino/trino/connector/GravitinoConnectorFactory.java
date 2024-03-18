@@ -10,6 +10,8 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
+import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
+import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
@@ -26,6 +28,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   private CatalogConnectorManager catalogConnectorManager;
+  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   @Override
   public String getName() {
@@ -33,7 +36,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino creates a connector. It creates DummyGravitinoConnector at first.
+   * This function call by trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
    * @param catalogName the connector name of catalog
@@ -66,6 +69,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           }
           catalogConnectorManager.start();
 
+          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
           throw e;
@@ -81,15 +86,15 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
       return catalogConnectorContext.getConnector();
     } else {
-      // The static connector is an instance of DummyGravitinoConnector. It is loaded by Trino using
-      // the connector configuration.
+      // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
+      // using the connector configuration.
       String metalake = config.getMetalake();
       if (Strings.isNullOrEmpty(metalake)) {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
       catalogConnectorManager.addMetalake(metalake);
 
-      return new DummyGravitinoConnector(metalake, catalogConnectorManager);
+      return new GravitinoSystemConnector(metalake, catalogConnectorManager);
     }
   }
 }

@@ -20,6 +20,8 @@ import java.util.Map;
  * connectors.
  */
 public class CatalogConnectorContext {
+
+  private final GravitinoCatalog catalog;
   private final GravitinoMetalake metalake;
 
   // Connector communicates with trino
@@ -31,19 +33,24 @@ public class CatalogConnectorContext {
   private final CatalogConnectorAdapter adapter;
 
   public CatalogConnectorContext(
-      NameIdentifier catalogName,
+      GravitinoCatalog catalog,
       GravitinoMetalake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
+    this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
 
-    this.connector = new GravitinoConnector(catalogName, this);
+    this.connector = new GravitinoConnector(catalog.geNameIdentifier(), this);
   }
 
   public GravitinoMetalake getMetalake() {
     return metalake;
+  }
+
+  public GravitinoCatalog getCatalog() {
+    return catalog;
   }
 
   public GravitinoConnector getConnector() {
@@ -79,6 +86,7 @@ public class CatalogConnectorContext {
     private NameIdentifier catalogName;
     private GravitinoMetalake metalake;
     private Connector internalConnector;
+    private GravitinoCatalog catalog;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
@@ -97,22 +105,21 @@ public class CatalogConnectorContext {
       return this;
     }
 
-    Builder withCatalogName(NameIdentifier catalogName) {
-      this.catalogName = catalogName;
-      return this;
-    }
-
     Builder withInternalConnector(Connector internalConnector) {
       this.internalConnector = internalConnector;
       return this;
     }
 
+    Builder withCatalog(GravitinoCatalog catalog) {
+      this.catalog = catalog;
+      return this;
+    }
+
     CatalogConnectorContext build() {
-      Preconditions.checkArgument(catalogName != null, "catalogName is not null");
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
-      return new CatalogConnectorContext(
-          catalogName, metalake, internalConnector, connectorAdapter);
+      Preconditions.checkArgument(catalog != null, "catalog is not null");
+      return new CatalogConnectorContext(catalog, metalake, internalConnector, connectorAdapter);
     }
   }
 }
