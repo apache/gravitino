@@ -21,7 +21,7 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Schema;
@@ -85,7 +85,7 @@ public class TestKafkaCatalogOperations {
             .build();
 
     kafkaCatalogOperations = new KafkaCatalogOperations(store, idGenerator);
-    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity);
+    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo());
   }
 
   @AfterAll
@@ -113,7 +113,7 @@ public class TestKafkaCatalogOperations {
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
 
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity);
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
     Assertions.assertNotNull(ops.adminClientConfig);
     Assertions.assertEquals(2, ops.adminClientConfig.size());
     Assertions.assertEquals(
@@ -140,7 +140,7 @@ public class TestKafkaCatalogOperations {
                     .build())
             .build();
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity);
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
 
     Assertions.assertNotNull(ops.defaultSchemaIdent);
     Assertions.assertEquals("default", ops.defaultSchemaIdent.name());

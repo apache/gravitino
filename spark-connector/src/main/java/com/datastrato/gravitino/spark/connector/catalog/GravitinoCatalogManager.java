@@ -8,8 +8,8 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -28,12 +28,12 @@ public class GravitinoCatalogManager {
   private volatile boolean isClosed = false;
   private final Cache<String, Catalog> gravitinoCatalogs;
   private final String metalakeName;
-  private final GravitinoMetaLake metalake;
-  private final GravitinoClient gravitinoClient;
+  private final GravitinoMetalake metalake;
+  private final GravitinoAdminClient gravitinoClient;
 
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
     this.metalakeName = metalakeName;
-    this.gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+    this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     // Will not evict catalog by default
     this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
     this.metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));

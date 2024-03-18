@@ -4,10 +4,11 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -20,7 +21,6 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -72,8 +72,7 @@ public class TestCatalogOperations
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity)
-      throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}

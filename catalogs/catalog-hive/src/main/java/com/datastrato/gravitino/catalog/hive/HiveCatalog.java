@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.ProxyPlugin;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;

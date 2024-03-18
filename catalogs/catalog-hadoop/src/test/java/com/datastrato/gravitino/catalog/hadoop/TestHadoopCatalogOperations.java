@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -20,7 +20,7 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
+import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -149,7 +149,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath = new Path(catalogPath, name);
     FileSystem fs = schemaPath.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath));
-    Assertions.assertTrue(fs.isDirectory(schemaPath));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath).length == 0);
   }
 
@@ -165,7 +165,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
   }
 
@@ -181,7 +181,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
 
     Assertions.assertFalse(fs.exists(new Path(catalogPath)));
