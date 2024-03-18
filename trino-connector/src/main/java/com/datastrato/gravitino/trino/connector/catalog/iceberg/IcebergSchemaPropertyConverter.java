@@ -5,10 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;

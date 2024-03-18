@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

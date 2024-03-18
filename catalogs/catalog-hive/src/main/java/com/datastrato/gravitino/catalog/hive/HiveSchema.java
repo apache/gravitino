@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata.LOCATION;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import java.util.Map;

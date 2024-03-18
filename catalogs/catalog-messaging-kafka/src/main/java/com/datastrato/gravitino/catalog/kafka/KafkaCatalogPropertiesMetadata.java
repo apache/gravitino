@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.kafka;
 
-import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import java.util.Collections;
 import java.util.Map;
 

@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.trino.connector;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.google.common.base.Preconditions;
@@ -64,7 +64,7 @@ public class GravitinoConnector implements Connector {
             session, gravitinoTransactionHandle.getInternalTransactionHandle());
     Preconditions.checkNotNull(internalMetadata);
 
-    GravitinoMetaLake metalake = catalogConnectorContext.getMetalake();
+    GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
 
     CatalogConnectorMetadata catalogConnectorMetadata =
         new CatalogConnectorMetadata(metalake, catalogIdentifier);

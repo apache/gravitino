@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import com.datastrato.gravitino.connector.BaseColumn;
 import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Iceberg column. */

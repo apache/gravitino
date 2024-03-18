@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.ToString;

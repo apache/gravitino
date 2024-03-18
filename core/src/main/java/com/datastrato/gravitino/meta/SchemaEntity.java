@@ -40,6 +40,12 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
 
   private Map<String, String> properties;
 
+  private SchemaEntity() {}
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /**
    * Returns an unmodifiable map of the fields and their corresponding values for this schema.
    *

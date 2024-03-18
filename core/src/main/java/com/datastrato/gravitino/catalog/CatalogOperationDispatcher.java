@@ -6,6 +6,8 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.datastrato.gravitino.EntityStore;
@@ -13,9 +15,9 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.file.EntityCombinedFileset;
-import com.datastrato.gravitino.catalog.rel.EntityCombinedSchema;
-import com.datastrato.gravitino.catalog.rel.EntityCombinedTable;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -126,7 +128,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.schemaPropertiesMetadata().validatePropertyForCreate(properties);
+                  validatePropertyForCreate(p.schemaPropertiesMetadata(), properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -447,7 +449,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.tablePropertiesMetadata().validatePropertyForCreate(properties);
+                  validatePropertyForCreate(p.tablePropertiesMetadata(), properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -686,7 +688,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.filesetPropertiesMetadata().validatePropertyForCreate(properties);
+                  validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -804,7 +806,7 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
                 p -> {
                   Map<String, String> upserts = getPropertiesForSet(changes);
                   Map<String, String> deletes = getPropertiesForDelete(changes);
-                  provider.apply(p).validatePropertyForAlter(upserts, deletes);
+                  validatePropertyForAlter(provider.apply(p), upserts, deletes);
                   return null;
                 }),
         IllegalArgumentException.class);

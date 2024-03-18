@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -12,9 +12,10 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -27,7 +28,6 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
@@ -68,7 +68,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_METADATA =
       new HadoopFilesetPropertiesMetadata();
 
-  private final CatalogEntity entity;
+  private CatalogInfo info;
 
   private final EntityStore store;
 
@@ -77,17 +77,17 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
   // For testing only.
-  HadoopCatalogOperations(CatalogEntity entity, EntityStore store) {
-    this.entity = entity;
+  HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
 
-  public HadoopCatalogOperations(CatalogEntity entity) {
-    this(entity, GravitinoEnv.getInstance().entityStore());
+  public HadoopCatalogOperations() {
+    this(GravitinoEnv.getInstance().entityStore());
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Initialize Hadoop Configuration.
     this.hadoopConf = new Configuration();
     Map<String, String> bypassConfigs =

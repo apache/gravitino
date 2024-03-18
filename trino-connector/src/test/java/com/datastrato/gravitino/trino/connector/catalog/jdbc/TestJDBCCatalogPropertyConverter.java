@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogP
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_URL_KEY;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import java.util.Map;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;

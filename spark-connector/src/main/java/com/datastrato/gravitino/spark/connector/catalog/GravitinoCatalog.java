@@ -382,6 +382,24 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
       return com.datastrato.gravitino.rel.TableChange.renameColumn(
           renameColumn.fieldNames(), renameColumn.newName());
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      TableChange.UpdateColumnPosition sparkUpdateColumnPosition =
+          (TableChange.UpdateColumnPosition) change;
+      com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition gravitinoUpdateColumnPosition =
+          (com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition)
+              com.datastrato.gravitino.rel.TableChange.updateColumnPosition(
+                  sparkUpdateColumnPosition.fieldNames(),
+                  transformColumnPosition(sparkUpdateColumnPosition.position()));
+      Preconditions.checkArgument(
+          !(gravitinoUpdateColumnPosition.getPosition()
+              instanceof com.datastrato.gravitino.rel.TableChange.Default),
+          "Doesn't support alter column position without specifying position");
+      return gravitinoUpdateColumnPosition;
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      TableChange.UpdateColumnComment updateColumnComment =
+          (TableChange.UpdateColumnComment) change;
+      return com.datastrato.gravitino.rel.TableChange.updateColumnComment(
+          updateColumnComment.fieldNames(), updateColumnComment.newComment());
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

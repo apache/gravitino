@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 
 public class HadoopSchema extends BaseSchema {
 

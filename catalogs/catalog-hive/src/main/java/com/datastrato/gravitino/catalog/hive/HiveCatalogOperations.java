@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
@@ -12,15 +11,17 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PR
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -28,7 +29,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -89,7 +89,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting HiveConf hiveConf;
 
-  private final CatalogEntity entity;
+  private CatalogInfo info;
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
@@ -112,22 +112,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
 
   /**
-   * Constructs a new instance of HiveCatalogOperations.
-   *
-   * @param entity The catalog entity associated with this operations instance.
-   */
-  public HiveCatalogOperations(CatalogEntity entity) {
-    this.entity = entity;
-  }
-
-  /**
    * Initializes the Hive catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Hive catalog operations.
+   * @param info The catalog info associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf) throws RuntimeException {
+  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
     this.schemaPropertiesMetadata = new HiveSchemaPropertiesMetadata();
@@ -176,7 +169,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
 
         // The id of entity is a random unique id.
-        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
+        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
         keytabFile.deleteOnExit();
         if (keytabFile.exists() && !keytabFile.delete()) {
           throw new IllegalStateException(
@@ -211,7 +204,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
-                1, getThreadFactory(String.format("Kerberos-check-%s", entity.id())));
+                1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
@@ -263,7 +256,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, entity.id()));
+    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
     if (keytabFile.exists() && !keytabFile.delete()) {
       LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
     }

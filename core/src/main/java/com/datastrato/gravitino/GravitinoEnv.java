@@ -8,7 +8,7 @@ import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
-import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;

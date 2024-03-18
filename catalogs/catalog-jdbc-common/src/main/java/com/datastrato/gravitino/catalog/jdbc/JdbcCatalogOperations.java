@@ -4,13 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -20,6 +18,9 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -27,7 +28,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -70,7 +70,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
 
-  private final CatalogEntity entity;
+  private CatalogInfo info;
 
   private final JdbcExceptionConverter exceptionConverter;
 
@@ -87,7 +87,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
-   * @param entity The catalog entity associated with this operations instance.
    * @param exceptionConverter The exception converter to be used by the operations.
    * @param jdbcTypeConverter The type converter to be used by the operations.
    * @param databaseOperation The database operations to be used by the operations.
@@ -95,14 +94,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param jdbcTablePropertiesMetadata The table properties metadata to be used by the operations.
    */
   public JdbcCatalogOperations(
-      CatalogEntity entity,
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
       JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
-    this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
@@ -115,10 +112,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Initializes the Jdbc catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Jdbc catalog operations.
+   * @param info The catalog info associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf) throws RuntimeException {
+  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
