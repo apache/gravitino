@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  lint-and-test:
+  test:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -18,6 +18,10 @@ jobs:
       - name: Install dependencies
         run: |
           cd clients/client-python
-          pip install -i requirements.txt
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip list
+          python pip install -i requirements.txt
+          python -m pip list
       - name: Unit tests
         run: pytest
