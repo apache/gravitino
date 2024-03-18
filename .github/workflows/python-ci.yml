@@ -17,11 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          cd clients/client-python
           python --version
           python -m pip install --upgrade pip
           python -m pip list
-          python -m pip install -i requirements.txt
+          python -m pip install -i clients/client-python/requirements.txt
           python -m pip list
       - name: Unit tests
-        run: pytest
+        run: pytest clients/client-python/tests
