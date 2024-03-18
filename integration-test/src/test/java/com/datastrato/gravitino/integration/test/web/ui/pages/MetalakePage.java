@@ -17,8 +17,6 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
-  public int sleepTimeMillis = 1_000;
-
   @FindBy(
       xpath =
           "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
@@ -57,10 +55,11 @@ public class MetalakePage extends AbstractWebIT {
   @FindBy(xpath = "//button[@data-refer='add-metalake-props']")
   public WebElement addMetalakePropsBtn;
 
-  @FindBy(xpath = "//button[@aria-label='Go to next page']")
+  @FindBy(xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to next page']")
   public WebElement nextPageBtn;
 
-  @FindBy(xpath = "//button[@aria-label='Go to previous page']")
+  @FindBy(
+      xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to previous page']")
   public WebElement prevPageBtn;
 
   public MetalakePage() {
@@ -94,8 +93,14 @@ public class MetalakePage extends AbstractWebIT {
   }
 
   public void setQueryInput(String queryInput) {
-    clearQueryInput();
-    queryMetalakeInput.sendKeys(queryInput);
+    try {
+      Thread.sleep(AbstractWebIT.SLEEP_MILLIS);
+      clearQueryInput();
+      queryMetalakeInput.sendKeys(queryInput);
+      Thread.sleep(AbstractWebIT.SLEEP_MILLIS);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void clearQueryInput() {
@@ -107,26 +112,31 @@ public class MetalakePage extends AbstractWebIT {
   public void clickDeleteMetalakeBtn(String name) {
     try {
       String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
-      WebElement deleteMetalakeBtn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, AbstractWebIT.MAX_TIMEOUT);
-      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-      deleteMetalakeBtn.click();
-      Thread.sleep(sleepTimeMillis);
+      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
+      clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
   }
 
   public void clickViewMetalakeBtn(String name) {
-    String xpath = "//button[@data-refer='view-metalake-" + name + "']";
-    WebElement viewMetalakeBtn = driver.findElement(By.xpath(xpath));
-    viewMetalakeBtn.click();
+    try {
+      String xpath = "//button[@data-refer='view-metalake-" + name + "']";
+      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
+      clickAndWait(By.xpath(xpath));
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void clickEditMetalakeBtn(String name) {
-    String xpath = "//button[@data-refer='edit-metalake-" + name + "']";
-    WebElement editMetalakeBtn = driver.findElement(By.xpath(xpath));
-    editMetalakeBtn.click();
+    try {
+      String xpath = "//button[@data-refer='edit-metalake-" + name + "']";
+      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
+      clickAndWait(By.xpath(xpath));
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void clickMetalakeLink(String name) {
@@ -237,9 +247,6 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyEmptyMetalake() {
     try {
-      // To prevent errors in actions, it is necessary to wait for the completion of frontend delay
-      // animations before proceeding with the next step of operation verification.
-      Thread.sleep(sleepTimeMillis);
       String xpath =
           "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
 
@@ -260,12 +267,8 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyChangePagination() {
     try {
-      Thread.sleep(500);
-      if (!nextPageBtn.isEnabled()) {
-        return false;
-      }
-      nextPageBtn.click();
-
+      waitElementClickable(nextPageBtn, AbstractWebIT.MAX_TIMEOUT);
+      clickElementAndWait(nextPageBtn);
       // Check if the previous page button is available
       return prevPageBtn.isEnabled() && performPrevPageAction();
     } catch (Exception e) {
@@ -275,8 +278,8 @@ public class MetalakePage extends AbstractWebIT {
 
   private boolean performPrevPageAction() {
     try {
-      Thread.sleep(500);
-      prevPageBtn.click();
+      waitElementClickable(prevPageBtn, AbstractWebIT.MAX_TIMEOUT);
+      clickElementAndWait(prevPageBtn);
       return true;
     } catch (Exception e) {
       return false;
@@ -285,9 +288,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyQueryMetalake(String name) {
     try {
-      Thread.sleep(sleepTimeMillis);
       setQueryInput(name);
-      Thread.sleep(sleepTimeMillis);
       List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
       // Check if the text in the first row matches the search input
       boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
