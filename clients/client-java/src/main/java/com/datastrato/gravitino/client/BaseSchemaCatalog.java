@@ -6,6 +6,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.client.api.SupportsSchema;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
@@ -35,13 +36,16 @@ import org.slf4j.LoggerFactory;
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas, SupportsSchema {
   private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
+  /** The namespace of current catalog, which is the metalake name. */
+  protected final Namespace namespace;
 
   BaseSchemaCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -51,6 +55,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
+    Namespace.checkCatalog(namespace);
+    this.namespace = namespace;
   }
 
   @Override
@@ -193,6 +199,47 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
       LOG.warn("Failed to drop schema {}", ident, e);
       return false;
     }
+  }
+
+  @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    return listSchemas(Namespace.ofSchema(namespace.level(0), name()));
+  }
+
+  @Override
+  public boolean schemaExists(String schemaName) {
+    try {
+      loadSchema(schemaName);
+      return true;
+    } catch (NoSuchSchemaException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ofSchemaIdentifier(schemaName), comment, properties);
+  }
+
+  @Override
+  public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
+    return loadSchema(ofSchemaIdentifier(schemaName));
+  }
+
+  @Override
+  public Schema alterSchema(String schemaName, SchemaChange... changes)
+      throws NoSuchSchemaException {
+    return alterSchema(ofSchemaIdentifier(schemaName), changes);
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    return dropSchema(ofSchemaIdentifier(schemaName), cascade);
+  }
+
+  private NameIdentifier ofSchemaIdentifier(String schemaName) {
+    return NameIdentifier.ofSchema(namespace.level(0), this.name(), schemaName);
   }
 
   @VisibleForTesting

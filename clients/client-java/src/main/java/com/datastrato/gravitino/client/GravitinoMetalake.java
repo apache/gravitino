@@ -9,6 +9,7 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.client.api.SupportsCatalog;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
@@ -35,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * as sub-level metadata collections. With {@link GravitinoMetalake}, users can list, create, load,
  * alter and drop a catalog with specified identifier.
  */
-public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
+public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, SupportsCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
 
@@ -94,7 +95,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -132,7 +133,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -165,7 +166,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -192,6 +193,47 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
       LOG.warn("Failed to drop catalog {}", ident, e);
       return false;
     }
+  }
+
+  @Override
+  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+    return listCatalogs(Namespace.ofCatalog(name()));
+  }
+
+  @Override
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
+    return loadCatalog(ofCatalogIdentifier(catalogName));
+  }
+
+  @Override
+  public boolean catalogExists(String catalogName) {
+    return catalogExists(ofCatalogIdentifier(catalogName));
+  }
+
+  @Override
+  public Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(ofCatalogIdentifier(catalogName), type, provider, comment, properties);
+  }
+
+  @Override
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
+      throws NoSuchCatalogException, IllegalArgumentException {
+    return alterCatalog(ofCatalogIdentifier(catalogName), changes);
+  }
+
+  @Override
+  public boolean dropCatalog(String catalogName) {
+    return dropCatalog(ofCatalogIdentifier(catalogName));
+  }
+
+  private NameIdentifier ofCatalogIdentifier(String catalogName) {
+    return NameIdentifier.ofCatalog(this.name(), catalogName);
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {
