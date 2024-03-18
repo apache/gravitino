@@ -22,7 +22,7 @@ jobs:
           python -m pip list
           echo ${{ github.workspace }}/clients/client-python/requirements.txt
           cat ${{ github.workspace }}/clients/client-python/requirements.txt
-          python -m pip install -i ${{ github.workspace }}/clients/client-python/requirements.txt
+          python -m pip install -r ${{ github.workspace }}/clients/client-python/requirements.txt
           python -m pip list
       - name: Unit tests
         run: pytest ${{ github.workspace }}/clients/client-python/tests
