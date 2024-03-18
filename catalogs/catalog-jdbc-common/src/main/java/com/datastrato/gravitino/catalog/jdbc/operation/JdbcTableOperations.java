@@ -134,7 +134,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check the
       // result
-      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
       boolean found = false;
       // Handle case-sensitive issues.
       while (table.next() && !found) {
@@ -402,7 +402,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected JdbcTable.Builder getBasicJdbcTableInfo(ResultSet table) throws SQLException {
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withName(table.getString("TABLE_NAME"))
         .withComment(table.getString("REMARKS"))
         .withAuditInfo(AuditInfo.EMPTY);
@@ -421,7 +421,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     Expression defaultValue =
         columnDefaultValueConverter.toGravitino(typeBean, columnDef, isExpression, nullable);
 
-    return new JdbcColumn.Builder()
+    return JdbcColumn.builder()
         .withName(column.getString("COLUMN_NAME"))
         .withType(typeConverter.toGravitinoType(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)

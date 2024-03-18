@@ -170,7 +170,7 @@ public class TableDTO implements Table {
     protected IndexDTO[] indexes;
 
     /** Default constructor. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Sets the name of the table.
@@ -293,6 +293,15 @@ public class TableDTO implements Table {
           distributionDTO,
           sortOrderDTOs,
           indexes);
+    }
+
+    /**
+     * Creates a new instance of {@link Builder}.
+     *
+     * @return The new instance.
+     */
+    public static Builder builder() {
+      return new Builder();
     }
   }
 }

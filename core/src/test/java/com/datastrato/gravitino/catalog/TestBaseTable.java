@@ -27,6 +27,8 @@ final class BaseTableExtension extends BaseTable {
   }
 
   public static class Builder extends BaseTableBuilder<Builder, BaseTableExtension> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected BaseTableExtension internalBuild() {
@@ -39,6 +41,15 @@ final class BaseTableExtension extends BaseTable {
       table.partitioning = partitioning;
       return table;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }
 
@@ -53,7 +64,7 @@ public class TestBaseTable {
         AuditInfo.builder().withCreator("Justin").withCreateTime(Instant.now()).build();
 
     BaseTable table =
-        new BaseTableExtension.Builder()
+        BaseTableExtension.builder()
             .withName("testTableName")
             .withComment("testTableComment")
             .withColumns(new Column[0])

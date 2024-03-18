@@ -98,7 +98,7 @@ public class SchemaPO {
   public static class Builder {
     private final SchemaPO schemaPO;
 
-    public Builder() {
+    private Builder() {
       schemaPO = new SchemaPO();
     }
 
@@ -167,5 +167,13 @@ public class SchemaPO {
       validate();
       return schemaPO;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

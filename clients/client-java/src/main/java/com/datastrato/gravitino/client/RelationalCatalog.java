@@ -273,7 +273,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     /** The REST client to send the requests. */
     private RESTClient restClient;
 
-    private Builder() {}
+    protected Builder() {}
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;

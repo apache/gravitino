@@ -362,7 +362,7 @@ public class JsonUtils {
             node);
         Type dataType = readDataType(node.get(DATA_TYPE));
         String value = getStringOrNull(LITERAL_VALUE, node);
-        return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
+        return LiteralDTO.builder().withDataType(dataType).withValue(value).build();
       case FIELD:
         Preconditions.checkArgument(
             node.has(FIELD_NAME),
@@ -382,7 +382,7 @@ public class JsonUtils {
         String functionName = getString(FUNCTION_NAME, node);
         List<FunctionArg> args = Lists.newArrayList();
         node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
-        return new FuncExpressionDTO.Builder()
+        return FuncExpressionDTO.builder()
             .withFunctionName(functionName)
             .withFunctionArgs(args.toArray(FunctionArg.EMPTY_ARGS))
             .build();
@@ -998,7 +998,7 @@ public class JsonUtils {
       Preconditions.checkArgument(
           node.has(SORT_TERM), "Cannot parse sort order from missing sort term: %s", node);
       FunctionArg sortTerm = readFunctionArg(node.get(SORT_TERM));
-      SortOrderDTO.Builder builder = new SortOrderDTO.Builder().withSortTerm(sortTerm);
+      SortOrderDTO.Builder builder = SortOrderDTO.builder().withSortTerm(sortTerm);
       if (node.has(DIRECTION)) {
         builder.withDirection(SortDirection.fromString(getString(DIRECTION, node)));
       }
@@ -1036,7 +1036,7 @@ public class JsonUtils {
           node != null && !node.isNull() && node.isObject(),
           "Cannot parse distribution from invalid JSON: %s",
           node);
-      DistributionDTO.Builder builder = new DistributionDTO.Builder();
+      DistributionDTO.Builder builder = DistributionDTO.builder();
       if (node.has(STRATEGY)) {
         String strategy = getString(STRATEGY, node);
         builder.withStrategy(Strategy.getByName(strategy));
@@ -1234,7 +1234,7 @@ public class JsonUtils {
           "Index must be a valid JSON object, but found: %s",
           node);
 
-      IndexDTO.Builder builder = new IndexDTO.Builder();
+      IndexDTO.Builder builder = IndexDTO.builder();
       Preconditions.checkArgument(
           node.has(INDEX_TYPE), "Cannot parse index from missing type: %s", node);
       String indexType = getString(INDEX_TYPE, node);

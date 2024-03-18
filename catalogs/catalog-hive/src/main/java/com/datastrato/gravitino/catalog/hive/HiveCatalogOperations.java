@@ -308,7 +308,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       HiveSchema hiveSchema =
-          new HiveSchema.Builder()
+          HiveSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
@@ -701,7 +701,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       }
 
       HiveTable hiveTable =
-          new HiveTable.Builder()
+          HiveTable.builder()
               .withName(tableIdent.name())
               .withSchemaName(schemaIdent.name())
               .withClientPool(clientPool)

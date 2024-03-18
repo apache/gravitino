@@ -47,7 +47,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.LongType.get())
             .withComment("increment key")
@@ -55,16 +55,15 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(INT)
             .withNullable(false)
             .withComment("set test key")
             .build());
+    columns.add(JdbcColumn.builder().withName("col_3").withType(INT).withNullable(true).build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(true).build());
-    columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_4")
             .withType(VARCHAR)
             // TODO: uncomment this line when default value is supported
@@ -97,7 +96,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
 
     // alter table
     JdbcColumn newColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_5")
             .withType(VARCHAR)
             .withComment("new_add")
@@ -115,7 +114,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     List<JdbcColumn> alterColumns = new ArrayList<JdbcColumn>();
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.LongType.get())
             .withComment("test_new_comment")
@@ -123,7 +122,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(Types.DecimalType.of(10, 2))
             .withNullable(false)
@@ -141,7 +140,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.clear();
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1_new")
             .withType(Types.LongType.get())
             .withComment("test_new_comment")
@@ -149,7 +148,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(Types.DoubleType.get())
             .withNullable(false)
@@ -165,7 +164,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.clear();
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1_new")
             .withType(Types.LongType.get())
             .withComment("test_new_comment")
@@ -173,7 +172,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     alterColumns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(Types.DoubleType.get())
             .withNullable(true)
@@ -216,83 +215,82 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.BooleanType.get())
             .withNullable(true)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(Types.ShortType.get())
             .withNullable(false)
             .build());
+    columns.add(JdbcColumn.builder().withName("col_3").withType(INT).withNullable(true).build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(true).build());
-    columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_4")
             .withType(Types.LongType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_5")
             .withType(Types.FloatType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_6")
             .withType(Types.DoubleType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_7")
             .withType(Types.DateType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_8")
             .withType(Types.TimeType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_9")
             .withType(Types.TimestampType.withoutTimeZone())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_10")
             .withType(Types.TimestampType.withTimeZone())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_11")
             .withType(Types.DecimalType.of(10, 2))
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_12").withType(VARCHAR).withNullable(false).build());
+        JdbcColumn.builder().withName("col_12").withType(VARCHAR).withNullable(false).build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_13")
             .withType(Types.FixedCharType.of(10))
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_14")
             .withType(Types.StringType.get())
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_15")
             .withType(Types.BinaryType.get())
             .withNullable(false)
@@ -350,7 +348,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         TEST_DB_NAME,
         table_1,
         new JdbcColumn[] {
-          new JdbcColumn.Builder()
+          JdbcColumn.builder()
               .withName("col_1")
               .withType(VARCHAR)
               .withComment("test_comment_col1")
@@ -378,7 +376,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         TEST_DB_NAME,
         table_2,
         new JdbcColumn[] {
-          new JdbcColumn.Builder()
+          JdbcColumn.builder()
               .withName("col_1")
               .withType(VARCHAR)
               .withComment("test_comment_col1")
@@ -416,7 +414,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.LongType.get())
             .withComment("increment key")
@@ -424,7 +422,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(INT)
             .withNullable(false)
@@ -451,7 +449,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
 
     columns.clear();
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.ShortType.get())
             .withComment("increment key")
@@ -459,7 +457,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(INT)
             .withNullable(false)
@@ -493,7 +491,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_1")
             .withType(Types.LongType.get())
             .withComment("increment key")
@@ -501,21 +499,21 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withAutoIncrement(true)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_2")
             .withType(INT)
             .withNullable(false)
             .withComment("id-1")
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_3")
             .withType(VARCHAR)
             .withNullable(false)
             .withComment("name")
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_4")
             .withType(VARCHAR)
             .withNullable(false)

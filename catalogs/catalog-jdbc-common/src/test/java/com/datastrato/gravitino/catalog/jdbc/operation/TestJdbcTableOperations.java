@@ -111,7 +111,7 @@ public class TestJdbcTableOperations {
     JdbcColumn[] columns = generateRandomColumn(1, 4);
     // Sqlite does not support the comment and default value attribute, so it is not set here
     JdbcColumn col_a =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_a")
             .withNullable(true)
             .withType(Types.IntegerType.get())
@@ -119,7 +119,7 @@ public class TestJdbcTableOperations {
             .withDefaultValue(null)
             .build();
     JdbcColumn col_b =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_b")
             .withNullable(false)
             .withType(Types.StringType.get())
@@ -190,7 +190,7 @@ public class TestJdbcTableOperations {
     JdbcColumn[] columns = new JdbcColumn[r.nextInt(maxSize - minSize) + minSize];
     for (int j = 0; j < columns.length; j++) {
       columns[j] =
-          new JdbcColumn.Builder()
+          JdbcColumn.builder()
               .withName(prefixColName + (j + 1))
               .withNullable(r.nextBoolean())
               .withType(getRandomGravitinoType())
