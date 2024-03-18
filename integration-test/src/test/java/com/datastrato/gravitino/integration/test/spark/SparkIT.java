@@ -53,9 +53,9 @@ public class SparkIT extends SparkEnvIT {
           DataTypes.createStructType(
               Arrays.asList(
                   DataTypes.createStructField(
-                      "a", DataTypes.createArrayType(DataTypes.IntegerType), true),
+                      "col1", DataTypes.createArrayType(DataTypes.IntegerType), true),
                   DataTypes.createStructField(
-                      "b",
+                      "col2",
                       DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
                       true))),
           "struct(array(1, 2, 3), map('a', 1, 'b', 2))");
@@ -429,7 +429,7 @@ public class SparkIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: INT, col2: STRING> COMMENT 'struct')",
+            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: ARRAY<INT>, col2: MAP<STRING, INT>> COMMENT 'struct')",
             tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
     List<SparkColumnInfo> expectedSparkInfo =
@@ -443,8 +443,12 @@ public class SparkIT extends SparkEnvIT {
                 "col3",
                 DataTypes.createStructType(
                     Arrays.asList(
-                        DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-                        DataTypes.createStructField("col2", DataTypes.StringType, true))),
+                        DataTypes.createStructField(
+                            "col1", DataTypes.createArrayType(DataTypes.IntegerType), true),
+                        DataTypes.createStructField(
+                            "col2",
+                            DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                            true))),
                 "struct"));
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
 
