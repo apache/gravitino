@@ -76,6 +76,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
+    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
@@ -90,6 +91,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(position, addColumn.getPosition());
+    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
@@ -103,6 +105,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertNull(addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
+    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test

@@ -365,7 +365,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .withNullable(false)
             .build());
     columns.add(
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_5")
             .withType(VARCHAR)
             .withComment("txt5")

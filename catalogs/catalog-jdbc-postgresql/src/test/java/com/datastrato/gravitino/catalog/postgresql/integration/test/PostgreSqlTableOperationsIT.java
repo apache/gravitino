@@ -105,7 +105,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withNullable(true)
             .build();
     JdbcColumn newColumn1 =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_6")
             .withType(Types.BooleanType.get())
             .withComment("new_add")

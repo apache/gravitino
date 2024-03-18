@@ -482,8 +482,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           Arrays.stream(columns)
               .map(
                   column -> {
-                      IcebergTableOpsHelper.validateColumnDefaultValue(
-                              column.name(), column.defaultValue());
+                    IcebergTableOpsHelper.validateColumnDefaultValue(
+                        column.name(), column.defaultValue());
                     return IcebergColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
