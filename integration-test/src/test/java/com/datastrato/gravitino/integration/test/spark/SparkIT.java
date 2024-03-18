@@ -41,7 +41,24 @@ public class SparkIT extends SparkEnvIT {
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
-      ImmutableMap.of(DataTypes.IntegerType, "2", DataTypes.StringType, "'gravitino_it_test'");
+      ImmutableMap.of(
+          DataTypes.IntegerType,
+          "2",
+          DataTypes.StringType,
+          "'gravitino_it_test'",
+          DataTypes.createArrayType(DataTypes.IntegerType),
+          "array(1, 2, 3)",
+          DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+          "map('a', 1, 'b', 2)",
+          DataTypes.createStructType(
+              Arrays.asList(
+                  DataTypes.createStructField(
+                      "a", DataTypes.createArrayType(DataTypes.IntegerType), true),
+                  DataTypes.createStructField(
+                      "b",
+                      DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                      true))),
+          "struct(array(1, 2, 3), map('a', 1, 'b', 2))");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
