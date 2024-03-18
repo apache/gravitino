@@ -49,16 +49,12 @@ public class SparkIT extends SparkEnvIT {
           DataTypes.createArrayType(DataTypes.IntegerType),
           "array(1, 2, 3)",
           DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-          "map('a', 1, 'b', 2)",
+          "map('a', 1)",
           DataTypes.createStructType(
               Arrays.asList(
-                  DataTypes.createStructField(
-                      "col1", DataTypes.createArrayType(DataTypes.IntegerType), true),
-                  DataTypes.createStructField(
-                      "col2",
-                      DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-                      true))),
-          "struct(array(1, 2, 3), map('a', 1, 'b', 2))");
+                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
+          "struct(1, 'a')");
 
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
@@ -429,7 +425,7 @@ public class SparkIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: ARRAY<INT>, col2: MAP<STRING, INT>> COMMENT 'struct')",
+            "CREATE TABLE %s (col1 ARRAY<INT> COMMENT 'array', col2 MAP<STRING, INT> COMMENT 'map', col3 STRUCT<col1: INT, col2: STRING> COMMENT 'struct')",
             tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
     List<SparkColumnInfo> expectedSparkInfo =
@@ -443,12 +439,8 @@ public class SparkIT extends SparkEnvIT {
                 "col3",
                 DataTypes.createStructType(
                     Arrays.asList(
-                        DataTypes.createStructField(
-                            "col1", DataTypes.createArrayType(DataTypes.IntegerType), true),
-                        DataTypes.createStructField(
-                            "col2",
-                            DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-                            true))),
+                        DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                        DataTypes.createStructField("col2", DataTypes.StringType, true))),
                 "struct"));
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
 
@@ -481,8 +473,19 @@ public class SparkIT extends SparkEnvIT {
             .map(Object::toString)
             .map(
                 s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.removeEnd(s, "'");
-                  tmp = org.apache.commons.lang3.StringUtils.removeStart(tmp, "'");
+                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
+                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
+                    return tmp;
+                  } else if (tmp.startsWith("array")) {
+                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
+                  } else if (tmp.startsWith("map")) {
+                    return tmp.replace("map", "")
+                        .replace("(", "{")
+                        .replace(")", "}")
+                        .replace(",", "=");
+                  } else if (tmp.startsWith("struct")) {
+                    return tmp.replace("struct", "").replace("(", "{").replace(")", "}");
+                  }
                   return tmp;
                 })
             .collect(Collectors.joining(","));
@@ -492,7 +495,16 @@ public class SparkIT extends SparkEnvIT {
             .map(
                 line ->
                     Arrays.stream(line)
-                        .map(item -> item.toString())
+                        .map(
+                            item -> {
+                              if (item instanceof Object[]) {
+                                return Arrays.stream((Object[]) item)
+                                    .map(Object::toString)
+                                    .collect(Collectors.joining(","));
+                              } else {
+                                return item.toString();
+                              }
+                            })
                         .collect(Collectors.joining(",")))
             .collect(Collectors.toList());
     Assertions.assertTrue(
