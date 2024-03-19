@@ -22,6 +22,19 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.jsqlparser)
   implementation(libs.slf4j.api)
+
+  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
+  testImplementation(libs.commons.lang3)
+  testImplementation(libs.guava)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
@@ -64,6 +77,10 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
+
+    doFirst {
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.0")
+    }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
