@@ -44,6 +44,7 @@ public final class KvGarbageCollector implements Closeable {
   private final KvBackend kvBackend;
   private final Config config;
   private final EntityKeyEncoder<byte[]> entityKeyEncoder;
+  private long dateTimeLineMillis;
 
   private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
@@ -58,20 +59,23 @@ public final class KvGarbageCollector implements Closeable {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
+  @SuppressWarnings("deprecation")
   public KvGarbageCollector(
       KvBackend kvBackend, Config config, EntityKeyEncoder<byte[]> entityKeyEncoder) {
     this.kvBackend = kvBackend;
     this.config = config;
     this.entityKeyEncoder = entityKeyEncoder;
+
+    // If users use the deprecated configuration, we will give priority to the deprecated value,
+    // otherwise the new configuration and its default values will be used.
+    this.dateTimeLineMillis = config.get(STORE_DELETE_AFTER_TIME);
+    if (null != config.get(KV_DELETE_AFTER_TIME)) {
+      this.dateTimeLineMillis = config.get(KV_DELETE_AFTER_TIME);
+    }
   }
 
   public void start() {
-    // If users use the deprecated configuration, we will give priority to the deprecated value,
-    // otherwise the new configuration and its default values will be used.
-    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
-    if (null != config.get(KV_DELETE_AFTER_TIME)) {
-      dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
-    }
+    long dateTimeLineMinute = dateTimeLineMillis / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -125,7 +129,7 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveOldVersionData() throws IOException {
-    long deleteTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
+    long deleteTimeLine = System.currentTimeMillis() - dateTimeLineMillis;
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
     // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
     // is smaller than transactionIdToDelete)
