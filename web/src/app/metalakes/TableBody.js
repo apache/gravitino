@@ -232,6 +232,7 @@ const TableBody = props => {
           },
           maxHeight: 'calc(100vh - 23.2rem)'
         }}
+        data-refer='metalake-table-grid'
         getRowId={row => row?.name}
         rows={store.filteredMetalakes}
         columns={columns}
