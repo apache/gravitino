@@ -127,8 +127,9 @@ class TestKvGarbageCollector {
       // 0x1E, last_timestamp can be seen as they have not been stored to the backend.
       Assertions.assertEquals(7, allData.size());
 
-      KvGarbageCollector kvGarbageCollector = new KvGarbageCollector(kvBackend, config, null);
+      // Set the TTL to 2 seconds before the kvGarbageCollector is created
       Mockito.doReturn(2000L).when(config).get(STORE_DELETE_AFTER_TIME);
+      KvGarbageCollector kvGarbageCollector = new KvGarbageCollector(kvBackend, config, null);
 
       // Wait TTL time to make sure the data is expired, please see ENTITY_KV_TTL
       Thread.sleep(3000);

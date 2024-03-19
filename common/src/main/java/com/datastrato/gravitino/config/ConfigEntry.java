@@ -150,6 +150,9 @@ public class ConfigEntry<T> {
 
     this.validator =
         value -> {
+          if (null == value) {
+            return;
+          }
           if (((Comparable<T>) value).compareTo(min) < 0
               || ((Comparable<T>) value).compareTo(max) > 0) {
             throw new IllegalArgumentException(
