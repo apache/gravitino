@@ -2,8 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.spark;
+package com.datastrato.gravitino.integration.test.spark.hive;
 
+import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
