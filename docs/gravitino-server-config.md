@@ -101,11 +101,11 @@ default values in the catalog configuration file.
 These rules only apply to the catalog properties and don't affect the schema or table properties.
 :::
 
-Below is a list of catalog properties that will be used all Gravitino catalogs:
+Below is a list of catalog properties that will be used by all Gravitino catalogs:
 
-| Configuration item | Description                                                                                                         | Default value | Required | Since version |
-|--------------------|---------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `package`          | The path of the catalog package. Gravitino leverages this path to load the related catalog libs and configurations. | (none)        | No       | 0.5.0         |
+| Configuration item | Description                                                                                                                                                                                                                                                | Default value | Required | Since version |
+|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `package`          | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0         |
 
 
 The following table lists the catalog specific properties and their default paths:
