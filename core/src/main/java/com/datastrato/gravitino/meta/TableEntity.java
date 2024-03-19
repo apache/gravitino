@@ -121,7 +121,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
     private final TableEntity tableEntity;
 
-    public Builder() {
+    private Builder() {
       this.tableEntity = new TableEntity();
     }
 
@@ -149,5 +149,14 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       tableEntity.validate();
       return tableEntity;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

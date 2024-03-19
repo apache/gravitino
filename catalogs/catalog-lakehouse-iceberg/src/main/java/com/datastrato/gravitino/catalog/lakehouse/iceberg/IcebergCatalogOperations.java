@@ -4,14 +4,15 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -19,7 +20,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -72,7 +72,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private IcebergSchemaPropertiesMetadata icebergSchemaPropertiesMetadata;
 
-  private CatalogEntity entity;
+  private CatalogInfo info;
 
   private IcebergTableOpsHelper icebergTableOpsHelper;
 
@@ -84,8 +84,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
-    this.entity = entity;
+  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -156,7 +156,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     try {
       String currentUser = currentUser();
       IcebergSchema createdSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
@@ -201,7 +201,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       GetNamespaceResponse response =
           icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(
                   Optional.of(response)
@@ -257,7 +257,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
               .orElse(null);
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)
@@ -486,7 +486,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                         column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
                         "Iceberg does not support column default value. Illegal column: "
                             + column.name());
-                    return new IcebergColumn.Builder()
+                    return IcebergColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
                         .withComment(column.comment())
@@ -496,7 +496,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
-          new IcebergTable.Builder()
+          IcebergTable.builder()
               .withName(tableIdent.name())
               .withColumns(icebergColumns)
               .withComment(comment)

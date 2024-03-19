@@ -6,13 +6,13 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
 
-import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergSortOrder;
-import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -130,7 +130,7 @@ public class IcebergTable extends BaseTable {
     }
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
-    return new IcebergTable.Builder()
+    return IcebergTable.builder()
         .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, null))
         .withLocation(table.location())
         .withProperties(properties)
@@ -151,6 +151,8 @@ public class IcebergTable extends BaseTable {
 
   /** A builder class for constructing IcebergTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, IcebergTable> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     private String location;
 
@@ -190,5 +192,13 @@ public class IcebergTable extends BaseTable {
       }
       return icebergTable;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

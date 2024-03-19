@@ -33,7 +33,7 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
   @Override
   public FilesetEntity deserialize(Fileset p) {
     FilesetEntity.Builder builder =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(p.getId())
             .withName(p.getName())
             .withStorageLocation(p.getStorageLocation())

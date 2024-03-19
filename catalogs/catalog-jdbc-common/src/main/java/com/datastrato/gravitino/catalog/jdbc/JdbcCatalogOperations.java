@@ -4,13 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -20,6 +18,9 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -27,7 +28,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -70,7 +70,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
 
-  private CatalogEntity entity;
+  private CatalogInfo info;
 
   private final JdbcExceptionConverter exceptionConverter;
 
@@ -112,12 +112,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Initializes the Jdbc catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Jdbc catalog operations.
-   * @param entity The catalog entity associated with this operations instance.
+   * @param info The catalog info associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogEntity entity) throws RuntimeException {
-    this.entity = entity;
+  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -185,7 +185,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     resultProperties.remove(StringIdentifier.ID_KEY);
     databaseOperation.create(
         ident.name(), StringIdentifier.addToComment(identifier, comment), resultProperties);
-    return new JdbcSchema.Builder()
+    return JdbcSchema.builder()
         .withName(ident.name())
         .withProperties(resultProperties)
         .withComment(comment)
@@ -212,7 +212,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    return new JdbcSchema.Builder()
+    return JdbcSchema.builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
@@ -289,7 +289,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       // Remove id from comment
       comment = StringIdentifier.removeIdFromComment(comment);
     }
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
@@ -387,7 +387,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         Arrays.stream(columns)
             .map(
                 column ->
-                    new JdbcColumn.Builder()
+                    JdbcColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
                         .withComment(column.comment())
@@ -408,7 +408,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         partitioning,
         indexes);
 
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withAuditInfo(
             AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)

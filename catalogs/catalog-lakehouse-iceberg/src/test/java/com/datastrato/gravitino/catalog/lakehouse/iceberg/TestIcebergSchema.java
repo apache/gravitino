@@ -6,7 +6,8 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -145,7 +146,7 @@ public class TestIcebergSchema {
     Map<String, String> conf = Maps.newHashMap();
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(conf, entity);
+      ops.initialize(conf, entity.toCatalogInfo());
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
       PropertiesMetadata metadata = ops.schemaPropertiesMetadata();
@@ -154,7 +155,7 @@ public class TestIcebergSchema {
           Assertions.assertThrows(
               IllegalArgumentException.class,
               () -> {
-                metadata.validatePropertyForCreate(map);
+                PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map);
               });
       Assertions.assertTrue(
           illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));

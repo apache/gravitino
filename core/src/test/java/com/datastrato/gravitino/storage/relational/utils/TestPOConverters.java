@@ -337,9 +337,7 @@ public class TestPOConverters {
     SchemaEntity schema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
-    SchemaPO.Builder builder = new SchemaPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
+    SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -350,10 +348,8 @@ public class TestPOConverters {
   public void testInitTablePOVersion() {
     TableEntity tableEntity =
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
-    TablePO.Builder builder = new TablePO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    TablePO.Builder builder =
+        TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -370,10 +366,8 @@ public class TestPOConverters {
             "this is test",
             "hdfs://localhost/test",
             new HashMap<>());
-    FilesetPO.Builder builder = new FilesetPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -416,9 +410,7 @@ public class TestPOConverters {
     SchemaEntity updatedSchema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
-    SchemaPO.Builder builder = new SchemaPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
+    SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema);
     assertEquals(1, initPO.getCurrentVersion());
@@ -433,10 +425,8 @@ public class TestPOConverters {
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
     TableEntity updatedTable =
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
-    TablePO.Builder builder = new TablePO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    TablePO.Builder builder =
+        TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
     TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable);
     assertEquals(1, initPO.getCurrentVersion());
@@ -478,10 +468,8 @@ public class TestPOConverters {
             "hdfs://localhost/test",
             properties);
 
-    FilesetPO.Builder builder = new FilesetPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
     // map has updated
@@ -520,7 +508,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new BaseMetalake.Builder()
+    return BaseMetalake.builder()
         .withId(id)
         .withName(name)
         .withComment(comment)
@@ -536,7 +524,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new MetalakePO.Builder()
+    return MetalakePO.builder()
         .withMetalakeId(id)
         .withMetalakeName(name)
         .withMetalakeComment(comment)
@@ -573,7 +561,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new CatalogPO.Builder()
+    return CatalogPO.builder()
         .withCatalogId(id)
         .withCatalogName(name)
         .withMetalakeId(metalakeId)
@@ -594,7 +582,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -611,7 +599,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new SchemaPO.Builder()
+    return SchemaPO.builder()
         .withSchemaId(id)
         .withSchemaName(name)
         .withMetalakeId(metalakeId)
@@ -628,7 +616,7 @@ public class TestPOConverters {
   private static TableEntity createTable(Long id, String name, Namespace namespace) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -641,7 +629,7 @@ public class TestPOConverters {
       throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new TablePO.Builder()
+    return TablePO.builder()
         .withTableId(id)
         .withTableName(name)
         .withMetalakeId(metalakeId)
@@ -663,7 +651,7 @@ public class TestPOConverters {
       Map<String, String> properties) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -686,7 +674,7 @@ public class TestPOConverters {
       throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new FilesetPO.Builder()
+    return FilesetPO.builder()
         .withFilesetId(id)
         .withFilesetName(name)
         .withMetalakeId(metalakeId)
@@ -712,7 +700,7 @@ public class TestPOConverters {
       String storageLocation,
       Map<String, String> properties)
       throws JsonProcessingException {
-    return new FilesetVersionPO.Builder()
+    return FilesetVersionPO.builder()
         .withId(id)
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)

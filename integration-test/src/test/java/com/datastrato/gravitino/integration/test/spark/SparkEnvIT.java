@@ -7,7 +7,7 @@ package com.datastrato.gravitino.integration.test.spark;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
@@ -24,11 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
-public class SparkEnvIT extends SparkUtilIT {
+public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  protected final String hiveCatalogName = "hive";
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
@@ -62,14 +61,14 @@ public class SparkEnvIT extends SparkUtilIT {
 
   private void initMetalakeAndCatalogs() {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
 
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, hiveCatalogName),
+        NameIdentifier.of(metalakeName, getCatalogName()),
         Catalog.Type.RELATIONAL,
-        "hive",
+        getProvider(),
         "",
         properties);
   }
@@ -106,4 +105,8 @@ public class SparkEnvIT extends SparkUtilIT {
             .enableHiveSupport()
             .getOrCreate();
   }
+
+  protected abstract String getCatalogName();
+
+  protected abstract String getProvider();
 }

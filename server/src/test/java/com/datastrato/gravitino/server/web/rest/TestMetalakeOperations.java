@@ -28,8 +28,8 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -102,7 +102,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -136,7 +136,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
 
     BaseMetalake mockMetalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(1L)
             .withName("metalake")
             .withComment("comment")
@@ -185,7 +185,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -260,7 +260,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)

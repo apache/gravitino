@@ -12,7 +12,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueC
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import com.datastrato.gravitino.connector.BaseColumn;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
@@ -111,7 +111,7 @@ public class TestJdbcTableOperations {
     JdbcColumn[] columns = generateRandomColumn(1, 4);
     // Sqlite does not support the comment and default value attribute, so it is not set here
     JdbcColumn col_a =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_a")
             .withNullable(true)
             .withType(Types.IntegerType.get())
@@ -119,7 +119,7 @@ public class TestJdbcTableOperations {
             .withDefaultValue(null)
             .build();
     JdbcColumn col_b =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName("col_b")
             .withNullable(false)
             .withType(Types.StringType.get())
@@ -190,7 +190,7 @@ public class TestJdbcTableOperations {
     JdbcColumn[] columns = new JdbcColumn[r.nextInt(maxSize - minSize) + minSize];
     for (int j = 0; j < columns.length; j++) {
       columns[j] =
-          new JdbcColumn.Builder()
+          JdbcColumn.builder()
               .withName(prefixColName + (j + 1))
               .withNullable(r.nextBoolean())
               .withType(getRandomGravitinoType())

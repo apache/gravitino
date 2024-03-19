@@ -78,7 +78,7 @@ public class TestRelationalCatalog extends TestBase {
 
   protected static Catalog catalog;
 
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
 
   protected static final String metalakeName = "testMetalake";
 
@@ -93,14 +93,14 @@ public class TestRelationalCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
             .withProvider(provider)
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "k2"))
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     CatalogCreateRequest catalogCreateRequest =
@@ -400,7 +400,7 @@ public class TestRelationalCatalog extends TestBase {
               "comment2",
               false,
               false,
-              new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
+              LiteralDTO.builder().withValue(null).withDataType(Types.NullType.get()).build())
         };
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -953,21 +953,21 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(
-            new FunctionArg[] {new FieldReferenceDTO.Builder().withColumnName(columnName).build()})
+            new FunctionArg[] {FieldReferenceDTO.builder().withColumnName(columnName).build()})
         .build();
   }
 
   private SortOrderDTO[] createMockSortOrderDTO(String columnName, SortDirection direction) {
     return new SortOrderDTO[] {
-      new SortOrderDTO.Builder()
+      SortOrderDTO.builder()
           .withDirection(direction)
           .withNullOrder(direction.defaultNullOrdering())
           .withSortTerm(
-              new FieldReferenceDTO.Builder().withFieldName(new String[] {columnName}).build())
+              FieldReferenceDTO.builder().withFieldName(new String[] {columnName}).build())
           .build()
     };
   }
@@ -1113,12 +1113,11 @@ public class TestRelationalCatalog extends TestBase {
 
   protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
-    return new SchemaDTO.Builder()
+    return SchemaDTO.builder()
         .withName(name)
         .withComment(comment)
         .withProperties(props)
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -1175,15 +1174,14 @@ public class TestRelationalCatalog extends TestBase {
       DistributionDTO distributionDTO,
       SortOrderDTO[] sortOrderDTOs,
       IndexDTO[] indexDTOS) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(name)
         .withColumns(columns)
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(distributionDTO)
         .withSortOrders(sortOrderDTOs)
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .withPartitioning(partitioning)
         .withIndex(indexDTOS)
         .build();
