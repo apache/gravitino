@@ -46,6 +46,4 @@ const Layout = ({ children, scrollToTop }) => {
   )
 }
 
-// ** use dynamic export instead of export default Layout
-// export default dynamic(() => Promise.resolve(Layout), { ssr: false })
 export default Layout

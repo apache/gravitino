@@ -12,7 +12,7 @@ const Loading = ({ height }) => {
 
   return (
     <Box className={`${heightParams} twc-grow twc-flex twc-items-center twc-flex-col twc-justify-center`}>
-      <CircularProgress disableShrink sx={{ mt: 6, mb: 6 }} />
+      <CircularProgress disableShrink sx={{ my: 6 }} />
     </Box>
   )
 }
