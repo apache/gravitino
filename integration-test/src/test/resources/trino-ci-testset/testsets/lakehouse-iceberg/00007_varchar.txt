@@ -1,0 +1,21 @@
+CREATE SCHEMA
+
+USE
+
+<QUERY_FAILED> Iceberg does not support the datatype CHAR
+
+<QUERY_FAILED> Iceberg does not support the datatype CHAR
+
+<QUERY_FAILED> Iceberg does not support the datatype VARCHAR with length
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_iceberg"".varchar_db1.tb04 (
+   id integer,
+   name varchar
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP SCHEMA
