@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.doris.integration.test;
 
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,14 +17,17 @@ public class TestDorisDatabaseOperations extends TestDorisAbstractIT {
 
   @Test
   public void testBaseOperationDatabase() {
-    String databaseName = RandomNameUtils.genRandomName("ct_db");
+    String databaseName = RandomNameUtils.genRandomName("it_db");
     Map<String, String> properties = new HashMap<>();
-    String databaseComment = "test_comment";
+    properties.put("property1", "value1");
 
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> {
-          DATABASE_OPERATIONS.create(databaseName, databaseComment, properties);
-        });
+    testBaseOperation(databaseName, properties, null);
+
+    // recreate database, get exception.
+    Assertions.assertThrowsExactly(
+        SchemaAlreadyExistsException.class,
+        () -> DATABASE_OPERATIONS.create(databaseName, "", properties));
+
+    testDropDatabase(databaseName);
   }
 }
