@@ -99,7 +99,7 @@ public class FilesetVersionPO {
   public static class Builder {
     private final FilesetVersionPO filesetVersionPO;
 
-    public Builder() {
+    private Builder() {
       filesetVersionPO = new FilesetVersionPO();
     }
 
@@ -168,5 +168,14 @@ public class FilesetVersionPO {
       validate();
       return filesetVersionPO;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

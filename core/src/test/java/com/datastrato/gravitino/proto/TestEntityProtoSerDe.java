@@ -79,7 +79,7 @@ public class TestEntityProtoSerDe {
 
     // Test Metalake
     com.datastrato.gravitino.meta.BaseMetalake metalake =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withProperties(props)
@@ -97,7 +97,7 @@ public class TestEntityProtoSerDe {
 
     // Test metalake without props map
     com.datastrato.gravitino.meta.BaseMetalake metalake1 =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withAuditInfo(auditInfo)
@@ -152,7 +152,7 @@ public class TestEntityProtoSerDe {
     Long schemaId = 1L;
     String schemaName = "schema";
     com.datastrato.gravitino.meta.SchemaEntity schemaEntity =
-        new com.datastrato.gravitino.meta.SchemaEntity.Builder()
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -165,7 +165,7 @@ public class TestEntityProtoSerDe {
 
     // Test SchemaEntity with additional fields
     com.datastrato.gravitino.meta.SchemaEntity schemaEntity1 =
-        new com.datastrato.gravitino.meta.SchemaEntity.Builder()
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -184,7 +184,7 @@ public class TestEntityProtoSerDe {
     Long tableId = 1L;
     String tableName = "table";
     com.datastrato.gravitino.meta.TableEntity tableEntity =
-        new com.datastrato.gravitino.meta.TableEntity.Builder()
+        com.datastrato.gravitino.meta.TableEntity.builder()
             .withId(tableId)
             .withName(tableName)
             .withAuditInfo(auditInfo)
@@ -199,7 +199,7 @@ public class TestEntityProtoSerDe {
     Long fileId = 1L;
     String fileName = "file";
     com.datastrato.gravitino.meta.FilesetEntity fileEntity =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -214,7 +214,7 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(fileEntity, fileEntityFromBytes);
 
     com.datastrato.gravitino.meta.FilesetEntity fileEntity1 =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -229,7 +229,7 @@ public class TestEntityProtoSerDe {
     Assertions.assertNull(fileEntityFromBytes1.properties());
 
     com.datastrato.gravitino.meta.FilesetEntity fileEntity2 =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)

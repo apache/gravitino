@@ -18,6 +18,9 @@ public class TestTable extends BaseTable {
 
   public static class Builder extends BaseTable.BaseTableBuilder<Builder, TestTable> {
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     @Override
     protected TestTable internalBuild() {
       TestTable table = new TestTable();
@@ -31,5 +34,13 @@ public class TestTable extends BaseTable {
       table.partitioning = partitioning;
       return table;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

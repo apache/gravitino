@@ -54,7 +54,7 @@ class BaseMetalakeSerDe
   @Override
   public com.datastrato.gravitino.meta.BaseMetalake deserialize(Metalake p) {
     com.datastrato.gravitino.meta.BaseMetalake.Builder builder =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder();
+        com.datastrato.gravitino.meta.BaseMetalake.builder();
     builder
         .withId(p.getId())
         .withName(p.getName())

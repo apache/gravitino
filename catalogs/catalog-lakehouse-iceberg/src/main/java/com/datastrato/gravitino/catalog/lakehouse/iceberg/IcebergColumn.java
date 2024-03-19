@@ -15,7 +15,8 @@ public class IcebergColumn extends BaseColumn {
 
   /** A builder class for constructing IcebergColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, IcebergColumn> {
-
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
     /**
      * Internal method to build a IcebergColumn instance using the provided values.
      *
@@ -31,5 +32,14 @@ public class IcebergColumn extends BaseColumn {
       icebergColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       return icebergColumn;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }
