@@ -69,8 +69,8 @@ public final class KvGarbageCollector implements Closeable {
     // If users use the deprecated configuration, we will give priority to the deprecated value,
     // otherwise the new configuration and its default values will be used.
     this.dateTimeLineMillis = config.get(STORE_DELETE_AFTER_TIME);
-    if (null != config.get(KV_DELETE_AFTER_TIME)) {
-      this.dateTimeLineMillis = config.get(KV_DELETE_AFTER_TIME);
+    if (config.get(KV_DELETE_AFTER_TIME).isPresent()) {
+      this.dateTimeLineMillis = config.get(KV_DELETE_AFTER_TIME).get();
     }
   }
 

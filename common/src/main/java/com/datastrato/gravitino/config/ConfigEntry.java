@@ -150,11 +150,21 @@ public class ConfigEntry<T> {
 
     this.validator =
         value -> {
-          if (null == value) {
+          // consider value as Optional<T> or T
+          T actualValue;
+          if (value instanceof Optional) {
+            if (!((Optional<T>) value).isPresent()) {
+              return;
+            }
+            actualValue = ((Optional<T>) value).get();
+          } else if (value == null) {
             return;
+          } else {
+            actualValue = value;
           }
-          if (((Comparable<T>) value).compareTo(min) < 0
-              || ((Comparable<T>) value).compareTo(max) > 0) {
+
+          if (((Comparable<T>) actualValue).compareTo(min) < 0
+              || ((Comparable<T>) actualValue).compareTo(max) > 0) {
             throw new IllegalArgumentException(
                 String.format(
                     "The value is out of range, "

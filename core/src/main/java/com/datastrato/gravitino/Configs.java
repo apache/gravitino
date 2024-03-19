@@ -8,6 +8,7 @@ import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.io.File;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
@@ -161,7 +162,7 @@ public interface Configs {
           .createWithDefault(2000L);
 
   @Deprecated
-  ConfigEntry<Long> KV_DELETE_AFTER_TIME =
+  ConfigEntry<Optional<Long>> KV_DELETE_AFTER_TIME =
       new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
           .doc(
               String.format(
@@ -171,7 +172,8 @@ public interface Configs {
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_3_0)
           .longConf()
-          .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW);
+          .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
+          .createWithOptional();
 
   ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
       new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
