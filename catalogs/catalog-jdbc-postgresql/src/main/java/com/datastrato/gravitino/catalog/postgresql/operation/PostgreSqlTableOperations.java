@@ -16,6 +16,8 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
@@ -74,11 +76,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException(
           "Currently we do not support Partitioning in PostgreSQL");
     }
+    Preconditions.checkArgument(
+        distribution == Distributions.NONE, "PostgreSQL does not support distribution");
+
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
