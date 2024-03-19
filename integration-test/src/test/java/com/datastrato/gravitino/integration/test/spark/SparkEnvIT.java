@@ -34,6 +34,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private String hiveMetastoreUri;
   private String gravitinoUri;
 
+  protected abstract String getCatalogName();
+
+  protected abstract String getProvider();
+
   @Override
   protected SparkSession getSparkSession() {
     Assertions.assertNotNull(sparkSession);
@@ -105,8 +109,4 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .enableHiveSupport()
             .getOrCreate();
   }
-
-  protected abstract String getCatalogName();
-
-  protected abstract String getProvider();
 }
