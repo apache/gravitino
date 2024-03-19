@@ -7,7 +7,6 @@ package com.datastrato.gravitino.filesystem.hadoop;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
 import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
@@ -43,7 +42,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Path workingDirectory;
   private URI uri;
   private GravitinoClient client;
-  private GravitinoMetalake metalake;
+  private String metalakeName;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
   private Cache<NameIdentifier, FilesetMeta> filesetCache;
 
@@ -80,7 +79,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(serverUri), "Gravitino server uri is not set in the configuration");
 
-    String metalakeName =
+    this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalakeName), "Gravitino metalake is not set in the configuration");
@@ -88,7 +87,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     // TODO Need support more authentication types, now we only support simple auth
     this.client =
         GravitinoClient.builder(serverUri).withMetalake(metalakeName).withSimpleAuth().build();
-    this.metalake = client.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
 
     // Close the gvfs cache to achieve tenant isolation based on different user tokens in the
     // configuration.
@@ -332,7 +330,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", proxyUri);
 
     return NameIdentifier.ofFileset(
-        metalake.name(), reservedDirs[0], reservedDirs[1], reservedDirs[2]);
+        metalakeName, reservedDirs[0], reservedDirs[1], reservedDirs[2]);
   }
 
   private FilesetMeta getCachedFileset(NameIdentifier identifier) throws IOException {
@@ -374,8 +372,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private Fileset loadFileset(NameIdentifier identifier) {
     Catalog catalog =
-        metalake.loadCatalog(
-            NameIdentifier.ofCatalog(metalake.name(), identifier.namespace().level(1)));
+        client.loadCatalog(NameIdentifier.ofCatalog(metalakeName, identifier.namespace().level(1)));
     return catalog.asFilesetCatalog().loadFileset(identifier);
   }
 
