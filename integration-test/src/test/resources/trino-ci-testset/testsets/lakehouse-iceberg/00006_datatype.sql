@@ -4,8 +4,8 @@ USE "test.gt_iceberg".gt_db2;
 
 -- Unsupported Type: TINYINT, SMALLINT
 CREATE TABLE tb01 (
-    f1 VARCHAR(200),
-    f2 CHAR(20),
+    f1 VARCHAR,
+    f2 VARCHAR,
     f3 VARBINARY,
     f4 DECIMAL(10, 3),
     f5 REAL,
@@ -30,8 +30,8 @@ VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 
 select * from tb01 order by f1;
 
 CREATE TABLE tb02 (
-    f1 VARCHAR(200) not null ,
-    f2 CHAR(20) not null ,
+    f1 VARCHAR not null ,
+    f2 VARCHAR not null ,
     f3 VARBINARY not null ,
     f4 DECIMAL(10, 3) not null ,
     f5 REAL not null ,
