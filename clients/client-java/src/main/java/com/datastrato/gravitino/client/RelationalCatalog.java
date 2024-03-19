@@ -279,7 +279,6 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     protected Builder() {}
 
-
     Builder withNamespace(Namespace namespace) {
       this.namespace = namespace;
       return this;

@@ -57,7 +57,6 @@ class DTOConverters {
     }
   }
 
-
   @SuppressWarnings("unchecked")
   static Catalog toCatalog(String metalake, CatalogDTO catalog, RESTClient client) {
     Namespace namespace = Namespace.ofCatalog(metalake);
