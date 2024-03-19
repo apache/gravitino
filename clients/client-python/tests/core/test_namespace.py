@@ -19,8 +19,20 @@ def test_create_namespace():
     assert ns.level(1) == 'schema'
     assert ns.level(2) == 'table'
     assert ns.is_empty() == False
-
     assert ns == Namespace('catalog', 'schema', 'table')
+    assert str(ns) == 'catalog.schema.table'
 
+    ns1 = Namespace('a')
+    assert ns1.length() == 1
+    assert ns1.level(0) == 'a'
+    assert ns1.is_empty() == False
+    assert ns1 == Namespace('a')
+    assert str(ns1) == 'a'
+
+
+def test_create_illigal_namespace():
     with pytest.raises(AssertionError) as e:
         Namespace('a', None, 'b')
+
+    with pytest.raises(AssertionError) as e:
+        Namespace(None)

@@ -5,7 +5,14 @@ This software is licensed under the Apache License version 2.
 from typing import Type
 
 class Namespace:
+    __levels : tuple
+
     def __init__(self, *levels):
+        """
+        A namespace is a sequence of levels separated by dots. It's used to identify a metalake, a
+        catalog or a schema. For example, "metalake1", "metalake1.catalog1" and
+        "metalake1.catalog1.schema1" are all valid namespaces.
+        """
         assert levels is not None
         for level in levels:
             assert level is not None
@@ -23,9 +30,9 @@ class Namespace:
     def level(self, pos) -> str:
         """
         Get the the level at the given position
+
         Args:
             pos (int): the position of the level
-
         Returns:
             level(str): the level at the given position
         """
@@ -39,7 +46,6 @@ class Namespace:
         Returns:
             length: the length of the namespace
         """
-        print('values:' + str(self.__levels))
         return len(self.__levels)
     
     def is_empty(self) -> int:
@@ -51,14 +57,13 @@ class Namespace:
         return len(self.__levels) == 0
     
     def __eq__(self, __value: object) -> bool:
-        if id(self) == id(__value):
-            return True
-        
         if isinstance(__value, Namespace):
-            return self.__levels == __value.__levels
+            return all(this == other for this, other in zip(self.__levels, __value.__levels))
         else:
             return False
         
+    def __str__(self) -> str:
+        return '.'.join(self.__levels)
     
 
     
