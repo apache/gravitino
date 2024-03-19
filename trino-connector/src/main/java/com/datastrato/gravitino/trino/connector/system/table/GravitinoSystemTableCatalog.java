@@ -7,9 +7,9 @@ package com.datastrato.gravitino.trino.connector.system.table;
 import static io.trino.spi.block.MapValueBuilder.buildMapValue;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
-import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.google.common.base.Preconditions;
 import io.trino.spi.Page;
 import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockBuilder;
