@@ -24,19 +24,19 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 
 ### Gravitino HTTP Server configuration
 
-| Configuration item                                    | Description                                                                                                                                                                       | Default value                                                                | Required | Since version |
-|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
+| Configuration item                                    | Description                                                                                                                                                                           | Default value                                                                | Required | Since version |
+|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
 | `gravitino.server.webserver.host`                     | The host of the Gravitino server.                                                                                                                                                     | `0.0.0.0`                                                                    | No       | 0.1.0         |
-| `gravitino.server.webserver.httpPort`                 | The port on which the Gravitino server listens for incoming connections.                                                                                                          | `8090`                                                                       | No       | 0.1.0         |
+| `gravitino.server.webserver.httpPort`                 | The port on which the Gravitino server listens for incoming connections.                                                                                                              | `8090`                                                                       | No       | 0.1.0         |
 | `gravitino.server.webserver.minThreads`               | The minimum number of threads in the thread pool used by the Jetty webserver. `minThreads` is 8 if the value is less than 8.                                                          | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0         |
 | `gravitino.server.webserver.maxThreads`               | The maximum number of threads in the thread pool used by the Jetty webserver. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be great or equal to `minThreads`. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.1.0         |
 | `gravitino.server.webserver.threadPoolWorkQueueSize`  | The size of the queue in the thread pool used by the Jetty webserver.                                                                                                                 | `100`                                                                        | No       | 0.1.0         |
-| `gravitino.server.webserver.stopTimeout`              | Time in milliseconds to gracefully shut down the Jetty webserver, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`.                                           | `30000`                                                                      | No       | 0.2.0         |
-| `gravitino.server.webserver.idleTimeout`              | The timeout in milliseconds of idle connections.                                                                                                                                  | `30000`                                                                      | No       | 0.2.0         |
-| `gravitino.server.webserver.requestHeaderSize`        | Maximum size of HTTP requests.                                                                                                                                                    | `131072`                                                                     | No       | 0.1.0         |
-| `gravitino.server.webserver.responseHeaderSize`       | Maximum size of HTTP responses.                                                                                                                                                   | `131072`                                                                     | No       | 0.1.0         |
-| `gravitino.server.shutdown.timeout`                   | Time in milliseconds to gracefully shut down of the Gravitino webserver.                                                                                                           | `3000`                                                                       | No       | 0.2.0         |
-| `gravitino.server.webserver.customFilters`            | Comma-separated list of filter class names to apply to the API.                                                                                                                  | (none)                                                                       | No       | 0.4.0         |
+| `gravitino.server.webserver.stopTimeout`              | Time in milliseconds to gracefully shut down the Jetty webserver, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`.                                              | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.server.webserver.idleTimeout`              | The timeout in milliseconds of idle connections.                                                                                                                                      | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.server.webserver.requestHeaderSize`        | Maximum size of HTTP requests.                                                                                                                                                        | `131072`                                                                     | No       | 0.1.0         |
+| `gravitino.server.webserver.responseHeaderSize`       | Maximum size of HTTP responses.                                                                                                                                                       | `131072`                                                                     | No       | 0.1.0         |
+| `gravitino.server.shutdown.timeout`                   | Time in milliseconds to gracefully shut down of the Gravitino webserver.                                                                                                              | `3000`                                                                       | No       | 0.2.0         |
+| `gravitino.server.webserver.customFilters`            | Comma-separated list of filter class names to apply to the API.                                                                                                                       | (none)                                                                       | No       | 0.4.0         |
 
 The filter in the customFilters should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
@@ -63,9 +63,9 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 
 ### Catalog configuration
 
-| Configuration item                           | Description                                                                                                                                                                                       | Default value | Required | Since version |
-|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                    | `3600000`     | No       | 0.1.0         |
+| Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
+|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
 ### Auxiliary service configuration
@@ -84,19 +84,31 @@ Refer to [security](security.md) for HTTPS and authentication configurations.
 
 There are three types of catalog properties:
 
-1. **Gravitino-defined properties**: These properties simplify the catalog creation process.
-2. **Properties with the `gravitino.bypass.` prefix**: These properties aren't managed by Gravitino; instead, they bypass the underlying system for advanced usage.
-3. **Other properties**: Stored in Gravitino storage, these properties don't bypass the underlying system.
+1. **Gravitino defined properties**: Gravitino defines these properties as the necessary
+   configurations for the catalog to work properly.
+2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by
+   Gravitino and pass directly to the underlying system for advanced usage.
+3. **Other properties**: Gravitino doesn't leverage these properties, just store them. Users
+   can use them for their own purposes.
 
-Catalog properties are either defined in catalog configuration files as default values or specified explicitly when creating a catalog.
+Catalog properties are either defined in catalog configuration files as default values or
+specified as `properties` explicitly when creating a catalog.
 
 :::info
-Explicit specifications take precedence over formal configurations.
-:::
+The catalog properties explicitly specified in the `properties` field take precedence over the
+default values in the catalog configuration file.
 
-:::caution
 These rules only apply to the catalog properties and don't affect the schema or table properties.
 :::
+
+Below is a list of catalog properties that will be used all Gravitino catalogs:
+
+| Configuration item | Description                                                                                                         | Default value | Required | Since version |
+|--------------------|---------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `package`          | The path of the catalog package. Gravitino leverages this path to load the related catalog libs and configurations. | (none)        | No       | 0.5.0         |
+
+
+The following table lists the catalog specific properties and their default paths:
 
 | catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
 |---------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------|
