@@ -65,7 +65,18 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
     this.clientPoolCache =
         Caffeine.newBuilder()
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
-            .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
+            .removalListener(
+                (ignored, value, cause) -> {
+                  // Set the class loader to the isolated class loader.
+                  ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                  Thread.currentThread()
+                      .setContextClassLoader(CachedClientPool.class.getClassLoader());
+                  try {
+                    ((HiveClientPool) value).close();
+                  } finally {
+                    Thread.currentThread().setContextClassLoader(classLoader);
+                  }
+                })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
   }
@@ -136,6 +147,13 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
 
   public void close() {
     clientPoolCache.invalidateAll();
+
+    // Let the remove listener to close the HiveClientPool first then close the class loader.
+    try {
+      Thread.sleep(500);
+    } catch (Exception e) {
+      // Ignore
+    }
     scheduler.shutdownNow();
   }
 }
