@@ -79,7 +79,9 @@ public class RelationalEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.insert(e, overwritten);
+    // Always insert, never overwrite in relational store, because when `Gaea` uses `insert into ...
+    // on duplicate key update (xxx)`, xxx cannot contain the shard key, so overwritten is disabled.
+    backend.insert(e, false);
   }
 
   @Override
