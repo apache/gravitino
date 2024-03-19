@@ -50,7 +50,7 @@ INSERT: 1 row
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f1
 
-<QUERY_FAILED> NULL value not allowed for NOT NULL column: f2
+<QUERY_FAILED> NULL value not allowed for NOT NULL column: f7
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f12
 
