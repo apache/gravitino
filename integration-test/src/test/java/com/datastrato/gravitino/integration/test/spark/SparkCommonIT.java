@@ -52,8 +52,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
           "struct(1, 'a')");
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
-  // read&write
-  // data to tables in default database. The main reason is default database location is
+  // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
   // not real HDFS address. The location of tables created under default database is like
   // hdfs://localhost:9000/xxx which couldn't read write data from SparkCommonIT. Will use default
