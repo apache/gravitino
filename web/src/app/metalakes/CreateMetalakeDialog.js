@@ -4,6 +4,7 @@
  */
 
 import { useState, forwardRef, useEffect } from 'react'
+import { updateMetalake } from '@/lib/store/metalakes'
 
 import {
   Box,
@@ -53,7 +54,7 @@ const Transition = forwardRef(function Transition(props, ref) {
 })
 
 const CreateMetalakeDialog = props => {
-  const { open, setOpen, data = {}, updateMetalake, type = 'create' } = props
+  const { open, setOpen, data = {}, type = 'create' } = props
 
   const dispatch = useAppDispatch()
 
