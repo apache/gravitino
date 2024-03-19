@@ -6,7 +6,7 @@ CREATE TABLE tb01 (id int, name char(20));
 
 CREATE TABLE tb02 (id int, name char);
 
-CREATE TABLE tb03 (id int, name char(233));
+CREATE TABLE tb03 (id int, name varchar(233));
 
 CREATE TABLE tb04 (id int, name varchar);
 
