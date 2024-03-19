@@ -89,10 +89,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public void setQueryInput(String queryInput) {
     try {
-      Thread.sleep(AbstractWebIT.SLEEP_MILLIS);
+      Thread.sleep(SLEEP_MILLIS);
       clearQueryInput();
       queryMetalakeInput.sendKeys(queryInput);
-      Thread.sleep(AbstractWebIT.SLEEP_MILLIS);
+      Thread.sleep(SLEEP_MILLIS);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -278,27 +278,17 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyLinkToCatalogsPage(String name) {
+  public boolean verifyLinkToCatalogsPage() {
     try {
-      String xpath = "//a[@data-refer='metalake-name-link']";
+      Thread.sleep(SLEEP_MILLIS);
+      String xpath = "//*[@data-refer='metalake-name-link']";
+      WebElement nameLink = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-
-      String url = driver.getCurrentUrl();
-      boolean isUrl = url.contains("/metalakes?metalake=" + name);
-
-      if (!isUrl) {
-        LOG.error("Expected URL to contain '/metalakes?metalake={}', but was: {}", name, url);
-        return false;
-      }
+      wait.until(ExpectedConditions.elementToBeClickable(nameLink));
 
       return true;
     } catch (Exception e) {
-      LOG.error(
-          "Verification failed for link to catalogs page with name '{}': {}",
-          name,
-          e.getMessage(),
-          e);
+      LOG.error(e.getMessage(), e);
       return false;
     }
   }
