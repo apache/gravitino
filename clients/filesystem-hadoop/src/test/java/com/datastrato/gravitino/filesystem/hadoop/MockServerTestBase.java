@@ -107,7 +107,7 @@ public abstract class MockServerTestBase {
             .withName(name)
             .withComment(comment)
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     try {
@@ -126,7 +126,7 @@ public abstract class MockServerTestBase {
             .withComment(comment)
             .withProperties(ImmutableMap.of("k1", "k2"))
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
@@ -160,8 +160,7 @@ public abstract class MockServerTestBase {
             .storageLocation(location)
             .comment("comment")
             .properties(ImmutableMap.of("k1", "v1"))
-            .audit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     FilesetResponse filesetResponse = new FilesetResponse(mockFileset);
     try {
