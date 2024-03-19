@@ -20,11 +20,11 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.util.StringUtils;
 
-@Tag("gravitino-docker-it")
 public abstract class SparkCommonIT extends SparkEnvIT {
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
@@ -51,6 +51,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
+  // Use a custom database not the original default database because SparkCommonIT couldn't
+  // read&write
+  // data to tables in default database. The main reason is default database location is
+  // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
+  // not real HDFS address. The location of tables created under default database is like
+  // hdfs://localhost:9000/xxx which couldn't read write data from SparkCommonIT. Will use default
+  // database after spark connector support Alter database xx set location command.
+  @BeforeAll
+  void initDefaultDatabase() {
+    sql("USE " + getCatalogName());
+    createDatabaseIfNotExists(getDefaultDatabase());
+  }
+
+  @BeforeEach
+  void init() {
+    sql("USE " + getCatalogName());
+    sql("USE " + getDefaultDatabase());
+  }
+
   protected String getDefaultDatabase() {
     return "default_db";
   }
@@ -58,7 +77,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
-    Assertions.assertTrue(catalogs.contains(catalogName));
+    Assertions.assertTrue(catalogs.contains(getCatalogName()));
   }
 
   @Test
@@ -496,8 +515,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
-  // override this method in subclass to create table for different datasources
-  protected String getCreateSimpleTableString(String tableName) {
+  private String getCreateSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
         tableName);

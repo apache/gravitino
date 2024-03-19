@@ -19,16 +19,15 @@ import java.util.Map;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Setup Datasource, Gravitino, Spark, Metalake environment to execute SparkSQL. */
-public class SparkEnvIT extends SparkUtilIT {
+/** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
+public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  protected String catalogName = null;
-  private String provider = null;
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
@@ -41,10 +40,9 @@ public class SparkEnvIT extends SparkUtilIT {
     return sparkSession;
   }
 
-  void startUp(String catalogName, String provider) {
-    this.catalogName = catalogName;
-    this.provider = provider;
-    initDatasourceEnv();
+  @BeforeAll
+  void startUp() {
+    initHiveEnv();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
     initSparkEnv();
@@ -68,9 +66,9 @@ public class SparkEnvIT extends SparkUtilIT {
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
 
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        NameIdentifier.of(metalakeName, getCatalogName()),
         Catalog.Type.RELATIONAL,
-        provider,
+        getProvider(),
         "",
         properties);
   }
@@ -81,7 +79,7 @@ public class SparkEnvIT extends SparkUtilIT {
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
   }
 
-  private void initDatasourceEnv() {
+  private void initHiveEnv() {
     containerSuite.startHiveContainer();
     hiveMetastoreUri =
         String.format(
@@ -107,4 +105,8 @@ public class SparkEnvIT extends SparkUtilIT {
             .enableHiveSupport()
             .getOrCreate();
   }
+
+  protected abstract String getCatalogName();
+
+  protected abstract String getProvider();
 }
