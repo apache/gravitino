@@ -25,7 +25,8 @@ class NameIdentifier:
         self.__namespace = namespace
         self.__name = name
 
-    def of(self, *names) -> Type['NameIdentifier']:
+    @classmethod
+    def of(cls, *names) -> Type['NameIdentifier']:
         """
         Create a NameIdentifier with the given levels of names.
 
@@ -33,19 +34,30 @@ class NameIdentifier:
             names(str): The names of the identifier.
         """
         assert len(names) > 0
-        return NameIdentifier(Namespace(names[:-1]), names[-1])
+        return cls(Namespace(names[:-1]), names[-1])
 
-
-    def of(self, namespace, name) ->Type['NameIdentifier']:
+    @classmethod
+    def parse(cls, identity:str) ->  Type['NameIdentifier']:
         """
-        Create a NameIdentifier with the namespace and the name.
-        Args:
-            namespace (Namespace): the namespace of the NameIdentifier.
-            name (str): the name of the NameIdentifier.
-        Return:
-            NameIdentifier: the created NameIdentofier.
         """
-        return NameIdentifier(namespace, name)
+        assert identity is not None
+        assert len(identity) > 0
+        return cls(tuple(identity.replace(' ', '').split(',')))
 
+    def hasNamespace(self) -> bool:
+        return not self.__namespace.is_empty()
 
+    def namespace(self) -> Namespace:
+        return self.__namespace
+    
+    def name(self) -> str:
+        return self.__name
 
+    def __eq__(self, __value: object) -> bool:
+        if id(self) == id(__value):
+            return True
+
+        if isinstance(__value, NameIdentifier):
+            return self.__namespace == __value.__namespace and self.__name == __value.__name
+        else:
+            return False

@@ -9,6 +9,7 @@ def test_empty_namespace():
     empty = Namespace()
     assert empty.length() == 0
     assert len(empty.levels()) == 0
+    assert empty.is_empty() == True
 
 def test_create_namespace():
     ns = Namespace('catalog', 'schema', 'table')
@@ -17,6 +18,9 @@ def test_create_namespace():
     assert ns.level(0) == 'catalog'
     assert ns.level(1) == 'schema'
     assert ns.level(2) == 'table'
+    assert ns.is_empty() == False
+
+    assert ns == Namespace('catalog', 'schema', 'table')
 
     with pytest.raises(AssertionError) as e:
         Namespace('a', None, 'b')

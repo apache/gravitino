@@ -49,6 +49,15 @@ class Namespace:
         Returns: true if the the namespace is empty, or else false.
         """
         return len(self.__levels) == 0
+    
+    def __eq__(self, __value: object) -> bool:
+        if id(self) == id(__value):
+            return True
+        
+        if isinstance(__value, Namespace):
+            return self.__levels == __value.__levels
+        else:
+            return False
         
     
 
