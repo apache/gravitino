@@ -13,6 +13,8 @@ import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
   @FindBy(
@@ -105,7 +107,6 @@ public class MetalakePage extends AbstractWebIT {
   public void clickDeleteMetalakeBtn(String name) {
     try {
       String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
-      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -115,7 +116,6 @@ public class MetalakePage extends AbstractWebIT {
   public void clickViewMetalakeBtn(String name) {
     try {
       String xpath = "//button[@data-refer='view-metalake-" + name + "']";
-      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -125,7 +125,6 @@ public class MetalakePage extends AbstractWebIT {
   public void clickEditMetalakeBtn(String name) {
     try {
       String xpath = "//button[@data-refer='edit-metalake-" + name + "']";
-      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -135,7 +134,6 @@ public class MetalakePage extends AbstractWebIT {
   public void clickMetalakeLink(String name) {
     try {
       String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
-      waitClickable(By.xpath(xpath), AbstractWebIT.MAX_TIMEOUT);
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -243,8 +241,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyChangePagination() {
     try {
-      waitElementClickable(nextPageBtn, AbstractWebIT.MAX_TIMEOUT);
-      clickElementAndWait(nextPageBtn);
+      clickAndWait(nextPageBtn);
       // Check if the previous page button is available
       return prevPageBtn.isEnabled() && performPrevPageAction();
     } catch (Exception e) {
@@ -254,8 +251,7 @@ public class MetalakePage extends AbstractWebIT {
 
   private boolean performPrevPageAction() {
     try {
-      waitElementClickable(prevPageBtn, AbstractWebIT.MAX_TIMEOUT);
-      clickElementAndWait(prevPageBtn);
+      clickAndWait(prevPageBtn);
       return true;
     } catch (Exception e) {
       return false;
@@ -285,19 +281,25 @@ public class MetalakePage extends AbstractWebIT {
   public boolean verifyLinkToCatalogsPage(String name) {
     try {
       String xpath = "//a[@data-refer='metalake-name-link']";
-      WebElement nameLink = driver.findElement(By.xpath(xpath));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
 
       String url = driver.getCurrentUrl();
-      boolean isUrl = url.contains("/ui/metalakes?metalake=" + name);
+      boolean isUrl = url.contains("/metalakes?metalake=" + name);
 
-      return nameLink.isDisplayed() && isUrl;
+      if (!isUrl) {
+        LOG.error("Expected URL to contain '/metalakes?metalake={}', but was: {}", name, url);
+        return false;
+      }
+
+      return true;
     } catch (Exception e) {
+      LOG.error(
+          "Verification failed for link to catalogs page with name '{}': {}",
+          name,
+          e.getMessage(),
+          e);
       return false;
-    } finally {
-      // Back to homepage
-      String xpath = "//*[@data-refer='back-home-btn']";
-      WebElement backHomeBtn = driver.findElement(By.xpath(xpath));
-      backHomeBtn.click();
     }
   }
 }

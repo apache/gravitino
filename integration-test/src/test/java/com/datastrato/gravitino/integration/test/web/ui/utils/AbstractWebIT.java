@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.openqa.selenium.By;
 import org.openqa.selenium.ElementClickInterceptedException;
+import org.openqa.selenium.InvalidArgumentException;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -53,9 +54,20 @@ public class AbstractWebIT extends AbstractIT {
     return wait.until((Function<WebDriver, WebElement>) driver -> driver.findElement(locator));
   }
 
-  protected void clickAndWait(final By locator) throws InterruptedException {
-    WebElement element = pollingWait(locator, MAX_IMPLICIT_WAIT);
+  protected void clickAndWait(final Object locatorOrElement) throws InterruptedException {
+    WebElement element;
+    if (locatorOrElement instanceof By) {
+      element = pollingWait((By) locatorOrElement, MAX_IMPLICIT_WAIT);
+    } else if (locatorOrElement instanceof WebElement) {
+      element = (WebElement) locatorOrElement;
+    } else {
+      throw new InvalidArgumentException("The provided argument is neither a By nor a WebElement");
+    }
     try {
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.visibilityOf(element));
+      wait.until(ExpectedConditions.elementToBeClickable(element));
+
       element.click();
       Thread.sleep(SLEEP_MILLIS);
     } catch (ElementClickInterceptedException e) {
@@ -64,31 +76,6 @@ public class AbstractWebIT extends AbstractIT {
       Thread.sleep(SLEEP_MILLIS);
       LOG.error(e.getMessage(), e);
     }
-  }
-
-  protected void clickElementAndWait(final WebElement element) throws InterruptedException {
-    try {
-      element.click();
-      Thread.sleep(SLEEP_MILLIS);
-    } catch (ElementClickInterceptedException e) {
-      Actions action = new Actions(driver);
-      action.moveToElement(element).click().build().perform();
-      Thread.sleep(SLEEP_MILLIS);
-      LOG.error(e.getMessage(), e);
-    }
-  }
-
-  protected void waitClickable(final By locator, final long timeout) {
-    WebElement element = pollingWait(locator, MAX_IMPLICIT_WAIT);
-    WebDriverWait wait = new WebDriverWait(driver, timeout);
-    wait.until(ExpectedConditions.visibilityOf(element));
-    wait.until(ExpectedConditions.elementToBeClickable(element));
-  }
-
-  protected void waitElementClickable(final WebElement element, final long timeout) {
-    WebDriverWait wait = new WebDriverWait(driver, timeout);
-    wait.until(ExpectedConditions.visibilityOf(element));
-    wait.until(ExpectedConditions.elementToBeClickable(element));
   }
 
   @BeforeAll
