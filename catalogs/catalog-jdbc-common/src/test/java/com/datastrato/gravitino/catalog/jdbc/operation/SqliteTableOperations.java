@@ -33,8 +33,7 @@ public class SqliteTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
     Preconditions.checkArgument(
-        null == distribution || distribution == Distributions.NONE,
-        "Currently we do not support distribution in Sqlite.");
+        distribution == Distributions.NONE, "SQLite does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (");
