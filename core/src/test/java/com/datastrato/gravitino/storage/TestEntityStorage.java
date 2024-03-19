@@ -780,7 +780,7 @@ public class TestEntityStorage {
   }
 
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
-    return new BaseMetalake.Builder()
+    return BaseMetalake.builder()
         .withId(id)
         .withName(name)
         .withAuditInfo(auditInfo)
@@ -806,7 +806,7 @@ public class TestEntityStorage {
 
   public static SchemaEntity createSchemaEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -818,7 +818,7 @@ public class TestEntityStorage {
 
   public static TableEntity createTableEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -828,7 +828,7 @@ public class TestEntityStorage {
 
   public static FilesetEntity createFilesetEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)

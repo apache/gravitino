@@ -16,6 +16,9 @@ public class HiveColumn extends BaseColumn {
   /** A builder class for constructing HiveColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, HiveColumn> {
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Internal method to build a HiveColumn instance using the provided values.
      *
@@ -32,5 +35,14 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       return hiveColumn;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

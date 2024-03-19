@@ -82,7 +82,7 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
     Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[1].defaultValue());
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[2].defaultValue());
     Assertions.assertEquals(
-        new LiteralDTO.Builder()
+        LiteralDTO.builder()
             .withValue("current_timestamp")
             .withDataType(Types.VarCharType.of(255))
             .build(),

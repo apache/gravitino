@@ -91,7 +91,7 @@ public class TablePO {
   public static class Builder {
     private final TablePO tablePO;
 
-    public Builder() {
+    private Builder() {
       tablePO = new TablePO();
     }
 
@@ -156,5 +156,14 @@ public class TablePO {
       validate();
       return tablePO;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

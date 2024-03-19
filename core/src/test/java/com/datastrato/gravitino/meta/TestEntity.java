@@ -50,7 +50,7 @@ public class TestEntity {
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withAuditInfo(auditInfo)
@@ -93,7 +93,7 @@ public class TestEntity {
   @Test
   public void testSchema() {
     SchemaEntity testSchema =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -105,7 +105,7 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(SchemaEntity.AUDIT_INFO));
 
     SchemaEntity testSchema1 =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -120,11 +120,7 @@ public class TestEntity {
   @Test
   public void testTable() {
     TableEntity testTable =
-        new TableEntity.Builder()
-            .withId(tableId)
-            .withName(tableName)
-            .withAuditInfo(auditInfo)
-            .build();
+        TableEntity.builder().withId(tableId).withName(tableName).withAuditInfo(auditInfo).build();
 
     Map<Field, Object> fields = testTable.fields();
     Assertions.assertEquals(tableId, fields.get(TableEntity.ID));
@@ -135,7 +131,7 @@ public class TestEntity {
   @Test
   public void testFile() {
     FilesetEntity testFile =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -154,7 +150,7 @@ public class TestEntity {
     Assertions.assertEquals("testLocation", fields.get(FilesetEntity.STORAGE_LOCATION));
 
     FilesetEntity testFile1 =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -169,7 +165,7 @@ public class TestEntity {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              new FilesetEntity.Builder()
+              FilesetEntity.builder()
                   .withId(fileId)
                   .withName(fileName)
                   .withAuditInfo(auditInfo)

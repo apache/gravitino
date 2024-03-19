@@ -176,7 +176,7 @@ public class DynConstructors {
       this.baseClass = baseClass;
     }
 
-    public Builder() {
+    private Builder() {
       this.baseClass = null;
     }
 

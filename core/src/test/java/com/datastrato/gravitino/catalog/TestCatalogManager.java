@@ -51,7 +51,7 @@ public class TestCatalogManager {
   private static String provider = "test";
 
   private static BaseMetalake metalakeEntity =
-      new BaseMetalake.Builder()
+      BaseMetalake.builder()
           .withId(1L)
           .withName(metalake)
           .withAuditInfo(
