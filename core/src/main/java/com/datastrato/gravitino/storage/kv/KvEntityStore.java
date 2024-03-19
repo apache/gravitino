@@ -371,7 +371,6 @@ public class KvEntityStore implements EntityStore {
           List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
           if (subEntityPrefix.isEmpty()) {
             // has no sub-entities
-            deleteUserEntitiesIfNecessary(ident, entityType);
             return transactionalKvBackend.delete(dataKey);
           }
 
