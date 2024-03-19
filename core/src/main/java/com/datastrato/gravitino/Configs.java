@@ -30,8 +30,22 @@ public interface Configs {
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
-  Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
-  String KV_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
+  // Config for data keep time after soft deletion, in milliseconds.
+  String STORE_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.deleteAfterTimeMs";
+  Long DEFAULT_STORE_DELETE_AFTER_TIME = 604800000L; // 7 days
+  // The maximum allowed keep time for data deletion, in milliseconds. Equivalent to 30 days.
+  Long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L;
+  // The minimum allowed keep time for data deletion, in milliseconds. Equivalent to 10 minutes.
+  Long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L;
+
+  // Count of versions allowed to be retained, including the current version, used to delete old
+  // versions data.
+  String VERSION_RETENTION_COUNT_KEY = "gravitino.entity.store.versionRetentionCount";
+  Long DEFAULT_VERSION_RETENTION_COUNT = 1L;
+  // The maximum allowed count of versions to be retained
+  Long MAX_VERSION_RETENTION_COUNT = 10L;
+  // The minimum allowed count of versions to be retained
+  Long MIN_VERSION_RETENTION_COUNT = 1L;
 
   // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
@@ -143,13 +157,31 @@ public interface Configs {
           .longConf()
           .createWithDefault(2000L);
 
-  ConfigEntry<Long> KV_DELETE_AFTER_TIME =
-      new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
+  ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
+      new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
           .doc(
-              "The maximum time in milliseconds that the deleted data and old version data is kept")
+              String.format(
+                  "The maximum time in milliseconds that the deleted data and old version data is kept, "
+                      + "max delete time allow is %s ms(30 days), "
+                      + "min delete time allow is %s ms(10 minutes)",
+                  MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_3_0)
           .longConf()
-          .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);
+          .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
+          .createWithDefault(DEFAULT_STORE_DELETE_AFTER_TIME);
+
+  ConfigEntry<Long> VERSION_RETENTION_COUNT =
+      new ConfigBuilder(VERSION_RETENTION_COUNT_KEY)
+          .doc(
+              String.format(
+                  "The count of versions allowed to be retained, including the current version, "
+                      + "max version retention count is %s, "
+                      + "min version retention count is %s",
+                  MAX_VERSION_RETENTION_COUNT, MIN_VERSION_RETENTION_COUNT))
+          .version(ConfigConstants.VERSION_0_3_0)
+          .longConf()
+          .checkRange(MIN_VERSION_RETENTION_COUNT, MAX_VERSION_RETENTION_COUNT)
+          .createWithDefault(DEFAULT_VERSION_RETENTION_COUNT);
 
   // The followings are configurations for tree lock
 

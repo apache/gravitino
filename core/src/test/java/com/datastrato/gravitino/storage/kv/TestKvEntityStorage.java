@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Catalog.Type;
@@ -132,7 +132,7 @@ public class TestKvEntityStorage {
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -233,7 +233,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
@@ -617,7 +617,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
@@ -926,7 +926,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
@@ -1035,7 +1035,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(
@@ -1151,7 +1151,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     // First time create entity store, the storage layout version should be DEFAULT_LAYOUT_VERSION
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
@@ -1183,7 +1183,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -1338,7 +1338,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -1368,7 +1368,7 @@ public class TestKvEntityStorage {
       store.put(metalake2);
       store.put(metalake3);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -1393,7 +1393,7 @@ public class TestKvEntityStorage {
       store.put(catalog1);
       store.put(catalog2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -1426,7 +1426,7 @@ public class TestKvEntityStorage {
       store.put(schema1);
       store.put(schema2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
@@ -1460,7 +1460,7 @@ public class TestKvEntityStorage {
       store.put(table1);
       store.put(table2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 

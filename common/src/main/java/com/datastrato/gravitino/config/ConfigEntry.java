@@ -137,6 +137,32 @@ public class ConfigEntry<T> {
   }
 
   /**
+   * Checks if the user-provided value for the config is within a specified range.
+   *
+   * @param min The minimum acceptable value for the configuration.
+   * @param max The maximum acceptable value for the configuration.
+   * @return The current ConfigEntry instance.
+   */
+  public ConfigEntry<T> checkRange(T min, T max) {
+    if (min instanceof Comparable && max instanceof Comparable) {
+      this.validator =
+          value -> {
+            if (((Comparable<T>) value).compareTo(min) < 0
+                || ((Comparable<T>) value).compareTo(max) > 0) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "The value is out of range, "
+                          + "please check it. The value is %s, "
+                          + "min value is %s, "
+                          + "max value is %s.",
+                      value, min, max));
+            }
+          };
+    }
+    return this;
+  }
+
+  /**
    * Split the string to a list, then map each string element to its converted form.
    *
    * @param str The string form of the value list from the conf entry.
