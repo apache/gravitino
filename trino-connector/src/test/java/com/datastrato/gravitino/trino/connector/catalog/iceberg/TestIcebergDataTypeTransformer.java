@@ -23,14 +23,14 @@ public class TestIcebergDataTypeTransformer {
         Assert.expectThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(charTypeWithLengthOne));
-    Assert.assertTrue(e.getMessage().contains("Gravitino does not support the datatype CHAR"));
+    Assert.assertTrue(e.getMessage().contains("Iceberg does not support the datatype CHAR"));
 
     io.trino.spi.type.Type varcharType = io.trino.spi.type.VarcharType.createVarcharType(1);
     e =
         Assert.expectThrows(
             TrinoException.class, () -> generalDataTypeTransformer.getGravitinoType(varcharType));
     Assert.assertTrue(
-        e.getMessage().contains("Gravitino does not support the datatype VARCHAR with length"));
+        e.getMessage().contains("Iceberg does not support the datatype VARCHAR with length"));
 
     io.trino.spi.type.Type varcharTypeWithoutLength = VarcharType.VARCHAR;
 

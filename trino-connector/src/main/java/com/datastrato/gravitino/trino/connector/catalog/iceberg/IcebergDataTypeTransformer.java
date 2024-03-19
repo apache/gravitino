@@ -23,13 +23,13 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
     if (typeClass == io.trino.spi.type.CharType.class) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-          "Gravitino does not support the datatype CHAR");
+          "Iceberg does not support the datatype CHAR");
     } else if (typeClass == io.trino.spi.type.VarcharType.class) {
       VarcharType varCharType = (VarcharType) type;
       if (varCharType.getLength().isPresent()) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Gravitino does not support the datatype VARCHAR with length");
+            "Iceberg does not support the datatype VARCHAR with length");
       }
 
       return Types.StringType.get();
