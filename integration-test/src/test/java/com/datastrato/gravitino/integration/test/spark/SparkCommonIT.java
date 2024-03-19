@@ -28,7 +28,7 @@ import org.junit.platform.commons.util.StringUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
-public class SparkCommonIT extends SparkEnvIT {
+public abstract class SparkCommonIT extends SparkEnvIT {
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
