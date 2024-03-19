@@ -67,7 +67,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     if (exist(databaseName)) {
-      return new JdbcSchema.Builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
+      return JdbcSchema.builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
     }
     return null;
   }

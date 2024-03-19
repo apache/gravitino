@@ -9,6 +9,8 @@ import com.datastrato.gravitino.connector.BaseFileset;
 public class HadoopFileset extends BaseFileset {
 
   public static class Builder extends BaseFilesetBuilder<Builder, HadoopFileset> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected HadoopFileset internalBuild() {
@@ -21,5 +23,14 @@ public class HadoopFileset extends BaseFileset {
       fileset.auditInfo = auditInfo;
       return fileset;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

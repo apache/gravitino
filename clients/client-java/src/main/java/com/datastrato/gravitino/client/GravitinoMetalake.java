@@ -197,6 +197,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   static class Builder extends MetalakeDTO.Builder<Builder> {
     private RESTClient restClient;
 
+    private Builder() {
+      super();
+    }
+
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
       return this;
@@ -210,5 +214,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
 
       return new GravitinoMetalake(name, comment, properties, audit, restClient);
     }
+  }
+
+  /** @return the builder for creating a new instance of GravitinoMetaLake. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

@@ -38,7 +38,7 @@ public class HiveSchema extends BaseSchema {
     AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
     Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
 
-    return new HiveSchema.Builder()
+    return HiveSchema.builder()
         .withName(db.getName())
         .withComment(db.getDescription())
         .withProperties(properties)
@@ -98,6 +98,9 @@ public class HiveSchema extends BaseSchema {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Internal method to build a HiveSchema instance using the provided values.
      *
@@ -114,5 +117,13 @@ public class HiveSchema extends BaseSchema {
 
       return hiveSchema;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

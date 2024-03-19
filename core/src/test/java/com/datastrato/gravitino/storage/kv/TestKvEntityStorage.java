@@ -71,7 +71,7 @@ public class TestKvEntityStorage {
   }
 
   public static BaseMetalake createBaseMakeLake(String name, AuditInfo auditInfo) {
-    return new BaseMetalake.Builder()
+    return BaseMetalake.builder()
         .withId(1L)
         .withName(name)
         .withAuditInfo(auditInfo)
@@ -92,7 +92,7 @@ public class TestKvEntityStorage {
 
   public static SchemaEntity createSchemaEntity(
       Namespace namespace, String name, AuditInfo auditInfo) {
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)
@@ -102,7 +102,7 @@ public class TestKvEntityStorage {
 
   public static TableEntity createTableEntity(
       Namespace namespace, String name, AuditInfo auditInfo) {
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)
@@ -112,7 +112,7 @@ public class TestKvEntityStorage {
 
   public static FilesetEntity createFilesetEntity(
       Namespace namespace, String name, AuditInfo auditInfo) {
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)

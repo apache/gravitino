@@ -185,7 +185,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     resultProperties.remove(StringIdentifier.ID_KEY);
     databaseOperation.create(
         ident.name(), StringIdentifier.addToComment(identifier, comment), resultProperties);
-    return new JdbcSchema.Builder()
+    return JdbcSchema.builder()
         .withName(ident.name())
         .withProperties(resultProperties)
         .withComment(comment)
@@ -212,7 +212,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    return new JdbcSchema.Builder()
+    return JdbcSchema.builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
@@ -289,7 +289,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       // Remove id from comment
       comment = StringIdentifier.removeIdFromComment(comment);
     }
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
@@ -387,7 +387,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         Arrays.stream(columns)
             .map(
                 column ->
-                    new JdbcColumn.Builder()
+                    JdbcColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
                         .withComment(column.comment())
@@ -408,7 +408,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         partitioning,
         indexes);
 
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withAuditInfo(
             AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)

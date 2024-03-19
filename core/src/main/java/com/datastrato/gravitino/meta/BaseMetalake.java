@@ -135,7 +135,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
     private final BaseMetalake metalake;
 
     /** Constructs a new {@link Builder}. */
-    public Builder() {
+    private Builder() {
       metalake = new BaseMetalake();
     }
 
@@ -214,5 +214,14 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
       metalake.validate();
       return metalake;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

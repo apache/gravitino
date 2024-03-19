@@ -65,11 +65,9 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col0 =
-        new HiveColumn.Builder().withName("name").withType(Types.StringType.get()).build();
-    HiveColumn col1 =
-        new HiveColumn.Builder().withName("city").withType(Types.ByteType.get()).build();
-    HiveColumn col2 =
-        new HiveColumn.Builder().withName("dt").withType(Types.DateType.get()).build();
+        HiveColumn.builder().withName("name").withType(Types.StringType.get()).build();
+    HiveColumn col1 = HiveColumn.builder().withName("city").withType(Types.ByteType.get()).build();
+    HiveColumn col2 = HiveColumn.builder().withName("dt").withType(Types.DateType.get()).build();
 
     columns = new Column[] {col0, col1, col2};
 
