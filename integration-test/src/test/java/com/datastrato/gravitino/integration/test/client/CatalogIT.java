@@ -123,11 +123,12 @@ public class CatalogIT extends AbstractIT {
     String catalogName1 = GravitinoITUtils.genRandomName("catalog");
     NameIdentifier catalogIdent1 = NameIdentifier.of(metalakeName, catalogName1);
     properties.put("package", "/tmp/none_exist_path_to_package");
-    Exception exception = Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            metalake.createCatalog(
-                catalogIdent1, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    catalogIdent1, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
     Assertions.assertTrue(
         exception.getMessage().contains("Invalid package path: /tmp/none_exist_path_to_package"));
   }
