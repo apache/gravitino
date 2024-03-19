@@ -22,12 +22,9 @@ import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.platform.commons.util.StringUtils;
 
 @Tag("gravitino-docker-it")
-@TestInstance(Lifecycle.PER_CLASS)
 public abstract class SparkCommonIT extends SparkEnvIT {
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
@@ -499,7 +496,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
-  private String getCreateSimpleTableString(String tableName) {
+  // override this method in subclass to create table for different datasources
+  protected String getCreateSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
         tableName);
