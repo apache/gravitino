@@ -330,7 +330,13 @@ const CreateMetalakeDialog = props => {
           <Button variant='contained' type='submit' id='submitHandleMetalake'>
             {typeText === 'Edit' ? 'Update' : typeText}
           </Button>
-          <Button variant='outlined' className={'twc-ml-1'} onClick={handleClose} type='reset'>
+          <Button
+            variant='outlined'
+            className={'twc-ml-1'}
+            onClick={handleClose}
+            type='reset'
+            id='cancelHandleMetalake'
+          >
             Cancel
           </Button>
         </DialogActions>
