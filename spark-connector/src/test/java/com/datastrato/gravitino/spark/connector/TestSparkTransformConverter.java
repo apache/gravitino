@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -221,9 +221,10 @@ public class TestSparkTransformConverter {
 
   private void initGravitinoToSparkTransformMap() {
     gravitinoToSparkPartitionTransformMaps.put(
-        IdentityPartitioningDTO.of("a"), SparkTransformConverter.createSparkIdentityTransform("a"));
+        DTOConverters.toDTO(Transforms.identity("a")),
+        SparkTransformConverter.createSparkIdentityTransform("a"));
     gravitinoToSparkPartitionTransformMaps.put(
-        IdentityPartitioningDTO.of("a", "b"),
+        DTOConverters.toDTO(Transforms.identity(new String[] {"a", "b"})),
         SparkTransformConverter.createSparkIdentityTransform("a.b"));
   }
 }
