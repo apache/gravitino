@@ -94,7 +94,7 @@ public class FilesetMetaService {
     try {
       NameIdentifier.checkFileset(filesetEntity.nameIdentifier());
 
-      FilesetPO.Builder builder = new FilesetPO.Builder();
+      FilesetPO.Builder builder = FilesetPO.builder();
       fillFilesetPOBuilderParentEntityId(builder, filesetEntity.namespace());
 
       FilesetPO po = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);

@@ -812,7 +812,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.METALAKE,
                 m -> {
                   BaseMetalake.Builder builder =
-                      new BaseMetalake.Builder()
+                      BaseMetalake.builder()
                           // Change the id, which is not allowed
                           .withId(2L)
                           .withName("test_metalake2")
@@ -832,7 +832,7 @@ public class TestRelationalEntityStore {
             Entity.EntityType.METALAKE,
             m -> {
               BaseMetalake.Builder builder =
-                  new BaseMetalake.Builder()
+                  BaseMetalake.builder()
                       .withId(m.id())
                       .withName("test_metalake2")
                       .withComment("this is test 2")
@@ -862,7 +862,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.METALAKE,
                 m -> {
                   BaseMetalake.Builder builder =
-                      new BaseMetalake.Builder()
+                      BaseMetalake.builder()
                           .withId(metalake3.id())
                           // metalake name already exists
                           .withName("test_metalake2")
@@ -990,7 +990,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.SCHEMA,
                 s -> {
                   SchemaEntity.Builder builder =
-                      new SchemaEntity.Builder()
+                      SchemaEntity.builder()
                           // Change the id, which is not allowed
                           .withId(2L)
                           .withName("test_schema2")
@@ -1010,7 +1010,7 @@ public class TestRelationalEntityStore {
             Entity.EntityType.SCHEMA,
             s -> {
               SchemaEntity.Builder builder =
-                  new SchemaEntity.Builder()
+                  SchemaEntity.builder()
                       .withId(s.id())
                       .withName("test_schema2")
                       .withNamespace(Namespace.ofSchema(metalake.name(), catalog.name()))
@@ -1046,7 +1046,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.SCHEMA,
                 s -> {
                   SchemaEntity.Builder builder =
-                      new SchemaEntity.Builder()
+                      SchemaEntity.builder()
                           .withId(schema3.id())
                           // schema name already exists
                           .withName("test_schema2")
@@ -1090,7 +1090,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.TABLE,
                 s -> {
                   TableEntity.Builder builder =
-                      new TableEntity.Builder()
+                      TableEntity.builder()
                           // Change the id, which is not allowed
                           .withId(2L)
                           .withName("test_table2")
@@ -1109,7 +1109,7 @@ public class TestRelationalEntityStore {
             Entity.EntityType.TABLE,
             s -> {
               TableEntity.Builder builder =
-                  new TableEntity.Builder()
+                  TableEntity.builder()
                       .withId(s.id())
                       .withName("test_table2")
                       .withNamespace(
@@ -1139,7 +1139,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.TABLE,
                 s -> {
                   TableEntity.Builder builder =
-                      new TableEntity.Builder()
+                      TableEntity.builder()
                           .withId(table3.id())
                           // table name already exists
                           .withName("test_table2")
@@ -1186,7 +1186,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.FILESET,
                 f -> {
                   FilesetEntity.Builder builder =
-                      new FilesetEntity.Builder()
+                      FilesetEntity.builder()
                           // Change the id, which is not allowed
                           .withId(2L)
                           .withName("test_fileset2")
@@ -1210,7 +1210,7 @@ public class TestRelationalEntityStore {
             Entity.EntityType.FILESET,
             f -> {
               FilesetEntity.Builder builder =
-                  new FilesetEntity.Builder()
+                  FilesetEntity.builder()
                       .withId(f.id())
                       .withName("test_fileset2")
                       .withNamespace(
@@ -1251,7 +1251,7 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.FILESET,
                 f -> {
                   FilesetEntity.Builder builder =
-                      new FilesetEntity.Builder()
+                      FilesetEntity.builder()
                           .withId(fileset3.id())
                           // fileset name already exists
                           .withName("test_fileset2")
@@ -1273,7 +1273,7 @@ public class TestRelationalEntityStore {
             Entity.EntityType.FILESET,
             f -> {
               FilesetEntity.Builder builder =
-                  new FilesetEntity.Builder()
+                  FilesetEntity.builder()
                       .withId(f.id())
                       .withName("test_fileset4")
                       .withNamespace(
@@ -1384,7 +1384,7 @@ public class TestRelationalEntityStore {
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    return new BaseMetalake.Builder()
+    return BaseMetalake.builder()
         .withId(id)
         .withName(name)
         .withComment(comment)
@@ -1435,7 +1435,7 @@ public class TestRelationalEntityStore {
       Long id, String name, Namespace namespace, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -1458,7 +1458,7 @@ public class TestRelationalEntityStore {
   private static TableEntity createTable(Long id, String name, Namespace namespace) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -1477,7 +1477,7 @@ public class TestRelationalEntityStore {
       Long id, String name, Namespace namespace, String comment, String location) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)

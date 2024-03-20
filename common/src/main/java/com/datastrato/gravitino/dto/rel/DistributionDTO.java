@@ -105,7 +105,7 @@ public class DistributionDTO implements Distribution {
     private Strategy strategy;
 
     /** Creates a new instance of {@link Builder}. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Sets the arguments of the function.

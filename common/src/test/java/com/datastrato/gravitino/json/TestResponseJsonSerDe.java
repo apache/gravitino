@@ -82,7 +82,7 @@ public class TestResponseJsonSerDe {
   @Test
   public void testMetalakeResponseBuilderSerDe() throws JsonProcessingException {
     MetalakeDTO metalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("key", "value"))

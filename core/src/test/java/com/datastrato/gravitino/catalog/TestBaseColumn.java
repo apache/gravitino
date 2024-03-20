@@ -16,6 +16,9 @@ final class BaseColumnExtension extends BaseColumn {
 
   public static class Builder extends BaseColumnBuilder<Builder, BaseColumnExtension> {
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     @Override
     protected BaseColumnExtension internalBuild() {
       BaseColumnExtension column = new BaseColumnExtension();
@@ -26,6 +29,15 @@ final class BaseColumnExtension extends BaseColumn {
       return column;
     }
   }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
 }
 
 public class TestBaseColumn {
@@ -33,7 +45,7 @@ public class TestBaseColumn {
   @Test
   void testColumnFields() {
     BaseColumn column =
-        new BaseColumnExtension.Builder()
+        BaseColumnExtension.builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
             .withType(Types.IntegerType.get())
@@ -47,28 +59,28 @@ public class TestBaseColumn {
   @Test
   void testEqualsAndHashCode() {
     BaseColumn column1 =
-        new BaseColumnExtension.Builder()
+        BaseColumnExtension.builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
             .withType(Types.StringType.get())
             .build();
 
     BaseColumn column2 =
-        new BaseColumnExtension.Builder()
+        BaseColumnExtension.builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
             .withType(Types.StringType.get())
             .build();
 
     BaseColumn column3 =
-        new BaseColumnExtension.Builder()
+        BaseColumnExtension.builder()
             .withName("differentColumnName")
             .withComment("testColumnComment")
             .withType(Types.StringType.get())
             .build();
 
     BaseColumn column4 =
-        new BaseColumnExtension.Builder()
+        BaseColumnExtension.builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
             .withType(Types.IntegerType.get())
