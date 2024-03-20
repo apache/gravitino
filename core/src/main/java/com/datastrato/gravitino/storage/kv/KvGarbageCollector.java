@@ -58,7 +58,6 @@ public final class KvGarbageCollector implements Closeable {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
-  @SuppressWarnings("deprecation")
   public KvGarbageCollector(
       KvBackend kvBackend, Config config, EntityKeyEncoder<byte[]> entityKeyEncoder) {
     this.kvBackend = kvBackend;
