@@ -77,6 +77,12 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
   }
 
+  protected ResultSet getDatabase(Connection connection, String databaseName) throws SQLException {
+    final DatabaseMetaData metaData = connection.getMetaData();
+    // It's indeed the catalog name, not the schema name.
+    return metaData.getCatalogs();
+  }
+
   /**
    * @param databaseName The name of the database.
    * @param comment The comment of the database.

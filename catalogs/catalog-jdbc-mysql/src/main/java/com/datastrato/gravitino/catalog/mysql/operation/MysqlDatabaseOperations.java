@@ -9,16 +9,16 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -93,33 +93,26 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     try (final Connection connection = this.dataSource.getConnection()) {
-      String query = "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?";
-      try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-        preparedStatement.setString(1, databaseName);
+      ResultSet resultSet = getDatabase(connection, databaseName);
 
-        // Execute the query
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-          if (!resultSet.next()) {
-            throw new NoSuchSchemaException(
-                "Database %s could not be found in information_schema.SCHEMATA", databaseName);
-          }
-          String schemaName = resultSet.getString("SCHEMA_NAME");
-          // Mysql currently only supports these two attributes
-          String characterSetName = resultSet.getString("DEFAULT_CHARACTER_SET_NAME");
-          String collationName = resultSet.getString("DEFAULT_COLLATION_NAME");
-          Map<String, String> properties = new HashMap<>();
-          properties.put("CHARACTER SET", characterSetName);
-          properties.put("COLLATE", collationName);
-
-          JdbcSchema.Builder builder =
-              JdbcSchema.builder()
-                  .withName(schemaName)
-                  .withProperties(properties)
-                  .withAuditInfo(AuditInfo.EMPTY);
-
-          return builder.build();
+      boolean found = false;
+      while (resultSet.next()) {
+        if (Objects.equals(resultSet.getString(1), databaseName)) {
+          found = true;
+          break;
         }
       }
+
+      if (!found) {
+        throw new NoSuchSchemaException("Database %s could not be found", databaseName);
+      }
+
+      return JdbcSchema.builder()
+          .withName(databaseName)
+          .withProperties(ImmutableMap.of())
+          .withAuditInfo(AuditInfo.EMPTY)
+          .build();
+
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
