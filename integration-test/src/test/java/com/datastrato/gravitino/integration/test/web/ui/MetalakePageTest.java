@@ -47,7 +47,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(2)
-  public void testViewMetalakeDetails() {
+  public void testViewMetalakeDetails() throws InterruptedException {
     metalakePage.clickViewMetalakeBtn(metalakeName);
     Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(metalakeName));
   }

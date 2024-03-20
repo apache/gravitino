@@ -202,7 +202,7 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyShowMetalakeDetails(String name) {
+  public boolean verifyShowMetalakeDetails(String name) throws InterruptedException {
     try {
       // Check the drawer css property value
       detailsDrawer.isDisplayed();
@@ -218,7 +218,7 @@ public class MetalakePage extends AbstractWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      closeDetailsBtn.click();
+      clickAndWait(closeDetailsBtn);
     }
   }
 
