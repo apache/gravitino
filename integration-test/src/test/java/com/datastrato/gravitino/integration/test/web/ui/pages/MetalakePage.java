@@ -136,7 +136,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public void clickMetalakeLink(String name) {
     try {
-      String xpath = "//a[@href='/ui/metalakes?metalake=" + name + "']";
+      String xpath = "//a[@data-refer='metalake-link-" + name + "']";
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);

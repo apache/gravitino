@@ -109,6 +109,7 @@ const TableBody = props => {
                   textOverflow: 'ellipsis',
                   '&:hover': { color: 'primary.main', textDecoration: 'underline' }
                 }}
+                data-refer={`metalake-link-${name}`}
               >
                 {name}
               </Typography>
