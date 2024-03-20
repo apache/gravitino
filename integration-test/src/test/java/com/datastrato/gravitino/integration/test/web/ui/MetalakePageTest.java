@@ -97,7 +97,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(7)
-  public void testCreateInvalidMetalake() {
+  public void testCreateInvalidMetalake() throws InterruptedException {
     String name = "1!@#$";
     metalakePage.createMetalakeBtn.click();
     metalakePage.setMetalakeNameField(name);

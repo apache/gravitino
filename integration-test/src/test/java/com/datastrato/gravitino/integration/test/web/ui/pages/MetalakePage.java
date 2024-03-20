@@ -65,6 +65,9 @@ public class MetalakePage extends AbstractWebIT {
       xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to previous page']")
   public WebElement prevPageBtn;
 
+  @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
+  public WebElement nameLink;
+
   public MetalakePage() {
     PageFactory.initElements(driver, this);
   }
@@ -152,7 +155,7 @@ public class MetalakePage extends AbstractWebIT {
     valueInput.sendKeys(value);
   }
 
-  public boolean checkIsErrorName() {
+  public boolean checkIsErrorName() throws InterruptedException {
     try {
       String xpath = "//div[@data-refer='metalake-name-field']";
       WebElement nameField = findElementByXPath(xpath);
@@ -164,7 +167,7 @@ public class MetalakePage extends AbstractWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      cancelHandleMetalakeBtn.click();
+      clickAndWait(cancelHandleMetalakeBtn);
     }
   }
 
@@ -281,9 +284,10 @@ public class MetalakePage extends AbstractWebIT {
   public boolean verifyLinkToCatalogsPage(String name) {
     try {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.urlContains(name));
+      wait.until(ExpectedConditions.visibilityOf(nameLink));
+      wait.until(ExpectedConditions.urlContains(nameLink.getAttribute("href")));
 
-      if (!driver.getCurrentUrl().contains(name)) {
+      if (!driver.getCurrentUrl().contains(name) || !nameLink.getAttribute("href").contains(name)) {
         LOG.error("name link is not match");
         return false;
       }
