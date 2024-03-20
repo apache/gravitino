@@ -169,7 +169,7 @@ public interface Configs {
                       + "max delete time allow is %s ms(30 days), "
                       + "min delete time allow is %s ms(10 minutes)",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
           .createWithOptional();
@@ -182,7 +182,7 @@ public interface Configs {
                       + "max delete time allow is %s ms(30 days), "
                       + "min delete time allow is %s ms(10 minutes)",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
           .createWithDefault(DEFAULT_STORE_DELETE_AFTER_TIME);
@@ -195,7 +195,7 @@ public interface Configs {
                       + "max version retention count is %s, "
                       + "min version retention count is %s",
                   MAX_VERSION_RETENTION_COUNT, MIN_VERSION_RETENTION_COUNT))
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .checkRange(MIN_VERSION_RETENTION_COUNT, MAX_VERSION_RETENTION_COUNT)
           .createWithDefault(DEFAULT_VERSION_RETENTION_COUNT);
