@@ -1,7 +1,7 @@
 CREATE SCHEMA "test.gt_hive".gt_db1;
 
 CREATE TABLE "test.gt_hive".gt_db1.tb01 (
-    name varchar,
+    name varchar(20),
     salary int,
     city int
 )
@@ -30,7 +30,7 @@ show create table "test.gt_hive".gt_db1.tb01;
 comment on column "test.gt_hive".gt_db1.tb01.s is 'test column comments';
 show create table "test.gt_hive".gt_db1.tb01;
 
-alter table "test.gt_hive".gt_db1.tb01 add column city varchar comment 'aaa';
+alter table "test.gt_hive".gt_db1.tb01 add column city varchar(100) comment 'aaa';
 show create table "test.gt_hive".gt_db1.tb01;
 
 drop table "test.gt_hive".gt_db1.tb01;
