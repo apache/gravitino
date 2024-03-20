@@ -18,7 +18,7 @@ public class GravitinoCatalogAdaptorFactory {
     switch (provider.toLowerCase(Locale.ROOT)) {
       case "hive":
         return new HiveAdaptor();
-      case "iceberg":
+      case "lakehouse-iceberg":
         return new IcebergAdaptor();
       default:
         throw new RuntimeException(String.format("Provider:%s is not supported yet", provider));

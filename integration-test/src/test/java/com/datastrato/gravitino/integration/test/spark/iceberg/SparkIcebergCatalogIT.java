@@ -19,6 +19,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Override
   protected String getProvider() {
-    return "iceberg";
+    return "lakehouse-iceberg";
   }
 }
