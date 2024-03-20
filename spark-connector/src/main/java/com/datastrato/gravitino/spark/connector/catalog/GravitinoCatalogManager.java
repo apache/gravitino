@@ -23,8 +23,7 @@ import org.slf4j.LoggerFactory;
 /** GravitinoCatalogManager is used to retrieve catalogs from Gravitino server. */
 public class GravitinoCatalogManager {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
-  private static volatile GravitinoCatalogManager gravitinoCatalogManager;
-  private static final Object LOCK = new Object();
+  private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
   private final Cache<String, Catalog> gravitinoCatalogs;
@@ -41,13 +40,9 @@ public class GravitinoCatalogManager {
   }
 
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
-    if (gravitinoCatalogManager == null) {
-      synchronized (LOCK) {
-        if (gravitinoCatalogManager == null) {
-          gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
-        }
-      }
-    }
+    Preconditions.checkState(
+        gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
+    gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
     return gravitinoCatalogManager;
   }
 
@@ -63,6 +58,7 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
     gravitinoClient.close();
+    gravitinoCatalogManager = null;
   }
 
   public Catalog getGravitinoCatalogInfo(String name) {
