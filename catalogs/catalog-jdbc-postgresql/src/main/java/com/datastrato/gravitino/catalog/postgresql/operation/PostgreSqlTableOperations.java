@@ -78,7 +78,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check
       // the result
-      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
       boolean found = false;
       // Handle case-sensitive issues.
       while (table.next() && !found) {
