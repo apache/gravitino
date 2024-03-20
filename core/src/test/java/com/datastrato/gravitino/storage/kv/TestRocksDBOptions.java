@@ -26,16 +26,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TestRocksDBOptions {
     @Test
     void testSetOptions() {
-        String prefix = "gravitino.entity.store.kv.rocksdb.options";
-        String optionsKey = prefix + "." + "maxBackgroundJobs";
+        String prefix = "gravitino.entity.store.kv.rocksdb";
+        String optionsKey = prefix + ".options.maxBackgroundJobs";
 
         Map<String, String> mockConfigMap = new HashMap<String, String>();
-        Config config = Mockito.mock(Config.class);
-        Mockito.when(config.getConfigsWithPrefix(prefix)).thenReturn(mockConfigMap);
-
         // set maxBackgroundJobs to 8
         int expectMaxBackgroundJobs = 8;
+        Config config = Mockito.mock(Config.class);
         mockConfigMap.put(optionsKey, String.valueOf(expectMaxBackgroundJobs));
+
+        Mockito.when(config.getConfigsWithPrefix(prefix)).thenReturn(mockConfigMap);
 
         Options mockOptions = Mockito.spy(new Options());
 

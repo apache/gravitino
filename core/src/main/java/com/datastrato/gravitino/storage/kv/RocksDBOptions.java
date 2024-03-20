@@ -40,18 +40,26 @@ public class RocksDBOptions {
     }
 
     private void initializeOptionSetters() {
-        // Each option name maps to a lambda that applies the setting to the appropriate option object
-        optionSetters.put("gravitino.entity.store.kv.rocksdb.options.createIfMissing", (holder, value) -> holder.options.setCreateIfMissing(Boolean.parseBoolean(value)));
-        // Add more options here. For example:
-        // optionSetters.put("maxOpenFiles", (holder, value) -> holder.options.setMaxOpenFiles(Integer.parseInt(value)));
+        // Each option name maps to a lambda that applies the setting to the appropriate
+        // option object
+        optionSetters.put(".options.maxBackgroundJobs",
+                (holder, value) -> {
+                    holder.options.setMaxBackgroundJobs(Integer.parseInt(value));
+                });
     }
 
+    //
+    /**
+     * Apply user-defined options to option if this options is configurable.
+     * TODO: List all configurable options.
+     */
     public void setOptions(Config config) {
-        String prefix = "gravitino.entity.store.kv.rocksdb.options";
+        String prefix = "gravitino.entity.store.kv.rocksdb";
         Map<String, String> configMap = config.getConfigsWithPrefix(prefix);
         optionSetters.forEach((optionKey, optionValue) -> {
-            if (configMap.containsKey(optionKey)) {
-                this.optionSetters.get(optionKey).accept(this, configMap.get(optionKey));
+            String originalOptionKey = prefix + optionKey;
+            if (configMap.containsKey(originalOptionKey)) {
+                optionValue.accept(this, configMap.get(originalOptionKey));
             }
         });
         LOGGER.debug("ZZZ Options: {}", this.options);
