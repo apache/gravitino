@@ -18,9 +18,7 @@ dependencies {
     compileOnly(libs.hadoop2.common)
   }
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.caffeine) {
-    exclude("com.google.errorprone")
-  }
+  implementation(libs.caffeine)
 
   if (defaultHadoopVersion == 3) {
     testImplementation(libs.hadoop3.common)

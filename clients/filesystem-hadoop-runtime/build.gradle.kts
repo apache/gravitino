@@ -21,6 +21,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
+  relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
   relocate("com.github.benmanes.caffeine", "com.datastrato.gravitino.shaded.com.github.benmanes.caffeine")
 }
 
