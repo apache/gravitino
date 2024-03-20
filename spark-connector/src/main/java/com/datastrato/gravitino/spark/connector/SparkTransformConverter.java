@@ -91,7 +91,8 @@ public class SparkTransformConverter {
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 bundles.setDistribution(distribution);
               } else {
-                throw new NotSupportedException("Doesn't support Spark transform: " + transform.name());
+                throw new NotSupportedException(
+                    "Doesn't support Spark transform: " + transform.name());
               }
             });
 
