@@ -54,6 +54,8 @@ public class RocksDBKvBackend implements KvBackend {
         String dbPath = getStoragePath(config);
         File dbDir = new File(dbPath, "instance");
         try {
+            // apply user-defined options
+            rocksDBOptions.setOptions(config);
             rocksDBOptions.getOptions().setCreateIfMissing(true);
 
             if (!dbDir.exists() && !dbDir.mkdirs()) {
