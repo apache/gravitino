@@ -31,8 +31,8 @@ public interface Configs {
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
-  @Deprecated Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
-  @Deprecated String KV_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
+  Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
+  String KV_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
 
   // Config for data keep time after soft deletion, in milliseconds.
   String STORE_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.deleteAfterTimeMs";
@@ -170,6 +170,7 @@ public interface Configs {
                       + "min delete time allow is %s ms(10 minutes)",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
+          .deprecated()
           .longConf()
           .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
           .createWithOptional();
