@@ -161,7 +161,6 @@ public interface Configs {
           .longConf()
           .createWithDefault(2000L);
 
-  @Deprecated
   ConfigEntry<Optional<Long>> KV_DELETE_AFTER_TIME =
       new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
           .doc(
