@@ -106,8 +106,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
       sparkSession.close();
       sparkSession = null;
     }
-      sparkSession =
-              SparkSession.builder()
+    sparkSession =
+            SparkSession.builder()
                       .master("local[1]")
                       .appName("Spark connector integration test")
                       .config("spark.plugins", GravitinoSparkPlugin.class.getName())
