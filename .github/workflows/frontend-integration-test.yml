@@ -83,7 +83,7 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
