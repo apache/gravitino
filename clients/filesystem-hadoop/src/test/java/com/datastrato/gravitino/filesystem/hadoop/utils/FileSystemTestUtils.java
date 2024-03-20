@@ -7,6 +7,7 @@ package com.datastrato.gravitino.filesystem.hadoop.utils;
 import com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -15,7 +16,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
 public class FileSystemTestUtils {
-  private static final String LOCAL_FS_PREFIX = "file:/tmp/";
+  private static final String LOCAL_FS_PREFIX =
+      "file:/tmp/gravitino_test_fs_" + UUID.randomUUID().toString().replace("-", "") + "/";
 
   private static final int BUFFER_SIZE = 3;
   private static final short REPLICATION = 1;
@@ -25,7 +27,11 @@ public class FileSystemTestUtils {
 
   private FileSystemTestUtils() {}
 
-  public static Path createGvfsPrefix(String filesetCatalog, String schema, String fileset) {
+  public static String localRootPrefix() {
+    return LOCAL_FS_PREFIX;
+  }
+
+  public static Path createFilesetPath(String filesetCatalog, String schema, String fileset) {
     return new Path(
         GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
             + "/"
@@ -36,12 +42,12 @@ public class FileSystemTestUtils {
             + fileset);
   }
 
-  public static Path createLocalPrefix(String filesetCatalog, String schema, String fileset) {
-    return new Path(LOCAL_FS_PREFIX + filesetCatalog + "/" + schema + "/" + fileset);
+  public static Path createLocalRootDir(String filesetCatalog) {
+    return new Path(LOCAL_FS_PREFIX + filesetCatalog);
   }
 
-  public static Path createLocalFilePath(String filePath) {
-    return new Path(LOCAL_FS_PREFIX + filePath);
+  public static Path createLocalDirPrefix(String filesetCatalog, String schema, String fileset) {
+    return new Path(LOCAL_FS_PREFIX + filesetCatalog + "/" + schema + "/" + fileset);
   }
 
   public static void create(Path path, FileSystem fileSystem) throws IOException {

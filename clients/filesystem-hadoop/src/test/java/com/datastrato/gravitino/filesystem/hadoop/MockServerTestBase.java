@@ -43,7 +43,8 @@ public abstract class MockServerTestBase {
   protected static final String metalakeName = "metalake_1";
   protected static final String catalogName = "fileset_catalog_1";
   protected static final String schemaName = "schema_1";
-  protected static final String filesetName = "fileset_1";
+  protected static final String managedFilesetName = "managed_fileset";
+  protected static final String externalFilesetName = "external_fileset";
   protected static final String provider = "test";
 
   @BeforeAll
@@ -103,7 +104,7 @@ public abstract class MockServerTestBase {
 
   protected static void mockMetalakeDTO(String name, String comment) {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(name)
             .withComment(comment)
             .withAudit(
@@ -119,7 +120,7 @@ public abstract class MockServerTestBase {
 
   protected static void mockCatalogDTO(String catalogName, String provider, String comment) {
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.FILESET)
             .withProvider(provider)
@@ -147,6 +148,7 @@ public abstract class MockServerTestBase {
       String catalogName,
       String schemaName,
       String filesetName,
+      Fileset.Type type,
       String location) {
     NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
     String filesetPath =
@@ -156,7 +158,7 @@ public abstract class MockServerTestBase {
     FilesetDTO mockFileset =
         FilesetDTO.builder()
             .name(fileset.name())
-            .type(Fileset.Type.MANAGED)
+            .type(type)
             .storageLocation(location)
             .comment("comment")
             .properties(ImmutableMap.of("k1", "v1"))
