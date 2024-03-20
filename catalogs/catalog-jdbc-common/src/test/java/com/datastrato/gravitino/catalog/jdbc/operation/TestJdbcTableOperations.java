@@ -16,6 +16,7 @@ import com.datastrato.gravitino.connector.BaseColumn;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
@@ -134,7 +135,14 @@ public class TestJdbcTableOperations {
     Assertions.assertDoesNotThrow(
         () ->
             JDBC_TABLE_OPERATIONS.create(
-                DATABASE_NAME, table1, jdbcColumns, null, properties, null, Indexes.EMPTY_INDEXES));
+                DATABASE_NAME,
+                table1,
+                jdbcColumns,
+                null,
+                properties,
+                null,
+                Distributions.NONE,
+                Indexes.EMPTY_INDEXES));
 
     // list table.
     List<String> allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
