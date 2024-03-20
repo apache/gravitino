@@ -29,15 +29,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private final String metalakeName = "test";
-  private final String warehouse =
-      String.format(
-          "hdfs://%s:%d/user/hive/warehouse",
-          containerSuite.getHiveContainer().getContainerIpAddress(),
-          HiveContainer.HDFS_DEFAULTFS_PORT);
 
   private SparkSession sparkSession;
   private String hiveMetastoreUri;
   private String gravitinoUri;
+  private String warehouse;
 
   protected abstract String getCatalogName();
 
@@ -98,6 +94,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
+    warehouse =
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
   private void initSparkEnv() {
