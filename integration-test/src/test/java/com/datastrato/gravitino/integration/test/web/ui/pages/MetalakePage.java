@@ -65,9 +65,6 @@ public class MetalakePage extends AbstractWebIT {
       xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to previous page']")
   public WebElement prevPageBtn;
 
-  @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
-  public WebElement nameLink;
-
   public MetalakePage() {
     PageFactory.initElements(driver, this);
   }
@@ -285,7 +282,9 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyLinkToCatalogsPage(String name) {
     try {
+      String xpath = "//a[@data-refer='metalake-name-link']";
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebElement nameLink = driver.findElement(By.xpath(xpath));
       wait.until(ExpectedConditions.visibilityOf(nameLink));
       wait.until(ExpectedConditions.urlContains(nameLink.getAttribute("href")));
 
