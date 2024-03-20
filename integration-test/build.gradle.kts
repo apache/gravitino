@@ -29,7 +29,6 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":spark-connector")) {
-    exclude("org.apache.iceberg")
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
