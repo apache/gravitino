@@ -58,11 +58,9 @@ public class TestHiveDataTypeConverter {
 
     io.trino.spi.type.Type varcharTypeWithoutLength =
         io.trino.spi.type.VarcharType.createUnboundedVarcharType();
-    e =
-        Assert.expectThrows(
-            TrinoException.class,
-            () -> generalDataTypeTransformer.getGravitinoType(varcharTypeWithoutLength));
-    Assert.assertTrue(
-        e.getMessage().contains("Hive does not support the datatype VARCHAR without length"));
+
+    Assert.assertEquals(
+        generalDataTypeTransformer.getGravitinoType(varcharTypeWithoutLength),
+        Types.StringType.get());
   }
 }
