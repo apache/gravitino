@@ -37,7 +37,7 @@ import scala.collection.JavaConverters;
  */
 public class SparkTransformConverter {
 
-  public static class GravitinoTransformBundles {
+  public static class PartitionAndBucketInfo {
     private List<Transform> partitions;
     @Getter private Distribution distribution;
     @Getter private SortOrder[] sortOrders;
@@ -67,9 +67,9 @@ public class SparkTransformConverter {
     }
   }
 
-  public static GravitinoTransformBundles toGravitinoTransform(
+  public static PartitionAndBucketInfo toGravitinoTransform(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
-    GravitinoTransformBundles bundles = new GravitinoTransformBundles();
+    PartitionAndBucketInfo bundles = new PartitionAndBucketInfo();
     if (ArrayUtils.isEmpty(transforms)) {
       return bundles;
     }
@@ -91,7 +91,7 @@ public class SparkTransformConverter {
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 bundles.setDistribution(distribution);
               } else {
-                throw new NotSupportedException("Not support Spark transform: " + transform.name());
+                throw new NotSupportedException("Doesn't support Spark transform: " + transform.name());
               }
             });
 
@@ -117,7 +117,7 @@ public class SparkTransformConverter {
                     break;
                   default:
                     throw new UnsupportedOperationException(
-                        "Not support gravitino partition: "
+                        "Doesn't support Gravitino partition: "
                             + transform.name()
                             + ", className: "
                             + transform.getClass().getName());
@@ -196,7 +196,7 @@ public class SparkTransformConverter {
         // Spark doesn't support EVEN or RANGE distribution
       default:
         throw new NotSupportedException(
-            "Not support distribution strategy: " + distribution.strategy());
+            "Doesn't support distribution strategy: " + distribution.strategy());
     }
   }
 

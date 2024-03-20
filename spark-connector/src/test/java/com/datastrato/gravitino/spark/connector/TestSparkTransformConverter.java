@@ -14,7 +14,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.spark.connector.SparkTransformConverter.GravitinoTransformBundles;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter.PartitionAndBucketInfo;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,7 +49,7 @@ public class TestSparkTransformConverter {
   void testPartition() {
     sparkToGravitinoPartitionTransformMaps.forEach(
         (sparkTransform, gravitinoTransform) -> {
-          GravitinoTransformBundles bundles =
+          PartitionAndBucketInfo bundles =
               SparkTransformConverter.toGravitinoTransform(
                   new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform});
           Assertions.assertNull(bundles.getDistribution());
@@ -110,7 +110,7 @@ public class TestSparkTransformConverter {
 
     org.apache.spark.sql.connector.expressions.Transform sparkBucket =
         Expressions.bucket(bucketNum, sparkFieldReferences);
-    GravitinoTransformBundles bundles =
+    PartitionAndBucketInfo bundles =
         SparkTransformConverter.toGravitinoTransform(
             new org.apache.spark.sql.connector.expressions.Transform[] {sparkBucket});
 
@@ -134,7 +134,7 @@ public class TestSparkTransformConverter {
             createSparkFieldReference(bucketColumnNames),
             createSparkFieldReference(sortColumnNames));
 
-    GravitinoTransformBundles bundles =
+    PartitionAndBucketInfo bundles =
         SparkTransformConverter.toGravitinoTransform(
             new org.apache.spark.sql.connector.expressions.Transform[] {sortedBucketTransform});
     Assertions.assertNull(bundles.getPartitions());

@@ -70,7 +70,7 @@ public class SparkTableInfo {
     if (partition instanceof IdentityTransform) {
       partitionColumnNames.add(((IdentityTransform) partition).reference().fieldNames()[0]);
     } else {
-      throw new NotSupportedException(partition.name() + " is not supported yet.");
+      throw new NotSupportedException("Doesn't support " + partition.name());
     }
   }
 
@@ -103,7 +103,8 @@ public class SparkTableInfo {
               } else if (transform instanceof IdentityTransform) {
                 sparkTableInfo.addPartition(transform);
               } else {
-                throw new NotSupportedException("Not support Spark transform: " + transform.name());
+                throw new NotSupportedException(
+                    "Doesn't support Spark transform: " + transform.name());
               }
             });
     return sparkTableInfo;
