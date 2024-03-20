@@ -67,8 +67,8 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
             .removalListener(
                 (ignored, value, cause) -> {
-                  // We have closed the HiveClientPool that iss manually removed from the cache.
-                  closeClientPoolWithIsolatedClassLoader((HiveClientPool) value);
+                  // We have closed the HiveClientPool that is manually removed from the cache.
+                  ((HiveClientPool) value).close();
                 })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
@@ -138,20 +138,10 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
         .build();
   }
 
-  private void closeClientPoolWithIsolatedClassLoader(HiveClientPool clientPool) {
-    // Set the class loader to the isolated class loader.
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    Thread.currentThread().setContextClassLoader(CachedClientPool.class.getClassLoader());
-    try {
-      clientPool.close();
-    } finally {
-      Thread.currentThread().setContextClassLoader(classLoader);
-    }
-  }
-
   public void close() {
-    // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler.
-    clientPoolCache.asMap().forEach((key, value) -> closeClientPoolWithIsolatedClassLoader(value));
+    // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler and
+    // the class loader.
+    clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
     scheduler.shutdownNow();
   }
