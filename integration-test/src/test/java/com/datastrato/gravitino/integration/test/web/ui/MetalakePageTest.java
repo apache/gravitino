@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.web.ui;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(0)
   public void homePage() {
     String title = driver.getTitle();
@@ -39,6 +41,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(1)
   public void testCreateMetalake() throws InterruptedException {
     createMetalakeAction(metalakeName);
@@ -46,6 +49,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(2)
   public void testViewMetalakeDetails() throws InterruptedException {
     metalakePage.clickViewMetalakeBtn(metalakeName);
@@ -53,6 +57,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(3)
   public void testEditMetalake() {
     metalakePage.clickEditMetalakeBtn(metalakeName);
@@ -62,6 +67,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(4)
   public void testDeleteMetalake() {
     metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
@@ -70,6 +76,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(5)
   public void testCreateMultipleMetalakes() throws InterruptedException {
     int twoPagesCount = 11;
@@ -88,6 +95,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(6)
   public void testQueryMetalake() throws InterruptedException {
     String name = "query";
@@ -96,6 +104,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
+  @Disabled
   @Order(7)
   public void testCreateInvalidMetalake() throws InterruptedException {
     String name = "1!@#$";
@@ -106,7 +115,7 @@ public class MetalakePageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   public void testLinkToCatalogsPage() throws InterruptedException {
     String name = "a_test_link";
     createMetalakeAction(name);

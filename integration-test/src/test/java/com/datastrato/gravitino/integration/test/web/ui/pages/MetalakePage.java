@@ -135,7 +135,9 @@ public class MetalakePage extends AbstractWebIT {
     try {
       Thread.sleep(ACTION_SLEEP_MILLIS);
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
+      LOG.info(metalakeTableGrid.getAttribute("innerHTML"));
       WebElement metalakeLink = metalakeTableGrid.findElement(By.xpath(xpath));
+      LOG.info(metalakeLink.getAttribute("innerHTML"));
       clickAndWait(metalakeLink);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
