@@ -49,11 +49,9 @@ public class RocksDBOptions {
     public void setOptions(Config config) {
         String prefix = "gravitino.entity.store.kv.rocksdb.options";
         Map<String, String> configMap = config.getConfigsWithPrefix(prefix);
-        configMap.forEach((optionKey, optionValue) -> {
-            if (this.optionSetters.containsKey(optionKey)) {
-                this.optionSetters.get(optionKey).accept(this, optionValue);
-            } else {
-                throw new IllegalArgumentException("Option " + optionKey + " is not supported.");
+        optionSetters.forEach((optionKey, optionValue) -> {
+            if (configMap.containsKey(optionKey)) {
+                this.optionSetters.get(optionKey).accept(this, configMap.get(optionKey));
             }
         });
         LOGGER.debug("ZZZ Options: {}", this.options);
