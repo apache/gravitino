@@ -89,10 +89,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public void setQueryInput(String queryInput) {
     try {
-      Thread.sleep(SLEEP_MILLIS);
+      Thread.sleep(ACTION_SLEEP_MILLIS);
       clearQueryInput();
       queryMetalakeInput.sendKeys(queryInput);
-      Thread.sleep(SLEEP_MILLIS);
+      Thread.sleep(ACTION_SLEEP_MILLIS);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -280,7 +280,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyLinkToCatalogsPage() {
     try {
-      Thread.sleep(SLEEP_MILLIS);
+      Thread.sleep(ACTION_SLEEP_MILLIS);
       String xpath = "//*[@data-refer='metalake-name-link']";
       WebElement nameLink = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);

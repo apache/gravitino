@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.openqa.selenium.By;
 import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.InvalidArgumentException;
@@ -33,7 +34,7 @@ public class AbstractWebIT extends AbstractIT {
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
   protected static final long MAX_TIMEOUT = 20;
-  protected static final long SLEEP_MILLIS = 1_000;
+  protected static final long ACTION_SLEEP_MILLIS = 1_000;
 
   protected boolean waitShowText(final String text, final By locator) {
     try {
@@ -69,11 +70,20 @@ public class AbstractWebIT extends AbstractIT {
       wait.until(ExpectedConditions.elementToBeClickable(element));
 
       element.click();
-      Thread.sleep(SLEEP_MILLIS);
+      Thread.sleep(ACTION_SLEEP_MILLIS);
     } catch (ElementClickInterceptedException e) {
       Actions action = new Actions(driver);
       action.moveToElement(element).click().build().perform();
-      Thread.sleep(SLEEP_MILLIS);
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  @BeforeEach
+  public void beforeEachTest() {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+    } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
   }

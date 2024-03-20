@@ -76,7 +76,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
     for (int i = 0; i < twoPagesCount; i++) {
       try {
-        Thread.sleep(800);
+        Thread.sleep(ACTION_SLEEP_MILLIS);
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
       }
