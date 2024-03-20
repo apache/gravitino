@@ -39,5 +39,7 @@ drop table "test.gt_hive".varchar_db1.tb05;
 
 drop table "test.gt_hive".varchar_db1.tb06;
 
+drop table "test.gt_hive".varchar_db1.tb07;
+
 drop schema "test.gt_hive".varchar_db1;
 

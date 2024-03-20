@@ -84,10 +84,11 @@ WITH (
    table_type = 'MANAGED_TABLE'
 )"
 
-<QUERY_FAILED> Hive does not support the datatype VARCHAR without length
+CREATE TABLE
 
 <QUERY_FAILED> Hive does not support the datatype VARCHAR with the length greater than 65535
 
+DROP TABLE
 
 DROP TABLE
 

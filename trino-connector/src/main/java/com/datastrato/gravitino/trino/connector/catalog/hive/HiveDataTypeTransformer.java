@@ -24,11 +24,7 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
     if (typeClass == VarcharType.class) {
       VarcharType varcharType = (VarcharType) type;
       if (varcharType.getLength().isEmpty()) {
-        // It was creating a table with column type 'varchar' NOT 'varchar(n)', We do not support
-        // this case
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Hive does not support the datatype VARCHAR without length");
+        return Types.StringType.get();
       }
 
       int length = varcharType.getLength().get();

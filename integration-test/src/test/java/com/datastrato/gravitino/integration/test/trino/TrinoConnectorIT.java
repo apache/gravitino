@@ -175,9 +175,9 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql3 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
-                + "  col1 varchar(20),\n"
-                + "  col2 varchar(20),\n"
-                + "  col3 varchar(20)\n"
+                + "  col1 varchar,\n"
+                + "  col2 varchar,\n"
+                + "  col3 varchar\n"
                 + ")\n"
                 + "WITH (\n"
                 + "  format = 'TEXTFILE'\n"
@@ -230,15 +230,15 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql3 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
-                + "  user_name varchar(20),\n"
-                + "  gender varchar(20),\n"
-                + "  age varchar(20),\n"
-                + "  phone varchar(20),\n"
-                + "  email varchar(20),\n"
-                + "  address varchar(20),\n"
-                + "  birthday varchar(20),\n"
-                + "  create_time varchar(20),\n"
-                + "  update_time varchar(20)\n"
+                + "  user_name varchar,\n"
+                + "  gender varchar,\n"
+                + "  age varchar,\n"
+                + "  phone varchar,\n"
+                + "  email varchar,\n"
+                + "  address varchar,\n"
+                + "  birthday varchar,\n"
+                + "  create_time varchar,\n"
+                + "  update_time varchar\n"
                 + ")\n"
                 + "WITH (\n"
                 + "  format = 'TEXTFILE'\n"
@@ -292,12 +292,12 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql4 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
-                + "  user_name varchar(20),\n"
-                + "  consumer varchar(20),\n"
-                + "  recharge varchar(20),\n"
-                + "  event_time varchar(20),\n"
-                + "  create_time varchar(20),\n"
-                + "  update_time varchar(20)\n"
+                + "  user_name varchar,\n"
+                + "  consumer varchar,\n"
+                + "  recharge varchar,\n"
+                + "  event_time varchar,\n"
+                + "  create_time varchar,\n"
+                + "  update_time varchar\n"
                 + ")\n"
                 + "WITH (\n"
                 + "  format = 'TEXTFILE'\n"
@@ -406,7 +406,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String createTableSql =
         String.format(
-            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar(20))"
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar)"
                 + " with ( serde_name = '123455', location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"
                 + ", partitioned_by = ARRAY['name'], bucketed_by = ARRAY['id'], bucket_count = 50, sorted_by = ARRAY['name']"
                 + ")",
@@ -781,7 +781,7 @@ public class TrinoConnectorIT extends AbstractIT {
     tableName = GravitinoITUtils.genRandomName("table_format1").toLowerCase();
     sql =
         String.format(
-            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar(20)) with (format = 'ORC')",
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC')",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
 
@@ -801,7 +801,7 @@ public class TrinoConnectorIT extends AbstractIT {
     tableName = GravitinoITUtils.genRandomName("table_format2").toLowerCase();
     sql =
         String.format(
-            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar(20)) with (format = 'ORC', input_format = 'org.apache.hadoop.mapred.TextInputFormat')",
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC', input_format = 'org.apache.hadoop.mapred.TextInputFormat')",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
     sql =
@@ -820,7 +820,7 @@ public class TrinoConnectorIT extends AbstractIT {
     tableName = GravitinoITUtils.genRandomName("table_format3").toLowerCase();
     sql =
         String.format(
-            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar(20)) with (format = 'ORC', output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat')",
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (format = 'ORC', output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat')",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
     sql =
@@ -1016,7 +1016,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String createTableSql =
         String.format(
-            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar(10))",
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar)",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
 
