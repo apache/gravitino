@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
+import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Entity;
@@ -35,18 +36,37 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.NewPartitions;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.errors.InvalidReplicationFactorException;
+import org.apache.kafka.common.errors.TopicExistsException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class KafkaCatalogOperations implements CatalogOperations, SupportsSchemas, TopicCatalog {
 
+  private static final Logger LOG = LoggerFactory.getLogger(KafkaCatalogOperations.class);
   private static final KafkaCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
       new KafkaCatalogPropertiesMetadata();
   private static final KafkaSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
@@ -60,6 +80,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
   private CatalogInfo info;
+  private AdminClient adminClient;
 
   @VisibleForTesting
   KafkaCatalogOperations(EntityStore store, IdGenerator idGenerator) {
@@ -92,39 +113,187 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
     adminClientConfig.putAll(bypassConfigs);
-    adminClientConfig.put(BOOTSTRAP_SERVERS, config.get(BOOTSTRAP_SERVERS));
+    adminClientConfig.put(
+        AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, config.get(BOOTSTRAP_SERVERS));
     // use gravitino catalog id as the admin client id
-    adminClientConfig.put("client.id", config.get(ID_KEY));
+    adminClientConfig.put(AdminClientConfig.CLIENT_ID_CONFIG, config.get(ID_KEY));
 
     createDefaultSchema();
+    adminClient = AdminClient.create(adminClientConfig);
   }
 
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+    if (!schemaExists(schemaIdent)) {
+      LOG.warn("Kafka catalog schema {} does not exist", schemaIdent);
+      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
+    }
+
+    try {
+      ListTopicsResult result = adminClient.listTopics();
+      Set<String> topicNames = result.names().get();
+      return topicNames.stream()
+          .map(name -> NameIdentifier.of(namespace, name))
+          .toArray(NameIdentifier[]::new);
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException("Failed to list topics under namespace " + namespace, e);
+    }
   }
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    throw new UnsupportedOperationException();
+    DescribeTopicsResult result = adminClient.describeTopics(Collections.singleton(ident.name()));
+    int partitions;
+    int replicationFactor;
+    try {
+      TopicDescription topicDescription = result.topicNameValues().get(ident.name()).get();
+      partitions = topicDescription.partitions().size();
+      replicationFactor = topicDescription.partitions().get(0).replicas().size();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof org.apache.kafka.common.errors.UnknownTopicOrPartitionException) {
+        throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
+      } else {
+        throw new RuntimeException("Failed to load topic " + ident.name() + " from Kafka", e);
+      }
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to load topic " + ident.name() + " from Kafka", e);
+    }
+
+    LOG.info("Loaded topic {} from Kafka", ident);
+
+    return KafkaTopic.builder()
+        .withName(ident.name())
+        .withProperties(
+            ImmutableMap.of(
+                KafkaTopicPropertiesMetadata.PARTITION_COUNT, String.valueOf(partitions),
+                KafkaTopicPropertiesMetadata.REPLICATION_FACTOR, String.valueOf(replicationFactor)))
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                .withCreateTime(Instant.now())
+                .build())
+        .build();
   }
 
   @Override
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    throw new UnsupportedOperationException();
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    if (!schemaExists(schemaIdent)) {
+      LOG.warn("Kafka catalog schema {} does not exist", schemaIdent);
+      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
+    }
+
+    try {
+      CreateTopicsResult createTopicsResult =
+          adminClient.createTopics(Collections.singleton(buildNewTopic(ident, properties)));
+      LOG.info(
+          "Created topic {} with {} partitions and replication factor {}",
+          ident,
+          createTopicsResult.numPartitions(ident.name()).get(),
+          createTopicsResult.replicationFactor(ident.name()).get());
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof TopicExistsException) {
+        throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
+      } else if (e.getCause() instanceof InvalidReplicationFactorException) {
+        throw new IllegalArgumentException(
+            "Invalid replication factor for topic " + ident + e.getCause().getMessage(), e);
+      } else {
+        throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
+      }
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
+    }
+
+    return KafkaTopic.builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                .withCreateTime(Instant.now())
+                .build())
+        .build();
   }
 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    throw new UnsupportedOperationException();
+    KafkaTopic topic = (KafkaTopic) loadTopic(ident);
+    String newComment = topic.comment();
+    int oldPartitionCount = Integer.parseInt(topic.properties().get(PARTITION_COUNT));
+    int newPartitionCount = oldPartitionCount;
+    Map<String, String> newProperties = Maps.newHashMap(topic.properties());
+    for (TopicChange change : changes) {
+      if (change instanceof TopicChange.UpdateTopicComment) {
+        newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
+
+      } else if (change instanceof TopicChange.SetProperty) {
+        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) change;
+        newProperties.put(setProperty.getProperty(), setProperty.getValue());
+        if (PARTITION_COUNT.equals(setProperty.getProperty())) {
+          newPartitionCount = Integer.parseInt(setProperty.getValue());
+        }
+
+      } else if (change instanceof TopicChange.RemoveProperty) {
+        TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) change;
+        Preconditions.checkArgument(
+            !PARTITION_COUNT.equals(removeProperty.getProperty()), "Cannot remove partition count");
+        newProperties.remove(removeProperty.getProperty());
+
+      } else {
+        throw new IllegalArgumentException("Unsupported topic change: " + change);
+      }
+    }
+
+    // increase partition count
+    if (newPartitionCount != oldPartitionCount) {
+      if (newPartitionCount < oldPartitionCount) {
+        throw new IllegalArgumentException(
+            "Cannot reduce partition count from " + oldPartitionCount + " to " + newPartitionCount);
+      }
+      try {
+        adminClient
+            .createPartitions(
+                Collections.singletonMap(ident.name(), NewPartitions.increaseTo(newPartitionCount)))
+            .all()
+            .get();
+      } catch (ExecutionException | InterruptedException e) {
+        throw new RuntimeException("Failed to alter topic " + ident.name() + " in Kafka", e);
+      }
+    }
+
+    return KafkaTopic.builder()
+        .withName(ident.name())
+        .withComment(newComment)
+        .withProperties(newProperties)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(topic.auditInfo().creator())
+                .withCreateTime(topic.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
   }
 
   @Override
   public boolean dropTopic(NameIdentifier ident) throws NoSuchTopicException {
-    throw new UnsupportedOperationException();
+    try {
+      adminClient.deleteTopics(Collections.singleton(ident.name())).all().get();
+      return true;
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof org.apache.kafka.common.errors.UnknownTopicOrPartitionException) {
+        throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
+      } else {
+        throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
+      }
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
+    }
   }
 
   @Override
@@ -205,7 +374,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    adminClient.close();
+  }
 
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
@@ -215,6 +386,18 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Kafka catalog does not support table operations");
+  }
+
+  private NewTopic buildNewTopic(NameIdentifier ident, Map<String, String> properties) {
+    Optional<Integer> partitionCount =
+        Optional.ofNullable(
+            (int) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, PARTITION_COUNT));
+    Optional<Short> replicationFactor =
+        Optional.ofNullable(
+            (short)
+                TOPIC_PROPERTIES_METADATA.getOrDefault(
+                    properties, KafkaTopicPropertiesMetadata.REPLICATION_FACTOR));
+    return new NewTopic(ident.name(), partitionCount, replicationFactor);
   }
 
   private void createDefaultSchema() {

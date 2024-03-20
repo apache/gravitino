@@ -16,10 +16,14 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
+  implementation(libs.kafka.clients)
+  implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.commons.io)
+  testImplementation(libs.kafka.get2().get12())
+  testImplementation(libs.curator.test)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
