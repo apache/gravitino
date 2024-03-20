@@ -7,6 +7,7 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -171,6 +172,7 @@ public interface Configs {
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
           .deprecated()
+          .alternatives(Lists.newArrayList(STORE_DELETE_AFTER_TIME_KEY))
           .longConf()
           .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
           .createWithOptional();
