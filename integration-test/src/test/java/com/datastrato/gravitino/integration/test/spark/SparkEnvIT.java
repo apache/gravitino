@@ -102,7 +102,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   private void initSparkEnv() {
-    if (sparkSession == null) {
+    if (sparkSession != null) {
+      sparkSession.close();
+      sparkSession = null;
+    }
       sparkSession =
               SparkSession.builder()
                       .master("local[1]")
@@ -114,5 +117,4 @@ public abstract class SparkEnvIT extends SparkUtilIT {
                       .enableHiveSupport()
                       .getOrCreate();
     }
-  }
 }
