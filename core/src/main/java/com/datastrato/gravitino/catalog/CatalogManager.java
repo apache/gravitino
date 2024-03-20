@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
@@ -20,6 +22,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -66,6 +70,9 @@ import org.slf4j.LoggerFactory;
 
 /** Manages the catalog instances and operations. */
 public class CatalogManager implements SupportsCatalogs, Closeable {
+
+  private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -214,7 +221,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     if (!metalakeExists) {
-      throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
     }
 
     try {
@@ -287,7 +294,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
       }
 
       // TODO: should avoid a race condition here
@@ -343,7 +350,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
     }
 
     try {
@@ -351,8 +358,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           f -> {
             Pair<Map<String, String>, Map<String, String>> alterProperty =
                 getCatalogAlterProperty(changes);
-            f.catalogPropertiesMetadata()
-                .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
+            validatePropertyForAlter(
+                f.catalogPropertiesMetadata(), alterProperty.getLeft(), alterProperty.getRight());
             return null;
           });
     } catch (IllegalArgumentException e1) {
@@ -402,7 +409,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
@@ -452,7 +459,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IOException ioe) {
       LOG.error("Failed to load catalog {}", ident, ioe);
@@ -486,7 +493,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         cl -> {
           Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
-          catalog.ops().catalogPropertiesMetadata().validatePropertyForCreate(configWithoutId);
+          validatePropertyForCreate(catalog.ops().catalogPropertiesMetadata(), configWithoutId);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the

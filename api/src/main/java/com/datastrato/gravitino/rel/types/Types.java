@@ -243,7 +243,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof DecimalType)) {
         return false;
       }
       DecimalType that = (DecimalType) o;
@@ -470,7 +470,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof FixedType)) {
         return false;
       }
       FixedType fixedType = (FixedType) o;
@@ -520,7 +520,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof VarCharType)) {
         return false;
       }
       VarCharType that = (VarCharType) o;
@@ -570,7 +570,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof FixedCharType)) {
         return false;
       }
       FixedCharType that = (FixedCharType) o;
@@ -649,7 +649,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof StructType)) {
         return false;
       }
       StructType that = (StructType) o;
@@ -752,7 +752,7 @@ public class Types {
         if (this == o) {
           return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof Field)) {
           return false;
         }
         Field field = (Field) o;
@@ -849,7 +849,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ListType)) {
         return false;
       }
       ListType listType = (ListType) o;
@@ -945,7 +945,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof MapType)) {
         return false;
       }
       MapType mapType = (MapType) o;
@@ -1004,7 +1004,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof UnionType)) {
         return false;
       }
       UnionType unionType = (UnionType) o;
@@ -1059,7 +1059,7 @@ public class Types {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof UnparsedType)) {
         return false;
       }
       UnparsedType that = (UnparsedType) o;

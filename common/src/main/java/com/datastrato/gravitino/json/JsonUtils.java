@@ -39,6 +39,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -241,6 +243,33 @@ public class JsonUtils {
   }
 
   /**
+   * AnyFieldMapperHolder is a static inner class that holds the instance of ObjectMapper which can
+   * access any field of the object. This class utilizes the Initialization-on-demand holder idiom,
+   * which is a lazy-loaded singleton. This idiom takes advantage of the fact that inner classes are
+   * not loaded until they are referenced. It's a thread-safe and efficient way to implement a
+   * singleton as the instance is created when it's needed at the first time.
+   */
+  private static class AnyFieldMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .registerModule(new JavaTimeModule());
+  }
+
+  /**
+   * Get the shared AnyFieldMapper instance for JSON serialization/deserialization.
+   *
+   * @return The ObjectMapper instance.
+   */
+  public static ObjectMapper anyFieldMapper() {
+    return AnyFieldMapperHolder.INSTANCE;
+  }
+
+  /**
    * Get a list of strings from a JSON node property.
    *
    * @param property The property name.
@@ -333,7 +362,7 @@ public class JsonUtils {
             node);
         Type dataType = readDataType(node.get(DATA_TYPE));
         String value = getStringOrNull(LITERAL_VALUE, node);
-        return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
+        return LiteralDTO.builder().withDataType(dataType).withValue(value).build();
       case FIELD:
         Preconditions.checkArgument(
             node.has(FIELD_NAME),
@@ -353,7 +382,7 @@ public class JsonUtils {
         String functionName = getString(FUNCTION_NAME, node);
         List<FunctionArg> args = Lists.newArrayList();
         node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
-        return new FuncExpressionDTO.Builder()
+        return FuncExpressionDTO.builder()
             .withFunctionName(functionName)
             .withFunctionArgs(args.toArray(FunctionArg.EMPTY_ARGS))
             .build();
@@ -969,7 +998,7 @@ public class JsonUtils {
       Preconditions.checkArgument(
           node.has(SORT_TERM), "Cannot parse sort order from missing sort term: %s", node);
       FunctionArg sortTerm = readFunctionArg(node.get(SORT_TERM));
-      SortOrderDTO.Builder builder = new SortOrderDTO.Builder().withSortTerm(sortTerm);
+      SortOrderDTO.Builder builder = SortOrderDTO.builder().withSortTerm(sortTerm);
       if (node.has(DIRECTION)) {
         builder.withDirection(SortDirection.fromString(getString(DIRECTION, node)));
       }
@@ -1007,7 +1036,7 @@ public class JsonUtils {
           node != null && !node.isNull() && node.isObject(),
           "Cannot parse distribution from invalid JSON: %s",
           node);
-      DistributionDTO.Builder builder = new DistributionDTO.Builder();
+      DistributionDTO.Builder builder = DistributionDTO.builder();
       if (node.has(STRATEGY)) {
         String strategy = getString(STRATEGY, node);
         builder.withStrategy(Strategy.getByName(strategy));
@@ -1205,7 +1234,7 @@ public class JsonUtils {
           "Index must be a valid JSON object, but found: %s",
           node);
 
-      IndexDTO.Builder builder = new IndexDTO.Builder();
+      IndexDTO.Builder builder = IndexDTO.builder();
       Preconditions.checkArgument(
           node.has(INDEX_TYPE), "Cannot parse index from missing type: %s", node);
       String indexType = getString(INDEX_TYPE, node);

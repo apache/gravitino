@@ -47,8 +47,28 @@ public class TestDTOJsonSerDe {
   private final String columnJson =
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
-  private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}";
+  private String getExpectedTableJson(
+      String tableName,
+      String tableComment,
+      String columns,
+      String properties,
+      String audit,
+      String distribution,
+      String sortOrders,
+      String partitioning,
+      String indexes) {
+    return String.format(
+        "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}",
+        withQuotes(tableName),
+        withQuotes(tableComment),
+        columns,
+        properties,
+        audit,
+        distribution,
+        sortOrders,
+        partitioning,
+        indexes);
+  }
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";
@@ -103,7 +123,7 @@ public class TestDTOJsonSerDe {
 
     // Test with required fields
     MetalakeDTO metalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(name)
             .withComment(comment)
             .withProperties(properties)
@@ -123,7 +143,7 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(metalake, desermetalake);
 
     // Test with optional fields
-    MetalakeDTO metalake1 = new MetalakeDTO.Builder().withName(name).withAudit(audit).build();
+    MetalakeDTO metalake1 = MetalakeDTO.builder().withName(name).withAudit(audit).build();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(metalake1);
     String expectedJson1 =
@@ -143,7 +163,7 @@ public class TestDTOJsonSerDe {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
@@ -158,7 +178,7 @@ public class TestDTOJsonSerDe {
 
     // test with optional fields
     CatalogDTO catalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
@@ -205,7 +225,7 @@ public class TestDTOJsonSerDe {
             .withDataType(Types.DateType.get())
             .withComment(comment)
             .withDefaultValue(
-                new LiteralDTO.Builder()
+                LiteralDTO.builder()
                     .withDataType(Types.DateType.get())
                     .withValue("2023-04-01")
                     .build())
@@ -259,10 +279,9 @@ public class TestDTOJsonSerDe {
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(table);
     String expectedJson =
-        String.format(
-            tableJson,
-            withQuotes(tableName),
-            withQuotes(tableComment),
+        getExpectedTableJson(
+            tableName,
+            tableComment,
             String.format(
                 columnJson,
                 withQuotes(name),
@@ -297,7 +316,7 @@ public class TestDTOJsonSerDe {
     // String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
     // String[][] p2Value = {{"2023-04-01", "Houston"}, {"2023-04-01", "Dallas"}};
     Partitioning listPart =
-        new ListPartitioningDTO.Builder()
+        ListPartitioningDTO.builder()
             .withFieldNames(new String[][] {field1, field2})
             // .withAssignment("p202304_California", p1Value)
             // .withAssignment("p202304_Texas", p2Value)
@@ -306,7 +325,7 @@ public class TestDTOJsonSerDe {
     // construct range partition
     // TODO: support assign partition value
     Partitioning rangePart =
-        new RangePartitioningDTO.Builder()
+        RangePartitioningDTO.builder()
             .withFieldName(field1)
             // .withRange("p20230101", "2023-01-01T00:00:00", "2023-01-02T00:00:00")
             // .withRange("p20230102", "2023-01-01T00:00:00", null)
@@ -315,15 +334,12 @@ public class TestDTOJsonSerDe {
     // construct function partitioning, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
     FunctionArg arg1 = FieldReferenceDTO.of(field1);
     FunctionArg arg2 =
-        new LiteralDTO.Builder()
+        LiteralDTO.builder()
             .withDataType(Types.StringType.get())
             .withValue("Asia/Shanghai")
             .build();
     FunctionArg toDateFunc =
-        new FuncExpressionDTO.Builder()
-            .withFunctionName("toDate")
-            .withFunctionArgs(arg1, arg2)
-            .build();
+        FuncExpressionDTO.builder().withFunctionName("toDate").withFunctionArgs(arg1, arg2).build();
     Partitioning expressionPart = FunctionPartitioningDTO.of("toYYYYMM", toDateFunc);
     Partitioning bucketPart = BucketPartitioningDTO.of(10, field1);
     Partitioning truncatePart = TruncatePartitioningDTO.of(20, field2);

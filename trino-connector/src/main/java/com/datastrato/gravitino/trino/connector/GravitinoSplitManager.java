@@ -20,6 +20,7 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
     this.internalSplitManager = internalSplitManager;
   }
 
+  @Override
   public ConnectorSplitSource getSplits(
       ConnectorTransactionHandle transaction,
       ConnectorSession session,

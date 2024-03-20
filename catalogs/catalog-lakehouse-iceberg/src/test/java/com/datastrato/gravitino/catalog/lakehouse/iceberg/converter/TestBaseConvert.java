@@ -77,7 +77,7 @@ public class TestBaseConvert {
     ArrayList<Column> results = Lists.newArrayList();
     for (String colName : colNames) {
       results.add(
-          new IcebergColumn.Builder()
+          IcebergColumn.builder()
               .withName(colName)
               .withType(getRandomGravitinoType())
               .withComment(TEST_COMMENT)

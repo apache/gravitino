@@ -82,6 +82,9 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.9
+  - Remove cache after installing packages.
+
 - gravitino-ci-hive:0.1.8
   - Change the value of `hive.server2.enable.doAs` to `true`
 
@@ -138,6 +141,9 @@ Changelog
 You can use this image to test Trino.
 
 Changelog
+
+- gravitino-ci-trino:0.1.5
+  - Add check for the version of gravitino-trino-connector
 
 - gravitino-ci-trino:0.1.4
   - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.partitions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 
 /**
@@ -19,6 +20,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literal;
  * its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01", "San
  * Francisco"]].
  */
+@Evolving
 public interface ListPartition extends Partition {
 
   /** @return The values of the list partition. */

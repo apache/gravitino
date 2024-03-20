@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -268,7 +269,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     if (expectResult.startsWith("<QUERY_FAILED>")) {
       boolean match =
           Pattern.compile(
-                  "^Query \\w+ failed.*: " + expectResult.replace("<QUERY_FAILED>", "").trim())
+                  "^Query \\w+ failed.*: "
+                      + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
               .matcher(result)
               .find();
       return match;
@@ -421,7 +423,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     boolean firstLine = true;
     while (sqlMatcher.find()) {
       if (!firstLine) {
-        outputStream.write("\n".getBytes());
+        outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
       }
       firstLine = false;
 
@@ -437,8 +439,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                 + "\nresult:\n"
                 + result);
       }
-      outputStream.write(result.getBytes());
-      outputStream.write("\n".getBytes());
+      outputStream.write(result.getBytes(StandardCharsets.UTF_8));
+      outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
     }
 
     outputStream.close();

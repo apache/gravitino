@@ -57,8 +57,7 @@ public class ConvertUtil {
    * @return Gravitino iceberg column
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
-    return new IcebergColumn.Builder()
-        .withId(nestedField.fieldId())
+    return IcebergColumn.builder()
         .withName(nestedField.name())
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())

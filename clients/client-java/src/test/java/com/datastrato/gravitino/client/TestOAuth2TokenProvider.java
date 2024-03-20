@@ -19,6 +19,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Date;
 import org.apache.hc.core5.http.HttpStatus;
@@ -30,6 +31,7 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpResponse;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenProvider {
 
   private static final int PORT = 1082;
@@ -134,6 +136,6 @@ public class TestOAuth2TokenProvider {
     Assertions.assertNotEquals(accessToken, oldAccessToken);
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
-        new String(provider.getTokenData()));
+        new String(provider.getTokenData(), StandardCharsets.UTF_8));
   }
 }

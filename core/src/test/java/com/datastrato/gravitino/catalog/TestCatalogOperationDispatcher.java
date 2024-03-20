@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static com.datastrato.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
-import static com.datastrato.gravitino.catalog.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
+import static com.datastrato.gravitino.connector.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -87,7 +87,7 @@ public class TestCatalogOperationDispatcher {
     entityStore.setSerDe(null);
 
     BaseMetalake metalakeEntity =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(1L)
             .withName(metalake)
             .withAuditInfo(
@@ -217,7 +217,7 @@ public class TestCatalogOperationDispatcher {
     // Case 4: Test if the fetched schema entity is matched.
     reset(entityStore);
     SchemaEntity unmatchedEntity =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(1L)
             .withName("schema11")
             .withNamespace(Namespace.of(metalake, catalog))
@@ -286,7 +286,7 @@ public class TestCatalogOperationDispatcher {
     // Case 4: Test if the fetched schema entity is matched.
     reset(entityStore);
     SchemaEntity unmatchedEntity =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(1L)
             .withName("schema21")
             .withNamespace(Namespace.of(metalake, catalog))
@@ -331,8 +331,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table1");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
-          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table1 = dispatcher.createTable(tableIdent1, columns, "comment", props, new Transform[0]);
@@ -407,8 +407,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table11");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
-          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table1 = dispatcher.createTable(tableIdent1, columns, "comment", props, new Transform[0]);
@@ -438,7 +438,7 @@ public class TestCatalogOperationDispatcher {
     // Case 4: Test if the table entity is not matched
     reset(entityStore);
     TableEntity tableEntity =
-        new TableEntity.Builder()
+        TableEntity.builder()
             .withId(1L)
             .withName("table11")
             .withNamespace(tableNs)
@@ -460,8 +460,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table21");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
-          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
@@ -504,7 +504,7 @@ public class TestCatalogOperationDispatcher {
     // Case 4: Test if the table entity is not matched
     reset(entityStore);
     TableEntity unmatchedEntity =
-        new TableEntity.Builder()
+        TableEntity.builder()
             .withId(1L)
             .withName("table21")
             .withNamespace(tableNs)
@@ -524,8 +524,8 @@ public class TestCatalogOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
-          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
     Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 

@@ -68,7 +68,7 @@ public class KvNameMappingService implements NameMappingService {
     return FunctionUtils.executeInTransaction(
         () -> {
           byte[] name = transactionalKvBackend.get(idByte);
-          return name == null ? null : new String(name);
+          return name == null ? null : new String(name, StandardCharsets.UTF_8);
         },
         transactionalKvBackend);
   }

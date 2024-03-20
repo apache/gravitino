@@ -5,9 +5,10 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
@@ -36,7 +37,7 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
     IcebergCatalog icebergCatalog =
         new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
-    CatalogOperations catalogOperations = icebergCatalog.newOps(Maps.newHashMap());
+    CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
     IcebergTableOps icebergTableOps =
@@ -63,15 +64,15 @@ public class TestIcebergCatalog {
 
     Map<String, String> conf = Maps.newHashMap();
 
-    try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
-      ops.initialize(conf);
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
+      ops.initialize(conf, entity.toCatalogInfo());
       Map<String, String> map1 = Maps.newHashMap();
       map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
       PropertiesMetadata metadata = ops.catalogPropertiesMetadata();
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> {
-            metadata.validatePropertyForCreate(map1);
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map1);
           });
 
       Map<String, String> map2 = Maps.newHashMap();
@@ -80,13 +81,14 @@ public class TestIcebergCatalog {
       map2.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
       Assertions.assertDoesNotThrow(
           () -> {
-            metadata.validatePropertyForCreate(map2);
+            PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map2);
           });
 
       Map<String, String> map3 = Maps.newHashMap();
       Throwable throwable =
           Assertions.assertThrows(
-              IllegalArgumentException.class, () -> metadata.validatePropertyForCreate(map3));
+              IllegalArgumentException.class,
+              () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map3));
 
       Assertions.assertTrue(
           throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME));

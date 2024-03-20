@@ -12,7 +12,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import java.sql.SQLException;
 
-/** Exception converter to gravitino exception for MySQL. */
+/** Exception converter to Gravitino exception for MySQL. */
 public class MysqlExceptionConverter extends JdbcExceptionConverter {
 
   @SuppressWarnings("FormatStringAnnotation")

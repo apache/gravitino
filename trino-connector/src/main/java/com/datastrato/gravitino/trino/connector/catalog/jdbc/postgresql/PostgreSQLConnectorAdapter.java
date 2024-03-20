@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import static java.util.Collections.emptyList;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
@@ -24,6 +24,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
@@ -38,6 +39,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     return config;
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new PostgreSQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());

@@ -18,6 +18,7 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -79,13 +80,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
-          generateCreateTableSql(tableName, columns, comment, properties, partitioning, indexes));
+          generateCreateTableSql(
+              tableName, columns, comment, properties, partitioning, distribution, indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -134,7 +137,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check the
       // result
-      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
+      JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
       boolean found = false;
       // Handle case-sensitive issues.
       while (table.next() && !found) {
@@ -357,6 +360,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
@@ -402,7 +406,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected JdbcTable.Builder getBasicJdbcTableInfo(ResultSet table) throws SQLException {
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withName(table.getString("TABLE_NAME"))
         .withComment(table.getString("REMARKS"))
         .withAuditInfo(AuditInfo.EMPTY);
@@ -421,7 +425,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     Expression defaultValue =
         columnDefaultValueConverter.toGravitino(typeBean, columnDef, isExpression, nullable);
 
-    return new JdbcColumn.Builder()
+    return JdbcColumn.builder()
         .withName(column.getString("COLUMN_NAME"))
         .withType(typeConverter.toGravitinoType(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)

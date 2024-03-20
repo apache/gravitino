@@ -28,10 +28,12 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   private static final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
   private static final String publicKey =
-      new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
+      new String(
+          Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
 
   private static String token;
 
+  @SuppressWarnings("JavaUtilDate")
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();

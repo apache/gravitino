@@ -95,7 +95,7 @@ public class TestDataTypeTransformer {
     try {
       dataTypeTransformer.getGravitinoType(HyperLogLogType.HYPER_LOG_LOG);
     } catch (TrinoException e) {
-      if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_TRINO_DATATYPE.toErrorCode()) {
+      if (!GRAVITINO_UNSUPPORTED_TRINO_DATATYPE.toErrorCode().equals(e.getErrorCode())) {
         throw e;
       }
     }
@@ -155,7 +155,7 @@ public class TestDataTypeTransformer {
     try {
       dataTypeTransformer.getTrinoType(Types.BinaryType.get());
     } catch (TrinoException e) {
-      if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE.toErrorCode()) {
+      if (!GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE.toErrorCode().equals(e.getErrorCode())) {
         throw e;
       }
     }

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.expressions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /**
@@ -11,6 +12,7 @@ import java.util.Objects;
  * FunctionExpression}, {@link com.datastrato.gravitino.rel.expressions.literals.Literal} or {@link
  * NamedReference}.
  */
+@Evolving
 public interface UnparsedExpression extends Expression {
 
   /** @return The unparsed expression as a string. */

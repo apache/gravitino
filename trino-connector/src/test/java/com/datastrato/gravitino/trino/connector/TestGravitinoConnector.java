@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.Session;
 import io.trino.plugin.memory.MemoryPlugin;
 import io.trino.testing.AbstractTestQueryFramework;
@@ -44,7 +46,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
     server = closeAfterClass(new GravitinoMockServer());
-    GravitinoPlugin.gravitinoClient = server.createGravitinoClient();
+    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();
     QueryRunner queryRunner = null;
@@ -52,7 +54,9 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       // queryRunner = LocalQueryRunner.builder(session).build();
       queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
-      queryRunner.installPlugin(new GravitinoPlugin());
+      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin();
+      gravitinoPlugin.setGravitinoClient(gravitinoClient);
+      queryRunner.installPlugin(gravitinoPlugin);
       queryRunner.installPlugin(new MemoryPlugin());
 
       {
@@ -70,10 +74,14 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
         properties.put("gravitino.uri", "http://127.0.0.1:8090");
         queryRunner.createCatalog("test1", "gravitino", properties);
       }
-      server.setCatalogConnectorManager(GravitinoPlugin.catalogConnectorManager);
+
+      CatalogConnectorManager catalogConnectorManager =
+          gravitinoPlugin.getCatalogConnectorManager();
+      catalogConnectorManager.setGravitinoClient(gravitinoClient);
+      server.setCatalogConnectorManager(catalogConnectorManager);
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       int max_tries = 35;
-      while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty() && max_tries > 0) {
+      while (catalogConnectorManager.getCatalogs().isEmpty() && max_tries > 0) {
         Thread.sleep(1000);
         max_tries--;
       }
@@ -253,13 +261,24 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
 
     // test metalake named test1. the connnector name is test1
-    GravitinoPlugin.gravitinoClient.createMetalake(
-        NameIdentifier.ofMetalake("test1"), "", Collections.emptyMap());
+    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
+    gravitinoClient.createMetalake(NameIdentifier.ofMetalake("test1"), "", Collections.emptyMap());
 
     assertUpdate("call test1.system.create_catalog('memory1', 'memory', Map())");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
     assertUpdate("call test1.system.drop_catalog('memory1')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test1.memory1");
+  }
+
+  @Test
+  public void testSystemTable() throws Exception {
+    MaterializedResult expectedResult = computeActual("select * from gravitino.system.catalog");
+    assertEquals(expectedResult.getRowCount(), 1);
+    List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
+    MaterializedRow row = expectedRows.get(0);
+    assertEquals(row.getField(0), "test.memory");
+    assertEquals(row.getField(1), "memory");
+    assertEquals(row.getField(2), "{\"max_ttl\":\"10\"}");
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {

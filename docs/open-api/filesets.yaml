@@ -1,0 +1,393 @@
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - fileset
+      summary: List filesets
+      operationId: listFilesets
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - fileset
+      summary: Create fileset
+      operationId: createFileset
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilesetCreateRequest"
+            examples:
+              FilesetCreateRequest:
+                $ref: "#/components/examples/FilesetCreateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/FilesetResponse"
+        "409":
+          description: Conflict - The target fileset already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                FilesetAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/FilesetAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/fileset"
+
+    get:
+      tags:
+        - fileset
+      summary: Get fileset
+      operationId: loadFileset
+      description: Returns the specified fileset object
+      responses:
+        "200":
+          $ref: "#/components/responses/FilesetResponse"
+        "404":
+          description: Not Found - The target fileset does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFilesetException:
+                  $ref: "#/components/examples/NoSuchFilesetException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - fileset
+      summary: Update fileset
+      operationId: alterFileset
+      description: Updates the specified fileset in a schema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilesetUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/FilesetResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target fileset does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFilesetException:
+                  $ref: "#/components/examples/NoSuchFilesetException"
+        "409":
+          description: Conflict - The target fileset already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                FilesetAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/FilesetAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - fileset
+      summary: Drop fileset
+      operationId: dropFileset
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+
+  schemas:
+    Fileset:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the fileset
+        description:
+          type: string
+          description: The description of the fileset
+          nullable: true
+        type:
+          type: string
+          description: The type of the fileset
+          nullable: true
+        comment:
+          type: string
+          description: The comment of the fileset
+          nullable: true
+        storageLocation:
+          type: string
+          description: The location of the fileset
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the fileset
+          nullable: true
+          default: {}
+          additionalProperties:
+              type: string
+    FilesetCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the fileset
+        description:
+          type: string
+          description: The description of the fileset
+          nullable: true
+        type:
+          type: string
+          description: The type of the fileset
+          nullable: true
+        comment:
+          type: string
+          description: The comment of the fileset
+          nullable: true
+        storageLocation:
+          type: string
+          description: The location of the fileset
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the fileset
+          nullable: true
+          default: {}
+          additionalProperties:
+              type: string
+
+    FilesetUpdatesRequest:
+      type: object
+      required:
+        - name
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilesetUpdateRequest"
+
+    FilesetUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameFilesetRequest"
+        - $ref: "#/components/schemas/SetFilesetPropertiesRequest"
+        - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
+        - $ref: "#/components/schemas/RemoveFilesetPropertiesRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameFilesetRequest"
+          setProperties: "#/components/schemas/SetFilesetPropertiesRequest"
+          updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
+          removeProperties: "#/components/schemas/RemoveFilesetPropertiesRequest"
+
+    RenameFilesetRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+              - rename
+        newName:
+          type: string
+          description: The new name of the fileset
+      example: {
+        "@type": "rename",
+        "newName": "newName"
+      }
+
+    SetFilesetPropertiesRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key",
+        "value": "value"
+      }
+
+    UpdateFilesetCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          description: The new comment of the fileset
+      example: {
+        "@type": "updateComment",
+        "newComment": "new comment"
+      }
+
+    RemoveFilesetPropertiesRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key1"
+      }
+
+  responses:
+    FilesetResponse:
+      description: The response of fileset object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              fileset:
+                $ref: "#/components/schemas/Fileset"
+          examples:
+            FilesetResponse:
+              $ref: "#/components/examples/FilesetResponse"
+
+
+  examples:
+    FilesetCreateRequest:
+      value: {
+        "name": "fileset1",
+        "description": "This is a fileset",
+        "type": "managed",
+        "comment": "This is a comment",
+        "storageLocation": "s3://bucket/path",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    FilesetResponse:
+      value: {
+        "code": 0,
+        "fileset" : {
+          "name": "fileset1",
+          "description": "This is a fileset",
+          "type": "managed",
+          "comment": "This is a comment",
+          "storageLocation": "s3://bucket/path",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2"
+          }
+        }
+      }
+
+    FilesetAlreadyExistsException:
+      value: {
+        "code": 1001,
+        "type": "FilesetAlreadyExistsException",
+        "message": "Fileset already exists",
+        "stack": [
+            "java.lang.FilesetAlreadyExistsException: Fileset already exists"
+        ]
+      }
+
+    NoSuchFilesetException:
+      value: {
+        "code": 1004,
+        "type": "NoSuchFilesetException",
+        "message": "Fileset does not exist",
+        "stack": [
+            "java.lang.NoSuchFilesetException: Fileset does not exist"
+        ]
+      }
+
+
+
+

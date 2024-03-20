@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_CONFLICT;
@@ -115,7 +116,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
             .asTableCatalog()
             .createTable(
                 tableId,
-                columns,
+                fromDTOs(columns),
                 "comment",
                 Collections.emptyMap(),
                 partitioning,
@@ -156,15 +157,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     String partitionPath =
         withSlash(((RelationalTable) partitionedTable).getPartitionRequestPath());
@@ -196,15 +191,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     RelationalTable table = (RelationalTable) partitionedTable;
     String partitionPath =

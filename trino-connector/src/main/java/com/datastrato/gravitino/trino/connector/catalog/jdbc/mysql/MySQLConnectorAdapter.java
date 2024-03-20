@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import static java.util.Collections.emptyList;
 
-import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
@@ -30,6 +30,7 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
     this.propertyMetadata = new MySQLPropertyMeta();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
@@ -44,6 +45,7 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
     return config;
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new MySQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());

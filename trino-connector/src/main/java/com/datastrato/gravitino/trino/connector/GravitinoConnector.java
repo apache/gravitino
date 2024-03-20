@@ -5,11 +5,10 @@
 package com.datastrato.gravitino.trino.connector;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.google.common.base.Preconditions;
-import io.trino.plugin.base.security.AllowAllAccessControl;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorCapabilities;
@@ -65,7 +64,7 @@ public class GravitinoConnector implements Connector {
             session, gravitinoTransactionHandle.getInternalTransactionHandle());
     Preconditions.checkNotNull(internalMetadata);
 
-    GravitinoMetaLake metalake = catalogConnectorContext.getMetalake();
+    GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
 
     CatalogConnectorMetadata catalogConnectorMetadata =
         new CatalogConnectorMetadata(metalake, catalogIdentifier);
@@ -134,7 +133,8 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public ConnectorAccessControl getAccessControl() {
-    return new AllowAllAccessControl();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getAccessControl();
   }
 
   @Override

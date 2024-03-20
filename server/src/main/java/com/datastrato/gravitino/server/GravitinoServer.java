@@ -7,7 +7,7 @@ package com.datastrato.gravitino.server;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
-import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 public class GravitinoServer extends ResourceConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
+
+  private static final String API_ANY_PATH = "/api/*";
 
   public static final String CONF_FILE = "gravitino.conf";
 
@@ -84,12 +86,12 @@ public class GravitinoServer extends ResourceConfig {
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);
-    server.addServlet(servlet, "/api/*");
+    server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addCustomFilters("/api/*");
-    server.addFilter(new VersioningFilter(), "/api/*");
-    server.addSystemFilters("/api/*");
+    server.addCustomFilters(API_ANY_PATH);
+    server.addFilter(new VersioningFilter(), API_ANY_PATH);
+    server.addSystemFilters(API_ANY_PATH);
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }

@@ -4,9 +4,11 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.time.Instant;
 
 /** Represents the audit information of an entity. */
+@Evolving
 public interface Audit {
 
   /**

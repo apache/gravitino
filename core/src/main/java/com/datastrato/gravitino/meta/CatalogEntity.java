@@ -11,6 +11,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.connector.CatalogInfo;
 import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.HashMap;
@@ -115,6 +116,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public EntityType type() {
     return EntityType.CATALOG;
+  }
+
+  /** Convert the catalog entity to a {@link CatalogInfo} instance. */
+  public CatalogInfo toCatalogInfo() {
+    return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
   }
 
   /** Builder class for creating instances of {@link CatalogEntity}. */
@@ -238,7 +244,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof CatalogEntity)) {
       return false;
     }
     CatalogEntity that = (CatalogEntity) o;
