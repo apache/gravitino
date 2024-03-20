@@ -20,15 +20,15 @@ public class MetalakePageTest extends AbstractWebIT {
   String editedMetalakeName = metalakeName + "_edited";
 
   // Create a metalake by name, set the default comment and properties.
-  public void createMetalakeAction(String name) {
-    metalakePage.createMetalakeBtn.click();
+  public void createMetalakeAction(String name) throws InterruptedException {
+    clickAndWait(metalakePage.createMetalakeBtn);
     metalakePage.setMetalakeNameField(name);
     metalakePage.setMetalakeCommentField("metalake comment");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(0, "key1", "value1");
     metalakePage.addMetalakePropsBtn.click();
     metalakePage.setMetalakeProps(1, "key2", "value2");
-    metalakePage.submitHandleMetalakeBtn.click();
+    clickAndWait(metalakePage.submitHandleMetalakeBtn);
   }
 
   @Test
@@ -40,7 +40,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(1)
-  public void testCreateMetalake() {
+  public void testCreateMetalake() throws InterruptedException {
     createMetalakeAction(metalakeName);
     Assertions.assertTrue(metalakePage.verifyCreateMetalake(metalakeName));
   }
@@ -71,7 +71,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(5)
-  public void testCreateMultipleMetalakes() {
+  public void testCreateMultipleMetalakes() throws InterruptedException {
     int twoPagesCount = 11;
 
     for (int i = 0; i < twoPagesCount; i++) {
@@ -89,7 +89,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(6)
-  public void testQueryMetalake() {
+  public void testQueryMetalake() throws InterruptedException {
     String name = "query";
     createMetalakeAction(name);
     Assertions.assertTrue(metalakePage.verifyQueryMetalake(name));
@@ -107,7 +107,7 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(7)
-  public void testLinkToCatalogsPage() {
+  public void testLinkToCatalogsPage() throws InterruptedException {
     String name = "a_test_link";
     createMetalakeAction(name);
     metalakePage.clickMetalakeLink(name);

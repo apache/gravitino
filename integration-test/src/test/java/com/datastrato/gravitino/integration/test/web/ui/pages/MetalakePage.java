@@ -136,7 +136,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public void clickMetalakeLink(String name) {
     try {
-      String xpath = "//a[@data-refer='metalake-link-" + name + "']";
+      String xpath =
+          "//div[contains(@class, 'MuiDataGrid-main')]//a[@data-refer='metalake-link-"
+              + name
+              + "']";
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
