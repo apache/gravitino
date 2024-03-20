@@ -26,6 +26,8 @@ SHOW CREATE TABLE "test.gt_hive".varchar_db1.tb06;
 
 CREATE TABLE tb07 (id int, name varchar);
 
+SHOW CREATE TABLE "test.gt_hive".varchar_db1.tb07;
+
 CREATE TABLE tb08 (id int, name varchar(65536));
 
 

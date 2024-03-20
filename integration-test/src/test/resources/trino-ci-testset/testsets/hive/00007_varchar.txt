@@ -86,7 +86,21 @@ WITH (
 
 CREATE TABLE
 
-<QUERY_FAILED> Hive does not support the datatype VARCHAR with the length greater than 65535
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb07 (
+   id integer,
+   name varchar
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb07',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb07',
+   table_type = 'MANAGED_TABLE'
+)"
+
+<QUERY_FAILED> Hive does not support the datatype VARCHAR with the length greater than 65535, you can use varchar without length instead
 
 DROP TABLE
 

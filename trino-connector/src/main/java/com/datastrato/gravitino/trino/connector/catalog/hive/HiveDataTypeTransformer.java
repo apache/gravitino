@@ -32,7 +32,8 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
             "Hive does not support the datatype VARCHAR with the length greater than "
-                + HIVE_VARCHAR_MAX_LENGTH);
+                + HIVE_VARCHAR_MAX_LENGTH
+                + ", you can use varchar without length instead");
       }
 
       return Types.VarCharType.of(length);
