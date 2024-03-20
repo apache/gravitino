@@ -67,15 +67,8 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
             .removalListener(
                 (ignored, value, cause) -> {
-                  // Set the class loader to the isolated class loader.
-                  ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-                  Thread.currentThread()
-                      .setContextClassLoader(CachedClientPool.class.getClassLoader());
-                  try {
-                    ((HiveClientPool) value).close();
-                  } finally {
-                    Thread.currentThread().setContextClassLoader(classLoader);
-                  }
+                  // We have closed the HiveClientPool that iss manually removed from the cache.
+                  closeClientPoolWithIsolatedClassLoader((HiveClientPool) value);
                 })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
@@ -145,15 +138,21 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
         .build();
   }
 
-  public void close() {
-    clientPoolCache.invalidateAll();
-
-    // Let the remove listener to close the HiveClientPool first then close the class loader.
+  private void closeClientPoolWithIsolatedClassLoader(HiveClientPool clientPool) {
+    // Set the class loader to the isolated class loader.
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(CachedClientPool.class.getClassLoader());
     try {
-      Thread.sleep(500);
-    } catch (Exception e) {
-      // Ignore
+      clientPool.close();
+    } finally {
+      Thread.currentThread().setContextClassLoader(classLoader);
     }
+  }
+
+  public void close() {
+    // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler.
+    clientPoolCache.asMap().forEach((key, value) -> closeClientPoolWithIsolatedClassLoader(value));
+    clientPoolCache.invalidateAll();
     scheduler.shutdownNow();
   }
 }

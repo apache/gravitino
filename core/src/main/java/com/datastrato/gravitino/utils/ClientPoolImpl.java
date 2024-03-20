@@ -36,7 +36,7 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   private final Object signal = new Object();
   private final boolean retryByDefault;
   private volatile int currentSize;
-  private boolean closed;
+  private volatile boolean closed;
 
   protected ClientPoolImpl(int poolSize, Class<? extends E> reconnectExc, boolean retryByDefault) {
     this.poolSize = poolSize;
@@ -89,6 +89,10 @@ public abstract class ClientPoolImpl<C, E extends Exception>
 
   @Override
   public void close() {
+    if (closed) {
+      return;
+    }
+
     this.closed = true;
     try {
       while (currentSize > 0) {
