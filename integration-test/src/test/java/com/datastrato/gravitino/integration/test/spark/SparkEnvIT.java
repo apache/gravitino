@@ -29,6 +29,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private final String metalakeName = "test";
+  private final String warehouse =
+      String.format(
+          "hdfs://%s:%d/user/hive/warehouse",
+          containerSuite.getHiveContainer().getContainerIpAddress(),
+          HiveContainer.HDFS_DEFAULTFS_PORT);
 
   private SparkSession sparkSession;
   private String hiveMetastoreUri;
@@ -68,6 +73,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
+    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
+    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
+    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
 
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, getCatalogName()),
@@ -100,12 +108,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config("spark.plugins", GravitinoSparkPlugin.class.getName())
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
-            .config(
-                "spark.sql.warehouse.dir",
-                String.format(
-                    "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainer().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("spark.sql.warehouse.dir", warehouse)
             .enableHiveSupport()
             .getOrCreate();
   }

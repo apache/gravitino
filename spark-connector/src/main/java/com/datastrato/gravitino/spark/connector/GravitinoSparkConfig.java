@@ -12,6 +12,9 @@ public class GravitinoSparkConfig {
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";
+  public static final String LAKEHOUSE_ICEBERG_CATALOG_BACKEND = "catalog-backend";
+  public static final String LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE = "warehouse";
+  public static final String LAKEHOUSE_ICEBERG_CATALOG_URI = "uri";
 
   private GravitinoSparkConfig() {}
 }
