@@ -102,15 +102,17 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   private void initSparkEnv() {
-    sparkSession =
-        SparkSession.builder()
-            .master("local[1]")
-            .appName("Spark connector integration test")
-            .config("spark.plugins", GravitinoSparkPlugin.class.getName())
-            .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
-            .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
-            .config("spark.sql.warehouse.dir", warehouse)
-            .enableHiveSupport()
-            .getOrCreate();
+    if (sparkSession == null) {
+      sparkSession =
+              SparkSession.builder()
+                      .master("local[1]")
+                      .appName("Spark connector integration test")
+                      .config("spark.plugins", GravitinoSparkPlugin.class.getName())
+                      .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
+                      .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
+                      .config("spark.sql.warehouse.dir", warehouse)
+                      .enableHiveSupport()
+                      .getOrCreate();
+    }
   }
 }
