@@ -11,6 +11,7 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -91,9 +92,17 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
+  protected ResultSet getSchema(Connection connection, String databaseName) throws SQLException {
+    final DatabaseMetaData metaData = connection.getMetaData();
+    // It'd indeed need to call getCatalogs() to get the schema not `getSchemas()` for MySQL.
+    return metaData.getCatalogs();
+  }
+
+
+    @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     try (final Connection connection = this.dataSource.getConnection()) {
-      ResultSet resultSet = getDatabase(connection, databaseName);
+      ResultSet resultSet = getSchema(connection, databaseName);
 
       boolean found = false;
       while (resultSet.next()) {

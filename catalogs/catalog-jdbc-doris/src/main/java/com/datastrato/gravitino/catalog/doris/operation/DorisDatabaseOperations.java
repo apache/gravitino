@@ -7,6 +7,9 @@ package com.datastrato.gravitino.catalog.doris.operation;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Map;
 
 /** Database operations for Doris. */
@@ -26,6 +29,11 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  protected ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     throw new UnsupportedOperationException();
   }
 }
