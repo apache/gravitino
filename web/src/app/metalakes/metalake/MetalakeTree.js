@@ -151,7 +151,11 @@ const MetalakeTree = props => {
 
   const renderNode = nodeData => {
     if (nodeData.path) {
-      return <Typography sx={{ color: theme => theme.palette.text.secondary }}>{nodeData.title}</Typography>
+      return (
+        <Typography sx={{ color: theme => theme.palette.text.secondary }} data-refer='tree-node'>
+          {nodeData.title}
+        </Typography>
+      )
     }
 
     return nodeData.title
@@ -206,6 +210,7 @@ const MetalakeTree = props => {
           '[&_.ant-tree-node-content-wrapper]:twc-items-center',
           '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]'
         ])}
+        data-refer='tree-view'
         icon={nodeProps => renderIcon(nodeProps)}
         titleRender={nodeData => renderNode(nodeData)}
       />

@@ -151,6 +151,7 @@ const TableView = () => {
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowDetails({ row, type: 'catalog' })}
+            data-refer={`view-catalog-${row.name}`}
           >
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
@@ -160,6 +161,7 @@ const TableView = () => {
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowEditDialog({ row, type: 'catalog' })}
+            data-refer={`edit-catalog-${row.name}`}
           >
             <EditIcon />
           </IconButton>
@@ -169,6 +171,7 @@ const TableView = () => {
             size='small'
             sx={{ color: theme => theme.palette.error.light }}
             onClick={() => handleDelete({ name: row.name, type: 'catalog' })}
+            data-refer={`delete-catalog-${row.name}`}
           >
             <DeleteIcon />
           </IconButton>
@@ -387,6 +390,7 @@ const TableView = () => {
             borderTop: 0
           }
         }}
+        data-refer='table-grid'
         loading={store.tableLoading}
         rows={store.tableData}
         getRowId={row => row?.name}
