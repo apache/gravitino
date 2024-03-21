@@ -34,6 +34,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
   }
 
+  private static String getDeleteSql(String tableName, String condition) {
+    return String.format("DELETE FROM %s where %s", tableName, condition);
+  }
+
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
       ImmutableMap.of(
@@ -442,7 +446,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
-  private void checkTableColumns(
+  protected void checkTableColumns(
       String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
         .withName(tableName)
@@ -451,7 +455,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .check(tableInfo);
   }
 
-  private void checkTableReadWrite(SparkTableInfo table) {
+  protected void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     String insertValues =
         table.getColumns().stream()
@@ -514,13 +518,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
+  protected void checkTableDelete(SparkTableInfo table) {
+    String name = table.getTableIdentifier();
+    checkTableReadWrite(table);
+    sql(getDeleteSql(name, "1=1"));
+    List<Object[]> queryResult = sql(getSelectAllSql(name));
+    Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
+  }
+
   private String getCreateSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
         tableName);
   }
 
-  private List<SparkColumnInfo> getSimpleTableColumn() {
+  protected List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
         SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
         SparkColumnInfo.of("name", DataTypes.StringType, ""),
@@ -529,7 +541,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   // Helper method to create a simple table, and could use corresponding
   // getSimpleTableColumn to check table column.
-  private void createSimpleTable(String identifier) {
+  protected void createSimpleTable(String identifier) {
     String createTableSql = getCreateSimpleTableString(identifier);
     sql(createTableSql);
   }
