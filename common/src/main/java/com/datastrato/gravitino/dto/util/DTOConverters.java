@@ -512,6 +512,8 @@ public class DTOConverters {
         return FunctionExpression.of(
             ((FuncExpressionDTO) arg).functionName(),
             fromFunctionArgs(((FuncExpressionDTO) arg).args()));
+      case UNPARSED:
+        return UnparsedExpression.of(((UnparsedExpressionDTO) arg).unparsedExpression());
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
