@@ -77,6 +77,15 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
   }
 
+  /**
+   * Load the schema with the given name.
+   *
+   * @param connection The connection to the database.
+   * @param schemaName The name of the schema.
+   * @return The result set of the schema. Some database may not support fuzzy query and the result
+   *     set may be empty or is not the schema with the given name.
+   * @throws SQLException
+   */
   protected abstract ResultSet getSchema(Connection connection, String schemaName)
       throws SQLException;
 

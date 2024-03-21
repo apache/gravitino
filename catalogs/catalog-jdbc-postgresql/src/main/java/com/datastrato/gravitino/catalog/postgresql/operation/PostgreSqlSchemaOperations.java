@@ -82,16 +82,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   public List<String> listDatabases() {
     List<String> result = new ArrayList<>();
     try (Connection connection = getConnection()) {
-      try (PreparedStatement statement =
-          connection.prepareStatement(
-              "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = ?")) {
-        statement.setString(1, database);
-        ResultSet resultSet = statement.executeQuery();
-        while (resultSet.next()) {
-          String databaseName = resultSet.getString(1);
-          if (!isSystemDatabase(databaseName)) {
-            result.add(databaseName);
-          }
+      ResultSet resultSet = getSchema(connection, null);
+      while (resultSet.next()) {
+        String schemaName = resultSet.getString(1);
+        if (!isSystemDatabase(schemaName)) {
+          result.add(resultSet.getString(1));
         }
       }
     } catch (final SQLException se) {
@@ -121,9 +116,9 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  protected ResultSet getSchema(Connection connection, String databaseName) throws SQLException {
+  protected ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getSchemas(database, databaseName);
+    return metaData.getSchemas(database, schemaName);
   }
 
   @Override
