@@ -13,7 +13,7 @@ RENAME TABLE
 DROP COLUMN
 
 "CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
-   name varchar(65535),
+   name varchar,
    salary integer
 )
 COMMENT ''
@@ -31,7 +31,7 @@ WITH (
 RENAME COLUMN
 
 "CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
-   s varchar(65535),
+   s varchar,
    salary integer
 )
 COMMENT ''
@@ -105,7 +105,7 @@ ADD COLUMN
 "CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
    s varchar(256) COMMENT 'test column comments',
    salary integer,
-   city varchar(65535) COMMENT 'aaa'
+   city varchar COMMENT 'aaa'
 )
 COMMENT 'test table comments'
 WITH (
