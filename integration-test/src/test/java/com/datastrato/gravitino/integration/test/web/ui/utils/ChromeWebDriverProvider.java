@@ -92,7 +92,6 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     } else {
       chromeOptions.setBinary(ITUtils.joinPath(downLoadDir, chromeBinName));
       chromeOptions.addArguments("--headless");
-      chromeOptions.addArguments("--no-sandbox");
     }
 
     return new ChromeDriver(chromeOptions);
