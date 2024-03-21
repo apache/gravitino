@@ -15,7 +15,7 @@ public class PrintFuncNameExtension implements BeforeEachCallback, AfterEachCall
 
   @Override
   public void beforeEach(ExtensionContext context) {
-    LOG.info("===== Entry test: {} =====", context.getDisplayName());
+    LOG.info("===== Enter test: {} =====", context.getDisplayName());
   }
 
   @Override
