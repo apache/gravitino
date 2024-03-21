@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
 public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private final String metalakeName = "test";
 
