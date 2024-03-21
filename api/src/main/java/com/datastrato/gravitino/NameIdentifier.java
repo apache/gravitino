@@ -7,6 +7,8 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 
 /**
@@ -97,6 +99,21 @@ public class NameIdentifier {
   }
 
   /**
+   * Create the fileset {@link NameIdentifier} with the given metalake, catalog, schema and fileset
+   * name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param fileset The fileset name
+   * @return The created fileset {@link NameIdentifier}
+   */
+  public static NameIdentifier ofFileset(
+      String metalake, String catalog, String schema, String fileset) {
+    return NameIdentifier.of(metalake, catalog, schema, fileset);
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -140,6 +157,17 @@ public class NameIdentifier {
   public static void checkTable(NameIdentifier ident) {
     check(ident != null, "Table identifier must not be null");
     Namespace.checkTable(ident.namespace);
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a fileset identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The fileset {@link NameIdentifier} to check.
+   */
+  public static void checkFileset(NameIdentifier ident) {
+    check(ident != null, "Fileset identifier must not be null");
+    Namespace.checkFileset(ident.namespace);
   }
 
   /**
@@ -193,7 +221,7 @@ public class NameIdentifier {
 
   @Override
   public boolean equals(Object other) {
-    if (other == null || !(other instanceof NameIdentifier)) {
+    if (!(other instanceof NameIdentifier)) {
       return false;
     }
 
@@ -215,9 +243,17 @@ public class NameIdentifier {
     }
   }
 
-  public static void check(boolean condition, String message, Object... args) {
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNameIdentifierException} if it's not.
+   *
+   * @param condition The condition to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
+  @FormatMethod
+  public static void check(boolean condition, @FormatString String message, Object... args) {
     if (!condition) {
-      throw new IllegalNameIdentifierException(String.format(message, args));
+      throw new IllegalNameIdentifierException(message, args);
     }
   }
 }

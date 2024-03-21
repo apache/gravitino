@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogP
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_URL_KEY;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY;
 
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import java.util.Map;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
@@ -26,7 +26,8 @@ public class TestJDBCCatalogPropertyConverter {
             "jdbc-user", "root",
             "jdbc-password", "root");
 
-    Map<String, String> trinoProperties = propertyConverter.toTrinoProperties(gravitinoProperties);
+    Map<String, String> trinoProperties =
+        propertyConverter.gravitinoToEngineProperties(gravitinoProperties);
     Assert.assertEquals(
         trinoProperties.get(JDBC_CONNECTION_URL_KEY), "jdbc:mysql://localhost:3306");
     Assert.assertEquals(trinoProperties.get(JDBC_CONNECTION_USER_KEY), "root");
@@ -40,7 +41,7 @@ public class TestJDBCCatalogPropertyConverter {
     Assert.assertThrows(
         IllegalArgumentException.class,
         () -> {
-          propertyConverter.toTrinoProperties(gravitinoPropertiesWithoutPassword);
+          propertyConverter.gravitinoToEngineProperties(gravitinoPropertiesWithoutPassword);
         });
   }
 }

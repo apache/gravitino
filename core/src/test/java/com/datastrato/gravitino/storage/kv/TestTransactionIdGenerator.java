@@ -62,6 +62,34 @@ public class TestTransactionIdGenerator {
     Assertions.assertNotNull(kvBackend.get(TransactionIdGeneratorImpl.LAST_TIMESTAMP));
   }
 
+  @Test
+  void testNextId() throws IOException {
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
+    transactionIdGenerator.start();
+
+    long id1 = transactionIdGenerator.nextId();
+    long id2 = transactionIdGenerator.nextId();
+
+    // Test that nextId generates different IDs
+    Assertions.assertNotEquals(id1, id2);
+    // Test that nextId generates increasing IDs
+    Assertions.assertTrue(id2 > id1);
+
+    // Test that incrementId reset to 0 after reaching its maximum value
+    for (int i = 2; i < (1 << 18); i++) {
+      transactionIdGenerator.nextId();
+    }
+    long idAfterReset = transactionIdGenerator.nextId();
+    Assertions.assertTrue(idAfterReset > id2);
+
+    // Test that nextId generates increasing IDs even after incrementId reset
+    long idAfterReset2 = transactionIdGenerator.nextId();
+    Assertions.assertTrue(idAfterReset2 > idAfterReset);
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {16})
   @Disabled("It's very time-consuming, so we disable it by default.")
@@ -95,7 +123,7 @@ public class TestTransactionIdGenerator {
             }
           });
     }
-    Thread.currentThread().sleep(100);
+    Thread.sleep(100);
     threadPoolExecutor.shutdown();
     threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
     LOGGER.info(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 2));

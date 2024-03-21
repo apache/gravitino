@@ -53,10 +53,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @VisibleForTesting
   final ThreadLocal<List<Pair<byte[], byte[]>>> putPairs =
-      ThreadLocal.withInitial(() -> Lists.newArrayList());
+      ThreadLocal.withInitial(Lists::newArrayList);
 
   private final ThreadLocal<List<byte[]>> originalKeys =
-      ThreadLocal.withInitial(() -> Lists.newArrayList());
+      ThreadLocal.withInitial(Lists::newArrayList);
 
   @VisibleForTesting final ThreadLocal<Long> txId = new ThreadLocal<>();
 
@@ -110,6 +110,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     } finally {
       putPairs.get().clear();
       originalKeys.get().clear();
+      txId.remove();
     }
   }
 
@@ -119,6 +120,18 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     for (Pair<byte[], byte[]> pair : putPairs.get()) {
       kvBackend.delete(pair.getKey());
     }
+  }
+
+  @Override
+  public void closeTransaction() {
+    putPairs.remove();
+    originalKeys.remove();
+    txId.remove();
+  }
+
+  @Override
+  public boolean inTransaction() {
+    return txId.get() != null;
   }
 
   @Override
@@ -161,8 +174,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public boolean deleteRange(KvRangeScan kvRangeScan) throws IOException {
-    List<Pair<byte[], byte[]>> pairs = scan(kvRangeScan);
+  public boolean deleteRange(KvRange kvRange) throws IOException {
+    List<Pair<byte[], byte[]>> pairs = scan(kvRange);
     pairs.forEach(
         p ->
             putPairs
@@ -175,7 +188,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
+  public List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException {
     // Why we need to change the end key? Because we use the transaction id to construct a row key
     // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
     // value of key a, then we need to change the end key to 'b' and set the value of endInclusive
@@ -187,8 +200,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       endInclude = false;
     }
 
-    KvRangeScan kvRangeScan =
-        new KvRangeScan.KvRangeScanBuilder()
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
             .start(scanRange.getStart())
             .end(end)
             .startInclusive(scanRange.isStartInclusive())
@@ -201,7 +214,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .limit(Integer.MAX_VALUE)
             .build();
 
-    List<Pair<byte[], byte[]>> rawPairs = kvBackend.scan(kvRangeScan);
+    List<Pair<byte[], byte[]>> rawPairs = kvBackend.scan(kvRange);
     List<Pair<byte[], byte[]>> result = Lists.newArrayList();
     int i = 0, j = 0;
     while (i < scanRange.getLimit() && j < rawPairs.size()) {
@@ -243,12 +256,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void close() throws IOException {}
 
-  @Override
-  public void closeTransaction() {
-    putPairs.get().clear();
-    originalKeys.get().clear();
-  }
-
   public static byte[] getRealValue(byte[] rawValue) {
     byte[] firstType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);
     ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(firstType[0]);
@@ -279,7 +286,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private byte[] getNextReadableValue(byte[] key) throws IOException {
     List<Pair<byte[], byte[]>> pairs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(key)
                 .startInclusive(false)
                 .end(endOfKey(key))
@@ -322,12 +329,14 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    * <p>When we try to get the value of key1, we will first the value of key1 10 and can skip old
    * versions quickly.
    */
-  private static byte[] revertByteArray(byte[] bytes) {
+  @VisibleForTesting
+  static byte[] revertByteArray(byte[] bytes) {
+    byte[] result = new byte[bytes.length];
     for (int i = 0; i < bytes.length; i++) {
-      bytes[i] = (byte) (bytes[i] ^ (byte) 0xff);
+      result[i] = (byte) (bytes[i] ^ (byte) 0xff);
     }
 
-    return bytes;
+    return result;
   }
 
   /** Generate a key of data for a specific transaction id. */
@@ -369,5 +378,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   /** Get the binary transaction id from the raw key. */
   static byte[] getBinaryTransactionId(byte[] rawKey) {
     return ArrayUtils.subarray(rawKey, rawKey.length - LENGTH_OF_TRANSACTION_ID, rawKey.length);
+  }
+
+  static long getTransactionId(byte[] binaryTransactionId) {
+    byte[] reverted = revertByteArray(binaryTransactionId);
+    return ByteUtils.byteToLong(reverted);
   }
 }

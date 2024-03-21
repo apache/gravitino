@@ -4,16 +4,22 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
@@ -25,6 +31,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -32,15 +39,23 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TestCatalogOperations implements CatalogOperations, TableCatalog, SupportsSchemas {
+public class TestCatalogOperations
+    implements CatalogOperations, TableCatalog, FilesetCatalog, SupportsSchemas {
 
   private final Map<NameIdentifier, TestTable> tables;
 
   private final Map<NameIdentifier, TestSchema> schemas;
 
+  private final Map<NameIdentifier, TestFileset> filesets;
+
   private final BasePropertiesMetadata tablePropertiesMetadata;
 
   private final BasePropertiesMetadata schemaPropertiesMetadata;
+
+  private final BasePropertiesMetadata filesetPropertiesMetadata;
+
+  private final BasePropertiesMetadata topicPropertiesMetadata;
+
   private Map<String, String> config;
 
   public static final String FAIL_CREATE = "fail-create";
@@ -48,13 +63,16 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
+    filesets = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
+    filesetPropertiesMetadata = new TestFilesetPropertiesMetadata();
+    topicPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
@@ -71,7 +89,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     if (tables.containsKey(ident)) {
       return tables.get(ident);
     } else {
-      throw new NoSuchTableException("Table " + ident + " does not exist");
+      throw new NoSuchTableException("Table %s does not exist", ident);
     }
   }
 
@@ -83,13 +101,14 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       Map<String, String> properties,
       Transform[] partitions,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(new HashMap<>(properties))
@@ -98,15 +117,16 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .withDistribution(distribution)
             .withSortOrders(sortOrders)
             .withPartitioning(partitions)
+            .withIndexes(indexes)
             .build();
 
     if (tables.containsKey(ident)) {
-      throw new TableAlreadyExistsException("Table " + ident + " already exists");
+      throw new TableAlreadyExistsException("Table %s already exists", ident);
     } else {
       tables.put(ident, table);
     }
 
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
@@ -115,6 +135,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withPartitioning(partitions)
+        .withIndexes(indexes)
         .build();
   }
 
@@ -122,11 +143,11 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     if (!tables.containsKey(ident)) {
-      throw new NoSuchTableException("Table " + ident + " does not exist");
+      throw new NoSuchTableException("Table %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =
-        new AuditInfo.Builder()
+        AuditInfo.builder()
             .withCreator("test")
             .withCreateTime(Instant.now())
             .withLastModifier("test")
@@ -150,7 +171,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     TestTable updatedTable =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
@@ -160,7 +181,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .build();
 
     tables.put(ident, updatedTable);
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(table.comment())
         .withProperties(new HashMap<>(newProps))
@@ -191,10 +212,10 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestSchema schema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -202,7 +223,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .build();
 
     if (schemas.containsKey(ident)) {
-      throw new SchemaAlreadyExistsException("Schema " + ident + " already exists");
+      throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
     } else {
       schemas.put(ident, schema);
     }
@@ -215,7 +236,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     if (schemas.containsKey(ident)) {
       return schemas.get(ident);
     } else {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist");
+      throw new NoSuchSchemaException("Schema %s does not exist", ident);
     }
   }
 
@@ -223,11 +244,11 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     if (!schemas.containsKey(ident)) {
-      throw new NoSuchSchemaException("Schema " + ident + " does not exist");
+      throw new NoSuchSchemaException("Schema %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =
-        new AuditInfo.Builder()
+        AuditInfo.builder()
             .withCreator("test")
             .withCreateTime(Instant.now())
             .withLastModifier("test")
@@ -251,7 +272,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     TestSchema updatedSchema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(schema.comment())
             .withProperties(newProps)
@@ -362,5 +383,114 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       };
     }
     return Maps::newHashMap;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return filesetPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return topicPropertiesMetadata;
+  }
+
+  @Override
+  public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
+    return filesets.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
+    if (filesets.containsKey(ident)) {
+      return filesets.get(ident);
+    } else {
+      throw new NoSuchFilesetException("Fileset %s does not exist", ident);
+    }
+  }
+
+  @Override
+  public Fileset createFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TestFileset fileset =
+        TestFileset.builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(auditInfo)
+            .withType(type)
+            .withStorageLocation(storageLocation)
+            .build();
+
+    if (tables.containsKey(ident)) {
+      throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+    } else {
+      filesets.put(ident, fileset);
+    }
+
+    return fileset;
+  }
+
+  @Override
+  public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
+      throws NoSuchFilesetException, IllegalArgumentException {
+    if (!filesets.containsKey(ident)) {
+      throw new NoSuchFilesetException("Fileset %s does not exist", ident);
+    }
+
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestFileset fileset = filesets.get(ident);
+    Map<String, String> newProps =
+        fileset.properties() != null ? Maps.newHashMap(fileset.properties()) : Maps.newHashMap();
+
+    for (FilesetChange change : changes) {
+      if (change instanceof FilesetChange.SetProperty) {
+        newProps.put(
+            ((FilesetChange.SetProperty) change).getProperty(),
+            ((FilesetChange.SetProperty) change).getValue());
+      } else if (change instanceof FilesetChange.RemoveProperty) {
+        newProps.remove(((FilesetChange.RemoveProperty) change).getProperty());
+      } else {
+        throw new IllegalArgumentException("Unsupported fileset change: " + change);
+      }
+    }
+
+    TestFileset updatedFileset =
+        TestFileset.builder()
+            .withName(ident.name())
+            .withComment(fileset.comment())
+            .withProperties(newProps)
+            .withAuditInfo(updatedAuditInfo)
+            .withType(fileset.type())
+            .withStorageLocation(fileset.storageLocation())
+            .build();
+    filesets.put(ident, updatedFileset);
+    return updatedFileset;
+  }
+
+  @Override
+  public boolean dropFileset(NameIdentifier ident) {
+    if (filesets.containsKey(ident)) {
+      filesets.remove(ident);
+      return true;
+    } else {
+      return false;
+    }
   }
 }

@@ -62,12 +62,14 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   @Override
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       DatabaseMetaData metaData = connection.getMetaData();
       ResultSet resultSet = metaData.getCatalogs();
       while (resultSet.next()) {
         String databaseName = resultSet.getString("TABLE_CAT");
-        databaseNames.add(databaseName);
+        if (!isSystemDatabase(databaseName)) {
+          databaseNames.add(databaseName);
+        }
       }
       return databaseNames;
     } catch (final SQLException se) {
@@ -93,5 +95,15 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
 
   protected Connection getConnection() throws SQLException {
     return dataSource.getConnection();
+  }
+
+  /**
+   * Check whether it is a system database.
+   *
+   * @param dbName The name of the database.
+   * @return false for all cases.
+   */
+  protected boolean isSystemDatabase(String dbName) {
+    return false;
   }
 }

@@ -19,19 +19,34 @@
 package com.datastrato.gravitino.exceptions;
 
 import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
 // Referred from Apache Iceberg's RESTException implementation
 // api/src/main/java/org/apache/iceberg/exceptions/RESTException.java
 
 /** An exception thrown when a REST request fails. */
 public class RESTException extends RuntimeException {
+
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
   @FormatMethod
-  public RESTException(String message, Object... args) {
+  public RESTException(@FormatString String message, Object... args) {
     super(String.format(message, args));
   }
 
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
   @FormatMethod
-  public RESTException(Throwable cause, String message, Object... args) {
+  public RESTException(Throwable cause, @FormatString String message, Object... args) {
     super(String.format(message, args), cause);
   }
 }

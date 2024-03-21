@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static org.testng.Assert.assertEquals;
 
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
 import org.testng.annotations.Test;
 
@@ -14,18 +14,12 @@ public class TestGravitinoColumn {
 
   @Test
   public void testGravitinoColumn() {
-    ColumnDTO columnDTO =
-        new ColumnDTO.Builder()
-            .withName("f1")
-            .withComment("test column")
-            .withDataType(Types.StringType.get())
-            .build();
+    Column column = Column.of("f1", Types.StringType.get(), "test column");
+    GravitinoColumn gravitinoColumn = new GravitinoColumn(column, 0);
 
-    GravitinoColumn column = new GravitinoColumn(columnDTO, 0);
-
-    assertEquals(column.getName(), columnDTO.name());
-    assertEquals(column.getIndex(), 0);
-    assertEquals(column.getComment(), columnDTO.comment());
-    assertEquals(column.getType(), columnDTO.dataType());
+    assertEquals(gravitinoColumn.getName(), column.name());
+    assertEquals(gravitinoColumn.getIndex(), 0);
+    assertEquals(gravitinoColumn.getComment(), column.comment());
+    assertEquals(gravitinoColumn.getType(), column.dataType());
   }
 }

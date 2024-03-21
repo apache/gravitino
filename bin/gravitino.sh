@@ -153,6 +153,7 @@ if [ "$JVM_VERSION" -eq 17 ]; then
   JAVA_OPTS+=" --add-opens java.base/sun.nio.cs=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/sun.security.action=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
 addJarInDir "${GRAVITINO_HOME}/libs"

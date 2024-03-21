@@ -1,0 +1,28 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 10 rows
+
+INSERT: 10 rows
+
+"Avram","Lawrence","8"
+"Avram","Lawrence","7"
+"Gregory","Smith","7"
+"Avram","Lawrence","6"
+"Avram","Lawrence","4"
+"Avram","Lawrence","4"
+"Avram","Lawrence","4"
+"Gregory","Smith","4"
+"Gregory","Smith","4"
+"Avram","Lawrence","2"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

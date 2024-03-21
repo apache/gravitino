@@ -1,0 +1,111 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+RENAME TABLE
+
+"tb03"
+
+RENAME TABLE
+
+"tb01"
+
+DROP COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+SET COLUMN TYPE
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+COMMENT
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200) COMMENT 'test column comments',
+   salary bigint
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+COMMENT
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200) COMMENT 'test column comments',
+   salary bigint
+)
+COMMENT 'test table comments'
+WITH (
+   engine = 'InnoDB'
+)"
+
+RENAME COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   s varchar(200) COMMENT 'test column comments',
+   salary bigint
+)
+COMMENT 'test table comments'
+WITH (
+   engine = 'InnoDB'
+)"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   s varchar(200) COMMENT 'test column comments',
+   salary bigint,
+   city varchar(50) COMMENT 'aaa'
+)
+COMMENT 'test table comments'
+WITH (
+   engine = 'InnoDB'
+)"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   s varchar(200) COMMENT 'test column comments',
+   salary bigint,
+   city varchar(50) COMMENT 'aaa',
+   age integer NOT NULL COMMENT 'age of users'
+)
+COMMENT 'test table comments'
+WITH (
+   engine = 'InnoDB'
+)"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   s varchar(200) COMMENT 'test column comments',
+   salary bigint,
+   city varchar(50) COMMENT 'aaa',
+   age integer NOT NULL COMMENT 'age of users',
+   address varchar(200) NOT NULL COMMENT 'address of users'
+)
+COMMENT 'test table comments'
+WITH (
+   engine = 'InnoDB'
+)"
+
+DROP TABLE
+
+DROP SCHEMA
+
+

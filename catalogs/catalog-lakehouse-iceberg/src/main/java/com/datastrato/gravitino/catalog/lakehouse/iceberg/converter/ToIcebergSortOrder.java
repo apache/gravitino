@@ -22,6 +22,8 @@ import org.apache.iceberg.expressions.UnboundTerm;
 /** Implement gravitino sort order converter to iceberg sort order. */
 public class ToIcebergSortOrder {
 
+  private ToIcebergSortOrder() {}
+
   private static final String DOT = ".";
 
   /**

@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
@@ -20,10 +22,13 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -66,6 +71,9 @@ import org.slf4j.LoggerFactory;
 /** Manages the catalog instances and operations. */
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
+  private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
   /** Wrapper class for a catalog instance and its class loader. */
@@ -98,6 +106,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithFilesetOps(ThrowableFunction<FilesetCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asFilesets() == null) {
+              throw new UnsupportedOperationException(
+                  "Catalog does not support fileset operations");
+            }
+            return fn.apply(asFilesets());
+          });
+    }
+
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
@@ -126,6 +145,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     private TableCatalog asTables() {
       return catalog.ops() instanceof TableCatalog ? (TableCatalog) catalog.ops() : null;
+    }
+
+    private FilesetCatalog asFilesets() {
+      return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
     }
   }
 
@@ -198,7 +221,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     if (!metalakeExists) {
-      throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
     }
 
     try {
@@ -246,13 +269,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
     // load catalog-related configuration from catalog-specific configuration file
-    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(provider);
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
     Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
 
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     CatalogEntity e =
-        new CatalogEntity.Builder()
+        CatalogEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -261,7 +284,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withComment(comment)
             .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -271,7 +294,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
       }
 
       // TODO: should avoid a race condition here
@@ -280,7 +303,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
-      throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
+      throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
     } catch (Exception e3) {
@@ -327,7 +350,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
     }
 
     try {
@@ -335,8 +358,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           f -> {
             Pair<Map<String, String>, Map<String, String>> alterProperty =
                 getCatalogAlterProperty(changes);
-            f.catalogPropertiesMetadata()
-                .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
+            validatePropertyForAlter(
+                f.catalogPropertiesMetadata(), alterProperty.getLeft(), alterProperty.getRight());
             return null;
           });
     } catch (IllegalArgumentException e1) {
@@ -355,7 +378,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
-                    new CatalogEntity.Builder()
+                    CatalogEntity.builder()
                         .withId(catalog.id())
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
@@ -364,7 +387,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withComment(catalog.getComment());
 
                 AuditInfo newInfo =
-                    new AuditInfo.Builder()
+                    AuditInfo.builder()
                         .withCreator(catalog.auditInfo().creator())
                         .withCreateTime(catalog.auditInfo().createTime())
                         .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
@@ -386,7 +409,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IllegalArgumentException iae) {
       LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
@@ -436,7 +459,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
-      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IOException ioe) {
       LOG.error("Failed to load catalog {}", ident, ioe);
@@ -451,7 +474,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
       String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(provider);
+      String confPath = buildConfPath(conf, provider);
       classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -470,7 +493,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         cl -> {
           Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
-          catalog.ops().catalogPropertiesMetadata().validatePropertyForCreate(configWithoutId);
+          validatePropertyForCreate(catalog.ops().catalogPropertiesMetadata(), configWithoutId);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
@@ -511,7 +534,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return catalog;
   }
 
-  private Map<String, String> loadCatalogSpecificConfig(String provider) {
+  private Map<String, String> loadCatalogSpecificConfig(
+      Map<String, String> properties, String provider) {
     if ("test".equals(provider)) {
       return Maps.newHashMap();
     }
@@ -519,7 +543,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String catalogSpecificConfigFile = provider + ".conf";
     Map<String, String> catalogSpecificConfig = Maps.newHashMap();
 
-    String fullPath = buildConfPath(provider) + File.separator + catalogSpecificConfigFile;
+    String fullPath =
+        buildConfPath(properties, provider) + File.separator + catalogSpecificConfigFile;
     try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
       Properties loadProperties = new Properties();
       loadProperties.load(inputStream);
@@ -544,22 +569,29 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    * Build the config path from the specific provider. Usually, the configuration file is under the
    * conf and conf and package are under the same directory.
    */
-  private String buildConfPath(String provider) {
+  private String buildConfPath(Map<String, String> properties, String provider) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    if (testEnv) {
-      return String.join(
-          File.separator,
-          gravitinoHome,
-          "catalogs",
-          "catalog-" + provider,
-          "build",
-          "resources",
-          "main");
-    }
 
-    return String.join(File.separator, gravitinoHome, "catalogs", provider, "conf");
+    String confPath;
+    String pkg = properties.get(Catalog.PROPERTY_PACKAGE);
+    if (pkg != null) {
+      confPath = String.join(File.separator, pkg, "conf");
+    } else if (testEnv) {
+      confPath =
+          String.join(
+              File.separator,
+              gravitinoHome,
+              "catalogs",
+              "catalog-" + provider,
+              "build",
+              "resources",
+              "main");
+    } else {
+      confPath = String.join(File.separator, gravitinoHome, "catalogs", provider, "conf");
+    }
+    return confPath;
   }
 
   private String buildPkgPath(Map<String, String> conf, String provider) {
@@ -570,7 +602,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
     String pkgPath;
     if (pkg != null) {
-      pkgPath = pkg;
+      pkgPath = String.join(File.separator, pkg, "libs");
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
       pkgPath =

@@ -20,9 +20,11 @@
 
 package com.datastrato.gravitino.rel.expressions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Arrays;
 
 /** Represents a field or column reference in the public logical expression API. */
+@Evolving
 public interface NamedReference extends Expression {
 
   /**
@@ -95,6 +97,12 @@ public interface NamedReference extends Expression {
     @Override
     public int hashCode() {
       return Arrays.hashCode(fieldName);
+    }
+
+    /** @return The string representation of the field reference. */
+    @Override
+    public String toString() {
+      return String.join(".", fieldName);
     }
   }
 }

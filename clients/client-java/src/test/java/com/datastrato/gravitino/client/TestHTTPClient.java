@@ -58,8 +58,6 @@ import org.mockserver.model.HttpResponse;
  */
 public class TestHTTPClient {
 
-  private static final int PORT = 1080;
-  private static final String URI = String.format("http://127.0.0.1:%d", PORT);
   private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
 
   private static ClientAndServer mockServer;
@@ -67,8 +65,11 @@ public class TestHTTPClient {
 
   @BeforeAll
   public static void beforeClass() {
-    mockServer = startClientAndServer(PORT);
-    restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
+    mockServer = startClientAndServer();
+    restClient =
+        HTTPClient.builder(ImmutableMap.of())
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build();
   }
 
   @AfterAll
@@ -269,7 +270,7 @@ public class TestHTTPClient {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof Item)) {
         return false;
       }
       Item item = (Item) o;

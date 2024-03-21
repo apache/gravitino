@@ -9,13 +9,17 @@ import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -45,6 +49,11 @@ public class ErrorHandlers {
     return MetalakeErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to Catalog operations.
+   *
+   * @return A Consumer representing the Catalog error handler.
+   */
   public static Consumer<ErrorResponse> catalogErrorHandler() {
     return CatalogErrorHandler.INSTANCE;
   }
@@ -68,6 +77,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to Partition operations.
+   *
+   * @return A Consumer representing the Partition error handler.
+   */
+  public static Consumer<ErrorResponse> partitionErrorHandler() {
+    return PartitionErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates a generic error handler for REST requests.
    *
    * @return A Consumer representing the generic REST error handler.
@@ -76,8 +94,22 @@ public class ErrorHandlers {
     return RestErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to OAuth2 requests.
+   *
+   * @return A Consumer representing the OAuth2 error handler.
+   */
   public static Consumer<ErrorResponse> oauthErrorHandler() {
     return OAuthErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Fileset operations.
+   *
+   * @return A Consumer representing the Fileset error handler.
+   */
+  public static Consumer<ErrorResponse> filesetErrorHandler() {
+    return FilesetErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -113,7 +145,52 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to Partition operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class PartitionErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new PartitionErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+
+          } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
+            throw new NoSuchTableException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchPartitionException.class.getSimpleName())) {
+            throw new NoSuchPartitionException(errorMessage);
+
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new PartitionAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Error handler specific to Table operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class TableErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new TableErrorHandler();
 
@@ -139,13 +216,17 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
   /** Error handler specific to Schema operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class SchemaErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new SchemaErrorHandler();
 
@@ -174,13 +255,15 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
   /** Error handler specific to Catalog operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class CatalogErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new CatalogErrorHandler();
 
@@ -206,13 +289,15 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
   /** Error handler specific to Metalake operations. */
+  @SuppressWarnings("FormatStringAnnotation")
   private static class MetalakeErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new MetalakeErrorHandler();
 
@@ -232,15 +317,25 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
+  /** * Error handler specific to OAuth2 requests. */
   public static class OAuthErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new OAuthErrorHandler();
 
+    /**
+     * Parses the error response from the server.
+     *
+     * @param code The response code indicating the error status.
+     * @param json The JSON data representing the error response.
+     * @param mapper The ObjectMapper used to deserialize the JSON data.
+     * @return An ErrorResponse object representing the error response.
+     */
     @Override
     public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
       try {
@@ -253,26 +348,65 @@ public class ErrorHandlers {
       return ErrorResponse.unknownError(errorMsg);
     }
 
+    /**
+     * Accepts the error response and throws an exception based on the error type.
+     *
+     * @param errorResponse the input argument
+     */
     @Override
     public void accept(ErrorResponse errorResponse) {
       if (errorResponse.getType() != null) {
         switch (errorResponse.getType()) {
           case OAuth2ClientUtil.INVALID_CLIENT_ERROR:
             throw new UnauthorizedException(
-                String.format(
-                    "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage()));
+                "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage());
           case OAuth2ClientUtil.INVALID_REQUEST_ERROR:
           case OAuth2ClientUtil.INVALID_GRANT_ERROR:
           case OAuth2ClientUtil.UNAUTHORIZED_CLIENT_ERROR:
           case OAuth2ClientUtil.UNSUPPORTED_GRANT_TYPE_ERROR:
           case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
             throw new BadRequestException(
-                String.format(
-                    "Malformed request: %s: %s",
-                    errorResponse.getType(), errorResponse.getMessage()));
+                "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
+          default:
+            super.accept(errorResponse);
         }
       }
       super.accept(errorResponse);
+    }
+  }
+
+  /** Error handler specific to Fileset operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class FilesetErrorHandler extends RestErrorHandler {
+
+    private static final FilesetErrorHandler INSTANCE = new FilesetErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchFilesetException.class.getSimpleName())) {
+            throw new NoSuchFilesetException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new FilesetAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 

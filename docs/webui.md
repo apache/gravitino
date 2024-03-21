@@ -2,8 +2,9 @@
 title: 'Gravitino web UI'
 slug: /webui
 keyword: webui
-toc_min_heading_level: 2
-toc_max_heading_level: 5
+last_update:
+  date: 2024-02-04
+  author: ch3yne
 license: 'Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.'
 ---
 
@@ -25,7 +26,7 @@ More features are under development. For the details, please refer to the [Manag
 
 The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security.md).
 
-Set parameter for `gravitino.authenticator`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode).
+Set parameter for `gravitino.authenticator`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option.
 
 :::tip
 After changing the configuration, make sure to restart the Gravitino server.
@@ -71,7 +72,7 @@ At the top-right, there is an icon button that takes you to the login page when 
 
 ### Metalake
 
-#### [Create a metalake](getting-started.md#using-rest-to-interact-with-gravitino)
+#### [Create metalake](getting-started.md#using-rest-to-interact-with-gravitino)
 
 On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to create a metalake.
 
@@ -91,15 +92,23 @@ There are 3 actions you can perform on a metalake.
 
 #### Show metalake details
 
+Clicking on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this metalake in the drawer component on the right.
+
 ![metalake-details](assets/webui/metalake-details.png)
 
 #### Edit metalake
 
-Displays a dialog for modifying metalakes fields.
+Clicking on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
+
+Displays the dialog for modifying fields of the selected metalake.
 
 ![create-metalake-dialog](assets/webui/create-metalake-dialog.png)
 
 #### Delete metalake
+
+Clicking on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
 Displays a confirmation dialog, clicking on the `SUBMIT` button deletes this metalake.
 
@@ -111,15 +120,29 @@ Clicking on a metalake name in the table views catalogs in a metalake.
 
 If this is the first time, it shows no data until after creating a catalog.
 
+Clicking on the left arrow icon button <Icon icon='mdi:arrow-left' fontSize='24' color='#6877ef' /> takes you to the metalake page.
+
 ![metalake-catalogs](assets/webui/metalake-catalogs.png)
 
 Clicking on the Tab - `DETAILS` views the details of the catalog on the metalake catalogs page.
 
 ![metalake-catalogs-details](assets/webui/metalake-catalogs-details.png)
 
-#### Create a catalog
+On the left side of the page is a tree list.
 
-Clicking on the `CREATE CATALOG` button displays a dialog to create a catalog.
+- Catalog <Icon icon='bx:book' fontSize='24px' />
+- Schema <Icon icon='bx:coin-stack' fontSize='24px' />
+- Table <Icon icon='bx:table' fontSize='24px' />
+
+![tree-view](assets/webui/tree-view.png)
+
+Hover your mouse over the corresponding icon to the data changes to a reload icon <Icon icon='mdi:reload' fontSize='24px' />. Click on this icon to reload the currently selected data.
+
+![tree-view-reload-catalog](assets/webui/tree-view-reload-catalog.png)
+
+#### Create catalog
+
+Clicking on the `CREATE CATALOG` button displays the dialog to create a catalog.
 
 ![create-catalog](assets/webui/create-catalog.png)
 
@@ -197,7 +220,7 @@ Creating a catalog requires these fields:
 
     |Key          |Description                                          |
     |-------------|-----------------------------------------------------|
-    |jdbc-driver  |e.g. `e.g. org.postgresql.Driver`                    |
+    |jdbc-driver  |e.g. `org.postgresql.Driver`                    |
     |jdbc-url     |e.g. `jdbc:postgresql://localhost:5432/your_database`|
     |jdbc-user    |The JDBC user name                                   |
     |jdbc-password|The JDBC password                                    |
@@ -210,7 +233,33 @@ After verifying the values of these fields, clicking on the `CREATE` button crea
 
 ![created-catalog](assets/webui/created-catalog.png)
 
-Clicking on the icon button - `←(left arrow)` takes you to the metalake page.
+#### Show catalog details
+
+Clicking on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
+
+You can see the detailed information of this catalog in the drawer component on the right.
+
+![show-catalog-details](assets/webui/show-catalog-details.png)
+
+#### Edit catalog
+
+Clicking on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
+
+Displays the dialog for modifying fields of the selected catalog.
+
+![update-catalog](assets/webui/update-catalog.png)
+
+Only the `name`, `comment`, and custom fields in `properties` can be modified, other fields such as `type`, `provider`, and default fields in `properties` cannot be modified.
+
+The fields that are not allowed to be modified cannot be selected and modified in the web UI.
+
+#### Delete catalog
+
+Clicking on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
+
+Displays a confirmation dialog, clicking on the SUBMIT button deletes this catalog.
+
+![delete-catalog](assets/webui/delete-catalog.png)
 
 ### Schema
 
@@ -243,6 +292,6 @@ Design draft preview:
 | Page     | Capabilities                                                                      |
 | -------- | --------------------------------------------------------------------------------- |
 | Metalake | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
-| Catalog  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
+| Catalog  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
 | Schema   | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
 | Table    | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |

@@ -33,7 +33,13 @@ public class ProtoEntitySerDe implements EntitySerDe {
               "com.datastrato.gravitino.proto.SchemaEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.TableEntity",
-              "com.datastrato.gravitino.proto.TableEntitySerde")
+              "com.datastrato.gravitino.proto.TableEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.FilesetEntity",
+              "com.datastrato.gravitino.proto.FilesetEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.TopicEntity",
+              "com.datastrato.gravitino.proto.TopicEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
@@ -47,7 +53,11 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.gravitino.meta.SchemaEntity",
           "com.datastrato.gravitino.proto.Schema",
           "com.datastrato.gravitino.meta.TableEntity",
-          "com.datastrato.gravitino.proto.Table");
+          "com.datastrato.gravitino.proto.Table",
+          "com.datastrato.gravitino.meta.FilesetEntity",
+          "com.datastrato.gravitino.proto.Fileset",
+          "com.datastrato.gravitino.meta.TopicEntity",
+          "com.datastrato.gravitino.proto.Topic");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;
@@ -55,8 +65,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
   private final Map<Class<? extends Entity>, Class<? extends Message>> entityToProto;
 
   public ProtoEntitySerDe() {
-    this.entityToSerDe = Maps.newHashMap();
-    this.entityToProto = Maps.newHashMap();
+    this.entityToSerDe = Maps.newConcurrentMap();
+    this.entityToProto = Maps.newConcurrentMap();
   }
 
   @Override

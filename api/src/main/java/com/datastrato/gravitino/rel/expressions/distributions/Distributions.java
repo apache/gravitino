@@ -11,9 +11,19 @@ import java.util.Arrays;
 /** Helper methods to create distributions to pass into Gravitino. */
 public class Distributions {
 
-  // NONE is used to indicate that there is no distribution.
+  /** NONE is used to indicate that there is no distribution. */
   public static final Distribution NONE =
+      new DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION);
+
+  /** List bucketing strategy hash, TODO: #1505 Separate the bucket number from the Distribution. */
+  public static final Distribution HASH =
       new DistributionImpl(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION);
+
+  /**
+   * List bucketing strategy range, TODO: #1505 Separate the bucket number from the Distribution.
+   */
+  public static final Distribution RANGE =
+      new DistributionImpl(Strategy.RANGE, 0, Expression.EMPTY_EXPRESSION);
 
   /**
    * Create a distribution by evenly distributing the data across the number of buckets.
@@ -93,16 +103,31 @@ public class Distributions {
       this.expressions = expressions;
     }
 
+    /**
+     * Get the strategy of the distribution.
+     *
+     * @return The strategy of the distribution.
+     */
     @Override
     public Strategy strategy() {
       return strategy;
     }
 
+    /**
+     * Get the number of buckets of the distribution.
+     *
+     * @return The number of buckets of the distribution.
+     */
     @Override
     public int number() {
       return number;
     }
 
+    /**
+     * Get the expressions of the distribution.
+     *
+     * @return The expressions of the distribution.
+     */
     @Override
     public Expression[] expressions() {
       return expressions;
@@ -114,24 +139,49 @@ public class Distributions {
       private int number;
       private Expression[] expressions;
 
+      /**
+       * Set the strategy of the distribution.
+       *
+       * @param strategy The strategy of the distribution.
+       * @return The builder.
+       */
       public Builder withStrategy(Strategy strategy) {
         this.strategy = strategy;
         return this;
       }
 
+      /**
+       * Set the number of buckets of the distribution.
+       *
+       * @param number The number of buckets of the distribution.
+       * @return The builder.
+       */
       public Builder withNumber(int number) {
         this.number = number;
         return this;
       }
 
+      /**
+       * Set the expressions of the distribution.
+       *
+       * @param expressions The expressions of the distribution.
+       * @return The builder.
+       */
       public Builder withExpressions(Expression[] expressions) {
         this.expressions = expressions;
         return this;
       }
 
+      /**
+       * Build the distribution.
+       *
+       * @return The created distribution.
+       */
       public Distribution build() {
         return new DistributionImpl(strategy, number, expressions);
       }
     }
   }
+
+  private Distributions() {}
 }

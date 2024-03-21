@@ -12,23 +12,35 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.dto.rel.partitions.BucketPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.FunctionPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.HourPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.ListPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.MonthPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.expressions.UnparsedExpressionDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.FunctionPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.HourPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.MonthPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -52,15 +64,14 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Utility class for working with JSON data. */
 public class JsonUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
   private static final String NAMESPACE = "namespace";
   private static final String NAME = "name";
   private static final String POSITION_FIRST = "first";
@@ -76,15 +87,22 @@ public class JsonUtils {
   private static final String EXPRESSION_TYPE = "type";
   private static final String DATA_TYPE = "dataType";
   private static final String LITERAL_VALUE = "value";
+  private static final String UNPARSED_EXPRESSION = "unparsedExpression";
   private static final String SORT_TERM = "sortTerm";
   private static final String DIRECTION = "direction";
   private static final String NULL_ORDERING = "nullOrdering";
+
+  private static final String INDEX_TYPE = "indexType";
+  private static final String INDEX_NAME = "name";
+  private static final String INDEX_FIELD_NAMES = "fieldNames";
   private static final String NUMBER = "number";
   private static final String TYPE = "type";
   private static final String STRUCT = "struct";
   private static final String LIST = "list";
   private static final String MAP = "map";
   private static final String UNION = "union";
+  private static final String UNPARSED = "unparsed";
+  private static final String UNPARSED_TYPE = "unparsedType";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -95,6 +113,13 @@ public class JsonUtils {
   private static final String MAP_KEY_TYPE = "keyType";
   private static final String MAP_VALUE_TYPE = "valueType";
   private static final String MAP_VALUE_NULLABLE = "valueContainsNull";
+  private static final String PARTITION_TYPE = "type";
+  private static final String PARTITION_NAME = "name";
+  private static final String PARTITION_PROPERTIES = "properties";
+  private static final String IDENTITY_PARTITION_VALUES = "values";
+  private static final String LIST_PARTITION_LISTS = "lists";
+  private static final String RANGE_PARTITION_UPPER = "upper";
+  private static final String RANGE_PARTITION_LOWER = "lower";
   private static final ImmutableMap<String, Type.PrimitiveType> TYPES =
       Maps.uniqueIndex(
           ImmutableList.of(
@@ -146,11 +171,21 @@ public class JsonUtils {
       this.elements = pNode.elements();
     }
 
+    /**
+     * Judge whether it has more elements in the JSON array.
+     *
+     * @return true if the iteration has more elements.
+     */
     @Override
     public boolean hasNext() {
       return elements.hasNext();
     }
 
+    /**
+     * Get a next element from the JSON array.
+     *
+     * @return the next element in the iteration.
+     */
     @Override
     public T next() {
       JsonNode element = elements.next();
@@ -181,7 +216,22 @@ public class JsonUtils {
     }
   }
 
-  private static volatile ObjectMapper mapper = null;
+  /**
+   * ObjectMapperHolder is a static inner class that holds the instance of ObjectMapper. This class
+   * utilizes the Initialization-on-demand holder idiom, which is a lazy-loaded singleton. This
+   * idiom takes advantage of the fact that inner classes are not loaded until they are referenced.
+   * It's a thread-safe and efficient way to implement a singleton as the instance is created when
+   * it's needed at the first time.
+   */
+  private static class ObjectMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .registerModule(new JavaTimeModule());
+  }
 
   /**
    * Get the shared ObjectMapper instance for JSON serialization/deserialization.
@@ -189,21 +239,34 @@ public class JsonUtils {
    * @return The ObjectMapper instance.
    */
   public static ObjectMapper objectMapper() {
-    if (mapper == null) {
-      synchronized (JsonUtils.class) {
-        if (mapper == null) {
-          mapper =
-              JsonMapper.builder()
-                  .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-                  .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
-                  .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                  .build()
-                  .registerModule(new JavaTimeModule());
-        }
-      }
-    }
+    return ObjectMapperHolder.INSTANCE;
+  }
 
-    return mapper;
+  /**
+   * AnyFieldMapperHolder is a static inner class that holds the instance of ObjectMapper which can
+   * access any field of the object. This class utilizes the Initialization-on-demand holder idiom,
+   * which is a lazy-loaded singleton. This idiom takes advantage of the fact that inner classes are
+   * not loaded until they are referenced. It's a thread-safe and efficient way to implement a
+   * singleton as the instance is created when it's needed at the first time.
+   */
+  private static class AnyFieldMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .registerModule(new JavaTimeModule());
+  }
+
+  /**
+   * Get the shared AnyFieldMapper instance for JSON serialization/deserialization.
+   *
+   * @return The ObjectMapper instance.
+   */
+  public static ObjectMapper anyFieldMapper() {
+    return AnyFieldMapperHolder.INSTANCE;
   }
 
   /**
@@ -213,7 +276,7 @@ public class JsonUtils {
    * @param node The JSON node.
    * @return The list of strings or null if property is missing or null.
    */
-  public static List<String> getStringListOrNull(String property, JsonNode node) {
+  static List<String> getStringListOrNull(String property, JsonNode node) {
     if (!node.has(property) || node.get(property).isNull()) {
       return null;
     }
@@ -230,14 +293,14 @@ public class JsonUtils {
    * @return The list of strings.
    * @throws IllegalArgumentException if the property is missing in the JSON node.
    */
-  public static List<String> getStringList(String property, JsonNode node) {
+  private static List<String> getStringList(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     return ImmutableList.<String>builder()
         .addAll(new JsonStringArrayIterator(property, node))
         .build();
   }
 
-  public static String[] getStringArray(ArrayNode node) {
+  private static String[] getStringArray(ArrayNode node) {
     String[] array = new String[node.size()];
     for (int i = 0; i < node.size(); i++) {
       array[i] = node.get(i).asText();
@@ -245,6 +308,13 @@ public class JsonUtils {
     return array;
   }
 
+  /**
+   * Get a int value from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The int value.
+   */
   public static int getInt(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     JsonNode pNode = node.get(property);
@@ -256,6 +326,13 @@ public class JsonUtils {
     return pNode.asInt();
   }
 
+  /**
+   * Get a long value from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The long value.
+   */
   public static long getLong(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
     JsonNode pNode = node.get(property);
@@ -267,7 +344,7 @@ public class JsonUtils {
     return pNode.asLong();
   }
 
-  public static FunctionArg readFunctionArg(JsonNode node) {
+  private static FunctionArg readFunctionArg(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull() && node.isObject(),
         "Cannot parse function arg from invalid JSON: %s",
@@ -284,8 +361,8 @@ public class JsonUtils {
             "Cannot parse literal arg from missing literal value: %s",
             node);
         Type dataType = readDataType(node.get(DATA_TYPE));
-        String value = getString(LITERAL_VALUE, node);
-        return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
+        String value = getStringOrNull(LITERAL_VALUE, node);
+        return LiteralDTO.builder().withDataType(dataType).withValue(value).build();
       case FIELD:
         Preconditions.checkArgument(
             node.has(FIELD_NAME),
@@ -305,16 +382,24 @@ public class JsonUtils {
         String functionName = getString(FUNCTION_NAME, node);
         List<FunctionArg> args = Lists.newArrayList();
         node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
-        return new FuncExpressionDTO.Builder()
+        return FuncExpressionDTO.builder()
             .withFunctionName(functionName)
             .withFunctionArgs(args.toArray(FunctionArg.EMPTY_ARGS))
+            .build();
+      case UNPARSED:
+        Preconditions.checkArgument(
+            node.has(UNPARSED_EXPRESSION) && node.get(UNPARSED_EXPRESSION).isTextual(),
+            "Cannot parse unparsed expression from missing string field unparsedExpression: %s",
+            node);
+        return UnparsedExpressionDTO.builder()
+            .withUnparsedExpression(getString(UNPARSED_EXPRESSION, node))
             .build();
       default:
         throw new IllegalArgumentException("Unknown function argument type: " + type);
     }
   }
 
-  public static void writeFunctionArg(FunctionArg arg, JsonGenerator gen) throws IOException {
+  private static void writeFunctionArg(FunctionArg arg, JsonGenerator gen) throws IOException {
     gen.writeStartObject();
     gen.writeStringField(EXPRESSION_TYPE, arg.argType().name().toLowerCase());
     switch (arg.argType()) {
@@ -335,6 +420,9 @@ public class JsonUtils {
         }
         gen.writeEndArray();
         break;
+      case UNPARSED:
+        gen.writeStringField(UNPARSED_EXPRESSION, ((UnparsedExpression) arg).unparsedExpression());
+        break;
       default:
         throw new IOException("Unknown function argument type: " + arg.argType());
     }
@@ -353,6 +441,29 @@ public class JsonUtils {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing string: %s", property);
     JsonNode pNode = node.get(property);
     return convertToString(property, pNode);
+  }
+
+  private static String getStringOrNull(String property, JsonNode node) {
+    if (!node.has(property) || node.get(property).isNull()) {
+      return null;
+    }
+
+    return getString(property, node);
+  }
+
+  private static Map<String, String> getStringMapOrNull(String property, JsonNode node) {
+    if (!node.has(property) || node.get(property).isNull()) {
+      return null;
+    }
+
+    JsonNode propertiesNode = node.get(property);
+    Iterator<Map.Entry<String, JsonNode>> fieldsIterator = propertiesNode.fields();
+    Map<String, String> properties = Maps.newHashMap();
+    while (fieldsIterator.hasNext()) {
+      Map.Entry<String, JsonNode> field = fieldsIterator.next();
+      properties.put(field.getKey(), field.getValue().asText());
+    }
+    return properties;
   }
 
   private static String convertToString(String property, JsonNode pNode) {
@@ -392,7 +503,8 @@ public class JsonUtils {
       case UUID:
       case FIXED:
       case BINARY:
-        // Primitive types are serialized as string
+      case NULL:
+        // Primitive types and nullType are serialized as string
         gen.writeString(dataType.simpleString());
         break;
       case STRUCT:
@@ -407,8 +519,11 @@ public class JsonUtils {
       case UNION:
         writeUnionType((Types.UnionType) dataType, gen);
         break;
+      case UNPARSED:
+        writeUnparsedType((Types.UnparsedType) dataType, gen);
+        break;
       default:
-        throw new IOException("Cannot serialize unknown type: " + dataType);
+        writeUnparsedType(dataType.simpleString(), gen);
     }
   }
 
@@ -423,12 +538,14 @@ public class JsonUtils {
         node != null && !node.isNull(), "Cannot parse type from invalid JSON: %s", node);
 
     if (node.isTextual()) {
-      return fromPrimitiveTypeString(node.asText().toLowerCase());
+      String text = node.asText().toLowerCase();
+      return text.equals(Types.NullType.get().simpleString())
+          ? Types.NullType.get()
+          : fromPrimitiveTypeString(text);
     }
 
-    if (node.isObject() && node.get(TYPE) != null) {
-      JsonNode typeField = node.get(TYPE);
-      String type = typeField.asText();
+    if (node.isObject() && node.has(TYPE)) {
+      String type = node.get(TYPE).asText();
 
       if (STRUCT.equals(type)) {
         return readStructType(node);
@@ -444,6 +561,10 @@ public class JsonUtils {
 
       if (UNION.equals(type)) {
         return readUnionType(node);
+      }
+
+      if (UNPARSED.equals(type)) {
+        return readUnparsedType(node);
       }
     }
 
@@ -512,6 +633,18 @@ public class JsonUtils {
     if (field.comment() != null) {
       gen.writeStringField(STRUCT_FIELD_COMMENT, field.comment());
     }
+    gen.writeEndObject();
+  }
+
+  private static void writeUnparsedType(Types.UnparsedType unparsedType, JsonGenerator gen)
+      throws IOException {
+    writeUnparsedType(unparsedType.unparsedType(), gen);
+  }
+
+  private static void writeUnparsedType(String unparsedType, JsonGenerator gen) throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, UNPARSED);
+    gen.writeStringField(UNPARSED_TYPE, unparsedType);
     gen.writeEndObject();
   }
 
@@ -617,6 +750,13 @@ public class JsonUtils {
     return Types.StructType.Field.of(name, type, nullable, comment);
   }
 
+  private static Types.UnparsedType readUnparsedType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);
+
+    return Types.UnparsedType.of(node.get(UNPARSED_TYPE).asText());
+  }
+
   // Nested classes for custom serialization and deserialization
 
   /** Custom JSON serializer for Gravitino Type objects. */
@@ -671,6 +811,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for SortOrderDTO objects. */
   public static class ColumnPositionSerializer extends JsonSerializer<TableChange.ColumnPosition> {
     @Override
     public void serialize(
@@ -693,6 +834,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for ColumnPosition objects. */
   public static class ColumnPositionDeserializer
       extends JsonDeserializer<TableChange.ColumnPosition> {
 
@@ -721,6 +863,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for PartitionDTO objects. */
   public static class PartitioningSerializer extends JsonSerializer<Partitioning> {
     @Override
     public void serialize(Partitioning value, JsonGenerator gen, SerializerProvider serializers)
@@ -775,6 +918,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Partitioning objects. */
   public static class PartitioningDeserializer extends JsonDeserializer<Partitioning> {
     @Override
     public Partitioning deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -827,6 +971,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for SortOrderDTO objects. */
   public static class SortOrderSerializer extends JsonSerializer<SortOrderDTO> {
     @Override
     public void serialize(SortOrderDTO value, JsonGenerator gen, SerializerProvider serializers)
@@ -840,6 +985,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for SortOrderDTO objects. */
   public static class SortOrderDeserializer extends JsonDeserializer<SortOrderDTO> {
     @Override
     public SortOrderDTO deserialize(JsonParser p, DeserializationContext ctxt)
@@ -852,7 +998,7 @@ public class JsonUtils {
       Preconditions.checkArgument(
           node.has(SORT_TERM), "Cannot parse sort order from missing sort term: %s", node);
       FunctionArg sortTerm = readFunctionArg(node.get(SORT_TERM));
-      SortOrderDTO.Builder builder = new SortOrderDTO.Builder().withSortTerm(sortTerm);
+      SortOrderDTO.Builder builder = SortOrderDTO.builder().withSortTerm(sortTerm);
       if (node.has(DIRECTION)) {
         builder.withDirection(SortDirection.fromString(getString(DIRECTION, node)));
       }
@@ -863,6 +1009,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {
     @Override
     public void serialize(DistributionDTO value, JsonGenerator gen, SerializerProvider serializers)
@@ -879,6 +1026,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for DistributionDTO objects. */
   public static class DistributionDeserializer extends JsonDeserializer<DistributionDTO> {
     @Override
     public DistributionDTO deserialize(JsonParser p, DeserializationContext ctxt)
@@ -888,7 +1036,7 @@ public class JsonUtils {
           node != null && !node.isNull() && node.isObject(),
           "Cannot parse distribution from invalid JSON: %s",
           node);
-      DistributionDTO.Builder builder = new DistributionDTO.Builder();
+      DistributionDTO.Builder builder = DistributionDTO.builder();
       if (node.has(STRATEGY)) {
         String strategy = getString(STRATEGY, node);
         builder.withStrategy(Strategy.getByName(strategy));
@@ -899,4 +1047,210 @@ public class JsonUtils {
       return builder.withArgs(args.toArray(FunctionArg.EMPTY_ARGS)).build();
     }
   }
+
+  /** Custom JSON serializer for Column default value. */
+  public static class ColumnDefaultValueSerializer extends JsonSerializer<Expression> {
+    @Override
+    public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      if (value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+        return;
+      }
+      writeFunctionArg((FunctionArg) value, gen);
+    }
+
+    @Override
+    public boolean isEmpty(SerializerProvider provider, Expression value) {
+      return value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET);
+    }
+  }
+
+  /** Custom JSON deserializer for Column default value. */
+  public static class ColumnDefaultValueDeserializer extends JsonDeserializer<Expression> {
+    @Override
+    public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return Column.DEFAULT_VALUE_NOT_SET;
+      }
+      return readFunctionArg(node);
+    }
+  }
+
+  /** Custom JSON serializer for PartitionDTO objects. */
+  public static class PartitionDTOSerializer extends JsonSerializer<PartitionDTO> {
+    @Override
+    public void serialize(PartitionDTO value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeStringField(PARTITION_TYPE, value.type().name().toLowerCase());
+      gen.writeStringField(PARTITION_NAME, value.name());
+      switch (value.type()) {
+        case IDENTITY:
+          IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) value;
+          gen.writeFieldName(FIELD_NAMES);
+          gen.writeObject(identityPartitionDTO.fieldNames());
+          gen.writeArrayFieldStart(IDENTITY_PARTITION_VALUES);
+          for (LiteralDTO literal : identityPartitionDTO.values()) {
+            writeFunctionArg(literal, gen);
+          }
+          gen.writeEndArray();
+          break;
+        case LIST:
+          ListPartitionDTO listPartitionDTO = (ListPartitionDTO) value;
+          gen.writeArrayFieldStart(LIST_PARTITION_LISTS);
+          for (LiteralDTO[] literals : listPartitionDTO.lists()) {
+            gen.writeStartArray();
+            for (LiteralDTO literal : literals) {
+              writeFunctionArg(literal, gen);
+            }
+            gen.writeEndArray();
+          }
+          gen.writeEndArray();
+          break;
+        case RANGE:
+          RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) value;
+          gen.writeFieldName(RANGE_PARTITION_UPPER);
+          writeFunctionArg(rangePartitionDTO.upper(), gen);
+          gen.writeFieldName(RANGE_PARTITION_LOWER);
+          writeFunctionArg(rangePartitionDTO.lower(), gen);
+          break;
+        default:
+          throw new IOException("Unknown partition type: " + value.type());
+      }
+      gen.writeObjectField(PARTITION_PROPERTIES, value.properties());
+      gen.writeEndObject();
+    }
+  }
+
+  /** Custom JSON deserializer for PartitionDTO objects. */
+  public static class PartitionDTODeserializer extends JsonDeserializer<PartitionDTO> {
+    @Override
+    public PartitionDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Partition must be a valid JSON object, but found: %s",
+          node);
+      Preconditions.checkArgument(
+          node.has(PARTITION_TYPE), "Partition must have a type field, but found: %s", node);
+      String type = getString(PARTITION_TYPE, node);
+      switch (PartitionDTO.Type.valueOf(type.toUpperCase())) {
+        case IDENTITY:
+          Preconditions.checkArgument(
+              node.has(FIELD_NAMES) && node.get(FIELD_NAMES).isArray(),
+              "Identity partition must have array of fieldNames, but found: %s",
+              node);
+          Preconditions.checkArgument(
+              node.has(IDENTITY_PARTITION_VALUES) && node.get(IDENTITY_PARTITION_VALUES).isArray(),
+              "Identity partition must have array of values, but found: %s",
+              node);
+
+          List<String[]> fieldNames = Lists.newArrayList();
+          node.get(FIELD_NAMES).forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
+          List<LiteralDTO> values = Lists.newArrayList();
+          node.get(IDENTITY_PARTITION_VALUES)
+              .forEach(value -> values.add((LiteralDTO) readFunctionArg(value)));
+          return IdentityPartitionDTO.builder()
+              .withName(getStringOrNull(PARTITION_NAME, node))
+              .withFieldNames(fieldNames.toArray(new String[0][0]))
+              .withValues(values.toArray(new LiteralDTO[0]))
+              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+              .build();
+
+        case LIST:
+          Preconditions.checkArgument(
+              node.has(PARTITION_NAME), "List partition must have name, but found: %s", node);
+          Preconditions.checkArgument(
+              node.has(LIST_PARTITION_LISTS) && node.get(LIST_PARTITION_LISTS).isArray(),
+              "List partition must have array of lists, but found: %s",
+              node);
+
+          List<LiteralDTO[]> lists = Lists.newArrayList();
+          node.get(LIST_PARTITION_LISTS)
+              .forEach(
+                  list -> {
+                    List<LiteralDTO> literals = Lists.newArrayList();
+                    list.forEach(literal -> literals.add((LiteralDTO) readFunctionArg(literal)));
+                    lists.add(literals.toArray(new LiteralDTO[0]));
+                  });
+
+          return ListPartitionDTO.builder()
+              .withName(getStringOrNull(PARTITION_NAME, node))
+              .withLists(lists.toArray(new LiteralDTO[0][0]))
+              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+              .build();
+
+        case RANGE:
+          Preconditions.checkArgument(
+              node.has(PARTITION_NAME), "Range partition must have name, but found: %s", node);
+          Preconditions.checkArgument(
+              node.has(RANGE_PARTITION_UPPER),
+              "Range partition must have upper, but found: %s",
+              node);
+          Preconditions.checkArgument(
+              node.has(RANGE_PARTITION_LOWER),
+              "Range partition must have lower, but found: %s",
+              node);
+
+          LiteralDTO upper = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_UPPER));
+          LiteralDTO lower = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_LOWER));
+          return RangePartitionDTO.builder()
+              .withName(getStringOrNull(PARTITION_NAME, node))
+              .withUpper(upper)
+              .withLower(lower)
+              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+              .build();
+
+        default:
+          throw new IOException("Unknown partition type: " + type);
+      }
+    }
+  }
+
+  /** Custom JSON serializer for Index objects. */
+  public static class IndexSerializer extends JsonSerializer<Index> {
+    @Override
+    public void serialize(Index value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeStringField(INDEX_TYPE, value.type().name().toUpperCase(Locale.ROOT));
+      if (null != value.name()) {
+        gen.writeStringField(INDEX_NAME, value.name());
+      }
+      gen.writeFieldName(INDEX_FIELD_NAMES);
+      gen.writeObject(value.fieldNames());
+      gen.writeEndObject();
+    }
+  }
+
+  /** Custom JSON deserializer for Index objects. */
+  public static class IndexDeserializer extends JsonDeserializer<Index> {
+    @Override
+    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Index must be a valid JSON object, but found: %s",
+          node);
+
+      IndexDTO.Builder builder = IndexDTO.builder();
+      Preconditions.checkArgument(
+          node.has(INDEX_TYPE), "Cannot parse index from missing type: %s", node);
+      String indexType = getString(INDEX_TYPE, node);
+      builder.withIndexType(Index.IndexType.valueOf(indexType.toUpperCase(Locale.ROOT)));
+      if (node.has(INDEX_NAME)) {
+        builder.withName(getString(INDEX_NAME, node));
+      }
+      Preconditions.checkArgument(
+          node.has(INDEX_FIELD_NAMES), "Cannot parse index from missing field names: %s", node);
+      List<String[]> fieldNames = Lists.newArrayList();
+      node.get(INDEX_FIELD_NAMES)
+          .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
+      builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      return builder.build();
+    }
+  }
+
+  private JsonUtils() {}
 }

@@ -43,7 +43,7 @@ class AuditInfoSerDe implements ProtoSerDe<com.datastrato.gravitino.meta.AuditIn
   @Override
   public com.datastrato.gravitino.meta.AuditInfo deserialize(AuditInfo p) {
     com.datastrato.gravitino.meta.AuditInfo.Builder builder =
-        new com.datastrato.gravitino.meta.AuditInfo.Builder();
+        com.datastrato.gravitino.meta.AuditInfo.builder();
 
     if (p.hasCreator()) builder.withCreator(p.getCreator());
     if (p.hasCreateTime()) builder.withCreateTime(ProtoUtils.toInstant(p.getCreateTime()));

@@ -44,6 +44,8 @@ public class CatalogInjector {
   private CreateCatalogHandle createHandle;
   private String trinoVersion;
 
+  private ConcurrentHashMap<String, Object> internalCatalogs = new ConcurrentHashMap<>();
+
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
 
@@ -159,6 +161,7 @@ public class CatalogInjector {
             // Call catalogFactory.createCatalog() return CatalogConnector
             Object catalogConnector =
                 createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+            internalCatalogs.put(catalogName, catalogConnector);
 
             // The catalogConnector hierarchy:
             // --catalogConnector (CatalogConnector)
@@ -167,6 +170,7 @@ public class CatalogInjector {
 
             // Get a connector object from trino CatalogConnector.
             Object catalogConnectorObject = getFiledObject(catalogConnector, "catalogConnector");
+
             return getFiledObject(catalogConnectorObject, "connector");
           };
 
@@ -205,7 +209,16 @@ public class CatalogInjector {
       // The catalogManager is an instance of StaticCatalogManager
       ConcurrentHashMap catalogs = (ConcurrentHashMap) getFiledObject(catalogManager, "catalogs");
       Preconditions.checkNotNull(catalogs, "catalogs should not be null");
-      removeHandle = (catalogName) -> catalogs.remove(catalogName);
+      removeHandle =
+          (catalogName) -> {
+            Object catalogConnector = catalogs.remove(catalogName);
+            if (catalogConnector != null) {
+              Method shutdown = catalogConnector.getClass().getDeclaredMethod("shutdown");
+              shutdown.invoke(catalogConnector);
+              Object internalCatalogConnector = internalCatalogs.get(catalogName);
+              shutdown.invoke(internalCatalogConnector);
+            }
+          };
     }
   }
 
@@ -302,10 +315,12 @@ public class CatalogInjector {
     try {
       ObjectMapper objectMapper = new ObjectMapper();
       connectorProperties = objectMapper.writeValueAsString(properties);
-      LOG.debug(
-          "Create internal catalog connector {}. The config:{} .",
-          connectorName,
-          connectorProperties);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Create internal catalog connector {}. The config:{} .",
+            connectorName,
+            connectorProperties);
+      }
 
       Object catalogConnector = createHandle.invoke(connectorName, connectorProperties);
 

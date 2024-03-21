@@ -26,6 +26,15 @@ public interface NameMappingService extends AutoCloseable {
   Long getIdByName(String name) throws IOException;
 
   /**
+   * Get name by id in the mapping service.
+   *
+   * @param id the id of the name
+   * @return the name of the id, or null if the id does not exist
+   * @throws IOException
+   */
+  String getNameById(long id) throws IOException;
+
+  /**
    * Get id from name. If the name does not exist, we will create a new id for the name and bind the
    * mapping between them
    *

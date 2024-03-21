@@ -4,12 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.google.common.collect.Lists;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -19,7 +15,7 @@ import org.apache.iceberg.types.Types;
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SparkTypeToType.java
  */
 public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
-  private final IcebergTable root;
+  private final com.datastrato.gravitino.rel.types.Types.StructType root;
   private int nextId = 0;
   private boolean nullable;
 
@@ -28,42 +24,49 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     this.nullable = nullable;
   }
 
-  public ToIcebergType(IcebergTable root) {
+  public ToIcebergType(com.datastrato.gravitino.rel.types.Types.StructType root) {
     this.root = root;
     // the root struct's fields use the first ids
-    this.nextId = root.columns().length;
+    this.nextId = root.fields().length;
   }
 
   private int getNextId() {
     return nextId++;
   }
 
+  @SuppressWarnings("ReferenceEquality")
   @Override
-  public Type struct(IcebergTable struct, List<Type> types) {
-    List<IcebergColumn> fields =
-        Arrays.stream(struct.columns())
-            .map(column -> (IcebergColumn) column)
-            .collect(Collectors.toList());
-    List<Types.NestedField> newFields = Lists.newArrayListWithExpectedSize(fields.size());
+  public Type struct(com.datastrato.gravitino.rel.types.Types.StructType struct, List<Type> types) {
+    com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields = struct.fields();
+    List<Types.NestedField> newFields = Lists.newArrayListWithExpectedSize(fields.length);
+    // Comparing the root node by reference equality.
     boolean isRoot = root == struct;
-
-    for (int i = 0; i < fields.size(); i += 1) {
-      IcebergColumn field = fields.get(i);
+    for (int i = 0; i < fields.length; i += 1) {
+      com.datastrato.gravitino.rel.types.Types.StructType.Field field = fields[i];
       Type type = types.get(i);
 
-      // for new conversions, use ordinals for ids in the root struct
-      int id = isRoot ? i : getNextId();
-      if (field.nullable()) {
-        newFields.add(Types.NestedField.optional(id, field.name(), type, field.comment()));
+      int id;
+      if (isRoot) {
+        // for new conversions, use ordinals for ids in the root struct
+        id = i;
       } else {
-        newFields.add(Types.NestedField.required(id, field.name(), type, field.comment()));
+        id = getNextId();
+      }
+
+      String doc = field.comment();
+
+      if (field.nullable()) {
+        newFields.add(Types.NestedField.optional(id, field.name(), type, doc));
+      } else {
+        newFields.add(Types.NestedField.required(id, field.name(), type, doc));
       }
     }
     return Types.StructType.of(newFields);
   }
 
   @Override
-  public Type field(IcebergColumn field, Type typeResult) {
+  public Type field(
+      com.datastrato.gravitino.rel.types.Types.StructType.Field field, Type typeResult) {
     return typeResult;
   }
 

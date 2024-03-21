@@ -6,11 +6,12 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.TrinoException;
@@ -28,6 +29,10 @@ public class GravitinoTable {
   private final String comment;
   private final Map<String, String> properties;
 
+  private SortOrder[] sortOrders = new SortOrder[0];
+  private Transform[] partitioning = new Transform[0];
+  private Distribution distribution = Distributions.NONE;
+
   @JsonCreator
   public GravitinoTable(String schemaName, String tableName, Table tableMetadata) {
     this.schemaName = schemaName;
@@ -40,6 +45,10 @@ public class GravitinoTable {
     this.columns = tableColumns.build();
     this.comment = tableMetadata.comment();
     properties = tableMetadata.properties();
+
+    sortOrders = tableMetadata.sortOrder();
+    partitioning = tableMetadata.partitioning();
+    distribution = tableMetadata.distribution();
   }
 
   public GravitinoTable(
@@ -80,16 +89,18 @@ public class GravitinoTable {
     return columns;
   }
 
-  public ColumnDTO[] getColumnDTOs() {
-    ColumnDTO[] gravitinoColumns = new ColumnDTO[columns.size()];
+  public Column[] getRawColumns() {
+    Column[] gravitinoColumns = new Column[columns.size()];
     for (int i = 0; i < columns.size(); i++) {
+      GravitinoColumn column = columns.get(i);
       gravitinoColumns[i] =
-          ColumnDTO.builder()
-              .withName(columns.get(i).getName())
-              .withDataType(columns.get(i).getType())
-              .withComment(columns.get(i).getComment())
-              .withNullable(columns.get(i).isNullable())
-              .build();
+          Column.of(
+              column.getName(),
+              column.getType(),
+              column.getComment(),
+              column.isNullable(),
+              column.isAutoIncrement(),
+              null);
     }
     return gravitinoColumns;
   }
@@ -116,13 +127,27 @@ public class GravitinoTable {
     return comment;
   }
 
-  public TableDTO getTableDTO() {
-    return TableDTO.builder()
-        .withName(tableName)
-        .withComment(comment)
-        .withColumns(getColumnDTOs())
-        .withProperties(properties)
-        .withAudit(new AuditDTO.Builder().build())
-        .build();
+  public void setSortOrders(SortOrder[] sortOrders) {
+    this.sortOrders = sortOrders;
+  }
+
+  public void setPartitioning(Transform[] partitioning) {
+    this.partitioning = partitioning;
+  }
+
+  public void setDistribution(Distribution distribution) {
+    this.distribution = distribution;
+  }
+
+  public SortOrder[] getSortOrders() {
+    return sortOrders;
+  }
+
+  public Transform[] getPartitioning() {
+    return partitioning;
+  }
+
+  public Distribution getDistribution() {
+    return distribution;
   }
 }

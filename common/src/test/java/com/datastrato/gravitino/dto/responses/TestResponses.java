@@ -17,7 +17,7 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.types.Types;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -62,7 +62,7 @@ public class TestResponses {
     entityList.validate(); // No exception thrown
     NameIdentifier[] identsB = entityList.identifiers();
     assertEquals(1, identsB.length);
-    assertEquals(identsB[0].name(), "TableA");
+    assertEquals("TableA", identsB[0].name());
   }
 
   @Test
@@ -74,8 +74,8 @@ public class TestResponses {
   @Test
   void testMetalakeResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeResponse response = new MetalakeResponse(metalake);
     response.validate(); // No exception thrown
   }
@@ -89,8 +89,8 @@ public class TestResponses {
   @Test
   void testMetalakeListResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeListResponse response = new MetalakeListResponse(new MetalakeDTO[] {metalake});
     response.validate(); // No exception thrown
   }
@@ -104,9 +104,9 @@ public class TestResponses {
   @Test
   void testCatalogResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("CatalogA")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
@@ -126,9 +126,9 @@ public class TestResponses {
   @Test
   void testSchemaResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     SchemaDTO schema =
-        new SchemaDTO.Builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
+        SchemaDTO.builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
     SchemaResponse schemaResponse = new SchemaResponse(schema);
     schemaResponse.validate(); // No exception thrown
   }
@@ -142,11 +142,11 @@ public class TestResponses {
   @Test
   void testTableResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     ColumnDTO column =
-        new ColumnDTO.Builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
+        ColumnDTO.builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
     TableDTO table =
-        new TableDTO.Builder()
+        TableDTO.builder()
             .withName("TableA")
             .withComment("comment")
             .withColumns(new ColumnDTO[] {column})

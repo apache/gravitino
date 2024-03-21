@@ -6,23 +6,30 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.storage.kv.KvNameMappingService.GENERAL_NAME_MAPPING_PREFIX;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity.EntityType;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,9 +42,12 @@ public final class KvGarbageCollector implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KvGarbageCollector.class);
   private final KvBackend kvBackend;
   private final Config config;
+  private final EntityKeyEncoder<byte[]> entityKeyEncoder;
 
   private static final long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L; // 30 days
   private static final long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L; // 10 minutes
+
+  private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -50,9 +60,11 @@ public final class KvGarbageCollector implements Closeable {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
-  public KvGarbageCollector(KvBackend kvBackend, Config config) {
+  public KvGarbageCollector(
+      KvBackend kvBackend, Config config, EntityKeyEncoder<byte[]> entityKeyEncoder) {
     this.kvBackend = kvBackend;
     this.config = config;
+    this.entityKeyEncoder = entityKeyEncoder;
 
     long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
     if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
@@ -70,8 +82,7 @@ public final class KvGarbageCollector implements Closeable {
     long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
-    // 100
-    // minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
+    // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
     long frequency = Math.max(dateTimeLineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
@@ -93,7 +104,7 @@ public final class KvGarbageCollector implements Closeable {
   private void collectAndRemoveUncommittedData() throws IOException {
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(new byte[] {0x20}) // below 0x20 is control character
                 .end(new byte[] {0x7F}) // above 0x7F is control character
                 .startInclusive(true)
@@ -109,7 +120,14 @@ public final class KvGarbageCollector implements Closeable {
     LOG.info("Start to remove {} uncommitted data", kvs.size());
     for (Pair<byte[], byte[]> pair : kvs) {
       // Remove is a high-risk operation, So we log every delete operation
-      LOG.info("Remove uncommitted data: Key {}", Bytes.wrap(pair.getKey()));
+      LogHelper logHelper = decodeKey(pair.getKey());
+      LOG.info(
+          "Physically delete key that has marked uncommitted: name identity: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+          logHelper.identifier,
+          logHelper.type,
+          logHelper.createTimeAsString,
+          logHelper.createTimeInMs,
+          pair.getKey());
       kvBackend.delete(pair.getKey());
     }
   }
@@ -128,7 +146,7 @@ public final class KvGarbageCollector implements Closeable {
     // TODO(yuqi), Use multi-thread to scan the data in case of the data is too large.
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
+            new KvRange.KvRangeBuilder()
                 .start(startKey)
                 .end(endKey)
                 .startInclusive(true)
@@ -157,7 +175,14 @@ public final class KvGarbageCollector implements Closeable {
 
         // Value has deleted mark, we can remove it.
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
-          LOG.info("Physically delete key that has marked deleted: {}", Bytes.wrap(key));
+          LogHelper logHelper = decodeKey(key, transactionId);
+          LOG.info(
+              "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+              logHelper.identifier,
+              logHelper.type,
+              logHelper.createTimeAsString,
+              logHelper.createTimeInMs,
+              Bytes.wrap(key));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
           continue;
@@ -168,7 +193,7 @@ public final class KvGarbageCollector implements Closeable {
         // directly.
         List<Pair<byte[], byte[]>> newVersionOfKey =
             kvBackend.scan(
-                new KvRangeScan.KvRangeScanBuilder()
+                new KvRange.KvRangeBuilder()
                     .start(key)
                     .end(generateKey(key, transactionId))
                     .startInclusive(false)
@@ -177,10 +202,20 @@ public final class KvGarbageCollector implements Closeable {
                     .build());
         if (!newVersionOfKey.isEmpty()) {
           // Has a newer version, we can remove it.
+          LogHelper logHelper = decodeKey(key, transactionId);
+          byte[] newVersionKey = newVersionOfKey.get(0).getKey();
+          LogHelper newVersionLogHelper = decodeKey(newVersionKey);
           LOG.info(
-              "Physically delete key that has newer version: {}, a newer version {}",
+              "Physically delete key that has newer version: name identifier: '{}', entity type: '{}', createTime: '{}({})', newVersion createTime: '{}({})',"
+                  + " key: '{}', newVersion key: '{}'",
+              logHelper.identifier,
+              logHelper.type,
+              logHelper.createTimeAsString,
+              logHelper.createTimeInMs,
+              newVersionLogHelper.createTimeAsString,
+              newVersionLogHelper.createTimeInMs,
               Bytes.wrap(rawKey),
-              Bytes.wrap(newVersionOfKey.get(0).getKey()));
+              Bytes.wrap(newVersionKey));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -188,9 +223,69 @@ public final class KvGarbageCollector implements Closeable {
 
       // All keys in this transaction have been deleted, we can remove the commit mark.
       if (keysDeletedCount == keysInTheTransaction.size()) {
+        long timestamp = TransactionalKvBackendImpl.getTransactionId(transactionId) >> 18;
+        LOG.info(
+            "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
+            Bytes.wrap(kv.getKey()),
+            DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT),
+            timestamp,
+            Bytes.wrap(kv.getKey()));
         kvBackend.delete(kv.getKey());
       }
     }
+  }
+
+  static class LogHelper {
+
+    @VisibleForTesting final NameIdentifier identifier;
+    @VisibleForTesting final EntityType type;
+    @VisibleForTesting final long createTimeInMs;
+    // Formatted createTime
+    @VisibleForTesting final String createTimeAsString;
+
+    public static final LogHelper NONE = new LogHelper(null, null, 0L, null);
+
+    public LogHelper(
+        NameIdentifier identifier,
+        EntityType type,
+        long createTimeInMs,
+        String createTimeAsString) {
+      this.identifier = identifier;
+      this.type = type;
+      this.createTimeInMs = createTimeInMs;
+      this.createTimeAsString = createTimeAsString;
+    }
+  }
+
+  @VisibleForTesting
+  LogHelper decodeKey(byte[] key, byte[] timestampArray) {
+    if (entityKeyEncoder == null) {
+      return LogHelper.NONE;
+    }
+
+    // Name mapping data, we do not support it now.
+    if (Arrays.equals(GENERAL_NAME_MAPPING_PREFIX, ArrayUtils.subarray(key, 0, 3))) {
+      return LogHelper.NONE;
+    }
+
+    Pair<NameIdentifier, EntityType> entityTypePair;
+    try {
+      entityTypePair = entityKeyEncoder.decode(key);
+    } catch (Exception e) {
+      LOG.warn("Unable to decode key: {}", Bytes.wrap(key), e);
+      return LogHelper.NONE;
+    }
+    long timestamp = TransactionalKvBackendImpl.getTransactionId(timestampArray) >> 18;
+    String ts = DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT);
+
+    return new LogHelper(entityTypePair.getKey(), entityTypePair.getValue(), timestamp, ts);
+  }
+
+  @VisibleForTesting
+  LogHelper decodeKey(byte[] rawKey) {
+    byte[] key = TransactionalKvBackendImpl.getRealKey(rawKey);
+    byte[] timestampArray = TransactionalKvBackendImpl.getBinaryTransactionId(rawKey);
+    return decodeKey(key, timestampArray);
   }
 
   @Override
@@ -199,6 +294,7 @@ public final class KvGarbageCollector implements Closeable {
     try {
       garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       LOG.error("Failed to close garbage collector", e);
     }
   }

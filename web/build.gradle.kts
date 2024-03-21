@@ -3,35 +3,35 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import com.github.gradle.node.yarn.task.YarnTask
+import com.github.gradle.node.pnpm.task.PnpmTask
 
 plugins {
   id("war")
 }
 
-tasks.withType(YarnTask::class) {
+tasks.withType(PnpmTask::class) {
   workingDir.set(file("${project.projectDir}"))
 }
 
 tasks {
   // Install dependencies
-  val yarnInstall by registering(YarnTask::class) {
+  val installDeps by registering(PnpmTask::class) {
     args = listOf("install")
   }
 
   // Check for lint errors
-  val lintCheck by registering(YarnTask::class) {
-    dependsOn(yarnInstall)
+  val lintCheck by registering(PnpmTask::class) {
+    dependsOn(installDeps)
     args = listOf("lint")
   }
 
   // Check for prettier errors
-  val prettierCheck by registering(YarnTask::class) {
-    dependsOn(yarnInstall)
+  val prettierCheck by registering(PnpmTask::class) {
+    dependsOn(installDeps)
     args = listOf("prettier:check")
   }
 
-  val webpack by registering(YarnTask::class) {
+  val webpack by registering(PnpmTask::class) {
     dependsOn(lintCheck, prettierCheck)
     args = listOf("dist")
     environment.put("NODE_ENV", "production")

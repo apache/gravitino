@@ -29,9 +29,10 @@ replay_pid*
 **/build
 gen
 **/.DS_Store
-*.iml
+**/*.iml
 out/**
 *.iws
+*.ipr
 
 distribution
 server/src/main/resources/project.properties
@@ -45,3 +46,7 @@ include web/.gitignore
 
 # node env
 .node
+
+# integration test
+integration-test/metastore_db
+catalogs/catalog-lakehouse-iceberg/spark-warehouse

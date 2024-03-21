@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Support trino Memory connector for testing. Transforming Memory connector configuration and
@@ -20,6 +21,7 @@ import java.util.Map;
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final AtomicInteger VERSION = new AtomicInteger(0);
   private final HasPropertyMeta propertyMetadata;
 
   public MemoryConnectorAdapter() {
@@ -29,7 +31,9 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle",
+        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
     config.put("connectorName", "memory");
 
     Map<String, Object> properties = new HashMap<>();

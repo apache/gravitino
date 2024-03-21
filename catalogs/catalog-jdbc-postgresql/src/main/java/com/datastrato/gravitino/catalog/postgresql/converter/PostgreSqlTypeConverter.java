@@ -7,91 +7,102 @@ package com.datastrato.gravitino.catalog.postgresql.converter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
-import java.util.List;
-import net.sf.jsqlparser.statement.create.table.ColDataType;
 
-public class PostgreSqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
+public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
+
+  static final String BOOL = "bool";
+  static final String INT_2 = "int2";
+  static final String INT_4 = "int4";
+  static final String INT_8 = "int8";
+  static final String FLOAT_4 = "float4";
+  static final String FLOAT_8 = "float8";
+
+  static final String TIMESTAMP_TZ = "timestamptz";
+  static final String NUMERIC = "numeric";
+  static final String BPCHAR = "bpchar";
+  static final String BYTEA = "bytea";
+
   @Override
-  public Type toGravitinoType(ColDataType type) {
-    List<String> arguments = type.getArgumentsStringList();
+  public Type toGravitinoType(JdbcTypeBean typeBean) {
     // TODO #947 Complex types are not considered for support in this issue, which will bring more
     // testing needs
-    switch (type.getDataType().toLowerCase()) {
-      case "boolean":
+    switch (typeBean.getTypeName().toLowerCase()) {
+      case BOOL:
         return Types.BooleanType.get();
-      case "smallint":
+      case INT_2:
         return Types.ShortType.get();
-      case "integer":
+      case INT_4:
         return Types.IntegerType.get();
-      case "bigint":
+      case INT_8:
         return Types.LongType.get();
-      case "real":
+      case FLOAT_4:
         return Types.FloatType.get();
-      case "double precision":
+      case FLOAT_8:
         return Types.DoubleType.get();
-      case "date":
+      case DATE:
         return Types.DateType.get();
-      case "time without time zone":
+      case TIME:
         return Types.TimeType.get();
-      case "timestamp without time zone":
+      case TIMESTAMP:
         return Types.TimestampType.withoutTimeZone();
-      case "timestamp with time zone":
+      case TIMESTAMP_TZ:
         return Types.TimestampType.withTimeZone();
-      case "numeric":
+      case NUMERIC:
         return Types.DecimalType.of(
-            Integer.parseInt(arguments.get(0)), Integer.parseInt(arguments.get(1)));
-      case "character varying":
-        return Types.VarCharType.of(Integer.parseInt(arguments.get(0)));
-      case "char":
-      case "character":
-        return Types.FixedCharType.of(Integer.parseInt(arguments.get(0)));
-      case "text":
+            Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
+      case VARCHAR:
+        return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+      case BPCHAR:
+        return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
+      case TEXT:
         return Types.StringType.get();
-      case "bytea":
+      case BYTEA:
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + type);
+        return Types.UnparsedType.of(typeBean.getTypeName());
     }
   }
 
   @Override
   public String fromGravitinoType(Type type) {
     if (type instanceof Types.BooleanType) {
-      return "boolean";
+      return BOOL;
     } else if (type instanceof Types.ShortType) {
-      return "smallint";
+      return INT_2;
     } else if (type instanceof Types.IntegerType) {
-      return "integer";
+      return INT_4;
     } else if (type instanceof Types.LongType) {
-      return "bigint";
+      return INT_8;
     } else if (type instanceof Types.FloatType) {
-      return "real";
+      return FLOAT_4;
     } else if (type instanceof Types.DoubleType) {
-      return "double precision";
+      return FLOAT_8;
     } else if (type instanceof Types.StringType) {
-      return "text";
+      return TEXT;
     } else if (type instanceof Types.DateType) {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
-      return "time without time zone";
+      return type.simpleString();
     } else if (type instanceof Types.TimestampType && !((Types.TimestampType) type).hasTimeZone()) {
-      return "timestamp without time zone";
+      return TIMESTAMP;
     } else if (type instanceof Types.TimestampType && ((Types.TimestampType) type).hasTimeZone()) {
-      return "timestamp with time zone";
+      return TIMESTAMP_TZ;
     } else if (type instanceof Types.DecimalType) {
-      return "numeric("
+      return NUMERIC
+          + "("
           + ((Types.DecimalType) type).precision()
           + ","
           + ((Types.DecimalType) type).scale()
           + ")";
     } else if (type instanceof Types.VarCharType) {
-      return "character varying(" + ((Types.VarCharType) type).length() + ")";
+      return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";
     } else if (type instanceof Types.FixedCharType) {
-      return type.simpleString();
+      return BPCHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.BinaryType) {
-      return "bytea";
+      return BYTEA;
     }
     throw new IllegalArgumentException(
-        String.format("Couldn't convert PostgreSQL type %s to Gravitino type", type.toString()));
+        String.format(
+            "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
   }
 }

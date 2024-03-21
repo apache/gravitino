@@ -19,12 +19,19 @@
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/expressions/Expression.java
 package com.datastrato.gravitino.rel.expressions;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 /** Base class of the public logical expression API. */
+@Evolving
 public interface Expression {
+
+  /**
+   * `EMPTY_EXPRESSION` is only used as an input when the default `children` method builds the
+   * result.
+   */
   Expression[] EMPTY_EXPRESSION = new Expression[0];
 
   /**

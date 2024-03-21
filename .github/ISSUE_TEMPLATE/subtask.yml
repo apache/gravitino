@@ -1,7 +1,7 @@
 name: Subtask
 title: "[Subtask] "
 description: A subtask issue
-labels: [ "kind:subtask" ]
+labels: [ "subtask" ]
 body:
 
   - type: textarea

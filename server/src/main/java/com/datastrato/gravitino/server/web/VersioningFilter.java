@@ -67,7 +67,10 @@ public class VersioningFilter implements Filter {
   private static final Pattern ACCEPT_VERSION_REGEX =
       Pattern.compile("application/vnd\\.gravitino\\.v(\\d+)\\+json");
   private static final String ACCEPT_VERSION_HEADER = "Accept";
-  private static final String ACCEPT_VERSION = "application/vnd.gravitino.v%d+json";
+
+  private static String getAcceptVersion(int version) {
+    return String.format("application/vnd.gravitino.v%d+json", version);
+  }
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {}
@@ -76,7 +79,7 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Enumeration<String> acceptHeader = req.getHeaders("Accept");
+    Enumeration<String> acceptHeader = req.getHeaders(ACCEPT_VERSION_HEADER);
     while (acceptHeader.hasMoreElements()) {
       String value = acceptHeader.nextElement();
 
@@ -101,8 +104,7 @@ public class VersioningFilter implements Filter {
     // If no version accept header not is set, then we need to set the latest version.
     MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
     ApiVersion latest = ApiVersion.latestVersion();
-    mutableRequest.putHeader(
-        ACCEPT_VERSION_HEADER, String.format(ACCEPT_VERSION, latest.version()));
+    mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(latest.version()));
 
     chain.doFilter(mutableRequest, response);
   }

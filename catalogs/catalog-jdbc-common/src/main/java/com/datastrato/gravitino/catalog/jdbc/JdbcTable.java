@@ -4,8 +4,10 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.google.common.collect.Maps;
+import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -16,9 +18,16 @@ public class JdbcTable extends BaseTable {
 
   private JdbcTable() {}
 
+  @Override
+  protected TableOperations newOps() {
+    // TODO: Implement this method when we have the JDBC table operations.
+    throw new UnsupportedOperationException("JdbcTable does not support TableOperations.");
+  }
+
   /** A builder class for constructing JdbcTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, JdbcTable> {
-
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
     /**
      * Internal method to build a JdbcTable instance using the provided values.
      *
@@ -34,7 +43,25 @@ public class JdbcTable extends BaseTable {
       jdbcTable.columns = columns;
       jdbcTable.partitioning = partitioning;
       jdbcTable.sortOrders = sortOrders;
+      jdbcTable.indexes = indexes;
       return jdbcTable;
     }
+
+    public String comment() {
+      return comment;
+    }
+
+    public Map<String, String> properties() {
+      return properties;
+    }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

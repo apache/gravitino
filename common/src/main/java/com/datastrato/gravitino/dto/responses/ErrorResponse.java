@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/** Represents an error response. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 public class ErrorResponse extends BaseResponse {
@@ -43,6 +44,7 @@ public class ErrorResponse extends BaseResponse {
     this.stack = null;
   }
 
+  /** Validates the error response. */
   @Override
   public void validate() {
     super.validate();
@@ -73,15 +75,34 @@ public class ErrorResponse extends BaseResponse {
     return sb.toString();
   }
 
+  /**
+   * Creates a new rest error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse restError(String message) {
     return new ErrorResponse(
         ErrorConstants.REST_ERROR_CODE, RESTException.class.getSimpleName(), message, null);
   }
 
+  /**
+   * Create a new illegal arguments error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse illegalArguments(String message) {
     return illegalArguments(message, null);
   }
 
+  /**
+   * Create a new illegal arguments error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
   public static ErrorResponse illegalArguments(String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
@@ -90,19 +111,47 @@ public class ErrorResponse extends BaseResponse {
         getStackTrace(throwable));
   }
 
+  /**
+   * Create a new not found error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse notFound(String type, String message) {
     return notFound(type, message, null);
   }
 
+  /**
+   * Create a new not found error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
   public static ErrorResponse notFound(String type, String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.NOT_FOUND_CODE, type, message, getStackTrace(throwable));
   }
 
+  /**
+   * Create a new internal error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse internalError(String message) {
     return internalError(message, null);
   }
 
+  /**
+   * Create a new internal error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
   public static ErrorResponse internalError(String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.INTERNAL_ERROR_CODE,
@@ -111,31 +160,100 @@ public class ErrorResponse extends BaseResponse {
         getStackTrace(throwable));
   }
 
+  /**
+   * Create a new already exists error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse alreadyExists(String type, String message) {
     return alreadyExists(type, message, null);
   }
 
+  /**
+   * Create a new already exists error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
   public static ErrorResponse alreadyExists(String type, String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.ALREADY_EXISTS_CODE, type, message, getStackTrace(throwable));
   }
 
+  /**
+   * Create a new non empty error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse nonEmpty(String type, String message) {
     return nonEmpty(type, message, null);
   }
 
+  /**
+   * Create a new non empty error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
   public static ErrorResponse nonEmpty(String type, String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.NON_EMPTY_CODE, type, message, getStackTrace(throwable));
   }
 
+  /**
+   * Create a new unknown error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse unknownError(String message) {
     return new ErrorResponse(
         ErrorConstants.UNKNOWN_ERROR_CODE, RuntimeException.class.getSimpleName(), message, null);
   }
 
+  /**
+   * Create a new unknown error instance of {@link ErrorResponse}.
+   *
+   * @param code The code of the error.
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @return The new instance.
+   */
   public static ErrorResponse oauthError(int code, String type, String message) {
     return new ErrorResponse(code, type, message, null);
+  }
+
+  /**
+   * Create a new unsupported operation error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unsupportedOperation(String message) {
+    return unsupportedOperation(message, null);
+  }
+
+  /**
+   * Create a new unsupported operation error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unsupportedOperation(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE,
+        UnsupportedOperationException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
   }
 
   private static List<String> getStackTrace(Throwable throwable) {

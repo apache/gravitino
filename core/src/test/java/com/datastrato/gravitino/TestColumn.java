@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import com.datastrato.gravitino.connector.BaseColumn;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
@@ -15,6 +15,8 @@ public class TestColumn extends BaseColumn {
   private TestColumn() {}
 
   public static class Builder extends BaseColumn.BaseColumnBuilder<Builder, TestColumn> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected TestColumn internalBuild() {
@@ -24,8 +26,18 @@ public class TestColumn extends BaseColumn {
       column.comment = comment;
       column.dataType = dataType;
       column.nullable = nullable;
+      column.defaultValue = defaultValue;
 
       return column;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

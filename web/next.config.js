@@ -39,9 +39,10 @@ const nextConfig = {
         }
       }),
   output: process.env.OUTPUT_MODE || 'standalone',
-  distDir: 'dist',
+  basePath: process.env.BASE_PATH,
+  distDir: process.env.DIST_DIR,
   trailingSlash: false,
-  reactStrictMode: false
+  reactStrictMode: true
 }
 
 module.exports = withBundleAnalyzer(nextConfig)

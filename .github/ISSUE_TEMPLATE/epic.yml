@@ -1,7 +1,7 @@
 name: Epic
 title: "[EPIC] "
 description: An epic issue with multiple sub-tasks
-labels: [ "kind:epic,priority:major" ]
+labels: [ "epic" ]
 body:
 
   - type: textarea

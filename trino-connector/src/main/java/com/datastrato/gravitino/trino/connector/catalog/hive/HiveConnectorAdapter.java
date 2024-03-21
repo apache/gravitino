@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.collect.Maps;
 import io.trino.spi.session.PropertyMetadata;
@@ -15,13 +15,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(HiveConnectorAdapter.class);
+  private static final AtomicInteger VERSION = new AtomicInteger(0);
+
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
@@ -30,15 +30,20 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new HiveCatalogPropertyConverter();
   }
 
+  @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, Object> config = new HashMap<>();
-    config.put("catalogHandle", catalog.getName() + ":normal:default");
+    config.put(
+        "catalogHandle",
+        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
     config.put("connectorName", "hive");
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getProperties());
+    properties.put("hive.security", "allow-all");
+    Map<String, String> trinoProperty =
+        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
 
     // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
     // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace
@@ -66,6 +71,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     return propertyMetadata.getSchemaPropertyMetadata();
   }
 
+  @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new HiveMetadataAdapter(

@@ -23,14 +23,28 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
   public static final Field NAME = Field.required("name", String.class, "The schema's name");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "The comment or description of the schema");
+  public static final Field PROPERTIES =
+      Field.optional("properties", Map.class, "The properties of the schema");
 
   private Long id;
 
   private String name;
 
+  private String comment;
+
   private AuditInfo auditInfo;
 
   protected Namespace namespace;
+
+  private Map<String, String> properties;
+
+  private SchemaEntity() {}
+
+  public static Builder builder() {
+    return new Builder();
+  }
 
   /**
    * Returns an unmodifiable map of the fields and their corresponding values for this schema.
@@ -43,6 +57,8 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
+    fields.put(COMMENT, comment);
+    fields.put(PROPERTIES, properties);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -88,6 +104,26 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
+   * Returns the comment of the schema. The returned string can be null if it is not stored in the
+   * Gravitino storage.
+   *
+   * @return The comment of the schema.
+   */
+  public String comment() {
+    return comment;
+  }
+
+  /**
+   * Return the properties of the schema. The returned map can be null if it is not stored in the
+   * Gravitino storage.
+   *
+   * @return The properties of the schema.
+   */
+  public Map<String, String> properties() {
+    return properties;
+  }
+
+  /**
    * Returns the type of the entity, which is {@link EntityType#SCHEMA}.
    *
    * @return The type of the entity.
@@ -103,18 +139,20 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof SchemaEntity)) {
       return false;
     }
     SchemaEntity schema = (SchemaEntity) o;
     return Objects.equal(id, schema.id)
         && Objects.equal(name, schema.name)
+        && Objects.equal(comment, schema.comment)
+        && Objects.equal(properties, schema.properties)
         && Objects.equal(auditInfo, schema.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, name, auditInfo);
+    return Objects.hashCode(id, name, auditInfo, comment, properties);
   }
 
   /** A builder class for {@link SchemaEntity}. */
@@ -122,7 +160,7 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
 
     private final SchemaEntity schema;
 
-    public Builder() {
+    private Builder() {
       this.schema = new SchemaEntity();
     }
 
@@ -160,6 +198,28 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
+     * Sets the comment of the schema.
+     *
+     * @param comment The comment of the schema.
+     * @return The builder instance.
+     */
+    public Builder withComment(String comment) {
+      schema.comment = comment;
+      return this;
+    }
+
+    /**
+     * Sets the properties of the schema.
+     *
+     * @param properties The properties of the schema.
+     * @return The builder instance.
+     */
+    public Builder withProperties(Map<String, String> properties) {
+      schema.properties = properties;
+      return this;
+    }
+
+    /**
      * Sets the audit details of the schema.
      *
      * @param auditInfo The audit details of the schema.
@@ -178,6 +238,15 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     public SchemaEntity build() {
       schema.validate();
       return schema;
+    }
+
+    /**
+     * Creates a new instance of {@link Builder}.
+     *
+     * @return The new instance.
+     */
+    public static Builder builder() {
+      return new Builder();
     }
   }
 }

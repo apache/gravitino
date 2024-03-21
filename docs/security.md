@@ -51,17 +51,50 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+### Kerberos mode
+
+Gravitino supports Kerberos mode.
+
+For the server side, users should set `gravitino.authenticator` as `kerberos` and give
+`gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value.
+
+For the client side, users can enable `kerberos` mode by the following code:
+
+```java
+// Use keytab to create KerberosTokenProvider
+KerberosTokenProvider provider = KerberosTokenProvider.builder()
+        .withClientPrincipal(clientPrincipal)
+        .withKeyTabFile(new File(keytabFile))
+        .build();
+
+// Use ticketCache to create KerberosTokenProvider
+KerberosTokenProvider provider = KerberosTokenProvider.builder()
+        .withClientPrincipal(clientPrincipal)
+        .build();        
+
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withKerberosAuth(provider)
+    .build();
+```
+
+:::info
+Now Iceberg REST service doesn't support Kerberos authentication.
+The URI must use the hostname of server instead of IP.
+:::
+
 ### Server configuration
 
-| Configuration item                                | Description                                                                 | Default value     | Required                                | Since version |
-|---------------------------------------------------|-----------------------------------------------------------------------------|-------------------|-----------------------------------------|---------------|
-| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`.     | `simple`          | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator.           | `GravitinoServer` | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator. | `0`               | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator.      | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.     | `RS256`           | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.serverUri`         | The URI of the default OAuth server.                                        | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
-| `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server.                             | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
+| Configuration item                                | Description                                                                                         | Default value     | Required                                   | Since version |
+|---------------------------------------------------|-----------------------------------------------------------------------------------------------------|-------------------|--------------------------------------------|---------------|
+| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple`,`oauth` or `kerberos`.                  | `simple`          | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator.                                   | `GravitinoServer` | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator.                         | `0`               | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator.                              | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.                             | `RS256`           | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.serverUri`         | The URI of the default OAuth server.                                                                | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server.                                                     | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.kerberos.principal`      | Indicates the Kerberos principal to be used for HTTP endpoint. Principal should start with `HTTP/`. | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0         |
+| `gravitino.authenticator.kerberos.keytab`         | Location of the keytab file with the credentials for the principal.                                 | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0         |
 
 The signature algorithms that Gravitino supports follows:
 
@@ -113,11 +146,11 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
-gravitino.authenticator oauth
-gravitino.authenticator.oauth.serviceAudience test
-gravitino.authenticator.oauth.defaultSignKey <the default signing key>
-gravitino.authenticator.oauth.tokenPath /oauth2/token
-gravitino.authenticator.oauth.serverUri http://localhost:8177
+gravitino.authenticator = oauth
+gravitino.authenticator.oauth.serviceAudience = test
+gravitino.authenticator.oauth.defaultSignKey = <the default signing key>
+gravitino.authenticator.oauth.tokenPath = /oauth2/token
+gravitino.authenticator.oauth.serverUri = http://localhost:8177
 ```
 
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test`, and scope `test`.
@@ -170,7 +203,7 @@ Both the Gravitino server and Iceberg REST service can configure HTTPS.
 | Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
 |------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
 | `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | No                                                | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `9433`        | No                                                | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | No                                                | 0.3.0         |
@@ -225,11 +258,11 @@ Configuration doesn't support resolving environment variables, so you should rep
 Then, You can start the Gravitino server.
 
 ```text
-gravitino.server.webserver.host localhost
-gravitino.server.webserver.enableHttps true
-gravitino.server.webserver.keyStorePath ${JAVA_HOME}/localhost.jks
-gravitino.server.webserver.keyStorePassword localhost
-gravitino.server.webserver.managerPassword localhost
+gravitino.server.webserver.host = localhost
+gravitino.server.webserver.enableHttps = true
+gravitino.server.webserver.keyStorePath = ${JAVA_HOME}/localhost.jks
+gravitino.server.webserver.keyStorePassword = localhost
+gravitino.server.webserver.managerPassword = localhost
 ```
 
 6. Request the Gravitino server

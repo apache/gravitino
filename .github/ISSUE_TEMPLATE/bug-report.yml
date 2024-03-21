@@ -1,8 +1,22 @@
 name: Bug Report
 title: "[Bug report] "
 description: A bug report issue
-labels: [ "kind:bug" ]
+labels: [ "bug" ]
 body:
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What version of Gravitino are you running?
+      options:
+        - main branch
+        - 0.3.1
+        - 0.3.0
+        - 0.2.0
+      default: 0
+    validations:
+      required: true
 
   - type: textarea
     attributes:

@@ -25,7 +25,7 @@ public class TestEntityProtoSerDe {
     String modifier = "modifier";
 
     com.datastrato.gravitino.meta.AuditInfo auditInfo =
-        new com.datastrato.gravitino.meta.AuditInfo.Builder()
+        com.datastrato.gravitino.meta.AuditInfo.builder()
             .withCreator(creator)
             .withCreateTime(now)
             .withLastModifier(modifier)
@@ -41,7 +41,7 @@ public class TestEntityProtoSerDe {
 
     // Test with optional fields
     com.datastrato.gravitino.meta.AuditInfo auditInfo1 =
-        new com.datastrato.gravitino.meta.AuditInfo.Builder()
+        com.datastrato.gravitino.meta.AuditInfo.builder()
             .withCreator(creator)
             .withCreateTime(now)
             .build();
@@ -54,7 +54,7 @@ public class TestEntityProtoSerDe {
 
     // Test with empty field
     com.datastrato.gravitino.meta.AuditInfo auditInfo2 =
-        new com.datastrato.gravitino.meta.AuditInfo.Builder().build();
+        com.datastrato.gravitino.meta.AuditInfo.builder().build();
 
     byte[] bytes1 = protoEntitySerDe.serialize(auditInfo2);
     com.datastrato.gravitino.meta.AuditInfo auditInfoFromBytes1 =
@@ -72,14 +72,14 @@ public class TestEntityProtoSerDe {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
     com.datastrato.gravitino.meta.AuditInfo auditInfo =
-        new com.datastrato.gravitino.meta.AuditInfo.Builder()
+        com.datastrato.gravitino.meta.AuditInfo.builder()
             .withCreator(creator)
             .withCreateTime(now)
             .build();
 
     // Test Metalake
     com.datastrato.gravitino.meta.BaseMetalake metalake =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withProperties(props)
@@ -97,7 +97,7 @@ public class TestEntityProtoSerDe {
 
     // Test metalake without props map
     com.datastrato.gravitino.meta.BaseMetalake metalake1 =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withAuditInfo(auditInfo)
@@ -117,7 +117,7 @@ public class TestEntityProtoSerDe {
     String provider = "test";
 
     com.datastrato.gravitino.meta.CatalogEntity catalogEntity =
-        new com.datastrato.gravitino.meta.CatalogEntity.Builder()
+        com.datastrato.gravitino.meta.CatalogEntity.builder()
             .withId(catalogId)
             .withName(catalogName)
             .withComment(comment)
@@ -132,11 +132,27 @@ public class TestEntityProtoSerDe {
             catalogBytes, com.datastrato.gravitino.meta.CatalogEntity.class);
     Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
 
+    // Test Fileset catalog
+    com.datastrato.gravitino.meta.CatalogEntity filesetCatalogEntity =
+        com.datastrato.gravitino.meta.CatalogEntity.builder()
+            .withId(catalogId)
+            .withName(catalogName)
+            .withComment(comment)
+            .withType(com.datastrato.gravitino.Catalog.Type.FILESET)
+            .withProvider(provider)
+            .withAuditInfo(auditInfo)
+            .build();
+    byte[] filesetCatalogBytes = protoEntitySerDe.serialize(filesetCatalogEntity);
+    com.datastrato.gravitino.meta.CatalogEntity filesetCatalogEntityFromBytes =
+        protoEntitySerDe.deserialize(
+            filesetCatalogBytes, com.datastrato.gravitino.meta.CatalogEntity.class);
+    Assertions.assertEquals(filesetCatalogEntity, filesetCatalogEntityFromBytes);
+
     // Test SchemaEntity
     Long schemaId = 1L;
     String schemaName = "schema";
     com.datastrato.gravitino.meta.SchemaEntity schemaEntity =
-        new com.datastrato.gravitino.meta.SchemaEntity.Builder()
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -147,11 +163,28 @@ public class TestEntityProtoSerDe {
         protoEntitySerDe.deserialize(schemaBytes, com.datastrato.gravitino.meta.SchemaEntity.class);
     Assertions.assertEquals(schemaEntity, schemaEntityFromBytes);
 
+    // Test SchemaEntity with additional fields
+    com.datastrato.gravitino.meta.SchemaEntity schemaEntity1 =
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
+            .withId(schemaId)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .withComment(comment)
+            .withProperties(props)
+            .build();
+    byte[] schemaBytes1 = protoEntitySerDe.serialize(schemaEntity1);
+    com.datastrato.gravitino.meta.SchemaEntity schemaEntityFromBytes1 =
+        protoEntitySerDe.deserialize(
+            schemaBytes1, com.datastrato.gravitino.meta.SchemaEntity.class);
+    Assertions.assertEquals(schemaEntity1, schemaEntityFromBytes1);
+    Assertions.assertEquals(comment, schemaEntityFromBytes1.comment());
+    Assertions.assertEquals(props, schemaEntityFromBytes1.properties());
+
     // Test TableEntity
     Long tableId = 1L;
     String tableName = "table";
     com.datastrato.gravitino.meta.TableEntity tableEntity =
-        new com.datastrato.gravitino.meta.TableEntity.Builder()
+        com.datastrato.gravitino.meta.TableEntity.builder()
             .withId(tableId)
             .withName(tableName)
             .withAuditInfo(auditInfo)
@@ -161,5 +194,85 @@ public class TestEntityProtoSerDe {
     com.datastrato.gravitino.meta.TableEntity tableEntityFromBytes =
         protoEntitySerDe.deserialize(tableBytes, com.datastrato.gravitino.meta.TableEntity.class);
     Assertions.assertEquals(tableEntity, tableEntityFromBytes);
+
+    // Test FileEntity
+    Long fileId = 1L;
+    String fileName = "file";
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity =
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withStorageLocation("testLocation")
+            .withProperties(props)
+            .withComment(comment)
+            .build();
+    byte[] fileBytes = protoEntitySerDe.serialize(fileEntity);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes =
+        protoEntitySerDe.deserialize(fileBytes, com.datastrato.gravitino.meta.FilesetEntity.class);
+    Assertions.assertEquals(fileEntity, fileEntityFromBytes);
+
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity1 =
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withStorageLocation("testLocation")
+            .build();
+    byte[] fileBytes1 = protoEntitySerDe.serialize(fileEntity1);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes1 =
+        protoEntitySerDe.deserialize(fileBytes1, com.datastrato.gravitino.meta.FilesetEntity.class);
+    Assertions.assertEquals(fileEntity1, fileEntityFromBytes1);
+    Assertions.assertNull(fileEntityFromBytes1.comment());
+    Assertions.assertNull(fileEntityFromBytes1.properties());
+
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity2 =
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.EXTERNAL)
+            .withProperties(props)
+            .withComment(comment)
+            .withStorageLocation("testLocation")
+            .build();
+    byte[] fileBytes2 = protoEntitySerDe.serialize(fileEntity2);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes2 =
+        protoEntitySerDe.deserialize(fileBytes2, com.datastrato.gravitino.meta.FilesetEntity.class);
+    Assertions.assertEquals(fileEntity2, fileEntityFromBytes2);
+    Assertions.assertEquals("testLocation", fileEntityFromBytes2.storageLocation());
+    Assertions.assertEquals(
+        com.datastrato.gravitino.file.Fileset.Type.EXTERNAL, fileEntityFromBytes2.filesetType());
+
+    // Test TopicEntity
+    Long topicId = 1L;
+    String topicName = "topic";
+    com.datastrato.gravitino.meta.TopicEntity topicEntity =
+        com.datastrato.gravitino.meta.TopicEntity.builder()
+            .withId(topicId)
+            .withName(topicName)
+            .withAuditInfo(auditInfo)
+            .withComment(comment)
+            .withProperties(props)
+            .build();
+    byte[] topicBytes = protoEntitySerDe.serialize(topicEntity);
+    com.datastrato.gravitino.meta.TopicEntity topicEntityFromBytes =
+        protoEntitySerDe.deserialize(topicBytes, com.datastrato.gravitino.meta.TopicEntity.class);
+    Assertions.assertEquals(topicEntity, topicEntityFromBytes);
+
+    com.datastrato.gravitino.meta.TopicEntity topicEntity1 =
+        com.datastrato.gravitino.meta.TopicEntity.builder()
+            .withId(topicId)
+            .withName(topicName)
+            .withAuditInfo(auditInfo)
+            .build();
+    byte[] topicBytes1 = protoEntitySerDe.serialize(topicEntity1);
+    com.datastrato.gravitino.meta.TopicEntity topicEntityFromBytes1 =
+        protoEntitySerDe.deserialize(topicBytes1, com.datastrato.gravitino.meta.TopicEntity.class);
+    Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
+    Assertions.assertNull(topicEntityFromBytes1.comment());
+    Assertions.assertNull(topicEntityFromBytes1.properties());
   }
 }

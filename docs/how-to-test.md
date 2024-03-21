@@ -14,11 +14,11 @@ are end-to-end tests that cover the whole system.
   environment.
 * Please refer to [How to build Gravitino](./how-to-build.md) for more details to make sure you have
   a build environment ready.
-* [OrbStack](https://orbstack.dev/) is highly recommended to replace Docker Desktop for
-  macOS. OrbStack automatically configures the network between Docker containers.
-* If you insist on using Docker Desktop for macOS, please launch
-  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running tests,
-  you can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
+* [OrbStack](https://orbstack.dev/) can be used to replace Docker Desktop
+  on macOS. OrbStack automatically configures the network between the Docker containers.
+* If you are using Docker Desktop for macOS, please launch
+  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running the tests.
+  You can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
   `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh` for more details.
 :::
 
@@ -63,12 +63,15 @@ Deploy the Gravitino server locally to run the integration tests. Follow these s
    in the `distribution` directory.
 3. Use the `./gradlew test [--rerun-tasks] -PskipTests -PtestMode=deploy` command to run the
    integration tests in the `distribution` directory.
+4. Use the `bash integration-test/trino-test-tools/trino_test.sh` command to run all the
+   Trino test sets in the `integration-test/src/test/resources/trino-ci-testset/testsets` directory.
 
 ## Skip tests
 
 * You can skip unit tests by using the `./gradlew build -PskipTests` command.
-* You can skip integration tests by using the `./gradlew build -PskipITs` command.
-* You can skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
+* You can skip backend and web frontend integration tests by using the `./gradlew build -PskipITs` command.
+* You can only skip web frontend integration tests by using the `./gradlew build -PskipWebITs` command.
+* You can skip both unit tests and all integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
 ## Docker test environment
 

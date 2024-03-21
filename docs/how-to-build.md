@@ -9,27 +9,25 @@ This software is licensed under the Apache License version 2."
 
 + Linux or macOS operating system
 + Git
-+ A Java Development Kit version 8 to 17 installed in your environment to launch Gradle
-+ Optionally Docker to run integration tests
++ A Java Development Kit, version 8 to 17, installed in your environment to launch Gradle
++ Optionally, Docker to run integration tests
 
-:::info Please read the following notes first
+:::info Please read the following notes before trying to build Gravitino.
 
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
-  install JDK8 to 17 version to launch the build environment.
-+ Gravitino itself supports using JDK8, 11, and 17 to build, Gravitino Trino connector uses
-  JDK17 to build. You don't have to preinstall the specified JDK environment,
-+ Gradle detects the JDK version needed and downloads it automatically.
-+ Gravitino uses Gradle Java Toolchain to detect and manage JDK versions, it checks the
-  installed JDK by running `./gradlew javaToolchains` command. For the details of Gradle Java
-  Toolchain, please see [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
-+ Make sure you have installed Docker in your environment as Gravitino uses it to run integration tests; without it, some Docker-related tests may not run.
-+ macOS uses "docker-connector" to make the Gravitino Trino connector work with Docker
-  for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector)
-  , `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
+  install a JDK, versions 8 to 17, to launch the build environment.
++ Gravitino itself supports using JDK8, 11, and 17 to build. The Gravitino Trino connector uses
+  JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
+  You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
++ Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, it checks the
+  installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
++ Make sure you have installed Docker in your environment if you plan to run integration texts. Without it, some Docker-related tests may not run.
++ macOS uses `docker-connector` to make the Gravitino Trino connector work with Docker
+  for macOS. See [docker-connector](https://github.com/wenjunxiao/mac-docker-connector), `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
   `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
-+ Alternatively, you can use OrbStack to replace Docker for macOS, please see
-  [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
-  without needing to install "docker-connector".
++ You can use OrbStack as a replacement for Docker for macOS. See
+  [OrbStack](https://orbstack.dev/). With OrbStack you can run Gravitino integration tests
+  without needing to install `docker-connector`.
 :::
 
 ## Quick start
@@ -47,8 +45,8 @@ This software is licensed under the Apache License version 2."
     ./gradlew build
     ```
 
-    The default specified JDK version is 8, if you want to use JDK 11 or 17 to build, you can
-    modify the property `jdkVersion` to 11 or 17 in `gradle.properties` file, or you can specify
+    The default specified JDK version is 8, if you want to use JDK 11 or 17 to build,
+    modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version
     with `-P`, like:
 
     ```shell
@@ -66,7 +64,7 @@ The first time you build the project, downloading the dependencies may take a wh
 `-x test` to skip the tests, by using `./gradlew build -x test`.
 
 The built Gravitino libraries are Java 8 compatible, and verified under Java 8, 11, and 17
-environment. You can use Java 8, 11, 17 runtime to run the Gravitino server, no matter which
+environments. You can use Java 8, 11, 17 runtimes to run the Gravitino server, no matter which
 JDK version you use to build the project.
 :::
 
@@ -100,7 +98,7 @@ The `gravitino-{version}-bin.tar.gz` file is the Gravitino server distribution p
 server distribution package.
 :::
 
-5. Assemble Gravitino Trino connector package
+5. Assemble the Gravitino Trino connector package
 
    ```shell
     ./gradlew assembleTrinoConnector

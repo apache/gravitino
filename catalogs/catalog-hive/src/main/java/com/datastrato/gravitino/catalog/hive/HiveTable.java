@@ -14,15 +14,18 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_NAME;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
-import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
-import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
-import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -45,7 +48,6 @@ import java.util.stream.Stream;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -60,6 +62,8 @@ public class HiveTable extends BaseTable {
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
   private String schemaName;
+  private CachedClientPool clientPool;
+  private StorageDescriptor sd;
 
   private HiveTable() {}
 
@@ -67,12 +71,12 @@ public class HiveTable extends BaseTable {
    * Creates a new HiveTable instance from a Table and a Builder.
    *
    * @param table The inner Table representing the HiveTable.
-   * @return A new HiveTable instance.
+   * @return A new HiveTable instance Builder.
    */
-  public static HiveTable fromHiveTable(Table table) {
+  public static HiveTable.Builder fromHiveTable(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.
-    AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
+    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
     Optional.ofNullable(table.getOwner()).ifPresent(auditInfoBuilder::withCreator);
     if (table.isSetCreateTime()) {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
@@ -105,7 +109,7 @@ public class HiveTable extends BaseTable {
                 sd.getCols().stream()
                     .map(
                         f ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(f.getName())
                                 .withType(FromHiveType.convert(f.getType()))
                                 .withComment(f.getComment())
@@ -113,14 +117,14 @@ public class HiveTable extends BaseTable {
                 table.getPartitionKeys().stream()
                     .map(
                         p ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(p.getName())
                                 .withType(FromHiveType.convert(p.getType()))
                                 .withComment(p.getComment())
                                 .build()))
             .toArray(Column[]::new);
 
-    return new HiveTable.Builder()
+    return HiveTable.builder()
         .withName(table.getTableName())
         .withComment(table.getParameters().get(COMMENT))
         .withProperties(buildTableProperties(table))
@@ -133,7 +137,26 @@ public class HiveTable extends BaseTable {
                 .map(p -> identity(p.getName()))
                 .toArray(Transform[]::new))
         .withSchemaName(table.getDbName())
-        .build();
+        .withStorageDescriptor(table.getSd());
+  }
+
+  public CachedClientPool clientPool() {
+    return clientPool;
+  }
+
+  public void close() {
+    if (clientPool != null) {
+      // Note: Cannot close the client pool here because the client pool is shared by catalog
+      clientPool = null;
+    }
+  }
+
+  public String schemaName() {
+    return schemaName;
+  }
+
+  public StorageDescriptor storageDescriptor() {
+    return sd;
   }
 
   private static Map<String, String> buildTableProperties(Table table) {
@@ -183,7 +206,7 @@ public class HiveTable extends BaseTable {
 
   private Map<String, String> buildTableParameters() {
     Map<String, String> parameters = Maps.newHashMap(properties());
-    parameters.put(COMMENT, comment);
+    Optional.ofNullable(comment).ifPresent(c -> parameters.put(COMMENT, c));
     String ignore =
         EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))
             ? parameters.put(EXTERNAL, "TRUE")
@@ -200,7 +223,7 @@ public class HiveTable extends BaseTable {
     return parameters;
   }
 
-  private List<FieldSchema> buildPartitionKeys() {
+  public List<FieldSchema> buildPartitionKeys() {
     return Arrays.stream(partitioning)
         .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName()))
         .collect(Collectors.toList());
@@ -286,10 +309,22 @@ public class HiveTable extends BaseTable {
     return serDeInfo;
   }
 
+  @Override
+  protected TableOperations newOps() {
+    return new HiveTableOperations(this);
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return (SupportsPartitions) ops();
+  }
+
   /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
 
     private String schemaName;
+    private CachedClientPool clientPool;
+    private StorageDescriptor sd;
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -301,6 +336,31 @@ public class HiveTable extends BaseTable {
       this.schemaName = schemaName;
       return this;
     }
+
+    /**
+     * Sets the StorageDescriptor to be used for adding partition.
+     *
+     * @param sd The StorageDescriptor instance of the HiveTable.
+     * @return This Builder instance.
+     */
+    public Builder withStorageDescriptor(StorageDescriptor sd) {
+      this.sd = sd;
+      return this;
+    }
+
+    /**
+     * Sets the HiveClientPool to be used for operate partition.
+     *
+     * @param clientPool The HiveClientPool instance.
+     * @return This Builder instance.
+     */
+    public Builder withClientPool(CachedClientPool clientPool) {
+      this.clientPool = clientPool;
+      return this;
+    }
+
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     /**
      * Internal method to build a HiveTable instance using the provided values.
@@ -319,6 +379,9 @@ public class HiveTable extends BaseTable {
       hiveTable.sortOrders = sortOrders;
       hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
+      hiveTable.clientPool = clientPool;
+      hiveTable.sd = sd;
+      hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters
       if (comment != null) {
@@ -327,5 +390,14 @@ public class HiveTable extends BaseTable {
 
       return hiveTable;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

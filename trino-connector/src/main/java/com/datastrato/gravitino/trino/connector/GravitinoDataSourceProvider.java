@@ -12,7 +12,6 @@ import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
-import java.util.ArrayList;
 import java.util.List;
 
 /** This class provides a ConnectorPageSource for trino read data from internal connector. */
@@ -32,20 +31,23 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
       ConnectorTableHandle table,
       List<ColumnHandle> columns,
       DynamicFilter dynamicFilter) {
+    if (!(table instanceof GravitinoTableHandle)) {
+      if (transaction instanceof GravitinoTransactionHandle) {
+        transaction = ((GravitinoTransactionHandle) transaction).getInternalTransactionHandle();
+      }
+      return internalPageSourceProvider.createPageSource(
+          transaction, session, split, table, columns, dynamicFilter);
+    }
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) table;
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transaction;
-    List<ColumnHandle> internalHandles = new ArrayList<>();
-    for (ColumnHandle column : columns) {
-      internalHandles.add(((GravitinoColumnHandle) column).getInternalColumnHandler());
-    }
     return internalPageSourceProvider.createPageSource(
         gravitinoTransactionHandle.getInternalTransactionHandle(),
         session,
         split,
         gravitinoTableHandle.getInternalTableHandle(),
-        internalHandles,
+        columns,
         dynamicFilter);
   }
 }

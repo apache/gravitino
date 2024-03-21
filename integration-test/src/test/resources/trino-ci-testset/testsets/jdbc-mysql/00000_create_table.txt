@@ -1,0 +1,56 @@
+CREATE SCHEMA
+
+"gt_db1"
+
+"CREATE SCHEMA ""test.gt_mysql"".gt_db1"
+
+<QUERY_FAILED> Schema 'test.gt_mysql.gt_db1' already exists
+
+CREATE SCHEMA
+
+CREATE SCHEMA
+
+"gt_db2"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+"tb01"
+
+<QUERY_FAILED> Table 'test.gt_mysql.gt_db1.tb01' already exists
+
+CREATE TABLE
+
+CREATE TABLE
+
+"tb02"
+
+DROP TABLE
+
+<BLANK_LINE>
+
+<QUERY_FAILED> Table 'test.gt_mysql.gt_db1.tb01' does not exist
+
+DROP TABLE
+
+DROP TABLE
+
+<BLANK_LINE>
+
+DROP SCHEMA
+
+<BLANK_LINE>
+
+DROP SCHEMA
+
+DROP SCHEMA
+
+<BLANK_LINE>

@@ -32,7 +32,7 @@ public class DataSourceUtils {
     try {
       return createDBCPDataSource(jdbcConfig);
     } catch (Exception exception) {
-      throw new GravitinoRuntimeException("Error creating datasource", exception);
+      throw new GravitinoRuntimeException(exception, "Error creating datasource");
     }
   }
 
@@ -65,11 +65,17 @@ public class DataSourceUtils {
   public static void closeDataSource(DataSource dataSource) {
     if (null != dataSource) {
       try {
-        assert dataSource instanceof BasicDataSource;
-        ((BasicDataSource) dataSource).close();
+        if (dataSource instanceof BasicDataSource) {
+          ((BasicDataSource) dataSource).close();
+        } else {
+          throw new UnsupportedOperationException(
+              "close operation can only be called in BasicDataSource.");
+        }
       } catch (SQLException ignore) {
         // no op
       }
     }
   }
+
+  private DataSourceUtils() {}
 }

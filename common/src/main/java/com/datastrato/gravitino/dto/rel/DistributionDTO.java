@@ -17,12 +17,23 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
+/** Data transfer object representing distribution information. */
 @JsonSerialize(using = JsonUtils.DistributionSerializer.class)
 @JsonDeserialize(using = JsonUtils.DistributionDeserializer.class)
 public class DistributionDTO implements Distribution {
 
+  /** A DistributionDTO instance that represents no distribution. */
   public static final DistributionDTO NONE =
-      new Builder().withStrategy(Strategy.HASH).withNumber(0).withArgs(EMPTY_ARGS).build();
+      builder().withStrategy(Strategy.NONE).withNumber(0).withArgs(EMPTY_ARGS).build();
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
 
   // Distribution strategy/method
   private final Strategy strategy;
@@ -38,51 +49,102 @@ public class DistributionDTO implements Distribution {
     this.strategy = strategy;
   }
 
+  /**
+   * Returns the arguments of the function.
+   *
+   * @return The arguments of the function.
+   */
   public FunctionArg[] args() {
     return args;
   }
 
+  /**
+   * Returns the strategy of the distribution.
+   *
+   * @return The strategy of the distribution.
+   */
   @Override
   public Strategy strategy() {
     return strategy;
   }
 
+  /**
+   * Returns the number of buckets.
+   *
+   * @return The number of buckets.
+   */
   @Override
   public int number() {
     return number;
   }
 
+  /**
+   * Returns the name of the distribution.
+   *
+   * @return The name of the distribution.
+   */
   @Override
   public Expression[] expressions() {
     return args;
   }
 
+  /**
+   * Validates the distribution.
+   *
+   * @param columns The columns to be validated.
+   * @throws IllegalArgumentException If the distribution is invalid.
+   */
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
     Arrays.stream(args).forEach(expression -> expression.validate(columns));
   }
 
+  /** Builder for {@link DistributionDTO}. */
   public static class Builder {
     private FunctionArg[] args;
     private int number = 0;
     private Strategy strategy;
 
-    public Builder() {}
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
+    /**
+     * Sets the arguments of the function.
+     *
+     * @param args The arguments of the function.
+     * @return The builder.
+     */
     public Builder withArgs(FunctionArg... args) {
       this.args = args;
       return this;
     }
 
+    /**
+     * Sets the number of buckets.
+     *
+     * @param bucketNum The number of buckets.
+     * @return The builder.
+     */
     public Builder withNumber(int bucketNum) {
       this.number = bucketNum;
       return this;
     }
 
+    /**
+     * Sets the strategy of the distribution.
+     *
+     * @param strategy The strategy of the distribution.
+     * @return The builder.
+     */
     public Builder withStrategy(Strategy strategy) {
       this.strategy = strategy;
       return this;
     }
 
+    /**
+     * Builds a new instance of {@link DistributionDTO}.
+     *
+     * @return The new instance.
+     */
     public DistributionDTO build() {
       strategy = strategy == null ? Strategy.HASH : strategy;
 
@@ -97,7 +159,7 @@ public class DistributionDTO implements Distribution {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof DistributionDTO)) {
       return false;
     }
 

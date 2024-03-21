@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata.LOCATION;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -35,10 +35,10 @@ public class HiveSchema extends BaseSchema {
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
     // time, last modifier and last modified time, we only get creator from Hive's database.
-    AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
+    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
     Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
 
-    return new HiveSchema.Builder()
+    return HiveSchema.builder()
         .withName(db.getName())
         .withComment(db.getDescription())
         .withProperties(properties)
@@ -98,6 +98,9 @@ public class HiveSchema extends BaseSchema {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Internal method to build a HiveSchema instance using the provided values.
      *
@@ -114,5 +117,13 @@ public class HiveSchema extends BaseSchema {
 
       return hiveSchema;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

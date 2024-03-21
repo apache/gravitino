@@ -36,9 +36,9 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   private final Object signal = new Object();
   private final boolean retryByDefault;
   private volatile int currentSize;
-  private boolean closed;
+  private volatile boolean closed;
 
-  public ClientPoolImpl(int poolSize, Class<? extends E> reconnectExc, boolean retryByDefault) {
+  protected ClientPoolImpl(int poolSize, Class<? extends E> reconnectExc, boolean retryByDefault) {
     this.poolSize = poolSize;
     this.reconnectExc = reconnectExc;
     this.clients = new ArrayDeque<>(poolSize);
@@ -89,6 +89,12 @@ public abstract class ClientPoolImpl<C, E extends Exception>
 
   @Override
   public void close() {
+    // To avoid closing it repeatedly, we add a judgment that if it has been closed,
+    // we do not need to close it anymore.
+    if (closed) {
+      return;
+    }
+
     this.closed = true;
     try {
       while (currentSize > 0) {

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import lombok.ToString;
 
 /** Represents a Jdbc Schema (Database) entity in the Jdbc schema. */
@@ -14,6 +14,8 @@ public class JdbcSchema extends BaseSchema {
   private JdbcSchema() {}
 
   public static class Builder extends BaseSchemaBuilder<Builder, JdbcSchema> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected JdbcSchema internalBuild() {
@@ -24,5 +26,14 @@ public class JdbcSchema extends BaseSchema {
       jdbcSchema.auditInfo = auditInfo;
       return jdbcSchema;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

@@ -16,6 +16,8 @@ import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
@@ -65,7 +67,11 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
-            NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
+            NameIdentifier[] idents =
+                TreeLockUtils.doWithTreeLock(
+                    NameIdentifier.of(metalake, catalog),
+                    LockType.WRITE,
+                    () -> dispatcher.listSchemas(schemaNS));
             return Utils.ok(new EntityListResponse(idents));
           });
     } catch (Exception e) {
@@ -88,7 +94,12 @@ public class SchemaOperations {
             request.validate();
             NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
             Schema schema =
-                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
+                TreeLockUtils.doWithTreeLock(
+                    ident,
+                    LockType.WRITE,
+                    () ->
+                        dispatcher.createSchema(
+                            ident, request.getComment(), request.getProperties()));
             return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
           });
 
@@ -112,7 +123,9 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-            Schema s = dispatcher.loadSchema(ident);
+            Schema s =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.READ, () -> dispatcher.loadSchema(ident));
             return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
           });
 
@@ -141,7 +154,9 @@ public class SchemaOperations {
                 request.getUpdates().stream()
                     .map(SchemaUpdateRequest::schemaChange)
                     .toArray(SchemaChange[]::new);
-            Schema s = dispatcher.alterSchema(ident, changes);
+            Schema s =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.WRITE, () -> dispatcher.alterSchema(ident, changes));
             return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
           });
 
@@ -165,7 +180,9 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-            boolean dropped = dispatcher.dropSchema(ident, cascade);
+            boolean dropped =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.WRITE, () -> dispatcher.dropSchema(ident, cascade));
             if (!dropped) {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }

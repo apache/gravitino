@@ -5,9 +5,12 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
+import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
@@ -25,7 +28,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("catalog-backend", "hive")
             .build();
     Map<String, String> hiveBackendConfig =
-        propertyConverter.toTrinoProperties(gravitinoIcebergConfig);
+        propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
     Assert.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "hive_metastore");
     Assert.assertEquals(hiveBackendConfig.get("hive.metastore.uri"), "1111");
@@ -33,7 +36,7 @@ public class TestIcebergCatalogPropertyConverter {
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("uri");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.toTrinoProperties(wrongMap))
+    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
         .isInstanceOf(TrinoException.class)
         .hasMessageContaining("Missing required property for Hive backend: [uri]");
   }
@@ -51,7 +54,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("other-key", "other")
             .build();
     Map<String, String> hiveBackendConfig =
-        propertyConverter.toTrinoProperties(gravitinoIcebergConfig);
+        propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
     // Test all properties are converted
     Assert.assertEquals(
@@ -67,8 +70,19 @@ public class TestIcebergCatalogPropertyConverter {
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("jdbc-driver");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.toTrinoProperties(wrongMap))
+    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
         .isInstanceOf(TrinoException.class)
         .hasMessageContaining("Missing required property for JDBC backend: [jdbc-driver]");
+  }
+
+  // To test whether we load jar `bundled-catalog` successfully.
+  @Test
+  public void testPropertyMetadata() {
+    Set<String> gravitinoHiveKeys =
+        Sets.newHashSet(IcebergTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
+    Set<String> actualGravitinoKeys =
+        Sets.newHashSet(new IcebergTablePropertiesMetadata().propertyEntries().keySet());
+
+    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 }

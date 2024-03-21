@@ -8,8 +8,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -146,6 +154,12 @@ public class TestJsonUtils {
             + "    ]\n"
             + "}";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+
+    type = Types.UnparsedType.of("user-defined");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n" + "    \"type\": \"unparsed\",\n" + "    \"unparsedType\": \"user-defined\"\n" + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
   }
 
   @Test
@@ -159,5 +173,257 @@ public class TestJsonUtils {
     JsonNode nodeNormal = objectMapper.readTree(jsonNormal);
     Long result = JsonUtils.getLong("property", nodeNormal);
     assertEquals(1L, result);
+  }
+
+  @Test
+  void testPartitionDTOSerde() throws JsonProcessingException {
+    String[] field1 = {"dt"};
+    String[] field2 = {"country"};
+    LiteralDTO literal1 =
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+    LiteralDTO literal2 =
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
+    PartitionDTO partition =
+        IdentityPartitionDTO.builder()
+            .withFieldNames(new String[][] {field1, field2})
+            .withValues(new LiteralDTO[] {literal1, literal2})
+            .build();
+    String jsonValue = JsonUtils.objectMapper().writeValueAsString(partition);
+
+    String expected =
+        "{\n"
+            + "  \"type\": \"identity\",\n"
+            + "  \"fieldNames\": [\n"
+            + "    [\n"
+            + "      \"dt\"\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      \"country\"\n"
+            + "    ]\n"
+            + "  ],\n"
+            + "  \"values\": [\n"
+            + "    {\n"
+            + "      \"type\": \"literal\",\n"
+            + "      \"dataType\": \"date\",\n"
+            + "      \"value\": \"2008-08-08\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"type\": \"literal\",\n"
+            + "      \"dataType\": \"string\",\n"
+            + "      \"value\": \"us\"\n"
+            + "    }\n"
+            + "  ]\n"
+            + "}";
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, IdentityPartitionDTO.class),
+        objectMapper.readValue(jsonValue, IdentityPartitionDTO.class));
+
+    partition =
+        RangePartitionDTO.builder()
+            .withName("p0")
+            .withUpper(
+                LiteralDTO.builder().withDataType(Types.NullType.get()).withValue("null").build())
+            .withLower(
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("6").build())
+            .build();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(partition);
+    expected =
+        "{\n"
+            + "  \"type\": \"range\",\n"
+            + "  \"name\": \"p0\",\n"
+            + "  \"upper\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"null\",\n"
+            + "    \"value\": \"null\"\n"
+            + "  },\n"
+            + "  \"lower\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"integer\",\n"
+            + "    \"value\": \"6\"\n"
+            + "  }\n"
+            + "}";
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, RangePartitionDTO.class),
+        objectMapper.readValue(jsonValue, RangePartitionDTO.class));
+
+    partition =
+        ListPartitionDTO.builder()
+            .withName("p202204_California")
+            .withLists(
+                new LiteralDTO[][] {
+                  {
+                    LiteralDTO.builder()
+                        .withDataType(Types.DateType.get())
+                        .withValue("2022-04-01")
+                        .build(),
+                    LiteralDTO.builder()
+                        .withDataType(Types.StringType.get())
+                        .withValue("Los Angeles")
+                        .build()
+                  },
+                  {
+                    LiteralDTO.builder()
+                        .withDataType(Types.DateType.get())
+                        .withValue("2022-04-01")
+                        .build(),
+                    LiteralDTO.builder()
+                        .withDataType(Types.StringType.get())
+                        .withValue("San Francisco")
+                        .build()
+                  }
+                })
+            .build();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(partition);
+    expected =
+        "{\n"
+            + "  \"type\": \"list\",\n"
+            + "  \"name\": \"p202204_California\",\n"
+            + "  \"lists\": [\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"Los Angeles\"\n"
+            + "      }\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"San Francisco\"\n"
+            + "      }\n"
+            + "    ]\n"
+            + "  ]\n"
+            + "}";
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, ListPartitionDTO.class),
+        objectMapper.readValue(jsonValue, ListPartitionDTO.class));
+  }
+
+  @Test
+  void testPartitionDTOSerdeException() {
+    String illegalJson1 =
+        "{\n"
+            + "  \"type\": \"identity\",\n"
+            + "  \"fieldNames\": [\n"
+            + "    [\n"
+            + "      \"dt\"\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      \"country\"\n"
+            + "    ]\n"
+            + "  ]\n"
+            + "}";
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson1, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Identity partition must have array of values"),
+        exception.getMessage());
+
+    String illegalJson2 =
+        "{\n"
+            + "  \"type\": \"list\",\n"
+            + "  \"lists\": [\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"Los Angeles\"\n"
+            + "      }\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"San Francisco\"\n"
+            + "      }\n"
+            + "    ]\n"
+            + "  ]\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson2, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("List partition must have name"), exception.getMessage());
+
+    String illegalJson3 =
+        "{\n"
+            + "  \"type\": \"range\",\n"
+            + "  \"upper\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"null\",\n"
+            + "    \"value\": \"null\"\n"
+            + "  },\n"
+            + "  \"lower\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"integer\",\n"
+            + "    \"value\": \"6\"\n"
+            + "  }\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson3, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Range partition must have name"), exception.getMessage());
+  }
+
+  @Test
+  void testIndexDTOSerde() throws JsonProcessingException {
+    Index idx1 =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.UNIQUE_KEY)
+            .withName("idx1")
+            .withFieldNames(new String[][] {{"col_1"}})
+            .build();
+
+    String jsonValue = JsonUtils.objectMapper().writeValueAsString(idx1);
+
+    String expected =
+        "{\"indexType\":\"UNIQUE_KEY\",\"name\":\"idx1\",\"fieldNames\":[[\"col_1\"]]}";
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, IndexDTO.class),
+        objectMapper.readValue(jsonValue, IndexDTO.class));
+
+    Index idx2 =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.PRIMARY_KEY)
+            .withName("idx2")
+            .withFieldNames(new String[][] {{"col_2"}, {"col_3"}})
+            .build();
+
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(idx2);
+
+    expected =
+        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"idx2\",\"fieldNames\":[[\"col_2\"],[\"col_3\"]]}";
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, IndexDTO.class),
+        objectMapper.readValue(jsonValue, IndexDTO.class));
   }
 }

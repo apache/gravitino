@@ -24,15 +24,15 @@ public abstract class TestBase {
 
   private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
 
-  private static ClientAndServer mockServer;
+  protected static ClientAndServer mockServer;
 
-  protected static GravitinoClient client;
+  protected static GravitinoAdminClient client;
 
   @BeforeAll
   public static void setUp() throws Exception {
     mockServer = ClientAndServer.startClientAndServer(0);
     int port = mockServer.getLocalPort();
-    client = GravitinoClient.builder("http://127.0.0.1:" + port).build();
+    client = GravitinoAdminClient.builder("http://127.0.0.1:" + port).build();
   }
 
   @AfterAll
@@ -76,5 +76,9 @@ public abstract class TestBase {
       Method method, String path, T reqBody, R respBody, int statusCode)
       throws JsonProcessingException {
     buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
+  }
+
+  protected static String withSlash(String path) {
+    return "/" + path;
   }
 }

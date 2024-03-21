@@ -1,0 +1,436 @@
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/table"
+
+    get:
+      tags:
+        - partition
+      summary: List partitions (names)
+      operationId: listPartitions
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns list of partition objects if {details} is true, else returns list of partition names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PartitionNameListResponse"
+                  - $ref: "#/components/schemas/PartitionListResponse"
+              examples:
+                PartitionNameListResponse:
+                  $ref: "#/components/examples/PartitionNameListResponse"
+                PartitionListResponse:
+                  $ref: "#/components/examples/PartitionListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - partition
+      summary: Add partitions
+      operationId: addPartitions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddPartitionsRequest"
+            examples:
+              HiveAddPartition:
+                $ref: "#/components/examples/HiveAddPartition"
+      responses:
+        "200":
+          $ref: "#/components/responses/PartitionListResponse"
+        "409":
+          description: Conflict - The target partition already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                PartitionAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/PartitionAlreadyExistsErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions/{partition}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/table"
+      - $ref: "#/components/parameters/partition"
+
+    get:
+      tags:
+        - partition
+      summary: Get partition by name
+      operationId: getPartition
+      description: Returns the specified partition
+      responses:
+        "200":
+          $ref: "#/components/responses/PartitionResponse"
+        "404":
+          description: Not Found - The specified partition does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchTableException:
+                  $ref: "./tables.yaml#/components/examples/NoSuchTableException"
+                NoSuchPartitionException:
+                  $ref: "#/components/examples/NoSuchPartitionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the partitions
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+    partition:
+      name: partition
+      in: path
+      description: The name of the partition
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    PartitionSpec:
+      oneOf:
+        - $ref: "#/components/schemas/IdentityPartition"
+        - $ref: "#/components/schemas/RangePartition"
+        - $ref: "#/components/schemas/ListPartition"
+      discriminator:
+        propertyName: type
+        mapping:
+          identity: "#/components/schemas/IdentityPartition"
+          range: "#/components/schemas/RangePartition"
+          list: "#/components/schemas/ListPartition"
+
+    AddPartitionsRequest:
+      type: object
+      required:
+        - partitions
+      properties:
+        partitions:
+          type: array
+          description: The partitions to add
+          items:
+            $ref: "#/components/schemas/PartitionSpec"
+
+    PartitionNameListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+          example: 0
+        names:
+          type: array
+          description: A list of partition names
+          items:
+            type: string
+
+    PartitionListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+          example: 0
+        partitions:
+          type: array
+          description: A list of partitions
+          items:
+            $ref: "#/components/schemas/PartitionSpec"
+
+
+    Properties:
+      type: object
+      description: The properties of the partition
+      nullable: true
+      default: {}
+      additionalProperties:
+        type: string
+
+    Name:
+      type: string
+      description: The name of the partition
+
+    ListValue:
+      type: array
+      description: The elements of lists partition
+      items:
+        $ref: "./expression.yaml#/components/schemas/Literal"
+
+    IdentityPartition:
+      type: object
+      required:
+        - type
+        - fieldNames
+        - values
+      properties:
+        type:
+          type: string
+          enum:
+            - "identity"
+        name:
+          $ref: "#/components/schemas/Name"
+        fieldNames:
+          $ref: "./tables.yaml#/components/schemas/FieldNames"
+        values:
+          type: array
+          description: The values of the partition, must be the same length and order as fieldNames
+          items:
+            $ref: "./expression.yaml#/components/schemas/Literal"
+        properties:
+            $ref: "#/components/schemas/Properties"
+
+    RangePartition:
+      type: object
+      required:
+        - type
+        - name
+        - upper
+        - lower
+      properties:
+        type:
+          type: string
+          enum:
+            - "range"
+        name:
+          $ref: "#/components/schemas/Name"
+        upper:
+          $ref: "./expression.yaml#/components/schemas/Literal"
+        lower:
+          $ref: "./expression.yaml#/components/schemas/Literal"
+        properties:
+            $ref: "#/components/schemas/Properties"
+
+    ListPartition:
+      type: object
+      required:
+        - type
+        - name
+        - lists
+      properties:
+        type:
+          type: string
+          enum:
+            - "list"
+        name:
+          $ref: "#/components/schemas/Name"
+        lists:
+          type: array
+          description: The values of the partition
+          items:
+            $ref: "#/components/schemas/ListValue"
+        properties:
+          $ref: "#/components/schemas/Properties"
+
+  responses:
+
+    PartitionListResponse:
+      description: Returns list of partition objects
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/PartitionListResponse"
+
+
+    PartitionResponse:
+      description: Returns include the partition object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              partition:
+                $ref: "#/components/schemas/PartitionSpec"
+          examples:
+            GetHivePartitionResponse:
+              $ref: "#/components/examples/HivePartitionResponse"
+
+  examples:
+    PartitionNameListResponse:
+      value: {
+        "code": 0,
+        "names": [
+          "p1",
+          "p2"
+        ]
+      }
+
+    PartitionListResponse:
+      value: {
+        "code": 0,
+        "partitions": [
+          {
+            "type": "identity",
+            "name": "p1",
+            "fieldNames": [
+              [
+                "col1"
+              ]
+            ],
+            "values": [
+              {
+                "type": "literal",
+                "dataType": "string",
+                "value": "v1"
+              }
+            ],
+            "properties": {}
+          },
+          {
+            "type": "identity",
+            "name": "p2",
+            "fieldNames": [
+              [
+                "col1"
+              ]
+            ],
+            "values": [
+              {
+                "type": "literal",
+                "dataType": "string",
+                "value": "v2"
+              }
+            ],
+            "properties": {}
+          }
+        ]
+      }
+
+    HiveAddPartition:
+      value: {
+        "partitions": [
+          {
+            "type": "identity",
+            "fieldNames": [
+              [
+                "hive_col_name2"
+              ],
+              [
+                "hive_col_name3"
+              ]
+            ],
+            "values": [
+              {
+                "type": "literal",
+                "dataType": "date",
+                "value": "2023-01-02"
+              },
+              {
+                "type": "literal",
+                "dataType": "string",
+                "value": "gravitino_it_test2"
+              }
+            ],
+            "properties": null
+          }
+        ]
+      }
+
+    HivePartitionResponse:
+      value: {
+        "code": 0,
+        "partition": {
+          "type": "identity",
+          "name": "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test",
+          "fieldNames": [
+            [
+              "hive_col_name2"
+            ],
+            [
+              "hive_col_name3"
+            ]
+          ],
+          "values": [
+            {
+              "type": "literal",
+              "dataType": "string",
+              "value": "2023-01-01"
+            },
+            {
+              "type": "literal",
+              "dataType": "string",
+              "value": "gravitino_it_test"
+            }
+          ],
+          "properties": {
+            "totalSize": "2",
+            "numRows": "0",
+            "rawDataSize": "0",
+            "COLUMN_STATS_ACCURATE": "{\"BASIC_STATS\":\"true\"}",
+            "numFiles": "1",
+            "transient_lastDdlTime": "1706950516"
+          }
+        }
+      }
+
+    PartitionAlreadyExistsErrorResponse:
+      value: {
+        "code": 1004,
+        "type": "PartitionAlreadyExistsException",
+        "message": "Failed to operate partition(s) operation [CREATE] of table [table1], reason [p1]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException: p1",
+          "..."
+        ]
+      }
+
+    NoSuchPartitionException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchPartitionException",
+        "message": "Failed to operate partition(s) operation [GET] of table [table1], reason [p3]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchPartitionException: p3",
+          "..."
+        ]
+      }
+

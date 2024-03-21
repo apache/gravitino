@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.rel.BaseColumn;
+import com.datastrato.gravitino.connector.BaseColumn;
 import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Hive Metastore catalog. */
@@ -15,6 +15,9 @@ public class HiveColumn extends BaseColumn {
 
   /** A builder class for constructing HiveColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, HiveColumn> {
+
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     /**
      * Internal method to build a HiveColumn instance using the provided values.
@@ -29,7 +32,17 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.comment = comment;
       hiveColumn.dataType = dataType;
       hiveColumn.nullable = nullable;
+      hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       return hiveColumn;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

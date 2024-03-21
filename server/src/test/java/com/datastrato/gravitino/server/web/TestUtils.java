@@ -119,4 +119,14 @@ public class TestUtils {
     assertEquals("RuntimeException", errorResponse.getType());
     assertEquals("New message", errorResponse.getMessage());
   }
+
+  @Test
+  public void testUnsupportedOperation() {
+    Response response = Utils.unsupportedOperation("Unsupported operation");
+    assertNotNull(response);
+    assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("Unsupported operation", errorResponse.getMessage());
+  }
 }

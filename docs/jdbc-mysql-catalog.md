@@ -9,18 +9,27 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage MySQL metadata.
+
+:::caution
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+:::
 
 ## Catalog
 
 ### Catalog capabilities
 
-- Supports metadata management of MySQL (5.6, 5.7, 8.0).
+- Gravitino catalog corresponds to the MySQL instance.
+- Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
-- Doesn't support table index operations.
-- Doesn't support setting certain column properties, such as default value and check constraints.
+- Supports table index.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
 
@@ -44,24 +53,24 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
 ### Schema capabilities
 
 - Gravitino schema corresponds to the MySQL database.
-- Supports create schema with comments.
-- Supports drop schema.
-- Doesn't support cascade drop database.
+- Supports creating schema, but does not support setting comment.
+- Supports dropping schema.
+- Doesn't support cascade dropping schema.
 
 ### Schema properties
 
-- Doesn't support any database property settings.
+- Doesn't support any schema property settings.
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -69,9 +78,9 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 - Gravitino table corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
-- Doesn't support setting certain column properties, such as default value and check constraints.
-- Doesn't support index definition.
-- Doesn't support table property settings.
+- Supports index.
+- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment)..
+- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 #### Table column types
 
@@ -94,15 +103,118 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 :::info
 MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
+
+#### Table column auto-increment
+
+:::note
+MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
+:::
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "integer",
+      "comment": "id column comment",
+      "nullable": false,
+      "autoIncrement": true
+    },
+    {
+      "name": "name",
+      "type": "varchar(500)",
+      "comment": "name column comment",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Column[] cols = new Column[] {
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, null),
+    Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
+};
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+}
+```
+
+</TabItem>
+</Tabs>
 
 ### Table properties
 
-- Doesn't support table properties.
+Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
+
+| Property Name           | Description                                                                                                                                                                             | Required  | Since version |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
+| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No        | 0.4.0         |
+| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No        | 0.4.0         |
+
+- Doesn't support remove table properties. You can only modify values, not delete properties.
+
+### Table indexes
+
+- Supports PRIMARY_KEY and UNIQUE_KEY.
+
+:::note
+The index name of the PRIMARY_KEY must be PRIMARY
+[Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
+:::
+
+<Tabs>
+<TabItem value="json" label="Json">
+
+```json
+{
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    },
+    {
+      "indexType": "unique_key",
+      "name": "id_name_uk",
+      "fieldNames": [["id"] ,["name"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+}
+```
+
+</TabItem>
+</Tabs>
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
@@ -116,6 +228,7 @@ Supports operations:
 - `UpdateColumnPosition`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `SetProperty`
 
 :::info
 You cannot submit the `RenameTable` operation at the same time as other operations.

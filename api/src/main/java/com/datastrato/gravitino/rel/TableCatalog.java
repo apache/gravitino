@@ -24,6 +24,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMP
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -31,12 +32,15 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import java.util.Map;
 
 /**
  * The TableCatalog interface defines the public API for managing tables in a schema. If the catalog
  * implementation supports tables, it must implement this interface.
  */
+@Evolving
 public interface TableCatalog {
 
   /**
@@ -197,7 +201,7 @@ public interface TableCatalog {
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
-  Table createTable(
+  default Table createTable(
       NameIdentifier ident,
       Column[] columns,
       String comment,
@@ -205,6 +209,42 @@ public interface TableCatalog {
       Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident,
+        columns,
+        comment,
+        properties,
+        partitions,
+        distribution,
+        sortOrders,
+        Indexes.EMPTY_INDEXES);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param distribution The distribution of the table
+   * @param sortOrders The sort orders of the table
+   * @param partitions The table partitioning.
+   * @param indexes The table indexes.
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**
@@ -223,7 +263,9 @@ public interface TableCatalog {
       throws NoSuchTableException, IllegalArgumentException;
 
   /**
-   * Drop a table from the catalog.
+   * Removes both the metadata and the directory associated with the table from the file system if
+   * the table is not an external table. In case of an external table, only the associated metadata
+   * is removed.
    *
    * @param ident A table identifier.
    * @return True if the table was dropped, false if the table did not exist.
@@ -231,7 +273,10 @@ public interface TableCatalog {
   boolean dropTable(NameIdentifier ident);
 
   /**
-   * Drop a table from the catalog and completely remove its data.
+   * Drop a table from the catalog and completely remove its data. Removes both the metadata and the
+   * directory associated with the table completely and skipping trash. If the table is an external
+   * table or the catalogs don't support purge table, {@link UnsupportedOperationException} is
+   * thrown.
    *
    * <p>If the catalog supports to purge a table, this method should be overridden. The default
    * implementation throws an {@link UnsupportedOperationException}.

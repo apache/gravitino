@@ -9,6 +9,9 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage Apache Iceberg metadata.
@@ -55,7 +58,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema 
 
@@ -69,11 +72,13 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table 
 
 ### Table capabilities
+
+- Doesn't support column default value.
 
 #### Table partitions
 
@@ -111,17 +116,86 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 ### Table distributions
 
-- Doesn't support `Distribution`, you should use `BucketPartition` instead.
+- Gravitino used by default `NoneDistribution`.
+
+<Tabs>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "strategy": "none",
+  "number": 0,
+  "expressions": []
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Distributions.NONE;
+```
+
+</TabItem>
+</Tabs>
+
+- Support `HashDistribution`, Hash distribute by partition key.
+
+<Tabs>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "strategy": "hash",
+  "number": 0,
+  "expressions": []
+}
+```
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Distributions.HASH;
+```
+
+</TabItem>
+</Tabs>
+
+- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
+
+<Tabs>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "strategy": "range",
+  "number": 0,
+  "expressions": []
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Distributions.RANGE;
+```
+
+</TabItem>
+</Tabs>
 
 :::info
-If you load Iceberg tables, the table distribution strategy is `hash` with num 0, which means no distribution.
+Iceberg automatically distributes the data according to the partition or table sort order. It is forbidden to specify distribution expressions.
+:::
+:::info
+Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 :::
 
 ### Table column types
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
+| `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
@@ -141,6 +215,7 @@ If you load Iceberg tables, the table distribution strategy is `hash` with num 0
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
 ### Table properties
@@ -149,19 +224,24 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/co
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item        | Description                                             |
-|---------------------------|---------------------------------------------------------|
-| `comment`                 | The table comment.                                      |
-| `creator`                 | The table creator.                                      |
-| `location`                | Iceberg location for table storage.                     |
-| `current-snapshot-id`     | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
-| `sort-order`              | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`       | The identifier fields for defining the table.           |
+| Configuration item              | Description                                             |
+|---------------------------------|---------------------------------------------------------|
+| `comment`                       | The table comment.                                      |
+| `creator`                       | The table creator.                                      |
+| `location`                      | Iceberg location for table storage.                     |
+| `current-snapshot-id`           | The snapshot represents the current state of the table. |
+| `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
+| `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
+| `identifier-fields`             | The identifier fields for defining the table.           |
+| `write.distribution-mode`       | Defines distribution of write data                      |
+
+### Table indexes
+
+- Doesn't support table indexes.
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
@@ -181,7 +261,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-Iceberg just supports updating primitive types.
 :::
 
 :::caution

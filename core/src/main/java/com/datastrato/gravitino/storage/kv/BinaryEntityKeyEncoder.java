@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
+import static com.datastrato.gravitino.Entity.EntityType.FILESET;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +69,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           METALAKE, new String[] {METALAKE.getShortName() + "/"},
           CATALOG, new String[] {CATALOG.getShortName() + "/", "/"},
           SCHEMA, new String[] {SCHEMA.getShortName() + "/", "/", "/"},
-          TABLE, new String[] {TABLE.getShortName() + "/", "/", "/", "/"});
+          TABLE, new String[] {TABLE.getShortName() + "/", "/", "/", "/"},
+          FILESET, new String[] {FILESET.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 
@@ -196,5 +199,40 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public byte[] encode(NameIdentifier ident, EntityType type, boolean nullIfMissing)
       throws IOException {
     return encodeEntity(ident, type, nullIfMissing);
+  }
+
+  /**
+   * Decodes a byte array into an entity object and corresponding entity type.
+   *
+   * @param key The byte array representing the encoded key.
+   * @return The decoded entity object and corresponding entity type.
+   * @throws IOException
+   */
+  @Override
+  public Pair<NameIdentifier, EntityType> decode(byte[] key) throws IOException {
+    String entityTypeString = new String(ArrayUtils.subarray(key, 0, 2), StandardCharsets.UTF_8);
+    EntityType entityType = EntityType.fromShortName(entityTypeString);
+
+    // If the entity type is a table, the key is encoded as:
+    // ta/{metalake_id}/{catalog_id}/{schema_id}/{table_id} and the length of the id is 8;
+    byte[] idArrays = ArrayUtils.subarray(key, 3, key.length);
+    long[] ids = new long[(idArrays.length + 1) / 9];
+    int index = 0;
+    for (int i = 0; i < ids.length; i++) {
+      ids[i] = ByteUtils.byteToLong(ArrayUtils.subarray(idArrays, index, index + 8));
+      index += 9;
+    }
+
+    // Please review the id-name mapping content in KvNameMappingService.java and
+    // method generateMappingKey in this class.
+    String[] names = new String[ids.length];
+    for (int i = 0; i < ids.length; i++) {
+      // The format of name is like '{metalake_id}/{catalog_id}/schema_name'
+      String name = nameMappingService.getNameById(ids[i]);
+      names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
+    }
+
+    NameIdentifier nameIdentifier = NameIdentifier.of(names);
+    return Pair.of(nameIdentifier, entityType);
   }
 }

@@ -16,7 +16,7 @@ paths:
     get:
       tags:
         - table
-      summary: List all tables in a schema
+      summary: List tables
       operationId: listTables
       responses:
         "200":
@@ -29,7 +29,7 @@ paths:
     post:
       tags:
         - table
-      summary: Create a new table in a schema
+      summary: Create table
       operationId: createTable
       requestBody:
         content:
@@ -39,6 +39,10 @@ paths:
             examples:
               HiveTableCreate:
                 $ref: "#/components/examples/HiveTableCreate"
+              MysqlTableCreate:
+                $ref: "#/components/examples/MysqlTableCreate"
+              PostgresqlTableCreate:
+                $ref: "#/components/examples/PostgresqlTableCreate"
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
@@ -65,7 +69,7 @@ paths:
     get:
       tags:
         - table
-      summary: Get the specified table in a schema
+      summary: Get table
       operationId: loadTable
       description: Returns the specified table object
       responses:
@@ -92,7 +96,7 @@ paths:
     put:
       tags:
         - table
-      summary: Update the specified table in a schema
+      summary: Update table
       operationId: alterTable
       description: Updates the specified table in a schema
       requestBody:
@@ -135,7 +139,7 @@ paths:
     delete:
       tags:
         - table
-      summary: Delete the specified table in a schema
+      summary: Drop table
       operationId: dropTable
       responses:
         "200":
@@ -190,6 +194,13 @@ components:
           default: [ ]
           items:
             $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+        indexes:
+          type: array
+          description: Indexes of the table
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "./indexes.yaml#/components/schemas/IndexSpec"
 
     Table:
       type: object
@@ -236,6 +247,13 @@ components:
           default: [ ]
           items:
             $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+        indexes:
+          type: array
+          description: Indexes of the table
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "./indexes.yaml#/components/schemas/IndexSpec"
 
     Distribution:
       type: object
@@ -302,6 +320,13 @@ components:
       items:
         type: string
 
+    ColumnDefaultValue:
+      $ref: "./expression.yaml#/components/schemas/FunctionArg"
+      description: The default value of the column
+      required: false
+      nullable: true
+      default: null
+
     Column:
       type: object
       required:
@@ -322,6 +347,13 @@ components:
           description: Whether the column is nullable
           nullable: true
           default: true
+        defaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
+        autoIncrement:
+          type: boolean
+          description: Whether the column is auto increment
+          nullable: true
+          default: false
 
     TableUpdatesRequest:
       type: object
@@ -667,6 +699,10 @@ components:
           examples:
             TableResponse:
               $ref: "#/components/examples/TableResponse"
+            MysqlTableResponse:
+              $ref: "#/components/examples/MysqlTableResponse"
+            PostgresqlTableResponse:
+              $ref: "#/components/examples/PostgresqlTableResponse"
 
   examples:
     TableListResponse:
@@ -693,7 +729,8 @@ components:
             "name": "id",
             "type": "integer",
             "comment": "id column comment",
-            "nullable": true
+            "nullable": true,
+            "autoIncrement": false
           },
           {
             "name": "name",
@@ -705,6 +742,43 @@ components:
             "name": "age",
             "type": "integer",
             "comment": "age column comment",
+            "nullable": true
+          },
+          {
+            "name": "info",
+            "type": {
+              "type": "struct",
+              "fields": [
+                {
+                  "name": "position",
+                  "type": "string",
+                  "nullable": true,
+                  "comment": "position field comment"
+                },
+                {
+                  "name": "contact",
+                  "type": {
+                    "type": "list",
+                    "elementType": "integer",
+                    "containsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "contact field comment"
+                },
+                {
+                  "name": "rating",
+                  "type": {
+                    "type": "map",
+                    "keyType": "string",
+                    "valueType": "integer",
+                    "valueContainsNull": false
+                  },
+                  "nullable": true,
+                  "comment": "rating field comment"
+                }
+              ]
+            },
+            "comment": "info column comment",
             "nullable": true
           },
           {
@@ -742,7 +816,118 @@ components:
         ],
         "properties": {
           "format": "ORC"
+        },
+        indexes:[ ]
+      }
+
+    MysqlTableCreate:
+      value: {
+        "name": "my_mysql_table",
+        "comment": "This is my MySQL table",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false,
+            "autoIncrement": true
+          },
+          {
+            "name": "name",
+            "type": "varchar(255)",
+            "comment": "name column comment",
+            "nullable": true,
+            "defaultValue": {
+              "type": "literal",
+              "dataType": "varchar(255)",
+              "value": "default_name"
+            }
+          },
+          {
+            "name": "age",
+            "type": "integer",
+            "comment": "age column comment",
+            "nullable": true
+          },
+          {
+            "name": "dt",
+            "type": "date",
+            "comment": "dt column comment",
+            "nullable": true
+          }
+        ],
+        "indexes": [
+          {
+            "indexType": "primary_key",
+            "name": "PRIMARY",
+            "fieldNames": [["id"]]
+          },
+          {
+            "indexType": "unique_key",
+            "name": "uk_1",
+            "fieldNames": [["name"]]
+          },
+          {
+            "indexType": "unique_key",
+            "name": "uk_2",
+            "fieldNames": [["name"] ,["age"] ,["dt"]]
+          }
+        ],
+        "properties": {
+          "engine": "InnoDB",
+          "auto-increment-offset": "1"
         }
+      }
+
+    PostgresqlTableCreate:
+      value: {
+        "name": "my_postgresql_table",
+        "comment": "This is my PostgreSQL table",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false,
+            "autoIncrement": true
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment",
+            "nullable": true
+          },
+          {
+            "name": "age",
+            "type": "integer",
+            "comment": "age column comment",
+            "nullable": true
+          },
+          {
+            "name": "dt",
+            "type": "date",
+            "comment": "dt column comment",
+            "nullable": true
+          }
+        ],
+        "indexes": [
+          {
+            "indexType": "primary_key",
+            "name": "PRIMARY",
+            "fieldNames": [["id"]]
+          },
+          {
+            "indexType": "unique_key",
+            "name": "uk_1",
+            "fieldNames": [["name"]]
+          },
+          {
+            "indexType": "unique_key",
+            "name": "uk_2",
+            "fieldNames": [["name"] ,["age"] ,["dt"]]
+          }
+        ],
+        "properties": { }
       }
 
     TableResponse:
@@ -756,7 +941,8 @@ components:
               "name": "id",
               "type": "integer",
               "comment": "id column comment",
-              "nullable": true
+              "nullable": true,
+              "autoIncrement": false
             },
             {
               "name": "name",
@@ -820,6 +1006,132 @@ components:
               "fieldName": [
                 "dt"
               ]
+            }
+          ],
+          "indexes": [ ]
+        }
+      }
+
+    MysqlTableResponse:
+      value: {
+        "code": 0,
+        "table": {
+          "name": "my_mysql_table",
+          "comment": "This is my MySQL table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "integer",
+              "comment": "id column comment",
+              "nullable": true,
+              "autoIncrement": true
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "comment": "name column comment",
+              "nullable": true
+            },
+            {
+              "name": "age",
+              "type": "integer",
+              "comment": "age column comment",
+              "nullable": true
+            },
+            {
+              "name": "dt",
+              "type": "date",
+              "comment": "dt column comment",
+              "nullable": true
+            }
+          ],
+          "properties": {
+            "engine": "InnoDB",
+            "auto-increment-offset": "1",
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T11:07:46.938Z"
+          },
+          "distribution": null,
+          "sortOrders": [ ],
+          "partitioning": [ ],
+          "indexes": [
+            {
+              "indexType": "primary_key",
+              "name": "PRIMARY",
+              "fieldNames": [["id"]]
+            },
+            {
+              "indexType": "unique_key",
+              "name": "uk_1",
+              "fieldNames": [["name"]]
+            },
+            {
+              "indexType": "unique_key",
+              "name": "uk_2",
+              "fieldNames": [["name"] ,["age"] ,["dt"]]
+            }
+          ]
+        }
+      }
+
+    PostgresqlTableResponse:
+      value: {
+        "code": 0,
+        "table": {
+          "name": "my_postgresql_table",
+          "comment": "This is my PostgreSQL table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "integer",
+              "comment": "id column comment",
+              "nullable": true,
+              "autoIncrement": true
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "comment": "name column comment",
+              "nullable": true
+            },
+            {
+              "name": "age",
+              "type": "integer",
+              "comment": "age column comment",
+              "nullable": true
+            },
+            {
+              "name": "dt",
+              "type": "date",
+              "comment": "dt column comment",
+              "nullable": true
+            }
+          ],
+          "properties": { },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T11:07:46.938Z"
+          },
+          "distribution": null,
+          "sortOrders": [ ],
+          "partitioning": [ ],
+          "indexes": [
+            {
+              "indexType": "primary_key",
+              "name": "PRIMARY",
+              "fieldNames": [["id"]]
+            },
+            {
+              "indexType": "unique_key",
+              "name": "uk_1",
+              "fieldNames": [["name"]]
+            },
+            {
+              "indexType": "unique_key",
+              "name": "uk_2",
+              "fieldNames": [["name"] ,["age"] ,["dt"]]
             }
           ]
         }

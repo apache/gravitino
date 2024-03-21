@@ -4,9 +4,13 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -36,6 +40,14 @@ public class ColumnDTO implements Column {
   @JsonProperty("autoIncrement")
   private boolean autoIncrement = false;
 
+  @JsonProperty("defaultValue")
+  // the NON_EMPTY annotation is used to avoid serializing the defaultValue field if it is not set
+  // or null.
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+  @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+  private Expression defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+
   private ColumnDTO() {}
 
   /**
@@ -46,14 +58,21 @@ public class ColumnDTO implements Column {
    * @param comment The comment associated with the column.
    * @param nullable Whether the column value can be null.
    * @param autoIncrement Whether the column is an auto-increment column.
+   * @param defaultValue The default value of the column.
    */
   private ColumnDTO(
-      String name, Type dataType, String comment, boolean nullable, boolean autoIncrement) {
+      String name,
+      Type dataType,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
     this.nullable = nullable;
     this.autoIncrement = autoIncrement;
+    this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
   }
 
   @Override
@@ -81,6 +100,11 @@ public class ColumnDTO implements Column {
     return autoIncrement;
   }
 
+  @Override
+  public Expression defaultValue() {
+    return defaultValue;
+  }
+
   /**
    * Creates a new Builder to build a Column DTO.
    *
@@ -97,12 +121,25 @@ public class ColumnDTO implements Column {
    */
   public static class Builder<S extends Builder> {
 
+    /** The name of the column. */
     protected String name;
+
+    /** The data type of the column. */
     protected Type dataType;
+
+    /** The comment associated with the column. */
     protected String comment;
+
+    /** * Whether the column value can be null. */
     protected boolean nullable = true;
+
+    /** Whether the column is an auto-increment column. */
     protected boolean autoIncrement = false;
 
+    /** The default value of the column. */
+    protected Expression defaultValue;
+
+    /** Constructs a new Builder. */
     public Builder() {}
 
     /**
@@ -161,28 +198,47 @@ public class ColumnDTO implements Column {
     }
 
     /**
+     * Sets the default value of the column.
+     *
+     * @param defaultValue The default value of the column.
+     * @return The Builder instance.
+     */
+    public S withDefaultValue(Expression defaultValue) {
+      this.defaultValue = defaultValue;
+      return (S) this;
+    }
+
+    /**
      * Builds a Column DTO based on the provided builder parameters.
      *
      * @return A new ColumnDTO instance.
-     * @throws NullPointerException If required fields name and data type are not set.
+     * @throws NullPointerException If required, fields name and data type are not set.
      */
     public ColumnDTO build() {
       Preconditions.checkNotNull(name, "Column name cannot be null");
       Preconditions.checkNotNull(dataType, "Column data type cannot be null");
-      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement);
+      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement, defaultValue);
     }
   }
 
+  /**
+   * Validates the Column DTO.
+   *
+   * @throws IllegalArgumentException If some of the required fields are not set or if the column is
+   *     non-nullable with a null default value, this method will throw an IllegalArgumentException.
+   */
   public void validate() throws IllegalArgumentException {
-    if (autoIncrement()) {
-      // TODO This part of the code will be deleted after underlying support.
-      throw new UnsupportedOperationException("Auto-increment column is not supported yet.");
-    }
     if (name() == null || name().isEmpty()) {
       throw new IllegalArgumentException("Column name cannot be null or empty.");
     }
     if (dataType() == null) {
       throw new IllegalArgumentException("Column data type cannot be null.");
+    }
+    if (!nullable()
+        && defaultValue() instanceof LiteralDTO
+        && ((LiteralDTO) defaultValue()).dataType().equals(Types.NullType.get())) {
+      throw new IllegalArgumentException(
+          "Column cannot be non-nullable with a null default value: " + name());
     }
   }
 }

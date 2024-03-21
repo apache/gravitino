@@ -13,25 +13,24 @@ repositories {
 }
 
 dependencies {
+  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.annotations)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.httpclient5)
-  implementation(libs.commons.lang3)
-  implementation(libs.trino.spi) {
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.commons.collections4)
+  compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
-  implementation(libs.trino.toolkit) {
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.trino.testing) {
-    exclude("org.apache.logging.log4j")
-  }
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.trino.memory) {
     exclude("org.antlr")
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(libs.trino.testing) {
     exclude("org.apache.logging.log4j")
   }
 }

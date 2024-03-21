@@ -8,7 +8,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -24,6 +25,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
+/** Represents a request to create a table. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -57,22 +59,27 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("partitioning")
   private final Partitioning[] partitioning;
 
+  @Nullable
+  @JsonProperty("indexes")
+  private final IndexDTO[] indexes;
+
+  /** Default constructor for Jackson deserialization. */
   public TableCreateRequest() {
-    this(null, null, null, null, null, null, null);
+    this(null, null, null, null, null, null, null, null);
   }
 
-  public TableCreateRequest(
-      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
-    this(
-        name,
-        comment,
-        columns,
-        properties,
-        new SortOrderDTO[0],
-        DistributionDTO.NONE,
-        new Partitioning[0]);
-  }
-
+  /**
+   * Creates a new TableCreateRequest.
+   *
+   * @param name The name of the table.
+   * @param comment The comment of the table.
+   * @param columns The columns of the table.
+   * @param properties The properties of the table.
+   * @param sortOrders The sort orders of the table.
+   * @param distribution The distribution of the table.
+   * @param partitioning The partitioning of the table.
+   * @param indexes The indexes of the table.
+   */
   public TableCreateRequest(
       String name,
       @Nullable String comment,
@@ -80,7 +87,8 @@ public class TableCreateRequest implements RESTRequest {
       @Nullable Map<String, String> properties,
       @Nullable SortOrderDTO[] sortOrders,
       @Nullable DistributionDTO distribution,
-      @Nullable Partitioning[] partitioning) {
+      @Nullable Partitioning[] partitioning,
+      @Nullable IndexDTO[] indexes) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
@@ -88,8 +96,14 @@ public class TableCreateRequest implements RESTRequest {
     this.sortOrders = sortOrders;
     this.distribution = distribution;
     this.partitioning = partitioning;
+    this.indexes = indexes;
   }
 
+  /**
+   * Validates the {@link TableCreateRequest} request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -113,7 +127,11 @@ public class TableCreateRequest implements RESTRequest {
 
     List<ColumnDTO> autoIncrementCols =
         Arrays.stream(columns)
-            .peek(ColumnDTO::validate)
+            .map(
+                column -> {
+                  column.validate();
+                  return column;
+                })
             .filter(ColumnDTO::autoIncrement)
             .collect(Collectors.toList());
     String autoIncrementColsStr =
@@ -122,5 +140,15 @@ public class TableCreateRequest implements RESTRequest {
         autoIncrementCols.size() <= 1,
         "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
             + autoIncrementColsStr);
+
+    if (indexes != null && indexes.length > 0) {
+      Arrays.stream(indexes)
+          .forEach(
+              index -> {
+                Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0, "Index field names cannot be null");
+              });
+    }
   }
 }

@@ -22,7 +22,9 @@ public class AuthenticatorFactory {
           AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
           AuthenticatorType.OAUTH.name().toLowerCase(),
-          OAuth2TokenAuthenticator.class.getCanonicalName());
+          OAuth2TokenAuthenticator.class.getCanonicalName(),
+          AuthenticatorType.KERBEROS.name().toLowerCase(),
+          KerberosAuthenticator.class.getCanonicalName());
 
   private AuthenticatorFactory() {}
 

@@ -28,9 +28,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
@@ -193,6 +191,10 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
+    }
+
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
@@ -250,6 +252,8 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         doUpdateColumnNullability(
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
+      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+        throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
@@ -309,18 +313,12 @@ public class IcebergTableOpsHelper {
     return icebergTableChange;
   }
 
-  public static Map<String, String> removeReservedProperties(Map<String, String> createProperties) {
-    return createProperties.entrySet().stream()
-        .filter(entry -> !IcebergReservedProperties.contains(entry.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-  }
-
   /**
    * Gravitino only supports single-level namespace storage management, which differs from Iceberg.
    * Therefore, we need to handle this difference here.
    *
    * @param namespace GravitinoNamespace
-   * @return
+   * @return Iceberg Namespace
    */
   public static Namespace getIcebergNamespace(com.datastrato.gravitino.Namespace namespace) {
     return getIcebergNamespace(namespace.level(namespace.length() - 1));
@@ -336,7 +334,7 @@ public class IcebergTableOpsHelper {
    *
    * @param namespace
    * @param name
-   * @return
+   * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(
       com.datastrato.gravitino.Namespace namespace, String name) {
@@ -349,7 +347,7 @@ public class IcebergTableOpsHelper {
    * `{namespace}.{table}`, so we need to perform truncation here.
    *
    * @param nameIdentifier GravitinoNameIdentifier
-   * @return
+   * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();

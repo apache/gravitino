@@ -4,11 +4,16 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
@@ -20,10 +25,11 @@ import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -40,7 +46,9 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestMetalakeOperations extends JerseyTest {
 
@@ -54,6 +62,15 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   private MetalakeManager metalakeManager = mock(MetalakeManager.class);
+
+  @BeforeAll
+  public static void setup() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+  }
 
   @Override
   protected Application configure() {
@@ -83,9 +100,9 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -119,13 +136,12 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
 
     BaseMetalake mockMetalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(1L)
             .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "v1"))
-            .withAuditInfo(
-                new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build())
+            .withAuditInfo(AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build())
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
@@ -167,9 +183,9 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -196,7 +212,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertNull(metalake1.properties());
 
     // Test when specified metalake is not found.
-    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name %s", metalakeName))
         .when(metalakeManager)
         .loadMetalake(any());
 
@@ -242,9 +258,9 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = new AuditInfo.Builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -281,7 +297,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertNull(metalake1.properties());
 
     // Test when specified metalake is not found.
-    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name %s", metalakeName))
         .when(metalakeManager)
         .alterMetalake(any(), any(), any());
 

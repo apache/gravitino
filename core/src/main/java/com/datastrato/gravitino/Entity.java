@@ -19,6 +19,8 @@ public interface Entity extends Serializable {
     SCHEMA("sc", 2),
     TABLE("ta", 3),
     COLUMN("co", 4),
+    FILESET("fi", 5),
+    TOPIC("to", 6),
 
     AUDIT("au", 65534);
 
@@ -29,6 +31,15 @@ public interface Entity extends Serializable {
     EntityType(String shortName, int index) {
       this.shortName = shortName;
       this.index = index;
+    }
+
+    public static EntityType fromShortName(String shortName) {
+      for (EntityType entityType : EntityType.values()) {
+        if (entityType.shortName.equals(shortName)) {
+          return entityType;
+        }
+      }
+      throw new IllegalArgumentException("Unknown entity type: " + shortName);
     }
   }
 

@@ -19,9 +19,18 @@
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/expressions/NullOrdering.java
 package com.datastrato.gravitino.rel.expressions.sorts;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /** A null order used in sorting expressions. */
+@Evolving
 public enum NullOrdering {
+
+  /**
+   * Nulls appear before non-nulls. For ascending order, this means nulls appear at the beginning,
+   */
   NULLS_FIRST,
+
+  /** Nulls appear after non-nulls. For ascending order, this means nulls appear at the end. */
   NULLS_LAST;
 
   @Override

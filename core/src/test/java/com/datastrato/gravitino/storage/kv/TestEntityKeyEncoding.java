@@ -28,10 +28,16 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -92,6 +98,9 @@ public class TestEntityKeyEncoding {
               ByteUtils.longToByte(0L));
       Assertions.assertArrayEquals(expectKey, realKey);
 
+      NameIdentifier decodeIdentifier = encoder.decode(realKey).getKey();
+      Assertions.assertEquals(mateLakeIdentifier1, decodeIdentifier);
+
       // name ---> id
       // catalog1 --> 1
       // catalog2 --> 2
@@ -115,6 +124,8 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(1L + i));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // name ---> id
@@ -142,6 +153,8 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(4L + i));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // name ---> id
@@ -171,17 +184,18 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(i + 7L));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // Unsupported operation
       Mockito.doReturn(10L).when(mockIdGenerator).nextId();
+      namespace = Namespace.of("metalake1", "catalog2", "schema3", "table1");
+      NameIdentifier id = NameIdentifier.of(namespace, "column1");
       Assertions.assertThrows(
           UnsupportedOperationException.class,
           () -> {
-            encoder.encode(
-                NameIdentifier.of(
-                    Namespace.of("metalake1", "catalog2", "schema3", "table1"), "column1"),
-                EntityType.COLUMN);
+            encoder.encode(id, EntityType.COLUMN);
           });
     }
   }
@@ -253,13 +267,79 @@ public class TestEntityKeyEncoding {
       Assertions.assertArrayEquals(expectKey, realKey);
 
       Mockito.doReturn(3L).when(mockIdGenerator).nextId();
+      namespace = Namespace.of("metalake1", "catalog2", "schema3", "table1");
+      NameIdentifier id = NameIdentifier.of(namespace, WILD_CARD);
       Assertions.assertThrows(
-          UnsupportedOperationException.class,
-          () ->
-              encoder.encode(
-                  NameIdentifier.of(
-                      Namespace.of("metalake1", "catalog2", "schema3", "table1"), WILD_CARD),
-                  EntityType.COLUMN));
+          UnsupportedOperationException.class, () -> encoder.encode(id, EntityType.COLUMN));
+    }
+  }
+
+  // Create random names for name identifiers.
+  private static Stream<Arguments> provideParameters() {
+    Random random = new Random();
+    Arguments[] arguments = new Arguments[100];
+    int identifierNameLen = 16;
+
+    for (int i = 0; i < 100; i++) {
+      String[] value = new String[4];
+      for (int j = 0; j < 4; j++) {
+        String tmp = "";
+        int current = 0;
+        while (current < identifierNameLen) {
+          int v;
+          while ((v = random.nextInt(127)) < 32) {}
+          if (v % 4 == 0) {
+            v = 47;
+          }
+
+          tmp += ((char) v);
+          current++;
+        }
+
+        value[j] = tmp;
+      }
+
+      arguments[i] = Arguments.of((Object[]) value);
+    }
+
+    return Stream.of(arguments);
+  }
+
+  @ParameterizedTest
+  @MethodSource("provideParameters")
+  void testSpecialCharacterDecoder(
+      String metalakeName, String catalogName, String schemaName, String tableName)
+      throws IOException {
+    Config config = getConfig();
+    try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
+
+      NameIdentifier identifier = NameIdentifier.of(Namespace.of(), metalakeName);
+      byte[] key = encoder.encode(identifier, EntityType.METALAKE);
+
+      Pair<NameIdentifier, EntityType> nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.METALAKE, nameIdentifierEntityTypePair.getValue());
+
+      identifier = NameIdentifier.of(Namespace.of(metalakeName), catalogName);
+      key = encoder.encode(identifier, EntityType.CATALOG);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.CATALOG, nameIdentifierEntityTypePair.getValue());
+
+      // Test Schema
+      identifier = NameIdentifier.of(Namespace.of(catalogName, catalogName), schemaName);
+      key = encoder.encode(identifier, EntityType.SCHEMA);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.SCHEMA, nameIdentifierEntityTypePair.getValue());
+
+      // Test Table
+      identifier = NameIdentifier.of(Namespace.of(catalogName, catalogName, schemaName), tableName);
+      key = encoder.encode(identifier, EntityType.TABLE);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.TABLE, nameIdentifierEntityTypePair.getValue());
     }
   }
 }

@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -29,10 +29,9 @@ public interface KvBackend extends Closeable {
    * @param value The value of the pair.
    * @param overwrite If true, overwrites the existing value.
    * @throws IOException If an I/O exception occurs during the operation.
-   * @throws EntityAlreadyExistsException If the key already exists and overwrite is false.
+   * @throws AlreadyExistsException If the key already exists and overwrite is false.
    */
-  void put(byte[] key, byte[] value, boolean overwrite)
-      throws IOException, EntityAlreadyExistsException;
+  void put(byte[] key, byte[] value, boolean overwrite) throws IOException, AlreadyExistsException;
 
   /**
    * Retrieves the value associated with a given key.
@@ -47,19 +46,19 @@ public interface KvBackend extends Closeable {
    * Deletes the key-value pair associated with the given key.
    *
    * @param key The key to delete.
-   * @return True if the key-value pair was successfully deleted, false if the key was not found.
-   * @throws IOException If an I/O exception occurs during deletion.
+   * @return True, if the key-value pair was successfully deleted, else throw exception.
+   * @throws IOException If an exception occurs during deletion.
    */
   boolean delete(byte[] key) throws IOException;
 
   /**
-   * Delete the key-value pair associated with the given {@link KvRangeScan}
+   * Delete the key-value pair associated with the given {@link KvRange}
    *
-   * @param kvRangeScan kv range to to delete
-   * @return True if the key-value pair was successfully deleted.
+   * @param kvRange kv range to to delete
+   * @return True, if the key-value pair was successfully deleted, else throw exception.
    * @throws IOException If an I/O exception occurs during deletion.
    */
-  boolean deleteRange(KvRangeScan kvRangeScan) throws IOException;
+  boolean deleteRange(KvRange kvRange) throws IOException;
 
   /**
    * Scans the specified range using the provided KvRangeScan and returns a list of key-value pairs.
@@ -68,5 +67,5 @@ public interface KvBackend extends Closeable {
    * @return A list of key-value pairs within the specified range.
    * @throws IOException If an I/O exception occurs during scanning.
    */
-  List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException;
+  List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException;
 }

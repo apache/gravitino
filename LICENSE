@@ -218,9 +218,11 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
+   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/spark/SparkUtilIT.java
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/CachedClientPool.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
@@ -228,6 +230,7 @@
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
+   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/TestCachedClientPool.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
@@ -244,13 +247,17 @@
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
    ./web/WEB-INF/web.xml
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/hive/yarn-env.sh
+   ./common/src/main/java/com/datastrato/gravitino/auth/KerberosUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosAuthenticator.java
+   ./server-common/src/test/java/com/datastrato/gravitino/server/auth/KerberosTestUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosServerUtils.java
 
    Apache Kafka
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
@@ -259,4 +266,5 @@
    ./bin/common.sh
 
    Trino
-   ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
+   ./trino-connector/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java

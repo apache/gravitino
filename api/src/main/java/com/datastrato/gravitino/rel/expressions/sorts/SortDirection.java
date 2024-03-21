@@ -22,14 +22,27 @@ package com.datastrato.gravitino.rel.expressions.sorts;
 import static com.datastrato.gravitino.rel.expressions.sorts.NullOrdering.NULLS_FIRST;
 import static com.datastrato.gravitino.rel.expressions.sorts.NullOrdering.NULLS_LAST;
 
+import com.datastrato.gravitino.annotation.Evolving;
+
 /**
  * A sort direction used in sorting expressions.
  *
  * <p>Each direction has a default null ordering that is implied if no null ordering is specified
  * explicitly.
  */
+@Evolving
 public enum SortDirection {
+
+  /**
+   * Ascending sort direction. Nulls appear first. For ascending order, this means nulls appear at
+   * the beginning.
+   */
   ASCENDING(NULLS_FIRST),
+
+  /**
+   * Descending sort direction. Nulls appear last. For ascending order, this means nulls appear at
+   * the end.
+   */
   DESCENDING(NULLS_LAST);
 
   private final NullOrdering defaultNullOrdering;
@@ -59,6 +72,12 @@ public enum SortDirection {
     }
   }
 
+  /**
+   * Returns the SortDirection from the string representation.
+   *
+   * @param str The string representation of the sort direction.
+   * @return The SortDirection.
+   */
   public static SortDirection fromString(String str) {
     switch (str.toLowerCase()) {
       case "asc":

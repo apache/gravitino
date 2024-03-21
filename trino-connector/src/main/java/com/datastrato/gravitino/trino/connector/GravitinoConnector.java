@@ -4,15 +4,11 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import static com.google.common.collect.Sets.immutableEnumSet;
-import static io.trino.spi.connector.ConnectorCapabilities.NOT_NULL_COLUMN_CONSTRAINT;
-
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.google.common.base.Preconditions;
-import io.trino.plugin.base.security.AllowAllAccessControl;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorCapabilities;
@@ -68,7 +64,7 @@ public class GravitinoConnector implements Connector {
             session, gravitinoTransactionHandle.getInternalTransactionHandle());
     Preconditions.checkNotNull(internalMetadata);
 
-    GravitinoMetaLake metalake = catalogConnectorContext.getMetalake();
+    GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
 
     CatalogConnectorMetadata catalogConnectorMetadata =
         new CatalogConnectorMetadata(metalake, catalogIdentifier);
@@ -137,11 +133,12 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public ConnectorAccessControl getAccessControl() {
-    return new AllowAllAccessControl();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getAccessControl();
   }
 
   @Override
   public Set<ConnectorCapabilities> getCapabilities() {
-    return immutableEnumSet(NOT_NULL_COLUMN_CONSTRAINT);
+    return catalogConnectorContext.getInternalConnector().getCapabilities();
   }
 }

@@ -3,14 +3,13 @@
   "private": true,
   "engines": {
     "node": ">=18.18.2",
-    "npm": ">=9.8.1",
-    "yarn": ">=1.22.19"
+    "npm": ">=9.8.1"
   },
   "scripts": {
-    "analyze": "env-cmd -f .env.analyze yarn build",
-    "server": "next dev --turbo",
-    "build": "yarn format && next build",
-    "dist": "env-cmd -f .env.static yarn build",
+    "analyze": "env-cmd -f .env.analyze pnpm build",
+    "dev": "next dev --turbo",
+    "build": "pnpm format && next build",
+    "dist": "env-cmd -f .env.static next build",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
@@ -21,12 +20,14 @@
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@hookform/resolvers": "^3.3.2",
+    "@mui/icons-material": "^5.15.11",
     "@mui/lab": "^5.0.0-alpha.153",
     "@mui/material": "^5.14.18",
     "@mui/x-data-grid": "^6.18.2",
     "@mui/x-tree-view": "^6.17.0",
     "@reduxjs/toolkit": "^1.9.7",
-    "axios": "^1.6.2",
+    "antd": "^5.13.3",
+    "axios": "^1.6.8",
     "chroma-js": "^2.4.2",
     "clsx": "^2.0.0",
     "dayjs": "^1.11.10",
@@ -40,7 +41,6 @@
     "react-hot-toast": "^2.4.1",
     "react-redux": "^8.1.3",
     "react-use": "^17.4.1",
-    "sweetalert2": "^11.10.2",
     "yup": "^1.3.2"
   },
   "devDependencies": {

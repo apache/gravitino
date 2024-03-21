@@ -99,6 +99,17 @@ public class Utils {
         .build();
   }
 
+  public static Response unsupportedOperation(String message) {
+    return unsupportedOperation(message, null);
+  }
+
+  public static Response unsupportedOperation(String message, Throwable throwable) {
+    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
+        .entity(ErrorResponse.unsupportedOperation(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =

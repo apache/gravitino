@@ -7,8 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_CATALOG_PROVIDER;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
@@ -43,7 +42,7 @@ public class CatalogConnectorFactory {
   }
 
   public CatalogConnectorContext loadCatalogConnector(
-      NameIdentifier nameIdentifier, GravitinoMetaLake metalake, GravitinoCatalog catalog) {
+      GravitinoMetalake metalake, GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
     if (builder == null) {
@@ -57,11 +56,11 @@ public class CatalogConnectorFactory {
 
     try {
       Connector internalConnector =
-          catalogInjector.createConnector(nameIdentifier.toString(), builder.buildConfig(catalog));
+          catalogInjector.createConnector(catalog.getFullName(), builder.buildConfig(catalog));
 
       return builder
           .withMetalake(metalake)
-          .withCatalogName(nameIdentifier)
+          .withCatalog(catalog)
           .withInternalConnector(internalConnector)
           .build();
 

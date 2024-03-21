@@ -20,9 +20,11 @@
 
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /** NamespaceChange class to set the property and value pairs for the namespace. */
+@Evolving
 public interface SchemaChange {
 
   /**
@@ -46,6 +48,7 @@ public interface SchemaChange {
     return new RemoveProperty(property);
   }
 
+  /** SchemaChange class to set the property and value pairs for the schema. */
   final class SetProperty implements SchemaChange {
     private final String property;
     private final String value;
@@ -111,6 +114,7 @@ public interface SchemaChange {
     }
   }
 
+  /** SchemaChange class to remove a property from the schema. */
   final class RemoveProperty implements SchemaChange {
     private final String property;
 

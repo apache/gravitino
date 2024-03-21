@@ -8,22 +8,22 @@ This software is licensed under the Apache License version 2."
 ## Install Gravitino from scratch
 
 :::note
-Gravitino supports running on Java 8, 11, and 17, please make sure you have Java installed and
-`JAVA_HOME` configured correctly. To confirm the Java version, you can simply run
+Gravitino supports running on Java 8, 11, and 17. Make sure you have Java installed and
+`JAVA_HOME` configured correctly. To confirm the Java version, run the
 `${JAVA_HOME}/bin/java -version` command.
 :::
 
 ### Get the Gravitino binary distribution package
 
-Before installing Gravitino, make sure you have Gravitino binary distribution package. You can
-download the latest Gravitino binary distribution Package from [GitHub](https://github.com/datastrato/gravitino/releases),
+Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can
+download the latest Gravitino binary distribution package from [GitHub](https://github.com/datastrato/gravitino/releases),
 or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
-If you build Gravitino yourself by `./gradlew compileDistribution` command, you can find the
-Gravitino binary distribution package in `distribution/package` directory.
+  - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the
+Gravitino binary distribution package in the `distribution/package` directory.
 
-If you build Gravitino yourself by `./gradlew assembleDistribution` command, you can get the
-compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in
+  - If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the
+compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the
 `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
 
 The Gravitino binary distribution package contains the following files:
@@ -37,36 +37,36 @@ The Gravitino binary distribution package contains the following files:
     |   └── lakehouse-iceberg/      # Apache Iceberg catalog dependencies and configurations.
     |   └── jdbc-mysql/             # JDBC MySQL catalog dependencies and configurations.
     |   └── jdbc-postgresql/        # JDBC PostgreSQL catalog dependencies and configurations.
-    |── conf/                       # All configuration for Gravitino.
+    |── conf/                       # All configurations for Gravitino.
     |   ├── gravitino.conf          # Gravitino server configuration.
     |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-    |   └── log4j2.properties       # log4j configuration for Gravitino server.
+    |   └── log4j2.properties       # log4j configuration for the Gravitino server.
     |── libs/                       # Gravitino server dependencies libraries.
     |── logs/                       # Gravitino server logs. Automatically created after the Gravitino server starts.
-    └── data/                       # Default directory for Gravitino server to store data.
+    └── data/                       # Default directory for the Gravitino server to store data.
 ```
 
-#### Configure Gravitino server
+#### Configure the Gravitino server
 
 The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino
-server by modifying this file. Basic configurations are already added to this file, all the
+server by modifying this file. Basic configurations are already added to this file. All the
 configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
 
-#### Configure Gravitino server log
+#### Configure the Gravitino server log
 
 The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as
 the Logging system. You can [Log4j2](https://logging.apache.org/log4j/2.x/) to
 do the log configuration.
 
-#### Configure Gravitino server environment
+#### Configure the Gravitino server environment
 
 The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes
-several environment variables, you can modify this file to reconfigure.
+several environment variables. You can modify them in this file.
 
 #### Configure Gravitino catalogs
 
-Gravitino supports multiple catalogs, you can configure the catalog level configurations by
-modifying the related configuration file in `catalogs/<catalog-provider>/conf` directory. The
+Gravitino supports multiple catalogs. You can configure the catalog-level configurations by
+modifying the related configuration file in the `catalogs/<catalog-provider>/conf` directory. The
 configurations you set here apply to all the catalogs of the same type you create.
 
 For example, if you want to configure the Hive catalog, you can modify the file
@@ -83,24 +83,23 @@ The catalog `properties` can override the catalog configurations specified in th
 file.
 :::
 
-Gravitino supports pass in catalog specific configurations by adding `gravitino.bypass.`. For
-example, if you want to pass in HMS specific configuration
-`hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog, you can
-simply add `gravitino.bypass.` prefix to it.
+Gravitino supports passing in catalog-specific configurations if you add `gravitino.bypass.`. For
+example, if you want to pass in the HMS-specific configuration
+`hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog, add the `gravitino.bypass.` prefix to it.
 
 Also, Gravitino supports loading catalog specific configurations from external files. For example,
-you can put your own `hive-site.xml` file in `catalogs/hive/conf` directory, and Gravitino loads
+you can put your own `hive-site.xml` file in the `catalogs/hive/conf` directory, and Gravitino loads
 it automatically.
 
 #### Start Gravitino server
 
-After configuring the Gravitino server, you can start the Gravitino server by running:
+After configuring the Gravitino server, start the Gravitino server by running:
 
 ```shell
 ./bin/gravitino.sh start
 ```
 
-You can access the Gravitino Web UI by typing <http://localhost:8090> in your browser. or you
+You can access the Gravitino Web UI by typing [http://localhost:8090](http://localhost:8090) in your browser. or you
 can run
 
 ```shell
@@ -111,7 +110,7 @@ to make sure Gravitino is running.
 
 :::info
 If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment
-variable in the `conf/gravitino-env.sh` file. Then you can create a `Remote JVM Debug`
+variable in the `conf/gravitino-env.sh` file. Then create a `Remote JVM Debug`
 configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 :::
 
@@ -120,13 +119,13 @@ configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 ### Get the Gravitino Docker image
 
 Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/datastrato/gravitino/tags).
-You can run the Gravitino Docker image by:
+Run the Gravitino Docker image by running:
 
 ```shell
 docker run -d -i -p 8090:8090 datastrato/gravitino:<version>
 ```
 
-You can access the Gravitino Web UI by typing `http://localhost:8090` in your browser. or you
+Access the Gravitino Web UI by typing `http://localhost:8090` in your browser, or you
 can run
 
 ```shell
@@ -138,9 +137,9 @@ to make sure Gravitino is running.
 ## Install Gravitino using Docker compose
 
 The published Gravitino Docker image only contains the Gravitino server with basic configurations. If
-you want to experience the whole Gravitino system with other components, you can use the Docker
-compose file.
+you want to experience the whole Gravitino system with other components, use the Docker
+`compose` file.
 
-For the details, you can review the
+For the details, review the
 [Gravitino playground repository](https://github.com/datastrato/gravitino-playground) and
 [playground example](./how-to-use-the-playground.md).

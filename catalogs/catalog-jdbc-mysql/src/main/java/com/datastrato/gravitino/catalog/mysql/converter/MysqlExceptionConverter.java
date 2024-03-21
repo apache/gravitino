@@ -12,24 +12,25 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import java.sql.SQLException;
 
-/** Exception converter to gravitino exception for MySQL. */
+/** Exception converter to Gravitino exception for MySQL. */
 public class MysqlExceptionConverter extends JdbcExceptionConverter {
 
+  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     switch (se.getErrorCode()) {
       case 1007:
-        return new SchemaAlreadyExistsException(se.getMessage(), se);
+        return new SchemaAlreadyExistsException(se, se.getMessage());
       case 1050:
-        return new TableAlreadyExistsException(se.getMessage(), se);
+        return new TableAlreadyExistsException(se, se.getMessage());
       case 1008:
       case 1049:
-        return new NoSuchSchemaException(se.getMessage(), se);
+        return new NoSuchSchemaException(se, se.getMessage());
       case 1146:
       case 1051:
-        return new NoSuchTableException(se.getMessage(), se);
+        return new NoSuchTableException(se, se.getMessage());
       default:
-        return new GravitinoRuntimeException(se.getMessage(), se);
+        return new GravitinoRuntimeException(se, se.getMessage());
     }
   }
 }

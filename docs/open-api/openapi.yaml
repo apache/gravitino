@@ -10,7 +10,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -61,6 +61,18 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}:
     $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D"
+
+  /metalaskes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions:
+    $ref: "./partitions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D~1partitions"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions/{partition}:
+    $ref: "./partitions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D~1partitions~1%7Bpartition%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets:
+    $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
+    $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D"
 
 components:
 
@@ -240,6 +252,14 @@ components:
       schema:
         type: string
 
+    fileset:
+      name: fileset
+      in: path
+      description: The name of the fileset
+      required: true
+      schema:
+        type: string
+
   securitySchemes:
 
     OAuth2WithJWT:
@@ -254,4 +274,8 @@ components:
     BasicAuth:
       type: http
       scheme: basic
+
+    KerberosAuth:
+      type: http
+      scheme: negotiate
 
