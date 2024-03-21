@@ -24,7 +24,6 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 
 ### Gravitino HTTP Server configuration
 
-<<<<<<< HEAD
 | Configuration item                                    | Description                                                                                                                                                                           | Default value                                                                | Required | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
 | `gravitino.server.webserver.host`                     | The host of the Gravitino server.                                                                                                                                                     | `0.0.0.0`                                                                    | No       | 0.1.0         |
