@@ -443,7 +443,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   private String formatTableName(String tableName) {
-    return String.format("%s_%s", tableName, getProvider());
+    return String.format("%s_%s", tableName, getCatalogName());
   }
 
   private void checkTableColumns(
