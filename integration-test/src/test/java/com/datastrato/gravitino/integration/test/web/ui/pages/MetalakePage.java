@@ -28,10 +28,10 @@ public class MetalakePage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='create-metalake-btn']")
   public WebElement createMetalakeBtn;
 
-  @FindBy(xpath = "//*[@data-refer='metalake-name-field']//input")
+  @FindBy(xpath = "//*[@data-refer='metalake-name-field']")
   public WebElement metalakeNameField;
 
-  @FindBy(xpath = "//*[@data-refer='metalake-comment-field']//textarea")
+  @FindBy(xpath = "//*[@data-refer='metalake-comment-field']")
   public WebElement metalakeCommentField;
 
   @FindBy(xpath = "//*[@data-refer='query-metalake']//input")
@@ -65,29 +65,39 @@ public class MetalakePage extends AbstractWebIT {
       xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to previous page']")
   public WebElement prevPageBtn;
 
+  @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
+  public WebElement metalakeNameLink;
+
+  @FindBy(
+      xpath =
+          "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]")
+  public WebElement metalakeTableWrapper;
+
   public MetalakePage() {
     PageFactory.initElements(driver, this);
   }
 
   public void setMetalakeNameField(String nameField) {
-    metalakeNameField.sendKeys(
+    WebElement metalakeNameFieldInput = metalakeNameField.findElement(By.tagName("input"));
+    metalakeNameFieldInput.sendKeys(
         Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-    metalakeNameField.clear();
-    metalakeNameField.sendKeys(nameField);
+    metalakeNameFieldInput.clear();
+    metalakeNameFieldInput.sendKeys(nameField);
   }
 
   public void setMetalakeCommentField(String commentField) {
-    metalakeCommentField.sendKeys(
+    WebElement metalakeCommentFieldInput = metalakeCommentField.findElement(By.tagName("textarea"));
+    metalakeCommentFieldInput.sendKeys(
         Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-    metalakeCommentField.clear();
-    metalakeCommentField.sendKeys(commentField);
+    metalakeCommentFieldInput.clear();
+    metalakeCommentFieldInput.sendKeys(commentField);
   }
 
-  public void setQueryInput(String queryInput) {
+  public void setQueryParams(String queryParams) {
     try {
       Thread.sleep(ACTION_SLEEP_MILLIS);
       clearQueryInput();
-      queryMetalakeInput.sendKeys(queryInput);
+      queryMetalakeInput.sendKeys(queryParams);
       Thread.sleep(ACTION_SLEEP_MILLIS);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -129,7 +139,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public void clickMetalakeLink(String name) {
     try {
-      setQueryInput(name);
+      setQueryParams(name);
       Thread.sleep(ACTION_SLEEP_MILLIS);
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
       WebElement metalakeLink = metalakeTableGrid.findElement(By.xpath(xpath));
@@ -153,10 +163,8 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean checkIsErrorName() throws InterruptedException {
     try {
-      String xpath = "//div[@data-refer='metalake-name-field']";
-      WebElement nameField = driver.findElement(By.xpath(xpath));
       List<WebElement> errorText =
-          nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
+          metalakeNameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
 
       return !errorText.isEmpty();
     } catch (Exception e) {
@@ -220,14 +228,10 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyEmptyMetalake() {
     try {
-      String xpath =
-          "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
-
-      boolean isNoRows = waitShowText("No rows", By.xpath(xpath));
+      boolean isNoRows = waitShowText("No rows", metalakeTableWrapper);
 
       if (!isNoRows) {
-        WebElement noMetalakeRows = driver.findElement(By.xpath(xpath));
-        LOG.error(noMetalakeRows.getText(), noMetalakeRows);
+        LOG.error(metalakeTableWrapper.getText(), metalakeTableWrapper);
         return false;
       }
 
@@ -259,7 +263,7 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyQueryMetalake(String name) {
     try {
-      setQueryInput(name);
+      setQueryParams(name);
       List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
       // Check if the text in the first row matches the search input
       boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
@@ -279,14 +283,13 @@ public class MetalakePage extends AbstractWebIT {
 
   public boolean verifyLinkToCatalogsPage(String name) {
     try {
-      String xpath = "//a[@data-refer='metalake-name-link']";
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      WebElement nameLink = driver.findElement(By.xpath(xpath));
-      wait.until(ExpectedConditions.visibilityOf(nameLink));
-      wait.until(ExpectedConditions.urlContains(nameLink.getAttribute("href")));
+      wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
+      wait.until(ExpectedConditions.urlContains(metalakeNameLink.getAttribute("href")));
 
-      if (!driver.getCurrentUrl().contains(name) || !nameLink.getAttribute("href").contains(name)) {
-        LOG.error("name link is not match");
+      if (!driver.getCurrentUrl().contains(name)
+          || !metalakeNameLink.getAttribute("href").contains(name)) {
+        LOG.error("metalake name link is not match");
         return false;
       }
 

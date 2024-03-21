@@ -34,12 +34,12 @@ public class AbstractWebIT extends AbstractIT {
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
   protected static final long MAX_TIMEOUT = 20;
+  protected static final long EACH_TEST_SLEEP_MILLIS = 1_000;
   protected static final long ACTION_SLEEP_MILLIS = 1_000;
 
-  protected boolean waitShowText(final String text, final By locator) {
+  protected boolean waitShowText(final String text, final Object locator) {
     try {
-      WebElement element = pollingWait(locator, MAX_TIMEOUT);
-      return text.equals(element.getText());
+      return text.equals(locatorElement(locator).getText());
     } catch (TimeoutException e) {
       return false;
     }
@@ -55,7 +55,24 @@ public class AbstractWebIT extends AbstractIT {
     return wait.until((Function<WebDriver, WebElement>) driver -> driver.findElement(locator));
   }
 
-  protected void clickAndWait(final Object locatorOrElement) throws InterruptedException {
+  protected void clickAndWait(final Object locator) throws InterruptedException {
+    try {
+      // wait the element is available
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.visibilityOf(locatorElement(locator)));
+      wait.until(ExpectedConditions.elementToBeClickable(locatorElement(locator)));
+
+      locatorElement(locator).click();
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+    } catch (ElementClickInterceptedException e) {
+      // if the previous click did not effected then try clicking in another way
+      Actions action = new Actions(driver);
+      action.moveToElement(locatorElement(locator)).click().build().perform();
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+    }
+  }
+
+  WebElement locatorElement(final Object locatorOrElement) {
     WebElement element;
     if (locatorOrElement instanceof By) {
       element = pollingWait((By) locatorOrElement, MAX_IMPLICIT_WAIT);
@@ -64,25 +81,13 @@ public class AbstractWebIT extends AbstractIT {
     } else {
       throw new InvalidArgumentException("The provided argument is neither a By nor a WebElement");
     }
-    try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.visibilityOf(element));
-      wait.until(ExpectedConditions.elementToBeClickable(element));
-
-      element.click();
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-    } catch (ElementClickInterceptedException e) {
-      Actions action = new Actions(driver);
-      action.moveToElement(element).click().build().perform();
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      LOG.error(e.getMessage(), e);
-    }
+    return element;
   }
 
   @BeforeEach
   public void beforeEachTest() {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
+      Thread.sleep(EACH_TEST_SLEEP_MILLIS);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
