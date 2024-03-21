@@ -47,10 +47,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
-  private static String getSelectAllSql(String tableName) {
-    return String.format("SELECT * FROM %s", tableName);
-  }
-
   private static String getInsertWithoutPartitionSql(String tableName, String values) {
     return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
   }
@@ -514,9 +510,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String tableLocation = table.getTableLocation();
     String partitionExpression = getPartitionExpression(table, "/").replace("'", "");
     Path partitionPath = new Path(tableLocation, partitionExpression);
+    checkDirExists(partitionPath);
+  }
+
+  protected void checkDirExists(Path dir) {
     try {
-      Assertions.assertTrue(
-          hdfs.exists(partitionPath), "Partition directory not exists," + partitionPath);
+      Assertions.assertTrue(hdfs.exists(dir), "HDFS directory not exists," + dir);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -571,23 +570,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                 })
             .collect(Collectors.joining(","));
 
-    List<String> queryResult =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
+    List<String> queryResult = getTableData(name);
     Assertions.assertTrue(
         queryResult.size() == 1, "Should just one row, table content: " + queryResult);
     Assertions.assertEquals(checkValues, queryResult.get(0));

@@ -32,14 +32,18 @@ import scala.collection.JavaConverters;
 /**
  * SparkTransformConverter translate between Spark transform and Gravitino partition, distribution,
  * sort orders. There may be multi partition transforms, but should be only one bucket transform.
- * Spark bucket transform is corresponding to Gravitino Hash distribution without sort orders. Spark
- * sorted bucket transform is corresponding to Gravitino Hash distribution with sort orders.
+ *
+ * <p>Spark bucket transform is corresponding to Gravitino Hash distribution without sort orders.
+ *
+ * <p>Spark sorted bucket transform is corresponding to Gravitino Hash distribution with sort
+ * orders.
  */
 public class SparkTransformConverter {
 
+  @Getter
   public static class DistributionAndSortOrdersInfo {
-    @Getter private Distribution distribution;
-    @Getter private SortOrder[] sortOrders;
+    private Distribution distribution;
+    private SortOrder[] sortOrders;
 
     private void setDistribution(Distribution distributionInfo) {
       Preconditions.checkState(distribution == null, "Should only set distribution once");
@@ -55,7 +59,7 @@ public class SparkTransformConverter {
   public static Transform[] toGravitinoPartitions(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
-      return new Transform[0];
+      return Transforms.EMPTY_TRANSFORM;
     }
 
     return Arrays.stream(transforms)
@@ -110,6 +114,9 @@ public class SparkTransformConverter {
       Arrays.stream(partitions)
           .forEach(
               transform -> {
+                Preconditions.checkArgument(
+                    transform instanceof SingleFieldPartitioning,
+                    "Only support SingleFieldPartitioning, but get " + transform.name());
                 SingleFieldPartitioning identityTransform = (SingleFieldPartitioning) transform;
                 String[] fieldName = identityTransform.fieldName();
                 switch (identityTransform.strategy()) {
