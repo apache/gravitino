@@ -69,10 +69,6 @@ public class MetalakePage extends AbstractWebIT {
     PageFactory.initElements(driver, this);
   }
 
-  public WebElement findElementByXPath(String xpath) {
-    return driver.findElement(By.xpath(xpath));
-  }
-
   public void setMetalakeNameField(String nameField) {
     metalakeNameField.sendKeys(
         Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
@@ -158,7 +154,7 @@ public class MetalakePage extends AbstractWebIT {
   public boolean checkIsErrorName() throws InterruptedException {
     try {
       String xpath = "//div[@data-refer='metalake-name-field']";
-      WebElement nameField = findElementByXPath(xpath);
+      WebElement nameField = driver.findElement(By.xpath(xpath));
       List<WebElement> errorText =
           nameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
 
