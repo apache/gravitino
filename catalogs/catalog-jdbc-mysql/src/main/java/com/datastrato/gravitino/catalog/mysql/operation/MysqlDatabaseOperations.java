@@ -98,8 +98,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     return metaData.getCatalogs();
   }
 
-
-    @Override
+  @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     try (final Connection connection = this.dataSource.getConnection()) {
       ResultSet resultSet = getSchema(connection, databaseName);
