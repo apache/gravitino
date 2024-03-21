@@ -135,6 +135,13 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   public void close() {
+    // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler. As
+    // Removal listener in Cache will be invoked by the scheduler asynchronously, we need to close
+    // the HiveClientPool instances first and then shutdown the scheduler. Another reason is that
+    // Caller may call this `close` method and then close the class loader that is needed by the
+    // `close` method. We must ensure that all the HiveClientPool instances are closed before the
+    // class loader is closed.
+    clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
   }
 }
