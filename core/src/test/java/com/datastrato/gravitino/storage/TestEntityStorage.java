@@ -41,14 +41,9 @@ import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.base.Preconditions;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -56,8 +51,10 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -118,20 +115,12 @@ public class TestEntityStorage {
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
         Statement statement = connection.createStatement()) {
-      URL scriptUrl = ClassLoader.getSystemResource(scriptPath);
-      if (scriptUrl == null) {
-        throw new IllegalStateException("Cannot find init sql script:" + scriptPath);
-      }
       StringBuilder ddlBuilder = new StringBuilder();
-      try (InputStreamReader inputStreamReader =
-              new InputStreamReader(
-                  Files.newInputStream(Paths.get(scriptUrl.getPath())), StandardCharsets.UTF_8);
-          BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-          ddlBuilder.append(line).append("\n");
-        }
-      }
+      IOUtils.readLines(
+              Objects.requireNonNull(
+                  this.getClass().getClassLoader().getResourceAsStream(scriptPath)),
+              StandardCharsets.UTF_8)
+          .forEach(line -> ddlBuilder.append(line).append("\n"));
       statement.execute(ddlBuilder.toString());
     } catch (Exception e) {
       throw new IllegalStateException("Create tables failed", e);
