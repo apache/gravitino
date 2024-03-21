@@ -52,24 +52,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String schema) throws NoSuchSchemaException {
     try (Connection connection = getConnection()) {
-//      String sql =
-//          "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ? AND catalog_name = ?";
-//      try (PreparedStatement statement = connection.prepareStatement(sql)) {
-//        statement.setString(1, schema);
-//        statement.setString(2, database);
-//        try (ResultSet resultSet = statement.executeQuery()) {
-//          if (!resultSet.next()) {
-//            throw new NoSuchSchemaException("No such schema: %s", schema);
-//          }
-//          String schemaName = resultSet.getString(1);
-//          String comment = getSchemaComment(schema, connection);
-//          return JdbcSchema.builder()
-//              .withName(schemaName)
-//              .withComment(comment)
-//              .withAuditInfo(AuditInfo.EMPTY)
-//              .withProperties(Collections.emptyMap())
-//              .build();
-//        }
       ResultSet resultSet = getSchema(connection, schema);
 
       boolean found = false;
@@ -86,11 +68,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
       String comment = getSchemaComment(schema, connection);
       return JdbcSchema.builder()
-              .withName(schema)
-              .withComment(comment)
-              .withAuditInfo(AuditInfo.EMPTY)
-              .withProperties(Collections.emptyMap())
-              .build();
+          .withName(schema)
+          .withComment(comment)
+          .withAuditInfo(AuditInfo.EMPTY)
+          .withProperties(Collections.emptyMap())
+          .build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
@@ -137,7 +119,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     }
     return sqlBuilder.toString();
   }
-
 
   @Override
   protected ResultSet getSchema(Connection connection, String databaseName) throws SQLException {

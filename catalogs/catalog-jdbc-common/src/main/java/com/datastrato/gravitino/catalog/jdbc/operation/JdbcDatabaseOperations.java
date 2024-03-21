@@ -77,7 +77,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
   }
 
-  protected abstract ResultSet getSchema(Connection connection, String schemaName) throws SQLException;
+  protected abstract ResultSet getSchema(Connection connection, String schemaName)
+      throws SQLException;
 
   /**
    * @param databaseName The name of the database.
