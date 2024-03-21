@@ -77,7 +77,7 @@ Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#
 
 ### Table capabilities
 
-- Gravitino table corresponds to the MySQL table.
+- Gravitino's table concept corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Supports index.
 - Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment)..
@@ -219,7 +219,8 @@ Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#
 
 #### Alter table operations
 
-The Gravitino table Supports these operations:
+The Gravitino Supports these alter table operations:
+
 - `RenameTable`
 - `UpdateComment`
 - `AddColumn`

@@ -14,7 +14,7 @@ Depending on your network and computer, startup time may take 3-5 minutes. Once 
 
 ## Prerequisites
 
-Install Git and docker-compose.
+Install Git and Docker Compose.
 
 ## TCP ports used
 

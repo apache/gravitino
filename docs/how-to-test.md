@@ -7,8 +7,7 @@ This software is licensed under the Apache License version 2."
 
 Gravitino has two types of tests:
 
-  - unit tests and integration tests that mainly
-focus on the functionalities of the specific class, module, or component.
+  - Unit tests, focus on the functionalities of the specific class, module, or component.
   - Integration tests, end-to-end tests that cover the whole system.
 
 :::note before test
