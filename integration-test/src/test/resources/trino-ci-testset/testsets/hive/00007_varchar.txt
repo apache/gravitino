@@ -1,0 +1,117 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb01 (
+   id integer,
+   name char(20)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb01',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb01',
+   table_type = 'MANAGED_TABLE'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb02 (
+   id integer,
+   name char(255)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb02',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb02',
+   table_type = 'MANAGED_TABLE'
+)"
+
+<QUERY_FAILED> Hive does not support the datatype CHAR with the length greater than 255
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb04 (
+   id integer,
+   name varchar(250)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb04',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb04',
+   table_type = 'MANAGED_TABLE'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb05 (
+   id integer,
+   name varchar(65535)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb05',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb05',
+   table_type = 'MANAGED_TABLE'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb06 (
+   id integer,
+   name char(1)
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb06',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb06',
+   table_type = 'MANAGED_TABLE'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_hive"".varchar_db1.tb07 (
+   id integer,
+   name varchar
+)
+COMMENT ''
+WITH (
+   input_format = 'org.apache.hadoop.mapred.TextInputFormat',
+   location = 'hdfs://%:9000/user/hive/warehouse/varchar_db1.db/tb07',
+   output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+   serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+   serde_name = 'tb07',
+   table_type = 'MANAGED_TABLE'
+)"
+
+<QUERY_FAILED> Hive does not support the datatype VARCHAR with the length greater than 65535, you can use varchar without length instead
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

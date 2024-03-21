@@ -17,6 +17,8 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
@@ -78,10 +80,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
     }
+
+    Preconditions.checkArgument(
+        distribution == Distributions.NONE, "MySQL does not support distribution");
+
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder

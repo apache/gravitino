@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
@@ -23,6 +24,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes) {
     throw new UnsupportedOperationException();
   }
