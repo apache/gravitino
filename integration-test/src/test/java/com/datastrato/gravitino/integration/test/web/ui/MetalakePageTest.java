@@ -7,15 +7,12 @@ package com.datastrato.gravitino.integration.test.web.ui;
 import com.datastrato.gravitino.integration.test.web.ui.Pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
-// TODO: Disable Test before fixed
-
-// import org.junit.jupiter.api.MethodOrderer;
-// import org.junit.jupiter.api.Order;
-// import org.junit.jupiter.api.Test;
-// import org.junit.jupiter.api.TestMethodOrder;
-
-// @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
 
@@ -31,8 +28,8 @@ public class MetalakePageTest extends AbstractWebIT {
     metalakePage.submitHandleMetalakeBtn.click();
   }
 
-  //  @Test
-  //  @Order(0)
+  @Test
+  @Order(0)
   public void homePage() {
     String title = driver.getTitle();
     Assertions.assertEquals("Gravitino", title);
