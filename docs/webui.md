@@ -295,3 +295,21 @@ Design draft preview:
 | Catalog  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10004; / _`Delete`_ &#10004; |
 | Schema   | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
 | Table    | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
+
+## E2E test
+End-to-end testing for web frontends is conducted using the [Selenium](https://www.selenium.dev/documentation/) testing framework, which is Java-based.
+
+Test cases can be found in the project directory: `integration-test/src/test/java/com/datastrato/gravitino/integration/test/web/ui`, where the `pages` directory is designated for storing definitions of frontend elements, among others.
+The root directory contains the actual steps for the test cases.
+
+:::tip
+ While writing test cases, running them in a local environment may not pose any issues.
+
+ However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
+
+ To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
+
+ This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
+
+ It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/) methods inherent to Selenium as a substitute for `Thread.sleep()`.
+:::
