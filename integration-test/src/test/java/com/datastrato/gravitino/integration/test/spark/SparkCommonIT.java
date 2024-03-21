@@ -146,7 +146,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testCreateSimpleTable() {
-    String tableName = "simple_table";
+    String tableName = formatTableName("simple_table");
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
     SparkTableInfo tableInfo = getTableInfo(tableName);
@@ -165,7 +165,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void testCreateTableWithDatabase() {
     // test db.table as table identifier
     String databaseName = "db1";
-    String tableName = "table1";
+    String tableName = formatTableName("table1");
     createDatabaseIfNotExists(databaseName);
     String tableIdentifier = String.join(".", databaseName, tableName);
 
@@ -178,7 +178,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     // use db then create table with table name
     databaseName = "db2";
-    tableName = "table2";
+    tableName = formatTableName("table2");
     createDatabaseIfNotExists(databaseName);
 
     sql("USE " + databaseName);
@@ -192,7 +192,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testCreateTableWithComment() {
-    String tableName = "comment_table";
+    String tableName = formatTableName("comment_table");
     dropTableIfExists(tableName);
     String createTableSql = getCreateSimpleTableString(tableName);
     String tableComment = "tableComment";
@@ -212,7 +212,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testDropTable() {
-    String tableName = "drop_table";
+    String tableName = formatTableName("drop_table");
     createSimpleTable(tableName);
     Assertions.assertEquals(true, tableExists(tableName));
 
@@ -224,8 +224,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testRenameTable() {
-    String tableName = "rename1";
-    String newTableName = "rename2";
+    String tableName = formatTableName("rename1");
+    String newTableName = formatTableName("rename2");
     dropTableIfExists(tableName);
     dropTableIfExists(newTableName);
 
@@ -250,8 +250,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testListTable() {
-    String table1 = "list1";
-    String table2 = "list2";
+    String table1 = formatTableName("list1");
+    String table2 = formatTableName("list2");
     createSimpleTable(table1);
     createSimpleTable(table2);
     Set<String> tables = listTableNames();
@@ -260,8 +260,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     // show tables from not current db
     String database = "db_list";
-    String table3 = "list3";
-    String table4 = "list4";
+    String table3 = formatTableName("list3");
+    String table4 = formatTableName("list4");
     createDatabaseIfNotExists(database);
     createSimpleTable(String.join(".", database, table3));
     createSimpleTable(String.join(".", database, table4));
@@ -275,7 +275,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testAlterTableSetAndRemoveProperty() {
-    String tableName = "test_property";
+    String tableName = formatTableName("test_property");
     dropTableIfExists(tableName);
 
     createSimpleTable(tableName);
@@ -293,7 +293,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testAlterTableAddAndDeleteColumn() {
-    String tableName = "test_column";
+    String tableName = formatTableName("test_column");
     dropTableIfExists(tableName);
 
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
@@ -312,7 +312,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testAlterTableUpdateColumnType() {
-    String tableName = "test_column_type";
+    String tableName = formatTableName("test_column_type");
     dropTableIfExists(tableName);
 
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
@@ -329,7 +329,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testAlterTableRenameColumn() {
-    String tableName = "test_rename_column";
+    String tableName = formatTableName("test_rename_column");
     dropTableIfExists(tableName);
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
     createSimpleTable(tableName);
@@ -349,7 +349,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testUpdateColumnPosition() {
-    String tableName = "test_column_position";
+    String tableName = formatTableName("test_column_position");
     dropTableIfExists(tableName);
 
     List<SparkColumnInfo> simpleTableColumns =
@@ -392,7 +392,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testAlterTableUpdateColumnComment() {
-    String tableName = "test_update_column_comment";
+    String tableName = formatTableName("test_update_column_comment");
     dropTableIfExists(tableName);
     List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
     createSimpleTable(tableName);
@@ -415,7 +415,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   void testComplexType() {
-    String tableName = "complex_type_table";
+    String tableName = formatTableName("complex_type_table");
     dropTableIfExists(tableName);
 
     sql(
@@ -440,6 +440,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
 
     checkTableReadWrite(tableInfo);
+  }
+
+  private String formatTableName(String tableName) {
+    return String.format("%s_%s", tableName, getProvider());
   }
 
   private void checkTableColumns(
