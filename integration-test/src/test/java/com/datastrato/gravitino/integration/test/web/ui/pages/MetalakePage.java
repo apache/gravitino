@@ -25,22 +25,22 @@ public class MetalakePage extends AbstractWebIT {
   @FindBy(xpath = "//div[@data-refer='metalake-table-grid']")
   public WebElement metalakeTableGrid;
 
-  @FindBy(xpath = "//*[@id='createMetalakeBtn']")
+  @FindBy(xpath = "//*[@data-refer='create-metalake-btn']")
   public WebElement createMetalakeBtn;
 
-  @FindBy(xpath = "//*[@id='metalakeNameField']")
+  @FindBy(xpath = "//*[@data-refer='metalake-name-field']//input")
   public WebElement metalakeNameField;
 
-  @FindBy(xpath = "//*[@id='metalakeCommentField']")
+  @FindBy(xpath = "//*[@data-refer='metalake-comment-field']//textarea")
   public WebElement metalakeCommentField;
 
-  @FindBy(xpath = "//*[@id='query-metalake']")
+  @FindBy(xpath = "//*[@data-refer='query-metalake']//input")
   public WebElement queryMetalakeInput;
 
-  @FindBy(xpath = "//*[@id='submitHandleMetalake']")
+  @FindBy(xpath = "//*[@data-refer='submit-handle-metalake']")
   public WebElement submitHandleMetalakeBtn;
 
-  @FindBy(xpath = "//*[@id='cancelHandleMetalake']")
+  @FindBy(xpath = "//*[@data-refer='cancel-handle-metalake']")
   public WebElement cancelHandleMetalakeBtn;
 
   @FindBy(xpath = "//button[@data-refer='confirm-delete']")
