@@ -18,7 +18,7 @@ import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
-import com.datastrato.gravitino.spark.connector.SparkTransformConverter.PartitionAndBucketInfo;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -115,7 +115,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table createTable(
-      Identifier ident, Column[] columns, Transform[] partitions, Map<String, String> properties)
+      Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
@@ -129,8 +129,10 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
     String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
-    PartitionAndBucketInfo gravitinoTransformContext =
-        SparkTransformConverter.toGravitinoTransform(partitions);
+    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
+        SparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
+    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions =
+        SparkTransformConverter.toGravitinoPartitions(transforms);
 
     try {
       com.datastrato.gravitino.rel.Table table =
@@ -141,9 +143,9 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
                   gravitinoColumns,
                   comment,
                   gravitinoProperties,
-                  gravitinoTransformContext.getPartitions(),
-                  gravitinoTransformContext.getDistribution(),
-                  gravitinoTransformContext.getSortOrders());
+                  partitions,
+                  distributionAndSortOrdersInfo.getDistribution(),
+                  distributionAndSortOrdersInfo.getSortOrders());
       return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());

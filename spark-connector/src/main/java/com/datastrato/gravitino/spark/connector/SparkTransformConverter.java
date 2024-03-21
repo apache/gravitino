@@ -37,39 +37,48 @@ import scala.collection.JavaConverters;
  */
 public class SparkTransformConverter {
 
-  public static class PartitionAndBucketInfo {
-    private List<Transform> partitions;
+  public static class DistributionAndSortOrdersInfo {
     @Getter private Distribution distribution;
     @Getter private SortOrder[] sortOrders;
 
-    public Transform[] getPartitions() {
-      if (partitions == null) {
-        return null;
-      }
-      return partitions.toArray(new Transform[0]);
+    private void setDistribution(Distribution distributionInfo) {
+      Preconditions.checkState(distribution == null, "Should only set distribution once");
+      this.distribution = distributionInfo;
     }
 
-    private void addPartition(Transform partition) {
-      if (partitions == null) {
-        this.partitions = new ArrayList<>();
-      }
-      partitions.add(partition);
-    }
-
-    private void setDistribution(Distribution distribution) {
-      Preconditions.checkState(this.distribution == null, "Should only set distribution once");
-      this.distribution = distribution;
-    }
-
-    private void setSortOrders(SortOrder[] sortOrders) {
-      Preconditions.checkState(this.sortOrders == null, "Should only set sort orders once");
-      this.sortOrders = sortOrders;
+    private void setSortOrders(SortOrder[] sortOrdersInfo) {
+      Preconditions.checkState(sortOrders == null, "Should only set sort orders once");
+      this.sortOrders = sortOrdersInfo;
     }
   }
 
-  public static PartitionAndBucketInfo toGravitinoTransform(
+  public static Transform[] toGravitinoPartitions(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
-    PartitionAndBucketInfo bundles = new PartitionAndBucketInfo();
+    if (ArrayUtils.isEmpty(transforms)) {
+      return null;
+    }
+
+    return Arrays.stream(transforms)
+        .map(
+            transform -> {
+              if (transform instanceof IdentityTransform) {
+                IdentityTransform identityTransform = (IdentityTransform) transform;
+                return Transforms.identity(identityTransform.reference().fieldNames());
+              } else if (transform instanceof BucketTransform
+                  || transform instanceof SortedBucketTransform) {
+                return null;
+              } else {
+                throw new NotSupportedException(
+                    "Doesn't support Spark transform: " + transform.name());
+              }
+            })
+        .filter(transform -> transform != null)
+        .toArray(Transform[]::new);
+  }
+
+  public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
+      org.apache.spark.sql.connector.expressions.Transform[] transforms) {
+    DistributionAndSortOrdersInfo bundles = new DistributionAndSortOrdersInfo();
     if (ArrayUtils.isEmpty(transforms)) {
       return bundles;
     }
@@ -77,11 +86,7 @@ public class SparkTransformConverter {
     Arrays.stream(transforms)
         .forEach(
             transform -> {
-              if (transform instanceof IdentityTransform) {
-                IdentityTransform identityTransform = (IdentityTransform) transform;
-                bundles.addPartition(
-                    Transforms.identity(identityTransform.reference().fieldNames()));
-              } else if (transform instanceof SortedBucketTransform) {
+              if (transform instanceof SortedBucketTransform) {
                 Pair<Distribution, SortOrder[]> pair =
                     toGravitinoDistributionAndSortOrders((SortedBucketTransform) transform);
                 bundles.setDistribution(pair.getLeft());
@@ -90,9 +95,6 @@ public class SparkTransformConverter {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 bundles.setDistribution(distribution);
-              } else {
-                throw new NotSupportedException(
-                    "Doesn't support Spark transform: " + transform.name());
               }
             });
 
