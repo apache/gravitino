@@ -529,7 +529,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   // Helper method to create a simple table, and could use corresponding
   // getSimpleTableColumn to check table column.
-  private void createSimpleTable(String identifier) {
+  protected void createSimpleTable(String identifier) {
     String createTableSql = getCreateSimpleTableString(identifier);
     sql(createTableSql);
   }
