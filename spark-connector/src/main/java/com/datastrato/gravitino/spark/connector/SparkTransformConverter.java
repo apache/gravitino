@@ -55,24 +55,24 @@ public class SparkTransformConverter {
   public static Transform[] toGravitinoPartitions(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
-      return null;
+      return new Transform[0];
     }
 
     return Arrays.stream(transforms)
+        .filter(
+            transform ->
+                !((transform instanceof BucketTransform)
+                    || (transform instanceof SortedBucketTransform)))
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
-              } else if (transform instanceof BucketTransform
-                  || transform instanceof SortedBucketTransform) {
-                return null;
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());
               }
             })
-        .filter(transform -> transform != null)
         .toArray(Transform[]::new);
   }
 

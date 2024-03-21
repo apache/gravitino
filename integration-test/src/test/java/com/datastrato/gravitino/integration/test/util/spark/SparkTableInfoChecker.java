@@ -49,13 +49,12 @@ public class SparkTableInfoChecker {
   }
 
   public SparkTableInfoChecker withIdentifyPartition(List<String> partitionColumns) {
-    partitionColumns.stream()
-        .forEach(
-            columnName -> {
-              IdentityTransform identityTransform =
-                  SparkTransformConverter.createSparkIdentityTransform(columnName);
-              this.expectedTableInfo.addPartition(identityTransform);
-            });
+    partitionColumns.forEach(
+        columnName -> {
+          IdentityTransform identityTransform =
+              SparkTransformConverter.createSparkIdentityTransform(columnName);
+          this.expectedTableInfo.addPartition(identityTransform);
+        });
     this.checkFields.add(CheckField.PARTITION);
     return this;
   }

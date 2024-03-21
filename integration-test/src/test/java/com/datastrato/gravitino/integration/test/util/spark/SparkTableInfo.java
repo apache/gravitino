@@ -66,12 +66,12 @@ public class SparkTableInfo {
   }
 
   void addPartition(Transform partition) {
-    this.partitions.add(partition);
     if (partition instanceof IdentityTransform) {
       partitionColumnNames.add(((IdentityTransform) partition).reference().fieldNames()[0]);
     } else {
       throw new NotSupportedException("Doesn't support " + partition.name());
     }
+    this.partitions.add(partition);
   }
 
   static SparkTableInfo create(SparkBaseTable baseTable) {
