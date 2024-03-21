@@ -89,6 +89,8 @@ public abstract class ClientPoolImpl<C, E extends Exception>
 
   @Override
   public void close() {
+    // To avoid closing it repeatedly, we add a judgment that if it has been closed,
+    // we do not need to close it anymore.
     if (closed) {
       return;
     }
