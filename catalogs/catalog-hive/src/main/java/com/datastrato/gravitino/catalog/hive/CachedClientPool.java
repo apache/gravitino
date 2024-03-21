@@ -67,7 +67,10 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
             .removalListener(
                 (ignored, value, cause) -> {
-                  // We have closed the HiveClientPool that is manually removed from the cache.
+                  // In fact, we have closed some HiveClientPools manually in the `close` method.
+                  // to avoid closing it repeatedly, we add a judgment that if it has been closed,
+                  // we do not need to close it anymore, please refer to the `close` method in
+                  // `ClientPoolImpl`.
                   ((HiveClientPool) value).close();
                 })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
