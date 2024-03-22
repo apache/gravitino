@@ -107,13 +107,13 @@ public class TestSparkTransformConverter {
 
     org.apache.spark.sql.connector.expressions.Transform sparkBucket =
         Expressions.bucket(bucketNum, sparkFieldReferences);
-    DistributionAndSortOrdersInfo bundles =
+    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(
             new org.apache.spark.sql.connector.expressions.Transform[] {sparkBucket});
 
-    Assertions.assertNull(bundles.getSortOrders());
+    Assertions.assertNull(distributionAndSortOrdersInfo.getSortOrders());
 
-    Distribution distribution = bundles.getDistribution();
+    Distribution distribution = distributionAndSortOrdersInfo.getDistribution();
     String[][] gravitinoFieldReferences = createGravitinoFieldReferenceNames(sparkFieldReferences);
     Assertions.assertTrue(
         distribution.equals(createHashDistribution(bucketNum, gravitinoFieldReferences)));
@@ -130,21 +130,26 @@ public class TestSparkTransformConverter {
             createSparkFieldReference(bucketColumnNames),
             createSparkFieldReference(sortColumnNames));
 
-    DistributionAndSortOrdersInfo bundles =
+    DistributionAndSortOrdersInfo distributionAndSortOrders =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(
             new org.apache.spark.sql.connector.expressions.Transform[] {sortedBucketTransform});
     Assertions.assertTrue(
-        bundles.getDistribution().equals(createHashDistribution(bucketNum, bucketColumnNames)));
+        distributionAndSortOrders
+            .getDistribution()
+            .equals(createHashDistribution(bucketNum, bucketColumnNames)));
 
     SortOrder[] sortOrders =
         createSortOrders(sortColumnNames, ConnectorConstants.SPARK_DEFAULT_SORT_DIRECTION);
     // SortOrder doesn't implement equals for now
-    Assertions.assertEquals(sortOrders.length, bundles.getSortOrders().length);
+    Assertions.assertEquals(sortOrders.length, distributionAndSortOrders.getSortOrders().length);
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(
-          sortOrders[i].nullOrdering(), bundles.getSortOrders()[i].nullOrdering());
-      Assertions.assertEquals(sortOrders[i].direction(), bundles.getSortOrders()[i].direction());
-      Assertions.assertEquals(sortOrders[i].expression(), bundles.getSortOrders()[i].expression());
+          sortOrders[i].nullOrdering(),
+          distributionAndSortOrders.getSortOrders()[i].nullOrdering());
+      Assertions.assertEquals(
+          sortOrders[i].direction(), distributionAndSortOrders.getSortOrders()[i].direction());
+      Assertions.assertEquals(
+          sortOrders[i].expression(), distributionAndSortOrders.getSortOrders()[i].expression());
     }
   }
 

@@ -82,9 +82,10 @@ public class SparkTransformConverter {
 
   public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
-    DistributionAndSortOrdersInfo bundles = new DistributionAndSortOrdersInfo();
+    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
+        new DistributionAndSortOrdersInfo();
     if (ArrayUtils.isEmpty(transforms)) {
-      return bundles;
+      return distributionAndSortOrdersInfo;
     }
 
     Arrays.stream(transforms)
@@ -93,16 +94,16 @@ public class SparkTransformConverter {
               if (transform instanceof SortedBucketTransform) {
                 Pair<Distribution, SortOrder[]> pair =
                     toGravitinoDistributionAndSortOrders((SortedBucketTransform) transform);
-                bundles.setDistribution(pair.getLeft());
-                bundles.setSortOrders(pair.getRight());
+                distributionAndSortOrdersInfo.setDistribution(pair.getLeft());
+                distributionAndSortOrdersInfo.setSortOrders(pair.getRight());
               } else if (transform instanceof BucketTransform) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
-                bundles.setDistribution(distribution);
+                distributionAndSortOrdersInfo.setDistribution(distribution);
               }
             });
 
-    return bundles;
+    return distributionAndSortOrdersInfo;
   }
 
   public static org.apache.spark.sql.connector.expressions.Transform[] toSparkTransform(
@@ -158,11 +159,10 @@ public class SparkTransformConverter {
       SortedBucketTransform sortedBucketTransform) {
     int bucketNum = (Integer) sortedBucketTransform.numBuckets().value();
     Expression[] bucketColumns =
-        transToGravitinoNamedReference(
-            JavaConverters.seqAsJavaList(sortedBucketTransform.columns()));
+        toGravitinoNamedReference(JavaConverters.seqAsJavaList(sortedBucketTransform.columns()));
 
     Expression[] sortColumns =
-        transToGravitinoNamedReference(
+        toGravitinoNamedReference(
             JavaConverters.seqAsJavaList(sortedBucketTransform.sortedColumns()));
     SortOrder[] sortOrders =
         Arrays.stream(sortColumns)
@@ -210,7 +210,7 @@ public class SparkTransformConverter {
     }
   }
 
-  private static Expression[] transToGravitinoNamedReference(
+  private static Expression[] toGravitinoNamedReference(
       List<org.apache.spark.sql.connector.expressions.NamedReference> sparkNamedReferences) {
     return sparkNamedReferences.stream()
         .map(sparkReference -> NamedReference.field(sparkReference.fieldNames()))
