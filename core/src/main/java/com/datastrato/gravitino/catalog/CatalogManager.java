@@ -211,24 +211,28 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-
-    boolean metalakeExists;
-    try {
-      metalakeExists = store.exists(metalakeIdent, EntityType.METALAKE);
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
-    }
-
-    if (!metalakeExists) {
-      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
-    }
+    checkMetalakeExists(metalakeIdent);
 
     try {
       return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
 
+    } catch (IOException ioe) {
+      LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
+    checkMetalakeExists(metalakeIdent);
+
+    try {
+      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
+          .map(entity -> createCatalogWrapper(entity).catalog)
+          .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
       throw new RuntimeException(ioe);
@@ -454,6 +458,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
+  }
+
+  private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {
+    try {
+      if (!store.exists(ident, EntityType.METALAKE)) {
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to do storage operation", e);
+      throw new RuntimeException(e);
+    }
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {

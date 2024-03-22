@@ -359,6 +359,39 @@ public class TestCatalogManager {
   }
 
   @Test
+  public void testListCatalogsInfo() {
+    NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
+    NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
+    Map<String, String> props = ImmutableMap.of("provider", "test");
+
+    catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
+
+    Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
+    Assertions.assertEquals(2, catalogs.length);
+    for (Catalog catalog : catalogs) {
+      Assertions.assertTrue(
+          catalog.name().equals("catalog_rel") || catalog.name().equals("catalog_file"));
+      Assertions.assertEquals("comment", catalog.comment());
+      testProperties(props, catalog.properties());
+
+      if (catalog.name().equals("catalog_rel")) {
+        Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
+      } else {
+        Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
+      }
+    }
+
+    // Test list under non-existed metalake
+    NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
+    Namespace namespace = ident2.namespace();
+    Throwable exception =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> catalogManager.listCatalogsInfo(namespace));
+    Assertions.assertTrue(exception.getMessage().contains("Metalake metalake1 does not exist"));
+  }
+
+  @Test
   public void testLoadCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
     Map<String, String> props = ImmutableMap.of("provider", "test");

@@ -16,6 +16,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -89,6 +90,35 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
 
     metalake.dropCatalog(catalogIdent);
+  }
+
+  @Test
+  public void testListCatalogsInfo() {
+    String relCatalogName = GravitinoITUtils.genRandomName("rel_catalog_");
+    NameIdentifier relCatalogIdent = NameIdentifier.of(metalakeName, relCatalogName);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    Catalog relCatalog =
+        metalake.createCatalog(
+            relCatalogIdent,
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "relational catalog comment",
+            properties);
+
+    String fileCatalogName = GravitinoITUtils.genRandomName("file_catalog_");
+    NameIdentifier fileCatalogIdent = NameIdentifier.of(metalakeName, fileCatalogName);
+    Catalog fileCatalog =
+        metalake.createCatalog(
+            fileCatalogIdent,
+            Catalog.Type.FILESET,
+            "hadoop",
+            "file catalog comment",
+            Collections.emptyMap());
+
+    Catalog[] catalogs = metalake.listCatalogsInfo(relCatalogIdent.namespace());
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
   }
 
   @Test
