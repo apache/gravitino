@@ -83,6 +83,9 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
   public WebElement metalakePageTitle;
 
+  @FindBy(xpath = "//*[@data-refer='details-props-table']")
+  public WebElement detailsPropsTable;
+
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
   }
@@ -268,7 +271,8 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyShowCatalogDetails(String name) throws InterruptedException {
+  public boolean verifyShowCatalogDetails(String name, String hiveMetastoreUris)
+      throws InterruptedException {
     try {
       // Check the drawer css property value
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
@@ -279,7 +283,19 @@ public class CatalogsPage extends AbstractWebIT {
       String drawerTitle = detailsTitle.getText();
       boolean isText = Objects.equals(drawerTitle, name);
 
-      return isVisible && isText;
+      // Since the provided catalog attributes are known and fixed, validation is also performed on
+      // these values.
+      boolean isHiveURIS =
+          waitShowText(
+              hiveMetastoreUris,
+              By.xpath(".//*[@data-prev-refer='details-props-key-metastore.uris']"));
+      boolean isShowCheck =
+          waitShowText(
+              "false",
+              By.xpath(
+                  ".//*[@data-prev-refer='details-props-key-gravitino.bypass.hive.metastore.client.capability.check']"));
+
+      return isVisible && isText && isHiveURIS && isShowCheck;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;

@@ -104,7 +104,12 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(4)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(catalogName);
-    Assertions.assertTrue(catalogsPage.verifyShowCatalogDetails(catalogName));
+    String hiveMetastoreUris =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+    Assertions.assertTrue(catalogsPage.verifyShowCatalogDetails(catalogName, hiveMetastoreUris));
   }
 
   @Test
