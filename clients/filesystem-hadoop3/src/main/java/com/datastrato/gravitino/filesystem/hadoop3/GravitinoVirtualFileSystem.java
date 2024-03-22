@@ -16,6 +16,7 @@ import com.datastrato.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -182,10 +183,15 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     }
   }
 
-  @SuppressWarnings("deprecation")
   private boolean checkMountsSingleFile(Pair<Fileset, FileSystem> filesetPair) {
     try {
-      return filesetPair.getRight().isFile(new Path(filesetPair.getLeft().storageLocation()));
+      return filesetPair
+          .getRight()
+          .getFileStatus(new Path(filesetPair.getLeft().storageLocation()))
+          .isFile();
+    } catch (FileNotFoundException e) {
+      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
+      return false;
     } catch (IOException e) {
       throw new RuntimeException(
           String.format(
