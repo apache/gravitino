@@ -16,6 +16,8 @@ import com.datastrato.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -248,7 +250,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Pair<Fileset, FileSystem> constructNewFilesetPair(NameIdentifier identifier) {
     // Always create a new file system instance for the fileset.
     // Therefore, users cannot bypass gvfs and use `FileSystem.get()` to directly obtain the
-    // Filesystem
+    // FileSystem
     try {
       Fileset fileset = loadFileset(identifier);
       URI storageUri = URI.create(fileset.storageLocation());
@@ -286,7 +288,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public void setWorkingDirectory(Path newDir) {
+  public synchronized void setWorkingDirectory(Path newDir) {
     FilesetContext context = getFilesetContext(newDir);
     context.getFileSystem().setWorkingDirectory(context.getActualPath());
     this.workingDirectory = newDir;
