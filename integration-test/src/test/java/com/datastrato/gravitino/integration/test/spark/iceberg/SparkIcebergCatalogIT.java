@@ -21,4 +21,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   protected String getProvider() {
     return "lakehouse-iceberg";
   }
+
+  @Override
+  protected String getUsingClause() {
+    return "USING ICEBERG";
+  }
 }

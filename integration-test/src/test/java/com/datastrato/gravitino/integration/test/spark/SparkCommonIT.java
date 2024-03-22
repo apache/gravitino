@@ -52,6 +52,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
+  protected abstract String getUsingClause();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -73,7 +75,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @AfterAll
   void cleanUp() {
     sql("USE " + getCatalogName());
-    sql("DROP DATABASE IF EXISTS " + getDefaultDatabase() + " CASCADE");
+    getDatabases()
+        .forEach(
+            databaseName -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", databaseName)));
   }
 
   protected String getDefaultDatabase() {
@@ -328,9 +332,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 string", tableName));
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 bigint", tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>(simpleTableColumns);
-    updateColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
+    updateColumns.add(SparkColumnInfo.of("col1", DataTypes.LongType, null));
     checkTableColumns(tableName, updateColumns, getTableInfo(tableName));
   }
 
@@ -367,8 +371,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
-            tableName));
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') %s",
+            tableName, getUsingClause()));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));

@@ -21,4 +21,9 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   protected String getProvider() {
     return "hive";
   }
+
+  @Override
+  protected String getUsingClause() {
+    return "USING PARQUET";
+  }
 }
