@@ -79,7 +79,7 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.1")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
