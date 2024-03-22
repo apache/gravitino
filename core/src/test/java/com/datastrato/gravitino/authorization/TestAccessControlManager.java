@@ -35,7 +35,7 @@ public class TestAccessControlManager {
   private static String metalake = "metalake";
 
   private static BaseMetalake metalakeEntity =
-      new BaseMetalake.Builder()
+      BaseMetalake.builder()
           .withId(1L)
           .withName(metalake)
           .withAuditInfo(
