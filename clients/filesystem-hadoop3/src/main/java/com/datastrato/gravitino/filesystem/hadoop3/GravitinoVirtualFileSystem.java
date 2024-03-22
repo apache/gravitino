@@ -293,14 +293,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    FilesetContext context = getFilesetContext(f);
+  public FSDataInputStream open(Path path, int bufferSize) throws IOException {
+    FilesetContext context = getFilesetContext(path);
     return context.getFileSystem().open(context.getActualPath(), bufferSize);
   }
 
   @Override
   public FSDataOutputStream create(
-      Path f,
+      Path path,
       FsPermission permission,
       boolean overwrite,
       int bufferSize,
@@ -308,7 +308,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       long blockSize,
       Progressable progress)
       throws IOException {
-    FilesetContext context = getFilesetContext(f);
+    FilesetContext context = getFilesetContext(path);
     return context
         .getFileSystem()
         .create(
@@ -322,9 +322,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
+  public FSDataOutputStream append(Path path, int bufferSize, Progressable progress)
       throws IOException {
-    FilesetContext context = getFilesetContext(f);
+    FilesetContext context = getFilesetContext(path);
     return context.getFileSystem().append(context.getActualPath(), bufferSize, progress);
   }
 
@@ -358,14 +358,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public boolean delete(Path f, boolean recursive) throws IOException {
-    FilesetContext context = getFilesetContext(f);
+  public boolean delete(Path path, boolean recursive) throws IOException {
+    FilesetContext context = getFilesetContext(path);
     return context.getFileSystem().delete(context.getActualPath(), recursive);
   }
 
   @Override
-  public FileStatus getFileStatus(Path f) throws IOException {
-    FilesetContext context = getFilesetContext(f);
+  public FileStatus getFileStatus(Path path) throws IOException {
+    FilesetContext context = getFilesetContext(path);
     FileStatus fileStatus = context.getFileSystem().getFileStatus(context.getActualPath());
     return convertFileStatusPathPrefix(
         fileStatus,
@@ -374,8 +374,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public FileStatus[] listStatus(Path f) throws IOException {
-    FilesetContext context = getFilesetContext(f);
+  public FileStatus[] listStatus(Path path) throws IOException {
+    FilesetContext context = getFilesetContext(path);
     FileStatus[] fileStatusResults = context.getFileSystem().listStatus(context.getActualPath());
     return Arrays.stream(fileStatusResults)
         .map(
@@ -388,8 +388,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public boolean mkdirs(Path f, FsPermission permission) throws IOException {
-    FilesetContext context = getFilesetContext(f);
+  public boolean mkdirs(Path path, FsPermission permission) throws IOException {
+    FilesetContext context = getFilesetContext(path);
     return context.getFileSystem().mkdirs(context.getActualPath(), permission);
   }
 
