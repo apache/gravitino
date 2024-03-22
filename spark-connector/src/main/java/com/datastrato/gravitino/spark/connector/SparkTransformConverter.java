@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning.SingleFieldPartitioning;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -117,23 +116,18 @@ public class SparkTransformConverter {
       Arrays.stream(partitions)
           .forEach(
               transform -> {
-                Preconditions.checkArgument(
-                    transform instanceof SingleFieldPartitioning,
-                    "Only support SingleFieldPartitioning, but get " + transform.name());
-                SingleFieldPartitioning identityTransform = (SingleFieldPartitioning) transform;
-                String[] fieldName = identityTransform.fieldName();
-                switch (identityTransform.strategy()) {
-                  case IDENTITY:
-                    sparkTransforms.add(
-                        createSparkIdentityTransform(
-                            String.join(ConnectorConstants.DOT, fieldName)));
-                    break;
-                  default:
-                    throw new UnsupportedOperationException(
-                        "Doesn't support Gravitino partition: "
-                            + transform.name()
-                            + ", className: "
-                            + transform.getClass().getName());
+                if (transform instanceof Transforms.IdentityTransform) {
+                  Transforms.IdentityTransform identityTransform =
+                      (Transforms.IdentityTransform) transform;
+                  sparkTransforms.add(
+                      createSparkIdentityTransform(
+                          String.join(ConnectorConstants.DOT, identityTransform.fieldName())));
+                } else {
+                  throw new UnsupportedOperationException(
+                      "Doesn't support Gravitino partition: "
+                          + transform.name()
+                          + ", className: "
+                          + transform.getClass().getName());
                 }
               });
     }

@@ -36,13 +36,9 @@ public class TestSparkTransformConverter {
   private Map<org.apache.spark.sql.connector.expressions.Transform, Transform>
       sparkToGravitinoPartitionTransformMaps = new HashMap<>();
 
-  private Map<Transform, org.apache.spark.sql.connector.expressions.Transform>
-      gravitinoToSparkPartitionTransformMaps = new HashMap<>();
-
   @BeforeAll
   void init() {
     initSparkToGravitinoTransformMap();
-    initGravitinoToSparkTransformMap();
   }
 
   @Test
@@ -57,8 +53,8 @@ public class TestSparkTransformConverter {
           Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
         });
 
-    gravitinoToSparkPartitionTransformMaps.forEach(
-        (gravitinoTransform, sparkTransform) -> {
+    sparkToGravitinoPartitionTransformMaps.forEach(
+        (sparkTransform, gravitinoTransform) -> {
           org.apache.spark.sql.connector.expressions.Transform[] sparkTransforms =
               SparkTransformConverter.toSparkTransform(
                   new Transform[] {gravitinoTransform}, null, null);
@@ -116,8 +112,8 @@ public class TestSparkTransformConverter {
 
     Distribution distribution = distributionAndSortOrdersInfo.getDistribution();
     String[][] gravitinoFieldReferences = createGravitinoFieldReferenceNames(sparkFieldReferences);
-    Assertions.assertTrue(
-        distribution.equals(createHashDistribution(bucketNum, gravitinoFieldReferences)));
+    Assertions.assertEquals(
+        createHashDistribution(bucketNum, gravitinoFieldReferences), distribution);
   }
 
   @Test
@@ -218,14 +214,5 @@ public class TestSparkTransformConverter {
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkIdentityTransform("a.b"),
         Transforms.identity(new String[] {"a", "b"}));
-  }
-
-  private void initGravitinoToSparkTransformMap() {
-    gravitinoToSparkPartitionTransformMaps.put(
-        DTOConverters.toDTO(Transforms.identity("a")),
-        SparkTransformConverter.createSparkIdentityTransform("a"));
-    gravitinoToSparkPartitionTransformMaps.put(
-        DTOConverters.toDTO(Transforms.identity(new String[] {"a", "b"})),
-        SparkTransformConverter.createSparkIdentityTransform("a.b"));
   }
 }
