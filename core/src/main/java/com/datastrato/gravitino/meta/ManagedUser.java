@@ -10,14 +10,12 @@ import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.User;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 
 /** A class representing a user metadata entity in Gravitino. */
 @ToString
