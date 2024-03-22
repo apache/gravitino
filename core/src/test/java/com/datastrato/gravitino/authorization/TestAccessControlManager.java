@@ -15,7 +15,6 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -86,8 +85,8 @@ public class TestAccessControlManager {
     Assertions.assertEquals("last", user.lastName());
     Assertions.assertEquals("display", user.displayName());
     Assertions.assertTrue(user.active());
-    Assertions.assertEquals(Lists.newArrayList("group"), user.groups());
-    Assertions.assertEquals(Lists.newArrayList("role"), user.roles());
+    Assertions.assertTrue(user.groups().isEmpty());
+    Assertions.assertTrue(user.roles().isEmpty());
     Assertions.assertNull(user.defaultRole());
     Assertions.assertNull(user.comment());
 
@@ -109,9 +108,9 @@ public class TestAccessControlManager {
     Assertions.assertEquals("first", user.firstName());
     Assertions.assertEquals("last", user.lastName());
     Assertions.assertEquals("display", user.displayName());
+    Assertions.assertTrue(user.groups().isEmpty());
+    Assertions.assertTrue(user.roles().isEmpty());
     Assertions.assertTrue(user.active());
-    Assertions.assertEquals(Lists.newArrayList("group"), user.groups());
-    Assertions.assertEquals(Lists.newArrayList("role"), user.roles());
     Assertions.assertEquals("role", user.defaultRole());
     Assertions.assertEquals("comment", user.comment());
 
