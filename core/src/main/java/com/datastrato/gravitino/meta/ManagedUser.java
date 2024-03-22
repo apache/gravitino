@@ -30,23 +30,23 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
 
-  public static final Field COMMENT = Field.optional("comment", String.class, "The");
+  public static final Field COMMENT = Field.optional("comment", String.class, "The comment of the user entity.");
 
-  public static final Field FIRST_NAME = Field.required("first_name", String.class, "");
+  public static final Field FIRST_NAME = Field.required("first_name", String.class, "The first name of the user entity.");
 
-  public static final Field LAST_NAME = Field.required("last_name", String.class, "");
+  public static final Field LAST_NAME = Field.required("last_name", String.class, "The last name of the user entity");
 
-  public static final Field DISPLAY_NAME = Field.required("display_name", String.class, "");
+  public static final Field DISPLAY_NAME = Field.required("display_name", String.class, "The display name of the user entity");
 
-  public static final Field EMAIL_ADDRESS = Field.required("email_address", String.class, "");
+  public static final Field EMAIL_ADDRESS = Field.required("email_address", String.class, "The email address of the user entity");
 
-  public static final Field ACTIVE = Field.required("active", Boolean.class, "");
+  public static final Field ACTIVE = Field.required("active", Boolean.class, "The status of the user entity is whether active or not.");
 
-  public static final Field GROUPS = Field.optional("groups", List.class, "");
+  public static final Field GROUPS = Field.optional("groups", List.class, "The groups of the user entity");
 
-  public static final Field ROLES = Field.optional("roles", List.class, "");
+  public static final Field ROLES = Field.optional("roles", List.class, "The roles of the user entity");
 
-  public static final Field DEFAULT_ROLE = Field.optional("default_role", String.class, "");
+  public static final Field DEFAULT_ROLE = Field.optional("default_role", String.class, "The default role of the user entity");
 
   private Long id;
   private String name;
