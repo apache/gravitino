@@ -84,7 +84,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   // multiple isolated class loaders with different package values.
   // Note: Unless you are assured that the class loader is not used anymore, you should not remove
   // the class loader from the map and close the class loader.
-  private static final Map<IsolatedClassloaderIdentifier, IsolatedClassLoader> CLASS_LOADER_MAP =
+  @VisibleForTesting
+  static final Map<IsolatedClassloaderIdentifier, IsolatedClassLoader> CLASS_LOADER_MAP =
       Maps.newConcurrentMap();
 
   /** Wrapper class for a catalog instance and its class loader. */
