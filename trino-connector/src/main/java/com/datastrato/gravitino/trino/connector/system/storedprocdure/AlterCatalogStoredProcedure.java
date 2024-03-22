@@ -55,7 +55,7 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
   }
 
   public void alterCatalog(
-      String catalogName, Map<String, String> set_properties, List<String> remove_properties) {
-    catalogConnectorManager.alterCatalog(metalake, catalogName, set_properties, remove_properties);
+      String catalogName, Map<String, String> setProperties, List<String> removeProperties) {
+    catalogConnectorManager.alterCatalog(metalake, catalogName, setProperties, removeProperties);
   }
 }

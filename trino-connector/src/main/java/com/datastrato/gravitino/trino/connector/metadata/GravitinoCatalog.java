@@ -58,6 +58,6 @@ public class GravitinoCatalog {
 
   public Instant getLastModifiedTime() {
     Instant time = catalog.auditInfo().lastModifiedTime();
-    return time == null ? Instant.MIN : time;
+    return time == null ? catalog.auditInfo().createTime() : time;
   }
 }

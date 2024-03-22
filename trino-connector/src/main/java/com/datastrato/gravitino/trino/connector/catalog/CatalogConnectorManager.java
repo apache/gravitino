@@ -315,22 +315,28 @@ public class CatalogConnectorManager {
       GravitinoCatalog oldCatalog = catalogConnectorContext.getCatalog();
 
       List<CatalogChange> changes = new ArrayList<>();
-      setProperties.entrySet().stream()
+      setProperties
+          .entrySet()
           .forEach(
               e -> {
-                if (!oldCatalog.getProperties().containsKey(e.getKey())
-                    || !oldCatalog.getProperties().get(e.getKey()).equals(e.getValue())) {
+                // Skip the no changed attributes
+                boolean matched =
+                    oldCatalog.getProperties().entrySet().stream()
+                        .anyMatch(
+                            oe ->
+                                oe.getKey().equals(e.getKey())
+                                    && oe.getValue().equals(e.getValue()));
+                if (!matched) {
                   changes.add(CatalogChange.setProperty(e.getKey(), e.getValue()));
                 }
               });
 
-      removeProperties.stream()
-          .forEach(
-              key -> {
-                if (oldCatalog.getProperties().containsKey(key)) {
-                  changes.add(CatalogChange.removeProperty(key));
-                }
-              });
+      removeProperties.forEach(
+          key -> {
+            if (oldCatalog.getProperties().containsKey(key)) {
+              changes.add(CatalogChange.removeProperty(key));
+            }
+          });
 
       if (changes.isEmpty()) {
         return;
