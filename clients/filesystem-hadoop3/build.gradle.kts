@@ -29,5 +29,7 @@ tasks.build {
 }
 
 tasks.javadoc {
-  source = sourceSets["main"].allJava
+  dependsOn(":clients:client-java-runtime:javadoc")
+  source = sourceSets["main"].allJava +
+    project(":clients:client-java-runtime").sourceSets["main"].allJava
 }
