@@ -9,22 +9,12 @@ plugins {
   id("idea")
 }
 
-val defaultHadoopVersion: Int = 3
-
 dependencies {
-  if (defaultHadoopVersion == 3) {
-    compileOnly(libs.hadoop3.common)
-  } else {
-    compileOnly(libs.hadoop2.common)
-  }
+  compileOnly(libs.hadoop3.common)
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.caffeine)
 
-  if (defaultHadoopVersion == 3) {
-    testImplementation(libs.hadoop3.common)
-  } else {
-    testImplementation(libs.hadoop2.common)
-  }
+  testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
@@ -40,5 +30,4 @@ tasks.build {
 
 tasks.javadoc {
   source = sourceSets["main"].allJava
-  classpath = configurations["compileClasspath"]
 }

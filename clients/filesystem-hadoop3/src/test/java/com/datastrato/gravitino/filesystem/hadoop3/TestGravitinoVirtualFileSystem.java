@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.datastrato.gravitino.filesystem.hadoop3;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.filesystem.hadoop.utils.FileSystemTestUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -135,7 +134,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
       FileSystem proxyLocalFs =
           Objects.requireNonNull(
                   ((GravitinoVirtualFileSystem) gravitinoFileSystem)
-                      .getAuthedFilesetCache()
+                      .getFilesetCache()
                       .getIfPresent(
                           NameIdentifier.of(
                               metalakeName, catalogName, schemaName, managedFilesetName)))
@@ -191,15 +190,15 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
       Thread.sleep(1000);
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
-              .getAuthedFilesetCache()
+              .getFilesetCache()
               .getIfPresent(NameIdentifier.of(metalakeName, catalogName, schemaName, "fileset1")));
 
       // expired by time
       Thread.sleep(1000);
-      assertEquals(0, ((GravitinoVirtualFileSystem) fs).getAuthedFilesetCache().asMap().size());
+      assertEquals(0, ((GravitinoVirtualFileSystem) fs).getFilesetCache().asMap().size());
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
-              .getAuthedFilesetCache()
+              .getFilesetCache()
               .getIfPresent(NameIdentifier.of(metalakeName, catalogName, schemaName, "fileset2")));
     }
   }

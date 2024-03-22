@@ -12,7 +12,7 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":clients:filesystem-hadoop"))
+  implementation(project(":clients:filesystem-hadoop3"))
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {

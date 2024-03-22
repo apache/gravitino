@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.datastrato.gravitino.filesystem.hadoop3;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.file.Fileset;
@@ -15,7 +15,7 @@ import org.apache.hadoop.fs.Path;
  * A context object that holds the information about the fileset and the file system which used in
  * the {@link GravitinoVirtualFileSystem}'s operations.
  */
-public class FilesetContext {
+class FilesetContext {
   private NameIdentifier identifier;
   private Fileset fileset;
   private FileSystem fileSystem;

@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.datastrato.gravitino.filesystem.hadoop3;
 
 import java.io.IOException;
 import java.net.URI;
