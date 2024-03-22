@@ -5,13 +5,8 @@
 
 import '@/lib/styles/globals.css'
 
-import { Suspense } from 'react'
-
 import { NavigationEvents } from './rootLayout/navigation-events'
-
 import Provider from '@/lib/provider'
-
-import Loading from './rootLayout/Loading'
 import Layout from './rootLayout/Layout'
 import StyledToast from '../components/StyledToast'
 
@@ -19,7 +14,7 @@ export const metadata = {
   title: 'Gravitino',
   description: 'A high-performance, geo-distributed and federated metadata lake.',
   icons: {
-    icon: '/ui/icons/gravitino.svg'
+    icon: process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'
   }
 }
 
@@ -28,10 +23,8 @@ const RootLayout = ({ children }) => {
     <html lang='en' suppressHydrationWarning>
       <body>
         <Provider>
-          <Suspense fallback={<Loading />}>
-            <NavigationEvents />
-            <Layout>{children}</Layout>
-          </Suspense>
+          <NavigationEvents />
+          <Layout>{children}</Layout>
         </Provider>
         <StyledToast />
       </body>

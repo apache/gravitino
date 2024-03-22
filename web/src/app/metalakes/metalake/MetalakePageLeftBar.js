@@ -6,8 +6,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import MetalakeTree from './MetalakeTree'
 import { Box } from '@mui/material'
+import dynamic from 'next/dynamic'
+import Loading from '@/app/rootLayout/Loading'
+
+const DynamicMetalakeTree = dynamic(() => import('./MetalakeTree'), {
+  loading: () => <Loading />,
+  ssr: false
+})
 
 const MetalakePageLeftBar = () => {
   const treeWrapper = useRef(null)
@@ -27,7 +33,7 @@ const MetalakePageLeftBar = () => {
       sx={{ p: theme => theme.spacing(2.5, 2.5, 2.5), height: `calc(100% - 1.5rem)` }}
       ref={treeWrapper}
     >
-      <MetalakeTree height={height} />
+      <DynamicMetalakeTree height={height} />
     </Box>
   )
 }

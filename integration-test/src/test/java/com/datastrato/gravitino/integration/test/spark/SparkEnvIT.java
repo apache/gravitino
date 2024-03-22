@@ -24,16 +24,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
-public class SparkEnvIT extends SparkUtilIT {
+public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  protected final String hiveCatalogName = "hive";
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
   private String hiveMetastoreUri;
   private String gravitinoUri;
+
+  protected abstract String getCatalogName();
+
+  protected abstract String getProvider();
 
   @Override
   protected SparkSession getSparkSession() {
@@ -67,9 +70,9 @@ public class SparkEnvIT extends SparkUtilIT {
     properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
 
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, hiveCatalogName),
+        NameIdentifier.of(metalakeName, getCatalogName()),
         Catalog.Type.RELATIONAL,
-        "hive",
+        getProvider(),
         "",
         properties);
   }
