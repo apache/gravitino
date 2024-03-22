@@ -169,3 +169,7 @@ tasks.test {
     init(this)
   }
 }
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("runtimeJars")
+}

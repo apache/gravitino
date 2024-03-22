@@ -172,3 +172,7 @@ tasks.test {
 tasks.clean {
   delete("spark-warehouse")
 }
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("runtimeJars")
+}

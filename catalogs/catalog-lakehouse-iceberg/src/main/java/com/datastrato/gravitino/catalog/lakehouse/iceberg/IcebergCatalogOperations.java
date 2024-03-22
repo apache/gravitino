@@ -80,7 +80,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Iceberg catalog operations.
-   * @param entity The catalog entity associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
