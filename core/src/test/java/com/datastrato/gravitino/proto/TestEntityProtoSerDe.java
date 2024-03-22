@@ -6,7 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
-import com.datastrato.gravitino.meta.MetalakeUser;
+import com.datastrato.gravitino.meta.ManagedUser;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -279,23 +279,22 @@ public class TestEntityProtoSerDe {
     // Test UserEntity
     Long userId = 1L;
     String userName = "user";
-    MetalakeUser metalakeUser =
-        MetalakeUser.builder()
+    ManagedUser managedUser =
+        ManagedUser.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withProperties(props)
             .build();
-    byte[] userBytes = protoEntitySerDe.serialize(metalakeUser);
-    MetalakeUser metalakeUserFromBytes =
-        protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
-    Assertions.assertEquals(metalakeUser, metalakeUserFromBytes);
+    byte[] userBytes = protoEntitySerDe.serialize(managedUser);
+    ManagedUser managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
+    Assertions.assertEquals(managedUser, managedUserFromBytes);
 
-    MetalakeUser metalakeUserWithoutFields =
-        MetalakeUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
-    userBytes = protoEntitySerDe.serialize(metalakeUserWithoutFields);
-    metalakeUserFromBytes = protoEntitySerDe.deserialize(userBytes, MetalakeUser.class);
-    Assertions.assertEquals(metalakeUserWithoutFields, metalakeUserFromBytes);
-    Assertions.assertNull(metalakeUserFromBytes.properties());
+    ManagedUser managedUserWithoutFields =
+        ManagedUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    userBytes = protoEntitySerDe.serialize(managedUserWithoutFields);
+    managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
+    Assertions.assertEquals(managedUserWithoutFields, managedUserFromBytes);
+    Assertions.assertNull(managedUserFromBytes.properties());
   }
 }

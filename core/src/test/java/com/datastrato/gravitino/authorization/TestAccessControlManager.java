@@ -2,13 +2,12 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.tenant;
+package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
-import com.datastrato.gravitino.User;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -16,6 +15,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -68,21 +68,85 @@ public class TestAccessControlManager {
   public void testCreateUser() {
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
-    User user = accessControlManager.createUser("metalake", "user", props);
-    Assertions.assertEquals("user", user.name());
+    User user =
+        accessControlManager.createUser(
+            "metalake",
+            "testCreate",
+            "first",
+            "last",
+            "display",
+            "123@abc.com",
+            true,
+            null,
+            null,
+            props);
+    Assertions.assertEquals("testCreate", user.name());
     testProperties(props, user.properties());
+    Assertions.assertEquals("first", user.firstName());
+    Assertions.assertEquals("last", user.lastName());
+    Assertions.assertEquals("display", user.displayName());
+    Assertions.assertTrue(user.active());
+    Assertions.assertEquals(Lists.newArrayList("group"), user.groups());
+    Assertions.assertEquals(Lists.newArrayList("role"), user.roles());
+    Assertions.assertNull(user.defaultRole());
+    Assertions.assertNull(user.comment());
+
+    user =
+        accessControlManager.createUser(
+            "metalake",
+            "testCreateWithOptionalField",
+            "first",
+            "last",
+            "display",
+            "123@abc.com",
+            true,
+            "role",
+            "comment",
+            props);
+
+    Assertions.assertEquals("testCreateWithOptionalField", user.name());
+    testProperties(props, user.properties());
+    Assertions.assertEquals("first", user.firstName());
+    Assertions.assertEquals("last", user.lastName());
+    Assertions.assertEquals("display", user.displayName());
+    Assertions.assertTrue(user.active());
+    Assertions.assertEquals(Lists.newArrayList("group"), user.groups());
+    Assertions.assertEquals(Lists.newArrayList("role"), user.roles());
+    Assertions.assertEquals("role", user.defaultRole());
+    Assertions.assertEquals("comment", user.comment());
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
         UserAlreadyExistsException.class,
-        () -> accessControlManager.createUser("metalake", "user", props));
+        () ->
+            accessControlManager.createUser(
+                "metalake",
+                "testCreate",
+                "first",
+                "last",
+                "display",
+                "123@abc.com",
+                true,
+                "role",
+                "comment",
+                props));
   }
 
   @Test
   public void testLoadUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-    accessControlManager.createUser("metalake", "testLoad", props);
+    accessControlManager.createUser(
+        "metalake",
+        "testLoad",
+        "first",
+        "last",
+        "display",
+        "123@abc.com",
+        true,
+        "role",
+        "comment",
+        props);
 
     User user = accessControlManager.loadUser("metalake", "testLoad");
     Assertions.assertEquals("testLoad", user.name());
@@ -100,7 +164,17 @@ public class TestAccessControlManager {
   public void testDropUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-    accessControlManager.createUser("metalake", "testDrop", props);
+    accessControlManager.createUser(
+        "metalake",
+        "testDrop",
+        "first",
+        "last",
+        "display",
+        "123@abc.com",
+        true,
+        "role",
+        "comment",
+        props);
 
     // Test drop user
     boolean dropped = accessControlManager.dropUser("metalake", "testDrop");

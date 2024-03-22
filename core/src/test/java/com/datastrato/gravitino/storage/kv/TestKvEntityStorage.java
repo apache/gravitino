@@ -31,11 +31,12 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
-import com.datastrato.gravitino.meta.MetalakeUser;
+import com.datastrato.gravitino.meta.ManagedUser;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.StorageLayoutVersion;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -91,12 +92,18 @@ public class TestKvEntityStorage {
         .build();
   }
 
-  public static MetalakeUser createUser(String metalake, String name, AuditInfo auditInfo) {
-    return MetalakeUser.builder()
+  public static ManagedUser createUser(String metalake, String name, AuditInfo auditInfo) {
+    return ManagedUser.builder()
         .withId(1L)
         .withMetalake(metalake)
         .withName(name)
         .withAuditInfo(auditInfo)
+        .withRoles(Lists.newArrayList())
+        .withGroups(Lists.newArrayList())
+        .withFirstName("first")
+        .withLastName("last")
+        .withDisplayName("display")
+        .withEmailAddress("123@abc.om")
         .build();
   }
 
@@ -640,9 +647,9 @@ public class TestKvEntityStorage {
 
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       store.put(metalake);
-      MetalakeUser oneUser = createUser("metalake", "oneUser", auditInfo);
+      ManagedUser oneUser = createUser("metalake", "oneUser", auditInfo);
       store.put(oneUser);
-      MetalakeUser anotherUser = createUser("metalake", "anotherUser", auditInfo);
+      ManagedUser anotherUser = createUser("metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
       Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), EntityType.USER));
       Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), EntityType.USER));

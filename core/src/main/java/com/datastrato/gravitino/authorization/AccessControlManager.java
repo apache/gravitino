@@ -2,28 +2,30 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.tenant;
+package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.User;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.MetalakeUser;
+import com.datastrato.gravitino.meta.ManagedUser;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/* AccessControlManager is used for manage users, roles, grant information, this class is
- * an important class for tenant management. */
+/**
+ * AccessControlManager is used for manage users, roles, grant information, this class is an
+ * important class for tenant management.
+ */
 public class AccessControlManager implements SupportsUserManagement {
 
   private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
@@ -48,21 +50,47 @@ public class AccessControlManager implements SupportsUserManagement {
    * Creates a new User.
    *
    * @param metalake The Metalake of the User.
-   * @param userName THe name of the User.
-   * @param properties Additional properties for the Metalake.
+   * @param name The name of the User.
+   * @param firstName The first name of the User.
+   * @param lastName The last name of the User.
+   * @param displayName The display name of the User.
+   * @param emailAddress The email address of the User.
+   * @param active The status of the User is whether active or not.
+   * @param defaultRole The default role of the User.
+   * @param comment The comment of the User.
+   * @param properties Additional properties for the User.
    * @return The created User instance.
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
    * @throws RuntimeException If creating the User encounters storage issues.
    */
   @Override
-  public User createUser(String metalake, String userName, Map<String, String> properties)
+  public User createUser(
+      String metalake,
+      String name,
+      String firstName,
+      String lastName,
+      String displayName,
+      String emailAddress,
+      boolean active,
+      String defaultRole,
+      String comment,
+      Map<String, String> properties)
       throws UserAlreadyExistsException {
-    MetalakeUser metalakeUser =
-        MetalakeUser.builder()
+    ManagedUser managedUser =
+        ManagedUser.builder()
             .withId(idGenerator.nextId())
-            .withName(userName)
+            .withName(name)
             .withMetalake(metalake)
             .withProperties(properties)
+            .withFirstName(firstName)
+            .withLastName(lastName)
+            .withDisplayName(displayName)
+            .withEmailAddress(emailAddress)
+            .withActive(active)
+            .withGroups(Lists.newArrayList())
+            .withRoles(Lists.newArrayList())
+            .withDefaultRole(defaultRole)
+            .withComment(comment)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -70,18 +98,15 @@ public class AccessControlManager implements SupportsUserManagement {
                     .build())
             .build();
     try {
-      store.put(metalakeUser, false /* overwritten */);
-      return metalakeUser;
+      store.put(managedUser, false /* overwritten */);
+      return managedUser;
     } catch (EntityAlreadyExistsException e) {
-      LOG.warn("User {} in the metalake {} already exists", userName, metalake, e);
+      LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
       throw new UserAlreadyExistsException(
-          "User %s in the metalake %s already exists", userName, metalake);
+          "User %s in the metalake %s already exists", name, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Creating user {} failed in the metalake {} due to storage issues",
-          userName,
-          metalake,
-          ioe);
+          "Creating user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -122,7 +147,7 @@ public class AccessControlManager implements SupportsUserManagement {
   public User loadUser(String metalake, String userName) throws NoSuchUserException {
     try {
       return store.get(
-          NameIdentifier.of(metalake, userName), Entity.EntityType.USER, MetalakeUser.class);
+          NameIdentifier.of(metalake, userName), Entity.EntityType.USER, ManagedUser.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("user {} does not exist in the metalake {}", userName, metalake, e);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, userName, metalake);
