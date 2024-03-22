@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.config;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -134,46 +133,6 @@ public class ConfigEntry<T> {
                     "%s in %s is invalid. %s", stringConverter.apply(value), key, errorMsg));
           }
         });
-    return this;
-  }
-
-  /**
-   * Checks if the user-provided value for the config is within a specified range.
-   *
-   * @param min The minimum acceptable value for the configuration.
-   * @param max The maximum acceptable value for the configuration.
-   * @return The current ConfigEntry instance.
-   */
-  public ConfigEntry<T> checkRange(T min, T max) {
-    Preconditions.checkArgument(min instanceof Comparable, "min must be Comparable");
-    Preconditions.checkArgument(max instanceof Comparable, "max must be Comparable");
-
-    this.validator =
-        value -> {
-          // consider value as Optional<T> or T
-          T actualValue;
-          if (value instanceof Optional) {
-            if (!((Optional<T>) value).isPresent()) {
-              return;
-            }
-            actualValue = ((Optional<T>) value).get();
-          } else if (value == null) {
-            return;
-          } else {
-            actualValue = value;
-          }
-
-          if (((Comparable<T>) actualValue).compareTo(min) < 0
-              || ((Comparable<T>) actualValue).compareTo(max) > 0) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "The value is out of range, "
-                        + "please check it. The value is %s, "
-                        + "min value is %s, "
-                        + "max value is %s.",
-                    value, min, max));
-          }
-        };
     return this;
   }
 

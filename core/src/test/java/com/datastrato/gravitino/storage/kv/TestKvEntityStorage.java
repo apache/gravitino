@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
@@ -42,7 +41,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -133,7 +131,6 @@ public class TestKvEntityStorage {
 
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(Optional.empty());
     return config;
   }
 

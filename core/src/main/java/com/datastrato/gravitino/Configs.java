@@ -9,7 +9,6 @@ import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.Lists;
 import java.io.File;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
@@ -37,7 +36,8 @@ public interface Configs {
 
   // Config for data keep time after soft deletion, in milliseconds.
   String STORE_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.deleteAfterTimeMs";
-  Long DEFAULT_STORE_DELETE_AFTER_TIME = 604800000L; // 7 days
+  // using the fallback default value
+  Long DEFAULT_STORE_DELETE_AFTER_TIME = DEFAULT_KV_DELETE_AFTER_TIME;
   // The maximum allowed keep time for data deletion, in milliseconds. Equivalent to 30 days.
   Long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L;
   // The minimum allowed keep time for data deletion, in milliseconds. Equivalent to 10 minutes.
@@ -162,7 +162,7 @@ public interface Configs {
           .longConf()
           .createWithDefault(2000L);
 
-  ConfigEntry<Optional<Long>> KV_DELETE_AFTER_TIME =
+  ConfigEntry<Long> KV_DELETE_AFTER_TIME =
       new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
           .doc(
               String.format(
@@ -172,10 +172,13 @@ public interface Configs {
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
           .deprecated()
-          .alternatives(Lists.newArrayList(STORE_DELETE_AFTER_TIME_KEY))
           .longConf()
-          .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
-          .createWithOptional();
+          .checkValue(
+              v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  KV_DELETE_AFTER_TIME_KEY, MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW))
+          .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);
 
   ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
       new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
@@ -186,8 +189,13 @@ public interface Configs {
                       + "min delete time allow is %s ms(10 minutes)",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
+          .alternatives(Lists.newArrayList(KV_DELETE_AFTER_TIME_KEY))
           .longConf()
-          .checkRange(MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW)
+          .checkValue(
+              v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  STORE_DELETE_AFTER_TIME_KEY, MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW))
           .createWithDefault(DEFAULT_STORE_DELETE_AFTER_TIME);
 
   ConfigEntry<Long> VERSION_RETENTION_COUNT =
@@ -200,7 +208,13 @@ public interface Configs {
                   MAX_VERSION_RETENTION_COUNT, MIN_VERSION_RETENTION_COUNT))
           .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
-          .checkRange(MIN_VERSION_RETENTION_COUNT, MAX_VERSION_RETENTION_COUNT)
+          .checkValue(
+              v -> v >= MIN_VERSION_RETENTION_COUNT && v <= MAX_VERSION_RETENTION_COUNT,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  VERSION_RETENTION_COUNT_KEY,
+                  MIN_VERSION_RETENTION_COUNT,
+                  MAX_VERSION_RETENTION_COUNT))
           .createWithDefault(DEFAULT_VERSION_RETENTION_COUNT);
 
   // The followings are configurations for tree lock

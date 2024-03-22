@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage.kv;
 
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.storage.kv.KvNameMappingService.GENERAL_NAME_MAPPING_PREFIX;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
@@ -66,12 +65,7 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   public void start() {
-    // If users use the deprecated configuration, we will give priority to the deprecated value,
-    // otherwise the new configuration and its default values will be used.
     long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
-    if (config.get(KV_DELETE_AFTER_TIME).isPresent()) {
-      dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME).get() / 1000 / 60;
-    }
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -125,13 +119,7 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveOldVersionData() throws IOException {
-    // If users use the deprecated configuration, we will give priority to the deprecated value,
-    // otherwise the new configuration and its default values will be used.
-    long dateTimeLineMillis = config.get(STORE_DELETE_AFTER_TIME);
-    if (config.get(KV_DELETE_AFTER_TIME).isPresent()) {
-      dateTimeLineMillis = config.get(KV_DELETE_AFTER_TIME).get();
-    }
-    long deleteTimeLine = System.currentTimeMillis() - dateTimeLineMillis;
+    long deleteTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
     // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
     // is smaller than transactionIdToDelete)

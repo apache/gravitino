@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createBaseMakeLake;
@@ -39,7 +38,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -58,7 +56,6 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(Optional.empty());
     return config;
   }
 
