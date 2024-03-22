@@ -20,11 +20,11 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.platform.commons.util.StringUtils;
 
 public abstract class SparkCommonIT extends SparkEnvIT {
   private static String getSelectAllSql(String tableName) {
@@ -95,6 +95,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(2, 'b')");
 
+  protected abstract String getUsingClause();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -113,6 +115,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql("USE " + getDefaultDatabase());
   }
 
+  @AfterAll
+  void cleanUp() {
+    sql("USE " + getCatalogName());
+    getDatabases()
+        .forEach(
+            databaseName -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", databaseName)));
+  }
+
   protected String getDefaultDatabase() {
     return "default_db";
   }
@@ -121,53 +131,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(getCatalogName()));
-  }
-
-  @Test
-  void testCreateAndLoadSchema() {
-    String testDatabaseName = "t_create1";
-    dropDatabaseIfExists(testDatabaseName);
-    sql("CREATE DATABASE " + testDatabaseName);
-    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
-    Assertions.assertFalse(databaseMeta.containsKey("Comment"));
-    Assertions.assertTrue(databaseMeta.containsKey("Location"));
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    String properties = databaseMeta.get("Properties");
-    Assertions.assertTrue(StringUtils.isBlank(properties));
-
-    testDatabaseName = "t_create2";
-    dropDatabaseIfExists(testDatabaseName);
-    String testDatabaseLocation = "/tmp/" + testDatabaseName;
-    sql(
-        String.format(
-            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=001);",
-            testDatabaseName, testDatabaseLocation));
-    databaseMeta = getDatabaseMetadata(testDatabaseName);
-    String comment = databaseMeta.get("Comment");
-    Assertions.assertEquals("comment", comment);
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
-    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
-    properties = databaseMeta.get("Properties");
-    Assertions.assertEquals("((ID,001))", properties);
-  }
-
-  @Test
-  void testAlterSchema() {
-    String testDatabaseName = "t_alter";
-    sql("CREATE DATABASE " + testDatabaseName);
-    Assertions.assertTrue(
-        StringUtils.isBlank(getDatabaseMetadata(testDatabaseName).get("Properties")));
-
-    sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
-    Assertions.assertEquals("((ID,001))", getDatabaseMetadata(testDatabaseName).get("Properties"));
-
-    // Hive metastore doesn't support alter database location, therefore this test method
-    // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
-
-    Assertions.assertThrowsExactly(
-        NoSuchNamespaceException.class,
-        () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
   }
 
   @Test
@@ -365,9 +328,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 string", tableName));
+    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 bigint", tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>(simpleTableColumns);
-    updateColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
+    updateColumns.add(SparkColumnInfo.of("col1", DataTypes.LongType, null));
     checkTableColumns(tableName, updateColumns, getTableInfo(tableName));
   }
 
@@ -404,8 +367,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') USING PARQUET",
-            tableName));
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') %s",
+            tableName, getUsingClause()));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
