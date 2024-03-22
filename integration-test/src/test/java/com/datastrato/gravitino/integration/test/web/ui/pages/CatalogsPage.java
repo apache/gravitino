@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -28,10 +29,10 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='create-catalog-btn']")
   public WebElement createCatalogBtn;
 
-  @FindBy(xpath = "//*[@data-refer='catalog-name-field']//input")
+  @FindBy(xpath = "//*[@data-refer='catalog-name-field']")
   public WebElement catalogNameField;
 
-  @FindBy(xpath = "//*[@data-refer='catalog-comment-field']//textarea")
+  @FindBy(xpath = "//*[@data-refer='catalog-comment-field']")
   public WebElement catalogCommentField;
 
   @FindBy(xpath = "//button[@data-refer='add-catalog-props']")
@@ -42,6 +43,9 @@ public class CatalogsPage extends AbstractWebIT {
 
   @FindBy(xpath = "//div[@data-refer='tree-view']")
   public WebElement treeView;
+
+  @FindBy(xpath = "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]")
+  public WebElement tableWrapper;
 
   @FindBy(xpath = "//button[@data-refer='tab-table']")
   public WebElement tabTableBtn;
@@ -67,16 +71,29 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//button[@data-refer='confirm-delete']")
   public WebElement confirmDeleteBtn;
 
+  @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
+  public WebElement metalakeNameLink;
+
+  @FindBy(xpath = "//div[@data-prev-refer='props-metastore.uris']//input[@name='value']")
+  public WebElement hiveCatalogURIInput;
+
+  @FindBy(xpath = "//div[contains(@class, 'MuiDataGrid-columnHeaders')]//div[@role='row']")
+  public WebElement columnHeaders;
+
+  @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
+  public WebElement metalakePageTitle;
+
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
   }
 
   public void setCatalogNameField(String nameField) {
     try {
-      catalogNameField.sendKeys(
+      WebElement catalogNameFieldInput = catalogNameField.findElement(By.tagName("input"));
+      catalogNameFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-      catalogNameField.clear();
-      catalogNameField.sendKeys(nameField);
+      catalogNameFieldInput.clear();
+      catalogNameFieldInput.sendKeys(nameField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -84,10 +101,12 @@ public class CatalogsPage extends AbstractWebIT {
 
   public void setCatalogCommentField(String nameField) {
     try {
-      catalogCommentField.sendKeys(
+      WebElement metalakeCommentFieldInput =
+          catalogCommentField.findElement(By.tagName("textarea"));
+      metalakeCommentFieldInput.sendKeys(
           Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-      catalogCommentField.clear();
-      catalogCommentField.sendKeys(nameField);
+      metalakeCommentFieldInput.clear();
+      metalakeCommentFieldInput.sendKeys(nameField);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -95,9 +114,7 @@ public class CatalogsPage extends AbstractWebIT {
 
   public void setHiveCatalogURI(String value) {
     try {
-      String xpath = "//div[@data-prev-refer='props-metastore.uris']//input[@name='value']";
-      WebElement keyInput = driver.findElement(By.xpath(xpath));
-      keyInput.sendKeys(value);
+      hiveCatalogURIInput.sendKeys(value);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -209,11 +226,9 @@ public class CatalogsPage extends AbstractWebIT {
 
   public void clickBreadCrumbsToCatalogs() {
     try {
-      String xpath = "//a[@data-refer='metalake-name-link']";
-      WebElement link = tableGrid.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-      clickAndWait(link);
+      wait.until(ExpectedConditions.elementToBeClickable(metalakeNameLink));
+      clickAndWait(metalakeNameLink);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -256,8 +271,6 @@ public class CatalogsPage extends AbstractWebIT {
   public boolean verifyShowCatalogDetails(String name) throws InterruptedException {
     try {
       // Check the drawer css property value
-      String xpath = "//div[@data-refer='details-drawer']";
-      detailsDrawer = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(detailsDrawer));
       String drawerVisible = detailsDrawer.getCssValue("visibility");
@@ -268,6 +281,7 @@ public class CatalogsPage extends AbstractWebIT {
 
       return isVisible && isText;
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     } finally {
       clickAndWait(closeDetailsBtn);
@@ -287,22 +301,20 @@ public class CatalogsPage extends AbstractWebIT {
       // Check if the link text is match with name
       return Objects.equals(treeNode.getText(), name);
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     }
   }
 
   public boolean verifyEmptyCatalog() {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
       // Check is empty table
-      String rowXpath =
-          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]";
-      WebElement noCatalogRows = tableGrid.findElement(By.xpath(rowXpath));
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.visibilityOf(noCatalogRows));
-      boolean isEmptyTable = Objects.equals(noCatalogRows.getText(), "No rows");
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      return isEmptyTable;
+      boolean isNoRows = waitShowText("No rows", tableWrapper);
+      if (!isNoRows) {
+        LOG.error(tableWrapper.getText(), tableWrapper);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -311,7 +323,6 @@ public class CatalogsPage extends AbstractWebIT {
 
   public boolean verifyShowTableTitle(String title) {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
       WebElement text = tabTableBtn.findElement(By.tagName("p"));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(text));
@@ -326,9 +337,6 @@ public class CatalogsPage extends AbstractWebIT {
     try {
       List<String> columns = Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Comment");
 
-      String columnHeadersXpath =
-          "//div[contains(@class, 'MuiDataGrid-columnHeaders')]//div[@role='row']";
-      WebElement columnHeaders = driver.findElement(By.xpath(columnHeadersXpath));
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./div[@role='columnheader']"));
       if (columnHeadersRows.size() != columns.size()) {
@@ -353,13 +361,32 @@ public class CatalogsPage extends AbstractWebIT {
 
   public boolean verifyBackHomePage() {
     try {
-      Thread.sleep(ACTION_SLEEP_MILLIS);
-      String xpath = "//p[@data-refer='metalake-page-title']";
-      WebElement title = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.visibilityOf(title));
-      return Objects.equals(title.getText(), "Metalakes");
+      wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
+      return Objects.equals(metalakePageTitle.getText(), "Metalakes");
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyRefreshPage() {
+    try {
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(
+          webDriver ->
+              ((JavascriptExecutor) webDriver)
+                  .executeScript("return document.readyState")
+                  .equals("complete"));
+      wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
+      boolean isDisplayed = metalakeNameLink.isDisplayed();
+      if (!isDisplayed) {
+        LOG.error("No match with link, get {}", metalakeNameLink.getText());
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     }
   }

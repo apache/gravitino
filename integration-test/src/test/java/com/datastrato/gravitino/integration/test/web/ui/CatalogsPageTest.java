@@ -85,6 +85,14 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(2)
+  public void testRefreshPage() {
+    driver.navigate().refresh();
+    Assertions.assertEquals(driver.getTitle(), "Gravitino");
+    Assertions.assertTrue(catalogsPage.verifyRefreshPage());
+  }
+
+  @Test
+  @Order(3)
   public void testViewTabMetalakeDetails() throws InterruptedException {
     clickAndWait(catalogsPage.tabDetailsBtn);
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
@@ -93,14 +101,14 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(3)
+  @Order(4)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(catalogName);
     Assertions.assertTrue(catalogsPage.verifyShowCatalogDetails(catalogName));
   }
 
   @Test
-  @Order(4)
+  @Order(5)
   public void testEditCatalog() throws InterruptedException {
     catalogsPage.clickEditCatalogBtn(catalogName);
     catalogsPage.setCatalogNameField(modifiedCatalogName);
@@ -109,21 +117,21 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(5)
+  @Order(6)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(metalakeName, modifiedCatalogName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
   }
 
   @Test
-  @Order(6)
+  @Order(7)
   public void testClickSchemaLink() {
     catalogsPage.clickSchemaLink(metalakeName, modifiedCatalogName, schemaName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(metalakeName, modifiedCatalogName, schemaName, tableName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
@@ -131,7 +139,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(8)
+  @Order(9)
   public void testDeleteCatalog() throws InterruptedException {
     catalogsPage.clickBreadCrumbsToCatalogs();
     catalogsPage.clickDeleteCatalogBtn(modifiedCatalogName);
@@ -140,7 +148,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(9)
+  @Order(10)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
