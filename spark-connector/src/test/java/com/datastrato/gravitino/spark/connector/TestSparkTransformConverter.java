@@ -49,11 +49,12 @@ public class TestSparkTransformConverter {
   void testPartition() {
     sparkToGravitinoPartitionTransformMaps.forEach(
         (sparkTransform, gravitinoTransform) -> {
-          Transform[] gravitinoPartitions =
-              SparkTransformConverter.toGravitinoPartitions(
+          Transform[] gravitinoPartitionings =
+              SparkTransformConverter.toGravitinoPartitionings(
                   new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform});
-          Assertions.assertTrue(gravitinoPartitions != null && gravitinoPartitions.length == 1);
-          Assertions.assertEquals(gravitinoTransform, gravitinoPartitions[0]);
+          Assertions.assertTrue(
+              gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
+          Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
         });
 
     gravitinoToSparkPartitionTransformMaps.forEach(

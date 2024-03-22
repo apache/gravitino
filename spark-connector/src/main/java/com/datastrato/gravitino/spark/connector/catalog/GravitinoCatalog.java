@@ -131,8 +131,8 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
-    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions =
-        SparkTransformConverter.toGravitinoPartitions(transforms);
+    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
+        SparkTransformConverter.toGravitinoPartitionings(transforms);
 
     try {
       com.datastrato.gravitino.rel.Table table =
@@ -143,7 +143,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
                   gravitinoColumns,
                   comment,
                   gravitinoProperties,
-                  partitions,
+                  partitionings,
                   distributionAndSortOrdersInfo.getDistribution(),
                   distributionAndSortOrdersInfo.getSortOrders());
       return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);

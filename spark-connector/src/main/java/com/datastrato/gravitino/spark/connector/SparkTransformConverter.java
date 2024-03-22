@@ -56,17 +56,14 @@ public class SparkTransformConverter {
     }
   }
 
-  public static Transform[] toGravitinoPartitions(
+  public static Transform[] toGravitinoPartitionings(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
       return Transforms.EMPTY_TRANSFORM;
     }
 
     return Arrays.stream(transforms)
-        .filter(
-            transform ->
-                !((transform instanceof BucketTransform)
-                    || (transform instanceof SortedBucketTransform)))
+        .filter(transform -> !isBucketTransform(transform))
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
@@ -80,6 +77,11 @@ public class SparkTransformConverter {
         .toArray(Transform[]::new);
   }
 
+  public static boolean isBucketTransform(
+      org.apache.spark.sql.connector.expressions.Transform transform) {
+    return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
+  }
+
   public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
@@ -89,6 +91,7 @@ public class SparkTransformConverter {
     }
 
     Arrays.stream(transforms)
+        .filter(transform -> isBucketTransform(transform))
         .forEach(
             transform -> {
               if (transform instanceof SortedBucketTransform) {
@@ -100,6 +103,10 @@ public class SparkTransformConverter {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 distributionAndSortOrdersInfo.setDistribution(distribution);
+              } else {
+                throw new NotSupportedException(
+                    "Only support BucketTransform and SortedBucketTransform, but get: "
+                        + transform.name());
               }
             });
 
