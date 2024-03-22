@@ -8,11 +8,10 @@ import com.datastrato.gravitino.meta.ManagedUser;
 import java.util.Collection;
 import java.util.Map;
 
-public class ManagedUserSerDe
-    implements ProtoSerDe<ManagedUser, com.datastrato.gravitino.proto.User> {
+public class ManagedUserSerDe implements ProtoSerDe<ManagedUser, User> {
 
   @Override
-  public com.datastrato.gravitino.proto.User serialize(ManagedUser managedUser) {
+  public User serialize(ManagedUser managedUser) {
     User.Builder builder =
         User.newBuilder()
             .setId(managedUser.id())

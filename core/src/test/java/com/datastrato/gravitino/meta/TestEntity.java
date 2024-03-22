@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -209,10 +210,20 @@ public class TestEntity {
   public void testUser() {
     ManagedUser testManagedUser =
         ManagedUser.builder()
+            .withMetalake("metalake")
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withProperties(map)
+            .withFirstName("first")
+            .withLastName("last")
+            .withDisplayName("display")
+            .withEmailAddress("123@abc.com")
+            .withComment("comment")
+            .withDefaultRole("role")
+            .withActive(true)
+            .withGroups(Lists.newArrayList("group"))
+            .withRoles(Lists.newArrayList("role"))
             .build();
 
     Map<Field, Object> fields = testManagedUser.fields();
@@ -220,9 +231,34 @@ public class TestEntity {
     Assertions.assertEquals(userName, fields.get(ManagedUser.NAME));
     Assertions.assertEquals(auditInfo, fields.get(ManagedUser.AUDIT_INFO));
     Assertions.assertEquals(map, fields.get(ManagedUser.PROPERTIES));
+    Assertions.assertEquals("first", fields.get(ManagedUser.FIRST_NAME));
+    Assertions.assertEquals("last", fields.get(ManagedUser.LAST_NAME));
+    Assertions.assertEquals("display", fields.get(ManagedUser.DISPLAY_NAME));
+    Assertions.assertEquals("123@abc.com", fields.get(ManagedUser.EMAIL_ADDRESS));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(ManagedUser.ROLES));
+    Assertions.assertEquals(Lists.newArrayList("group"), fields.get(ManagedUser.GROUPS));
+    Assertions.assertTrue((Boolean) fields.get(ManagedUser.ACTIVE));
+    Assertions.assertEquals("comment", fields.get(ManagedUser.COMMENT));
+    Assertions.assertEquals("role", fields.get(ManagedUser.DEFAULT_ROLE));
 
     ManagedUser testManagedUserWithoutFields =
-        ManagedUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+        ManagedUser.builder()
+            .withMetalake("metalake")
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withFirstName("first")
+            .withLastName("last")
+            .withDisplayName("display")
+            .withEmailAddress("123@abc.com")
+            .build();
+
+    Assertions.assertEquals("first", fields.get(ManagedUser.FIRST_NAME));
+    Assertions.assertEquals("last", fields.get(ManagedUser.LAST_NAME));
+    Assertions.assertEquals("display", fields.get(ManagedUser.DISPLAY_NAME));
+    Assertions.assertEquals("123@abc.com", fields.get(ManagedUser.EMAIL_ADDRESS));
     Assertions.assertNull(testManagedUserWithoutFields.properties());
+    Assertions.assertNull(testManagedUserWithoutFields.roles());
+    Assertions.assertNull(testManagedUserWithoutFields.groups());
   }
 }

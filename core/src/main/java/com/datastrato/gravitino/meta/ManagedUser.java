@@ -10,12 +10,14 @@ import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.User;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** A class representing a user metadata entity in Gravitino. */
 @ToString
@@ -38,13 +40,13 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
 
   public static final Field DISPLAY_NAME = Field.required("display_name", String.class, "");
 
-  public static final Field EMAIL_ADDRESS = Field.required("display_name", String.class, "");
+  public static final Field EMAIL_ADDRESS = Field.required("email_address", String.class, "");
 
   public static final Field ACTIVE = Field.required("active", Boolean.class, "");
 
-  public static final Field GROUPS = Field.required("groups", List.class, "");
+  public static final Field GROUPS = Field.optional("groups", List.class, "");
 
-  public static final Field ROLES = Field.required("roles", List.class, "");
+  public static final Field ROLES = Field.optional("roles", List.class, "");
 
   public static final Field DEFAULT_ROLE = Field.optional("default_role", String.class, "");
 

@@ -9,6 +9,7 @@ import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.meta.ManagedUser;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -285,13 +286,33 @@ public class TestEntityProtoSerDe {
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withProperties(props)
+            .withFirstName("first")
+            .withLastName("last")
+            .withDisplayName("display")
+            .withEmailAddress("123@abc.com")
+            .withComment("comment")
+            .withDefaultRole("role")
+            .withActive(true)
+            .withGroups(Lists.newArrayList("group"))
+            .withRoles(Lists.newArrayList("role"))
             .build();
     byte[] userBytes = protoEntitySerDe.serialize(managedUser);
     ManagedUser managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
     Assertions.assertEquals(managedUser, managedUserFromBytes);
 
     ManagedUser managedUserWithoutFields =
-        ManagedUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+        ManagedUser.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withFirstName("first")
+            .withLastName("last")
+            .withDisplayName("display")
+            .withEmailAddress("123@abc.com")
+            .withComment("comment")
+            .withDefaultRole("role")
+            .withActive(true)
+            .build();
     userBytes = protoEntitySerDe.serialize(managedUserWithoutFields);
     managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
     Assertions.assertEquals(managedUserWithoutFields, managedUserFromBytes);
