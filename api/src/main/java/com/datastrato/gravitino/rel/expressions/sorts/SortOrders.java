@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel.expressions.sorts;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
+import java.util.Objects;
 
 /** Helper methods to create SortOrders to pass into Gravitino. */
 public class SortOrders {
@@ -83,6 +84,37 @@ public class SortOrders {
     @Override
     public NullOrdering nullOrdering() {
       return nullOrdering;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      SortImpl sort = (SortImpl) o;
+      return Objects.equals(expression, sort.expression)
+          && direction == sort.direction
+          && nullOrdering == sort.nullOrdering;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(expression, direction, nullOrdering);
+    }
+
+    @Override
+    public String toString() {
+      return "SortImpl{"
+          + "expression="
+          + expression
+          + ", direction="
+          + direction
+          + ", nullOrdering="
+          + nullOrdering
+          + '}';
     }
   }
 
