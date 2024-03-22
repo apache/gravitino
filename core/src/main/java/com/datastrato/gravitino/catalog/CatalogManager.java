@@ -22,6 +22,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.catalog.CatalogManager.CatalogWrapper.IsolatedClassloaderIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -63,6 +64,9 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -75,6 +79,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+
+  // Map to store the isolated class loaders for each catalog provider, each provider may have
+  // multiple isolated class loaders with different package values.
+  // Note: Unless you are assured that the class loader is not used anymore, you should not remove
+  // the class loader from the map and close the class loader.
+  private static final Map<IsolatedClassloaderIdentifier, IsolatedClassLoader> CLASS_LOADER_MAP =
+      Maps.newConcurrentMap();
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -135,8 +146,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       } catch (Exception e) {
         LOG.warn("Failed to close catalog", e);
       }
+    }
 
-      classLoader.close();
+    @AllArgsConstructor
+    @Getter
+    @EqualsAndHashCode
+    static class IsolatedClassloaderIdentifier {
+      private final String provider;
+      private final boolean usePackage;
+      private final String packageValue;
     }
 
     private SupportsSchemas asSchemas() {
@@ -471,17 +489,23 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    IsolatedClassLoader classLoader;
-    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
-    } else {
-      // This will use the current class loader, it is mainly used for test.
-      classLoader =
-          new IsolatedClassLoader(
-              Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    }
+    IsolatedClassLoader classLoader =
+        CLASS_LOADER_MAP.computeIfAbsent(
+            new IsolatedClassloaderIdentifier(
+                provider,
+                config.get(Configs.CATALOG_LOAD_ISOLATED),
+                conf.get(Catalog.PROPERTY_PACKAGE)),
+            k -> {
+              if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+                String pkgPath = buildPkgPath(conf, provider);
+                String confPath = buildConfPath(conf, provider);
+                return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+              } else {
+                // This will use the current class loader, it is mainly used for test.
+                return new IsolatedClassLoader(
+                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+              }
+            });
 
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
