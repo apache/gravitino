@@ -5,9 +5,8 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
-import java.util.Map;
-
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import java.util.Map;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
