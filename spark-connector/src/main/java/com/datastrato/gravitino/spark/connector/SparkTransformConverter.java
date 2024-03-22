@@ -77,11 +77,6 @@ public class SparkTransformConverter {
         .toArray(Transform[]::new);
   }
 
-  public static boolean isBucketTransform(
-      org.apache.spark.sql.connector.expressions.Transform transform) {
-    return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
-  }
-
   public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
@@ -246,5 +241,10 @@ public class SparkTransformConverter {
   private static String getFieldNameFromGravitinoNamedReference(
       NamedReference gravitinoNamedReference) {
     return String.join(ConnectorConstants.DOT, gravitinoNamedReference.fieldName());
+  }
+
+  private static boolean isBucketTransform(
+      org.apache.spark.sql.connector.expressions.Transform transform) {
+    return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
   }
 }
