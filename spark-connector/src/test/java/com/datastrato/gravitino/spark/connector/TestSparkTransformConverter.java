@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -117,7 +116,7 @@ public class TestSparkTransformConverter {
   }
 
   @Test
-  void testSparkToGravitinoSortOrder() {
+  void testSparkToGravitinoDistributionWithSortOrder() {
     int bucketNum = 16;
     String[][] bucketColumnNames = createGravitinoFieldReferenceNames("a", "b.c");
     String[][] sortColumnNames = createGravitinoFieldReferenceNames("f", "m.n");
@@ -130,28 +129,17 @@ public class TestSparkTransformConverter {
     DistributionAndSortOrdersInfo distributionAndSortOrders =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(
             new org.apache.spark.sql.connector.expressions.Transform[] {sortedBucketTransform});
-    Assertions.assertTrue(
-        distributionAndSortOrders
-            .getDistribution()
-            .equals(createHashDistribution(bucketNum, bucketColumnNames)));
+    Assertions.assertEquals(
+        createHashDistribution(bucketNum, bucketColumnNames),
+        distributionAndSortOrders.getDistribution());
 
     SortOrder[] sortOrders =
         createSortOrders(sortColumnNames, ConnectorConstants.SPARK_DEFAULT_SORT_DIRECTION);
-    // SortOrder doesn't implement equals for now
-    Assertions.assertEquals(sortOrders.length, distributionAndSortOrders.getSortOrders().length);
-    for (int i = 0; i < sortOrders.length; i++) {
-      Assertions.assertEquals(
-          sortOrders[i].nullOrdering(),
-          distributionAndSortOrders.getSortOrders()[i].nullOrdering());
-      Assertions.assertEquals(
-          sortOrders[i].direction(), distributionAndSortOrders.getSortOrders()[i].direction());
-      Assertions.assertEquals(
-          sortOrders[i].expression(), distributionAndSortOrders.getSortOrders()[i].expression());
-    }
+    Assertions.assertArrayEquals(sortOrders, distributionAndSortOrders.getSortOrders());
   }
 
   @Test
-  void testGravitinoToSparkSortOrder() {
+  void testGravitinoToSparkDistributionWithSortOrder() {
     int bucketNum = 16;
     String[][] bucketColumnNames = createGravitinoFieldReferenceNames("a", "b.c");
     String[][] sortColumnNames = createGravitinoFieldReferenceNames("f", "m.n");
