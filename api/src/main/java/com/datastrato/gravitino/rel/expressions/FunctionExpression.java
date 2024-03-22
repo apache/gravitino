@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel.expressions;
 
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * The interface of a function expression. A function expression is an expression that takes a
@@ -73,6 +74,26 @@ public interface FunctionExpression extends Expression {
         return functionName + "()";
       }
       return functionName + "(" + String.join(", ", Arrays.toString(arguments)) + ")";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      FuncExpressionImpl that = (FuncExpressionImpl) o;
+      return Objects.equals(functionName, that.functionName)
+          && Arrays.equals(arguments, that.arguments);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(functionName);
+      result = 31 * result + Arrays.hashCode(arguments);
+      return result;
     }
   }
 }
