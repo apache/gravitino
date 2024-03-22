@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -15,7 +14,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -425,17 +423,13 @@ public class CatalogMysqlIT extends AbstractIT {
                 ImmutableMap.of());
 
     Assertions.assertEquals(
-        toFunctionArg(UnparsedExpression.of("rand()")), createdTable.columns()[0].defaultValue());
+        UnparsedExpression.of("rand()"), createdTable.columns()[0].defaultValue());
     Assertions.assertEquals(
-        toFunctionArg(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
-        createdTable.columns()[1].defaultValue());
-    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[2].defaultValue());
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[1].defaultValue());
+    Assertions.assertEquals(Literals.NULL, createdTable.columns()[2].defaultValue());
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
-        LiteralDTO.builder()
-            .withValue("current_timestamp")
-            .withDataType(Types.VarCharType.of(255))
-            .build(),
+        Literals.varcharLiteral(255, "current_timestamp"),
         createdTable.columns()[4].defaultValue());
   }
 
@@ -484,71 +478,57 @@ public class CatalogMysqlIT extends AbstractIT {
     for (Column column : loadedTable.columns()) {
       switch (column.name()) {
         case "int_col_1":
-          Assertions.assertEquals(
-              toFunctionArg(Literals.integerLiteral(431)), column.defaultValue());
+          Assertions.assertEquals(Literals.integerLiteral(431), column.defaultValue());
           break;
         case "int_col_2":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("rand()")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("rand()"), column.defaultValue());
           break;
         case "int_col_3":
-          Assertions.assertEquals(toFunctionArg(Literals.integerLiteral(3)), column.defaultValue());
+          Assertions.assertEquals(Literals.integerLiteral(3), column.defaultValue());
           break;
         case "double_col_1":
-          Assertions.assertEquals(
-              toFunctionArg(Literals.doubleLiteral(123.45)), column.defaultValue());
+          Assertions.assertEquals(Literals.doubleLiteral(123.45), column.defaultValue());
           break;
         case "varchar20_col_1":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("10")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("10"), column.defaultValue());
           break;
         case "varchar100_col_1":
           Assertions.assertEquals(
-              toFunctionArg(Literals.varcharLiteral(100, "CURRENT_TIMESTAMP")),
-              column.defaultValue());
+              Literals.varcharLiteral(100, "CURRENT_TIMESTAMP"), column.defaultValue());
           break;
         case "varchar200_col_1":
-          Assertions.assertEquals(
-              toFunctionArg(Literals.varcharLiteral(200, "curdate()")), column.defaultValue());
+          Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("now()")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
           break;
         case "date_col_1":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
           break;
         case "date_col_2":
-          Assertions.assertEquals(toFunctionArg(Literals.NULL), column.defaultValue());
+          Assertions.assertEquals(Literals.NULL, column.defaultValue());
           break;
         case "date_col_3":
           Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("(curdate() + interval 1 year)")),
-              column.defaultValue());
+              UnparsedExpression.of("(curdate() + interval 1 year)"), column.defaultValue());
           break;
         case "date_col_4":
-          Assertions.assertEquals(
-              toFunctionArg(UnparsedExpression.of("curdate()")), column.defaultValue());
+          Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
           break;
         case "timestamp_col_1":
           Assertions.assertEquals(
-              toFunctionArg(Literals.timestampLiteral("2012-12-31T11:30:45")),
-              column.defaultValue());
+              Literals.timestampLiteral("2012-12-31T11:30:45"), column.defaultValue());
           break;
         case "timestamp_col_2":
           Assertions.assertEquals(
-              toFunctionArg(Literals.timestampLiteral("1983-09-05T00:00:00")),
-              column.defaultValue());
+              Literals.timestampLiteral("1983-09-05T00:00:00"), column.defaultValue());
           break;
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
-              toFunctionArg(Literals.decimalLiteral(Decimal.of("1.2", 6, 2))),
-              column.defaultValue());
+              Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());

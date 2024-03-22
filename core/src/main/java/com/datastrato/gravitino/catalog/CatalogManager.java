@@ -269,7 +269,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
     // load catalog-related configuration from catalog-specific configuration file
-    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(provider);
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
     Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
 
     long uid = idGenerator.nextId();
@@ -474,7 +474,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
       String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(provider);
+      String confPath = buildConfPath(conf, provider);
       classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -534,7 +534,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return catalog;
   }
 
-  private Map<String, String> loadCatalogSpecificConfig(String provider) {
+  private Map<String, String> loadCatalogSpecificConfig(
+      Map<String, String> properties, String provider) {
     if ("test".equals(provider)) {
       return Maps.newHashMap();
     }
@@ -542,7 +543,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String catalogSpecificConfigFile = provider + ".conf";
     Map<String, String> catalogSpecificConfig = Maps.newHashMap();
 
-    String fullPath = buildConfPath(provider) + File.separator + catalogSpecificConfigFile;
+    String fullPath =
+        buildConfPath(properties, provider) + File.separator + catalogSpecificConfigFile;
     try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
       Properties loadProperties = new Properties();
       loadProperties.load(inputStream);
@@ -567,22 +569,29 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    * Build the config path from the specific provider. Usually, the configuration file is under the
    * conf and conf and package are under the same directory.
    */
-  private String buildConfPath(String provider) {
+  private String buildConfPath(Map<String, String> properties, String provider) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    if (testEnv) {
-      return String.join(
-          File.separator,
-          gravitinoHome,
-          "catalogs",
-          "catalog-" + provider,
-          "build",
-          "resources",
-          "main");
-    }
 
-    return String.join(File.separator, gravitinoHome, "catalogs", provider, "conf");
+    String confPath;
+    String pkg = properties.get(Catalog.PROPERTY_PACKAGE);
+    if (pkg != null) {
+      confPath = String.join(File.separator, pkg, "conf");
+    } else if (testEnv) {
+      confPath =
+          String.join(
+              File.separator,
+              gravitinoHome,
+              "catalogs",
+              "catalog-" + provider,
+              "build",
+              "resources",
+              "main");
+    } else {
+      confPath = String.join(File.separator, gravitinoHome, "catalogs", provider, "conf");
+    }
+    return confPath;
   }
 
   private String buildPkgPath(Map<String, String> conf, String provider) {
@@ -593,7 +602,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
     String pkgPath;
     if (pkg != null) {
-      pkgPath = pkg;
+      pkgPath = String.join(File.separator, pkg, "libs");
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
       pkgPath =
