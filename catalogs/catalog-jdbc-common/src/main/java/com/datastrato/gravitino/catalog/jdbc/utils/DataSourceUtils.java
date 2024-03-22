@@ -51,7 +51,7 @@ public class DataSourceUtils {
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be
     // executed to confirm whether the connection is valid.
-    basicDataSource.setTestOnBorrow(true);
+    basicDataSource.setTestOnBorrow(false);
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     return basicDataSource;
   }
