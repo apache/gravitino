@@ -99,7 +99,7 @@ public class CatalogHiveIT extends AbstractIT {
 :::note
 * Make sure that the `Docker server` is running before running all the
   integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-it` tag.
-* on macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
+* On macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests; or make sure that
   [OrbStack](https://orbstack.dev/) is running.
 :::
@@ -116,12 +116,14 @@ Using Gravitino IT Docker container to run all integration tests. [deploy test]
 -----------------------------------------------------------------
 ```
 
-All the integration tests only run when all the required environments are ready. Otherwise,
-only the parts of the integration tests without the `gravitino-docker-it` tag run.
+Complete integration tests only run when all the required environments are met. Otherwise,
+only parts of them without the `gravitino-docker-it` tag run.
 
 ## How to debug Gravitino server and integration tests in embedded mode
 
-By default, the integration tests run in the embedded mode. `MiniGravitino` starts in the same process. Debugging `MiniGravitino` is simple and easy. You can modify any code in the Gravitino project and set breakpoints anywhere.
+By default, the integration tests run in the embedded mode, in which `MiniGravitino` starts in the
+same process. Debugging `MiniGravitino` is simple and easy, you can modify any code in the
+Gravitino project and set breakpoints anywhere.
 
 ## How to debug Gravitino server and integration tests in deploy mode
 
