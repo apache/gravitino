@@ -71,11 +71,7 @@ If a compile error occurs due to `The following artifacts could not be resolved:
 The corresponding configuration files are here: [gravitino.properties](../assets/trino/gravitino.properties) and [config.properties](../assets/trino/config.properties).
 
 :::note
-Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not recorded in the `/etc/config.properties`.
-:::
-
-:::note
-Use `plugin/trino-hive/pom.xml` after release version 435. Others should use `plugin/trino-hive-hadoop2/pom.xml`.
+Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not recorded in the `/etc/config.properties`. For the hive plugin, please use  `plugin/trino-hive/pom.xml` after release version 435. Others should use `plugin/trino-hive-hadoop2/pom.xml`.
 :::
 
 8. Start the Trino server and connect to the Gravitino server.
