@@ -233,7 +233,9 @@ public class ConfigEntry<T> {
   }
 
   /**
-   * Reads the configuration value.
+   * Reads the configuration value. If the configuration value is not found, it will try to find the
+   * value from the alternatives，which means that newer configurations have higher priority over
+   * deprecated ones.
    *
    * @param properties The map containing the configuration properties.
    * @return The value of the configuration entry.
