@@ -60,7 +60,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
     Assertions.assertEquals(
-        "((hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER), (ID,001))",
+        "((ID,001), (hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
         properties);
   }
 
@@ -74,7 +74,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
     Assertions.assertEquals(
-        "((hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER), (ID,001))",
+        "((ID,001), (hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
         getDatabaseMetadata(testDatabaseName).get("Properties"));
 
     // Hive metastore doesn't support alter database location, therefore this test method
