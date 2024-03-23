@@ -50,7 +50,8 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
-5. Change the `pom.xml` file in the `trino-gravitino` module accordingly. This is a [example](../assets/trino/pom.xml) of the `pom.xml` file in the `trino-gravitino` module.
+5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is a [example](../assets/trino/pom.xml) of the `pom.xml` file in the `trino-gravitino` module.
+
 6. Try to compile module `trino-gravitino` to see if there are any errors. 
 ```shell
 # build the whole trino project
@@ -60,10 +61,22 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 # build the trino-gravitino module if we change the code in the trino-gravitino module
 ./mvnw clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
+:::note
+If a compile error occurs due to `The following artifacts could not be resolved: com.datastrato.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
+:::
+
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
 ![](../assets/trino/add-config.jpg)
 
 The corresponding configuration files are here: [gravitino.properties](../assets/trino/gravitino.properties) and [config.properties](../assets/trino/config.properties).
+
+:::note
+Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not recorded in the `/etc/config.properties`.
+:::
+
+:::note
+Use `plugin/trino-hive/pom.xml` after release version 435. Others should use `plugin/trino-hive-hadoop2/pom.xml`.
+:::
 
 8. Start the Trino server and connect to the Gravitino server.
 ![](../assets/trino/start-trino.jpg)
