@@ -243,5 +243,27 @@ public class TestTransformTableChange {
         sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
     Assertions.assertEquals(
         sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
+
+  void testUpdateColumnDefaultValue() {
+    String[] fieldNames = new String[] {"col"};
+    String newDedauleValue = "col_default_value";
+    TableChange.UpdateColumnDefaultValue sparkUpdateColumnDefaultValue =
+        (TableChange.UpdateColumnDefaultValue)
+            TableChange.updateColumnDefaultValue(fieldNames, newDedauleValue);
+
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkUpdateColumnDefaultValue);
+
+    Assertions.assertTrue(
+        gravitinoChange
+            instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue);
+    com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue
+        gravitinoUpdateColumnDefaultValue =
+            (com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue) gravitinoChange;
+
+    Assertions.assertArrayEquals(
+        sparkUpdateColumnDefaultValue.fieldNames(), gravitinoUpdateColumnDefaultValue.fieldName());
+    Assertions.assertTrue(
+        newDedauleValue.equalsIgnoreCase(gravitinoUpdateColumnDefaultValue.newDefaultValue()));
   }
 }
