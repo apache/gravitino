@@ -10,7 +10,6 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SORT_ORDER_KEY;
 
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -184,7 +183,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
               ? Arrays.stream(gravitinoTable.getPartitioning())
                   .map(
                       ts ->
-                          ((Partitioning.SingleFieldPartitioning) ts)
+                          ((Transform.SingleFieldTransform) ts)
                               .fieldName()[0].toLowerCase(Locale.ENGLISH))
                   .collect(Collectors.toList())
               : Collections.EMPTY_LIST);

@@ -122,7 +122,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterNonExistantMetalake() {
+  public void testAlterNonExistentMetalake() {
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
     client.createMetalake(
