@@ -30,7 +30,7 @@
 
         <!--
         The following dependencies are required for the Gravitino connector. You can install them
-        locally (./gradlew publishToMavenLocal) or just use the release version like 0.5.0
+        locally (./gradlew publishToMavenLocal) or just use the release version like 0.4.0
         -->
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
