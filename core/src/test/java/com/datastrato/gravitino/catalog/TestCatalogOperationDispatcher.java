@@ -228,7 +228,6 @@ public class TestCatalogOperationDispatcher {
                     .build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
-    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
   }
@@ -310,7 +309,6 @@ public class TestCatalogOperationDispatcher {
   public void testCreateAndDropSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
 
     boolean dropped = dispatcher.dropSchema(schemaIdent, false);
     Assertions.assertTrue(dropped);
@@ -527,7 +525,6 @@ public class TestCatalogOperationDispatcher {
           TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
           TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
-    Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
     boolean dropped = dispatcher.dropTable(tableIdent);
     Assertions.assertTrue(dropped);

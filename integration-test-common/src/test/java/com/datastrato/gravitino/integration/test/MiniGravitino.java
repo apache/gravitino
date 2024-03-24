@@ -23,7 +23,6 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -111,7 +110,7 @@ public class MiniGravitino {
         .toLowerCase()
         .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
-          HTTPClient.builder(ImmutableMap.of())
+          HTTPClient.builder()
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
               .build();
@@ -120,12 +119,12 @@ public class MiniGravitino {
         .toLowerCase()
         .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
       restClient =
-          HTTPClient.builder(ImmutableMap.of())
+          HTTPClient.builder()
               .uri(URI)
               .withAuthDataProvider(KerberosProviderHelper.getProvider())
               .build();
     } else {
-      restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
+      restClient = HTTPClient.builder().uri(URI).build();
     }
 
     Future<?> future =

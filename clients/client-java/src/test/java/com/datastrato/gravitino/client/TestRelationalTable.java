@@ -35,7 +35,6 @@ import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -54,7 +53,6 @@ import org.junit.jupiter.api.Test;
 
 public class TestRelationalTable extends TestRelationalCatalog {
 
-  private static Schema schema;
   private static Table partitionedTable;
   private static final String schemaName = "testSchema";
   private static final String partitionedTableName = "testPartitionedTable";
@@ -72,8 +70,6 @@ public class TestRelationalTable extends TestRelationalCatalog {
         new SchemaCreateRequest(schemaName, "comment", Collections.emptyMap());
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
-
-    schema = catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
 
     // setup partitioned table
     NameIdentifier tableId =

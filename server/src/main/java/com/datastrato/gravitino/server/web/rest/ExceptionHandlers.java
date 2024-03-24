@@ -259,8 +259,6 @@ public class ExceptionHandlers {
 
     private static final String EXCEPTION_KEYWORD = "Exception: ";
 
-    private static final ExceptionHandler INSTANCE = new BaseExceptionHandler();
-
     private static String getBaseErrorMsg(
         String object, String operation, String parent, String reason) {
       return String.format(

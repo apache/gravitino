@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -83,7 +82,6 @@ public class CatalogConnectorContext {
 
   static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
-    private NameIdentifier catalogName;
     private GravitinoMetalake metalake;
     private Connector internalConnector;
     private GravitinoCatalog catalog;

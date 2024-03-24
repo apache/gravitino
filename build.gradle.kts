@@ -267,6 +267,7 @@ subprojects {
     tasks.withType<JavaCompile>().configureEach {
       options.errorprone.isEnabled.set(true)
       options.errorprone.disableAllChecks.set(true)
+      options.errorprone.disableWarningsInGeneratedCode.set(true)
       options.errorprone.enable(
         "AnnotateFormatMethod",
         "FormatStringAnnotation",
@@ -351,6 +352,7 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UnusedVariable",
         "UseCorrectAssertInTests",
         "VarTypeName",
         "XorPower",

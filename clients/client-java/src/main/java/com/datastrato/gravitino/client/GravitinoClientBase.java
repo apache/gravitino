@@ -39,11 +39,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @param authDataProvider The provider of the data which is used for authentication.
    */
   protected GravitinoClientBase(String uri, AuthDataProvider authDataProvider) {
-    this.restClient =
-        HTTPClient.builder(Collections.emptyMap())
-            .uri(uri)
-            .withAuthDataProvider(authDataProvider)
-            .build();
+    this.restClient = HTTPClient.builder().uri(uri).withAuthDataProvider(authDataProvider).build();
   }
 
   /**
