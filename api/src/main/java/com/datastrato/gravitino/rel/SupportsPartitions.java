@@ -8,7 +8,6 @@ import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.partitions.Partition;
-import java.util.List;
 
 /** Interface for tables that support partitions. */
 @Evolving
@@ -87,18 +86,9 @@ public interface SupportsPartitions {
   boolean dropPartition(String partitionName, boolean ifExists) throws NoSuchPartitionException;
 
   /**
-   * Drop partitions with specified names.
-   *
-   * @param partitionNames the names of the partition
-   * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists
-   * @return true if all partitions was deleted.
-   */
-  boolean dropPartitions(List<String> partitionNames, boolean ifExists)
-      throws NoSuchPartitionException, UnsupportedOperationException;
-
-  /**
    * If the table supports purging, drop a partition with specified name and completely remove
-   * partition data by skipping a trash.
+   * partition data by skipping a trash. If the table is an external table don't support purge
+   * partition, {@link UnsupportedOperationException} is thrown.
    *
    * @param partitionName The name of the partition.
    * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists
@@ -109,20 +99,5 @@ public interface SupportsPartitions {
   default boolean purgePartition(String partitionName, boolean ifExists)
       throws NoSuchPartitionException, UnsupportedOperationException {
     throw new UnsupportedOperationException("Partition purging is not supported");
-  }
-
-  /**
-   * If the table supports purging, drop partitions with specified names and completely remove
-   * partition data by skipping a trash.
-   *
-   * @param partitionNames The name of the partition.
-   * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists
-   * @return true if a partition was deleted, false if the partition did not exist.
-   * @throws NoSuchPartitionException If the partition does not exist.
-   * @throws UnsupportedOperationException If partition purging is not supported.
-   */
-  default boolean purgePartitions(List<String> partitionNames, boolean ifExists)
-      throws NoSuchPartitionException, UnsupportedOperationException {
-    throw new UnsupportedOperationException("Partitions purging is not supported");
   }
 }

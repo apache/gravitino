@@ -25,7 +25,6 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
-import com.datastrato.gravitino.dto.requests.DropPartitionsRequest;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
@@ -278,30 +277,4 @@ public class TestRelationalTable extends TestRelationalCatalog {
     Assertions.assertEquals("partition not found", exception.getMessage());
   }
 
-  @Test
-  public void testDropPartitions() throws JsonProcessingException {
-    String[] partitionNames = {"p1"};
-    DropPartitionsRequest req = new DropPartitionsRequest(partitionNames);
-
-    RelationalTable table = (RelationalTable) partitionedTable;
-    String partitionPath = withSlash(table.getPartitionRequestPath()) + "/delete";
-    DropResponse resp = new DropResponse(true);
-    buildMockResource(Method.POST, partitionPath, req, resp, SC_OK);
-    Assertions.assertTrue(
-        table.supportPartitions().dropPartitions(Arrays.asList(partitionNames), true));
-
-    // test throws exception
-    String[] partitionNames1 = {"p2"};
-    DropPartitionsRequest req1 = new DropPartitionsRequest(partitionNames1);
-    ErrorResponse errorResp =
-        ErrorResponse.notFound(
-            NoSuchPartitionException.class.getSimpleName(), "partition not found");
-    buildMockResource(Method.POST, partitionPath, req1, errorResp, SC_NOT_FOUND);
-
-    NoSuchPartitionException exception =
-        Assertions.assertThrows(
-            NoSuchPartitionException.class,
-            () -> table.supportPartitions().dropPartitions(Arrays.asList(partitionNames1), false));
-    Assertions.assertEquals("partition not found", exception.getMessage());
-  }
 }

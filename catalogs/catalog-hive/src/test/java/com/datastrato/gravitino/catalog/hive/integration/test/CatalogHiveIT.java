@@ -840,38 +840,6 @@ public class CatalogHiveIT extends AbstractIT {
         () -> createdTable.supportPartitions().dropPartition(partitionAdded.name(), false));
   }
 
-  @Test
-  public void testDropPartitions() throws TException, InterruptedException {
-    Table createdTable = preparePartitionedTable();
-
-    // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
-    String[] field1 = new String[] {"hive_col_name2"};
-    String[] field2 = new String[] {"hive_col_name3"};
-    Literal<?> literal1 = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
-    Literal<?> literal2 = Literals.stringLiteral("gravitino_it_test2");
-    Partition identity =
-        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
-    IdentityPartition partitionAdded =
-        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
-
-    List<String> partitionNames = Collections.singletonList(partitionAdded.name());
-
-    // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
-    boolean dropRes = createdTable.supportPartitions().dropPartitions(partitionNames, true);
-    Assertions.assertTrue(dropRes);
-    Assertions.assertThrows(
-        NoSuchObjectException.class,
-        () ->
-            hiveClientPool.run(
-                client ->
-                    client.getPartition(schemaName, createdTable.name(), partitionAdded.name())));
-
-    // test no-exist partition with ifExist=false
-    Assertions.assertThrows(
-        NoSuchPartitionException.class,
-        () -> createdTable.supportPartitions().dropPartitions(partitionNames, false));
-  }
-
   private Table preparePartitionedTable() throws TException, InterruptedException {
     Column[] columns = createColumns();
 
