@@ -225,21 +225,19 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   public boolean dropPartition(String partitionName, boolean ifExists)
       throws NoSuchPartitionException {
     try {
-      // check the partition exists
-      try {
-        table
-            .clientPool()
-            .run(c -> c.getPartition(table.schemaName(), table.name(), partitionName));
-      } catch (NoSuchObjectException e) {
+      // Check the partition exists
+      boolean partitionExists = partitionExists(partitionName);
+      if (!partitionExists) {
         if (ifExists) {
           return true;
         } else {
           throw new NoSuchPartitionException(
-              e, "Hive partition %s does not exist in Hive Metastore", partitionName);
+              "Hive partition %s does not exist in Hive Metastore", partitionName);
         }
       }
 
-      // get all partitions that will be deleted
+      // Get all children partitions for one parent partition name,
+      // cascade delete the parent partition of all its children partitions
       Table hiveTable = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
       List<org.apache.hadoop.hive.metastore.api.Partition> partitions =
           table
@@ -252,7 +250,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                           getFilterPartitionList(hiveTable, partitionName),
                           (short) -1));
 
-      // delete partitions iteratively
+      // Delete partitions iteratively
       for (org.apache.hadoop.hive.metastore.api.Partition partition : partitions) {
         table
             .clientPool()
@@ -280,15 +278,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     return true;
   }
 
-  @Override
-  public boolean dropPartitions(List<String> partitionNames, boolean ifExists)
-      throws NoSuchPartitionException, UnsupportedOperationException {
-    if (partitionNames.size() > 1) {
-      throw new UnsupportedOperationException("Only one partition is supported");
-    }
-    return dropPartition(partitionNames.get(0), ifExists);
-  }
-
   private List<String> getFilterPartitionList(Table dropTable, String partitionSpec)
       throws NoSuchPartitionException {
     Map<String, String> partMap = new HashMap<>();
@@ -298,7 +287,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       if (keyValue.length == 2) {
         partMap.put(keyValue[0], keyValue[1]);
       } else {
-        LOG.error("Error partition format: " + partitionSpec);
+        LOG.error("Error partition format: {}", partitionSpec);
         throw new NoSuchPartitionException(
             "Hive partition %s does not exist in Hive Metastore", partitionSpec);
       }

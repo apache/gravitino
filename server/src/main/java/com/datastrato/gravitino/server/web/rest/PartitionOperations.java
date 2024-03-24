@@ -13,7 +13,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
-import com.datastrato.gravitino.dto.requests.DropPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
@@ -26,7 +25,6 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -184,42 +182,6 @@ public class PartitionOperations {
                   table,
                   schema);
             }
-            return Utils.ok(new DropResponse(dropped));
-          });
-    } catch (Exception e) {
-      return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);
-    }
-  }
-
-  @POST
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "drop-partitions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @Path("/delete")
-  @ResponseMetered(name = "drop-partitions", absolute = true)
-  public Response dropPartitions(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
-      @QueryParam("purge") @DefaultValue("false") boolean purge,
-      @QueryParam("ifExists") @DefaultValue("false") boolean ifExists,
-      DropPartitionsRequest request) {
-    Preconditions.checkArgument(
-        request.getPartitionNames().length == 1, "Only one partition is supported");
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            Table loadTable = dispatcher.loadTable(tableIdent);
-            boolean dropped =
-                purge
-                    ? loadTable
-                        .supportPartitions()
-                        .purgePartitions(Arrays.asList(request.getPartitionNames()), ifExists)
-                    : loadTable
-                        .supportPartitions()
-                        .dropPartitions(Arrays.asList(request.getPartitionNames()), ifExists);
             return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
