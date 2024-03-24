@@ -42,7 +42,10 @@ public class RocksDBOptions {
     private void initializeOptionSetters() {
         // Each option name maps to a lambda that applies the setting to the appropriate
         // option object
-        optionSetters.put(".options.maxBackgroundJobs",
+        // and the syntax of optionKey should be:
+        // .<className>.<optionName>
+        // e.g. .Options.maxBackgroundJobs
+        optionSetters.put(".Options.maxBackgroundJobs",
                 (holder, value) -> {
                     holder.options.setMaxBackgroundJobs(Integer.parseInt(value));
                 });

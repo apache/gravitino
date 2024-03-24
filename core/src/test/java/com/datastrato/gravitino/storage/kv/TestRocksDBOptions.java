@@ -27,7 +27,7 @@ public class TestRocksDBOptions {
     @Test
     void testSetOptions() {
         String prefix = "gravitino.entity.store.kv.rocksdb";
-        String optionsKey = prefix + ".options.maxBackgroundJobs";
+        String optionsKey = prefix + ".Options.maxBackgroundJobs";
 
         Map<String, String> mockConfigMap = new HashMap<String, String>();
         // set maxBackgroundJobs to 8
