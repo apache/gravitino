@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.LongType;
 import org.apache.spark.sql.types.MapType;
 import org.apache.spark.sql.types.MetadataBuilder;
+import org.apache.spark.sql.types.NullType;
 import org.apache.spark.sql.types.ShortType;
 import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructField;
@@ -91,6 +92,8 @@ public class SparkTypeConverter {
                           f.getComment().isDefined() ? f.getComment().get() : null))
               .toArray(Types.StructType.Field[]::new);
       return Types.StructType.of(fields);
+    } else if (sparkType instanceof NullType) {
+      return Types.NullType.get();
     }
     throw new UnsupportedOperationException("Not support " + sparkType.toString());
   }
@@ -158,6 +161,8 @@ public class SparkTypeConverter {
                                   .build()))
               .collect(Collectors.toList());
       return DataTypes.createStructType(fields);
+    } else if (gravitinoType instanceof Types.NullType) {
+      return DataTypes.NullType;
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }
