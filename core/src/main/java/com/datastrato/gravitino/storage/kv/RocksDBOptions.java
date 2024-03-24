@@ -6,20 +6,19 @@
 package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
-import org.rocksdb.WriteOptions;
-import org.rocksdb.ReadOptions;
-import org.rocksdb.Options;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-
 import lombok.Getter;
+import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
+import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RocksDBOptions {
     public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
+    @Getter
     private final Map<String, BiConsumer<RocksDBOptions, String>> optionSetters;
     @Getter
     private Options options;
@@ -27,9 +26,7 @@ public class RocksDBOptions {
     @Getter
     private WriteOptions writeOptions;
 
-    @Getter
-    private ReadOptions readOptions;
-
+  @Getter private ReadOptions readOptions;
 
     public RocksDBOptions() {
         this.options = new Options();
@@ -39,32 +36,47 @@ public class RocksDBOptions {
         initializeOptionSetters();
     }
 
+    public RocksDBOptions(Options options, WriteOptions writeOptions, ReadOptions readOptions) {
+        this.options = options;
+        this.writeOptions = writeOptions;
+        this.readOptions = readOptions;
+        this.optionSetters = new HashMap<>();
+        initializeOptionSetters();
+    }
+
+    
     private void initializeOptionSetters() {
         // Each option name maps to a lambda that applies the setting to the appropriate
         // option object
         // and the syntax of optionKey should be:
         // .<className>.<optionName>
         // e.g. .Options.maxBackgroundJobs
-        optionSetters.put(".Options.maxBackgroundJobs",
+        optionSetters.put(
+                ".Options.maxBackgroundJobs",
                 (holder, value) -> {
                     holder.options.setMaxBackgroundJobs(Integer.parseInt(value));
                 });
     }
 
+    
+    
+    
+    
+
     //
-    /**
-     * Apply user-defined options to option if this options is configurable.
-     * TODO: List all configurable options.
-     */
-    public void setOptions(Config config) {
-        String prefix = "gravitino.entity.store.kv.rocksdb";
-        Map<String, String> configMap = config.getConfigsWithPrefix(prefix);
-        optionSetters.forEach((optionKey, optionValue) -> {
-            String originalOptionKey = prefix + optionKey;
-            if (configMap.containsKey(originalOptionKey)) {
-                optionValue.accept(this, configMap.get(originalOptionKey));
-            }
+  /**
+   * Apply user-defined options to option if this options is configurable. TODO: List all
+   * configurable options.
+   */
+  public void setOptions(Config config) {
+    String prefix = "gravitino.entity.store.kv.rocksdb";
+    Map<String, String> configMap = config.getConfigsWithPrefix(prefix);
+    optionSetters.forEach(
+        (optionKey, optionValue) -> {
+          String originalOptionKey = prefix + optionKey;
+          if (configMap.containsKey(originalOptionKey)) {
+            optionValue.accept(this, configMap.get(originalOptionKey));
+          }
         });
-        LOGGER.debug("ZZZ Options: {}", this.options);
-    }
+  }
 }
