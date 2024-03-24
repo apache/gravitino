@@ -26,71 +26,66 @@ SOFTWARE.
  * Referred from types/axios.d.ts
  */
 
-export type ErrorMessageMode = 'none' | 'modal' | 'message' | undefined
+export const ErrorMessageMode = 'none' | 'modal' | 'message' | undefined;
 
-export type SuccessMessageMode = ErrorMessageMode
+export const SuccessMessageMode = ErrorMessageMode;
 
-export interface RequestOptions {
-  joinParamsToUrl?: boolean
+export const RequestOptions = {
+  joinParamsToUrl: false,
 
   // ** Format request parameter time
-  formatDate?: boolean
+  formatDate: false,
 
   // ** Whether to process the request result
-  isTransformResponse?: boolean
+  isTransformResponse: false,
 
   // ** Whether to return native response headers
   // ** For example: use this attribute when you need to get the response headers
-  isReturnNativeResponse?: boolean
+  isReturnNativeResponse: false,
 
   // ** Whether to join url
-  joinPrefix?: boolean
+  joinPrefix: false,
 
-  // ** Interface address, use the default apiUrl if you leave it blank
-  apiUrl?: string
+  // ** interface address, use the default apiUrl if you leave it blank
+  apiUrl: undefined,
 
   // ** Concatenating Path for the Request
-  urlPrefix?: string
+  urlPrefix: undefined,
 
   // ** Error message prompt type
-  errorMessageMode?: ErrorMessageMode
+  errorMessageMode: ErrorMessageMode,
 
   // ** Success message prompt type
-  successMessageMode?: SuccessMessageMode
+  successMessageMode: SuccessMessageMode,
 
   // ** Whether to add a timestamp
-  joinTime?: boolean
-  ignoreCancelToken?: boolean
+  joinTime: boolean,
+  ignoreCancelToken: boolean,
 
   // ** Whether to send token in header
-  withToken?: boolean
+  withToken: boolean,
 
   // ** Retry Mechanism for Requests
-  retryRequest?: RetryRequest
+  retryRequest: RetryRequest
 }
 
-export interface RetryRequest {
-  isOpenRetry: boolean
-  count: number
-  waitTime: number
+export const RetryRequest = {
+  isOpenRetry: false,
+  count: 0,
+  waitTime: 0,
 }
 
-export interface Result<T = any> {
-  code: number
-  type: 'success' | 'error' | 'warning'
-  message: string
-  result: T
+export const Result = {
+  code: number,
+  type: 'success' | 'error' | 'warning',
+  message: string,
+  result: null
 }
 
 // ** multipart/form-data: upload file
-export interface UploadFileParams {
-  data?: Recordable
-
-  // ** File parameter interface field name
-  name?: string
-
-  file: File | Blob
-
-  filename?: string
-  [key: string]: any
-}
+export const UploadFileParams = {
+  data: {},
+  name: undefined,
+  file: null,
+  filename: undefined,
+};
