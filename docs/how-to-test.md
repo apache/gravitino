@@ -73,6 +73,13 @@ Deploy the Gravitino server locally to run the integration tests. Follow these s
 * You can only skip web frontend integration tests by using the `./gradlew build -PskipWebITs` command.
 * You can skip both unit tests and all integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
+## Configuring parameters for integration tests
+### `DISPLAY_WEBPAGE_IN_TESTING`
+By default, the Gravitino web frontend page will not pop up when running integration tests. 
+If you wish to display the web frontend page during integrations test, you can set the `DISPLAY_WEBPAGE_IN_TESTING` environment variable in `setIntegrationTestEnvironment` in file build.gradle.kts. 
+For example:
+```param.environment("DISPLAY_WEBPAGE_IN_TESTING", true)```
+
 ## Docker test environment
 
 Some integration test cases depend on the Gravitino CI Docker image.
