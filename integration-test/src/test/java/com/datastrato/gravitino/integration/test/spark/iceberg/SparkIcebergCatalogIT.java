@@ -27,6 +27,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
+  protected boolean supportsSparkSQLClusteredBy() {
+    return false;
+  }
+
+  @Override
   protected String getUsingClause() {
     return "USING ICEBERG";
   }
