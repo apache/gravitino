@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -271,6 +272,9 @@ public class TestMetalakeOperations extends JerseyTest {
             new MetalakeUpdateRequest.RenameMetalakeRequest("newTest"),
             new MetalakeUpdateRequest.UpdateMetalakeCommentRequest("newComment"));
 
+    updateRequests.stream()
+        .map(MetalakeUpdateRequest::metalakeChange)
+        .toArray(MetalakeChange[]::new);
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
