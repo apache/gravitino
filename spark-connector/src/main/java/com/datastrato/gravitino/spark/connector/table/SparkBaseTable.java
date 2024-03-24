@@ -5,8 +5,11 @@
 
 package com.datastrato.gravitino.spark.connector.table;
 
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -22,6 +25,7 @@ import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.connector.write.LogicalWriteInfo;
 import org.apache.spark.sql.connector.write.WriteBuilder;
@@ -115,6 +119,15 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
     return ((SupportsWrite) getSparkTable()).newWriteBuilder(info);
+  }
+
+  @Override
+  public Transform[] partitioning() {
+    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions =
+        gravitinoTable.partitioning();
+    Distribution distribution = gravitinoTable.distribution();
+    SortOrder[] sortOrders = gravitinoTable.sortOrder();
+    return SparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
   }
 
   protected Table getSparkTable() {

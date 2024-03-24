@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.TableOperations;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;

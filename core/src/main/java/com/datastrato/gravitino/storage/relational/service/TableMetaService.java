@@ -88,7 +88,7 @@ public class TableMetaService {
     try {
       NameIdentifier.checkTable(tableEntity.nameIdentifier());
 
-      TablePO.Builder builder = new TablePO.Builder();
+      TablePO.Builder builder = TablePO.builder();
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       SessionUtils.doWithCommit(

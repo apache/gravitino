@@ -61,7 +61,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           }
           String schemaName = resultSet.getString(1);
           String comment = getSchemaComment(schema, connection);
-          return new JdbcSchema.Builder()
+          return JdbcSchema.builder()
               .withName(schemaName)
               .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)

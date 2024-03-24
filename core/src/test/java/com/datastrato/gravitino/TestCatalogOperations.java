@@ -4,10 +4,11 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -71,7 +72,7 @@ public class TestCatalogOperations
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
@@ -107,7 +108,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(new HashMap<>(properties))
@@ -125,7 +126,7 @@ public class TestCatalogOperations
       tables.put(ident, table);
     }
 
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
@@ -170,7 +171,7 @@ public class TestCatalogOperations
     }
 
     TestTable updatedTable =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
@@ -180,7 +181,7 @@ public class TestCatalogOperations
             .build();
 
     tables.put(ident, updatedTable);
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(table.comment())
         .withProperties(new HashMap<>(newProps))
@@ -214,7 +215,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestSchema schema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -271,7 +272,7 @@ public class TestCatalogOperations
     }
 
     TestSchema updatedSchema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(schema.comment())
             .withProperties(newProps)
@@ -421,7 +422,7 @@ public class TestCatalogOperations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     TestFileset fileset =
-        new TestFileset.Builder()
+        TestFileset.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -471,7 +472,7 @@ public class TestCatalogOperations
     }
 
     TestFileset updatedFileset =
-        new TestFileset.Builder()
+        TestFileset.builder()
             .withName(ident.name())
             .withComment(fileset.comment())
             .withProperties(newProps)

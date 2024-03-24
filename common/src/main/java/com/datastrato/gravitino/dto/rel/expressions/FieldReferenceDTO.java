@@ -65,6 +65,9 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Build the field reference.
      *
@@ -73,5 +76,10 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
     public FieldReferenceDTO build() {
       return new FieldReferenceDTO(fieldName);
     }
+  }
+
+  /** @return the builder for creating a new instance of FieldReferenceDTO. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

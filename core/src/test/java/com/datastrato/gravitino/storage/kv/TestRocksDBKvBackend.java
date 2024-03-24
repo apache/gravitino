@@ -162,6 +162,79 @@ public class TestRocksDBKvBackend {
   }
 
   @Test
+  void testDeleteRangeWhenIsStartExclusiveTrue() throws IOException {
+    KvBackend kvBackend = getKvBackEnd();
+    kvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abd".getBytes(StandardCharsets.UTF_8), "abd".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        false);
+    kvBackend.put(
+        "abeee".getBytes(StandardCharsets.UTF_8), "abeee".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acc".getBytes(StandardCharsets.UTF_8), "acc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acca".getBytes(StandardCharsets.UTF_8), "acca".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accb".getBytes(StandardCharsets.UTF_8), "accb".getBytes(StandardCharsets.UTF_8), false);
+
+    // More test case please refer to TestTransactionalKvBackend
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
+            .start("abc".getBytes(StandardCharsets.UTF_8))
+            .end("abc".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(true)
+            .endInclusive(false)
+            .build();
+
+    Assertions.assertDoesNotThrow(() -> kvBackend.deleteRange(kvRange));
+    Assertions.assertNull(kvBackend.get("abc".getBytes(StandardCharsets.UTF_8)));
+
+    Assertions.assertNotNull(kvBackend.get("acc".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNotNull(kvBackend.get("acca".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNotNull(kvBackend.get("accb".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void testDeleteRangeWhenIsEndExclusiveTrue() throws IOException {
+    KvBackend kvBackend = getKvBackEnd();
+    kvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abd".getBytes(StandardCharsets.UTF_8), "abd".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        false);
+    kvBackend.put(
+        "abeee".getBytes(StandardCharsets.UTF_8), "abeee".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acc".getBytes(StandardCharsets.UTF_8), "acc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acca".getBytes(StandardCharsets.UTF_8), "acca".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accb".getBytes(StandardCharsets.UTF_8), "accb".getBytes(StandardCharsets.UTF_8), false);
+
+    // More test case please refer to TestTransactionalKvBackend
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
+            .start("ab".getBytes(StandardCharsets.UTF_8))
+            .end("abc".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(false)
+            .endInclusive(true)
+            .build();
+
+    Assertions.assertDoesNotThrow(() -> kvBackend.deleteRange(kvRange));
+
+    Assertions.assertNotNull(kvBackend.get("acc".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNotNull(kvBackend.get("acca".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNotNull(kvBackend.get("accb".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
   void testScanWithBrokenRocksDB() throws IOException {
     KvBackend kvBackend = getKvBackEnd();
     kvBackend.put(
@@ -196,6 +269,102 @@ public class TestRocksDBKvBackend {
 
     List<Pair<byte[], byte[]>> data = kvBackend.scan(kvRange);
     Assertions.assertEquals(4, data.size());
+
+    RocksDBKvBackend rocksDBKvBackend = (RocksDBKvBackend) kvBackend;
+    RocksDB db = rocksDBKvBackend.getDb();
+    RocksDB spyDb = Mockito.spy(db);
+
+    Mockito.when(spyDb.newIterator()).thenThrow(new RuntimeException("Mock: RocksDB is broken"));
+    rocksDBKvBackend.setDb(spyDb);
+
+    Exception e =
+        Assertions.assertThrowsExactly(RuntimeException.class, () -> kvBackend.scan(kvRange));
+    Assertions.assertTrue(e.getMessage().contains("Mock: RocksDB is broken"));
+  }
+
+  @Test
+  void testScanWithBrokenRocksDWhenIsStartExclusiveTrue() throws IOException {
+    KvBackend kvBackend = getKvBackEnd();
+    kvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abd".getBytes(StandardCharsets.UTF_8), "abd".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        false);
+    kvBackend.put(
+        "abeee".getBytes(StandardCharsets.UTF_8), "abeee".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acc".getBytes(StandardCharsets.UTF_8), "acc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acca".getBytes(StandardCharsets.UTF_8), "acca".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accb".getBytes(StandardCharsets.UTF_8), "accb".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accg".getBytes(StandardCharsets.UTF_8), "accg".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acf".getBytes(StandardCharsets.UTF_8), "acf".getBytes(StandardCharsets.UTF_8), false);
+
+    // More test case please refer to TestTransactionalKvBackend
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
+            .start("abc".getBytes(StandardCharsets.UTF_8))
+            .end("ac".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(true)
+            .endInclusive(false)
+            .build();
+
+    List<Pair<byte[], byte[]>> data = kvBackend.scan(kvRange);
+    Assertions.assertEquals(4, data.size());
+
+    RocksDBKvBackend rocksDBKvBackend = (RocksDBKvBackend) kvBackend;
+    RocksDB db = rocksDBKvBackend.getDb();
+    RocksDB spyDb = Mockito.spy(db);
+
+    Mockito.when(spyDb.newIterator()).thenThrow(new RuntimeException("Mock: RocksDB is broken"));
+    rocksDBKvBackend.setDb(spyDb);
+
+    Exception e =
+        Assertions.assertThrowsExactly(RuntimeException.class, () -> kvBackend.scan(kvRange));
+    Assertions.assertTrue(e.getMessage().contains("Mock: RocksDB is broken"));
+  }
+
+  @Test
+  void testScanWithBrokenRocksDBWhenIsEndExclusiveTrue() throws IOException {
+    KvBackend kvBackend = getKvBackEnd();
+    kvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "abc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abd".getBytes(StandardCharsets.UTF_8), "abd".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        "abffff".getBytes(StandardCharsets.UTF_8),
+        false);
+    kvBackend.put(
+        "abeee".getBytes(StandardCharsets.UTF_8), "abeee".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acc".getBytes(StandardCharsets.UTF_8), "acc".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acca".getBytes(StandardCharsets.UTF_8), "acca".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accb".getBytes(StandardCharsets.UTF_8), "accb".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "accg".getBytes(StandardCharsets.UTF_8), "accg".getBytes(StandardCharsets.UTF_8), false);
+    kvBackend.put(
+        "acf".getBytes(StandardCharsets.UTF_8), "acf".getBytes(StandardCharsets.UTF_8), false);
+
+    // More test case please refer to TestTransactionalKvBackend
+    KvRange kvRange =
+        new KvRange.KvRangeBuilder()
+            .start("ab".getBytes(StandardCharsets.UTF_8))
+            .end("abc".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(false)
+            .endInclusive(true)
+            .build();
+
+    List<Pair<byte[], byte[]>> data = kvBackend.scan(kvRange);
+    Assertions.assertEquals(1, data.size());
 
     RocksDBKvBackend rocksDBKvBackend = (RocksDBKvBackend) kvBackend;
     RocksDB db = rocksDBKvBackend.getDb();

@@ -15,8 +15,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -96,7 +95,7 @@ public class CatalogIcebergIT extends AbstractIT {
   private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
 
   private static Catalog catalog;
 
@@ -160,12 +159,12 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -578,7 +577,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(1, table.partitioning().length);
     Assertions.assertEquals(
         columns[0].name(),
-        ((Partitioning.SingleFieldPartitioning) table.partitioning()[0]).fieldName()[0]);
+        ((Transform.SingleFieldTransform) table.partitioning()[0]).fieldName()[0]);
 
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
@@ -977,9 +976,9 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertEquals(tableComment, table.comment());
     Assertions.assertEquals(columns.size(), table.columns().length);
-    Assertions.assertEquals(DTOConverters.toDTO(distribution), table.distribution());
-    Assertions.assertArrayEquals(DTOConverters.toDTOs(sortOrder), table.sortOrder());
-    Assertions.assertArrayEquals(DTOConverters.toDTOs(partitioning), table.partitioning());
+    Assertions.assertEquals(distribution, table.distribution());
+    Assertions.assertArrayEquals(sortOrder, table.sortOrder());
+    Assertions.assertArrayEquals(partitioning, table.partitioning());
     for (int i = 0; i < columns.size(); i++) {
       Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
       Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());

@@ -6,12 +6,7 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoContainer;
@@ -72,7 +67,7 @@ public class TrinoConnectorIT extends AbstractIT {
   public static String scenarioTab2Name =
       GravitinoITUtils.genRandomName("TrinoIT_table2").toLowerCase();
   public static String tab1Name = GravitinoITUtils.genRandomName("TrinoIT_table3").toLowerCase();
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
   private static Catalog catalog;
 
   @BeforeAll
@@ -434,15 +429,18 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(Strategy.HASH, distribution.strategy());
     Assertions.assertEquals(50, distribution.number());
     Assertions.assertEquals(
-        "id", ((FieldReferenceDTO) ((DistributionDTO) distribution).args()[0]).fieldName()[0]);
+        "id", ((NamedReference.FieldReference) distribution.expressions()[0]).fieldName()[0]);
 
     Assertions.assertEquals(1, table.partitioning().length);
-    Transform partitioning = table.partitioning()[0];
-    Assertions.assertEquals("name", ((IdentityPartitioningDTO) partitioning).fieldName()[0]);
+    Transform transform = table.partitioning()[0];
+    Assertions.assertEquals(Transforms.NAME_OF_IDENTITY, transform.name());
+    Assertions.assertInstanceOf(Transforms.IdentityTransform.class, transform);
+    Assertions.assertEquals("name", ((Transforms.IdentityTransform) transform).fieldName()[0]);
 
     Assertions.assertEquals(1, table.sortOrder().length);
-    SortOrderDTO sortOrder = (SortOrderDTO) table.sortOrder()[0];
-    Assertions.assertEquals("name", ((FieldReferenceDTO) sortOrder.sortTerm()).fieldName()[0]);
+    SortOrder sortOrder = table.sortOrder()[0];
+    Assertions.assertEquals(
+        "name", ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0]);
   }
 
   @Test
@@ -450,7 +448,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog =
         createdMetalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
@@ -601,7 +599,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testColumnTypeNotNullByTrino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -697,7 +695,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog =
         createdMetalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
@@ -840,7 +838,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testHiveCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     createdMetalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
         Catalog.Type.RELATIONAL,
@@ -878,7 +876,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testWrongHiveCatalogProperty() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     createdMetalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
         Catalog.Type.RELATIONAL,
@@ -915,7 +913,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String hiveContainerIp = containerSuite.getHiveContainer().getContainerIpAddress();
     Catalog catalog =
         createdMetalake.createCatalog(
@@ -1000,9 +998,10 @@ public class TrinoConnectorIT extends AbstractIT {
                 NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
 
     Arrays.stream(table.partitioning())
-        .anyMatch(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0].equals("name"));
+        .anyMatch(p -> ((Transform.SingleFieldTransform) p).fieldName()[0].equals("name"));
     Arrays.stream(table.sortOrder())
-        .anyMatch(p -> ((FieldReferenceDTO) p.expression()).fieldName()[0].equals("id"));
+        .anyMatch(
+            p -> ((NamedReference.FieldReference) p.expression()).fieldName()[0].equals("id"));
   }
 
   @Test
@@ -1031,7 +1030,7 @@ public class TrinoConnectorIT extends AbstractIT {
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1118,7 +1117,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testMySQLCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1161,7 +1160,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1279,7 +1278,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1414,7 +1413,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testDropCatalogAndCreateAgain() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1455,12 +1454,12 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

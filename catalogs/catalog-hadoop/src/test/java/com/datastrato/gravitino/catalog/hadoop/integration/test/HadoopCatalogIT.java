@@ -7,7 +7,7 @@ package com.datastrato.gravitino.catalog.hadoop.integration.test;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.file.Fileset;
@@ -47,7 +47,7 @@ public class HadoopCatalogIT extends AbstractIT {
   public static final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
   public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
   private static final String provider = "hadoop";
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static FileSystem hdfs;
   private static String defaultBaseLocation;
@@ -81,12 +81,12 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

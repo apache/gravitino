@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.datastrato.gravitino.Audit;
@@ -48,7 +49,7 @@ public class RelationalTable implements Table, SupportsPartitions {
     return new RelationalTable(namespace, tableDTO, restClient);
   }
 
-  private final TableDTO tableDTO;
+  private final Table table;
   private final RESTClient restClient;
   private final Namespace namespace;
 
@@ -61,8 +62,8 @@ public class RelationalTable implements Table, SupportsPartitions {
    */
   public RelationalTable(Namespace namespace, TableDTO tableDTO, RESTClient restClient) {
     this.namespace = namespace;
-    this.tableDTO = tableDTO;
     this.restClient = restClient;
+    this.table = fromDTO(tableDTO);
   }
 
   /**
@@ -81,56 +82,56 @@ public class RelationalTable implements Table, SupportsPartitions {
    */
   @Override
   public String name() {
-    return tableDTO.name();
+    return table.name();
   }
 
   /** @return the columns of the table. */
   @Override
   public Column[] columns() {
-    return tableDTO.columns();
+    return table.columns();
   }
 
   /** @return the partitioning of the table. */
   @Override
   public Transform[] partitioning() {
-    return tableDTO.partitioning();
+    return table.partitioning();
   }
 
   /** @return the sort order of the table. */
   @Override
   public SortOrder[] sortOrder() {
-    return tableDTO.sortOrder();
+    return table.sortOrder();
   }
 
   /** @return the distribution of the table. */
   @Override
   public Distribution distribution() {
-    return tableDTO.distribution();
+    return table.distribution();
   }
 
   /** @return the comment of the table. */
   @Nullable
   @Override
   public String comment() {
-    return tableDTO.comment();
+    return table.comment();
   }
 
   /** @return the properties of the table. */
   @Override
   public Map<String, String> properties() {
-    return tableDTO.properties();
+    return table.properties();
   }
 
   /** @return the audit information of the table. */
   @Override
   public Audit auditInfo() {
-    return tableDTO.auditInfo();
+    return table.auditInfo();
   }
 
   /** @return the indexes of the table. */
   @Override
   public Index[] index() {
-    return tableDTO.index();
+    return table.index();
   }
 
   /** @return The partition names of the table. */

@@ -32,14 +32,13 @@ import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -121,7 +120,7 @@ public class CatalogHiveIT extends AbstractIT {
   private static final String provider = "hive";
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
-  private static GravitinoMetaLake metalake;
+  private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static SparkSession sparkSession;
   private static FileSystem hdfs;
@@ -229,12 +228,12 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-    GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetaLakes.length);
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetaLake createdMetalake =
+    GravitinoMetalake createdMetalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetaLake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -622,8 +621,7 @@ public class CatalogHiveIT extends AbstractIT {
                 TABLE_COMMENT,
                 properties,
                 new Transform[] {
-                  IdentityPartitioningDTO.of(columns[1].name()),
-                  IdentityPartitioningDTO.of(columns[2].name())
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
 
     // Directly get table from hive metastore to check if the table is created successfully.
@@ -640,8 +638,7 @@ public class CatalogHiveIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Transform[] transforms =
         new Transform[] {
-          IdentityPartitioningDTO.of(columns[0].name()),
-          IdentityPartitioningDTO.of(columns[1].name())
+          Transforms.identity(columns[0].name()), Transforms.identity(columns[1].name())
         };
     RuntimeException exception =
         assertThrows(
@@ -868,7 +865,7 @@ public class CatalogHiveIT extends AbstractIT {
         distribution == null
             ? Collections.emptyList()
             : Arrays.stream(distribution.expressions())
-                .map(t -> ((FieldReferenceDTO) t).fieldName()[0])
+                .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
                 .collect(Collectors.toList());
     Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
 
@@ -877,14 +874,14 @@ public class CatalogHiveIT extends AbstractIT {
           sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
-          ((FieldReferenceDTO) sortOrders[i].expression()).fieldName()[0],
+          ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],
           hiveTab.getSd().getSortCols().get(i).getCol());
     }
     Assertions.assertNotNull(createdTable.partitioning());
     Assertions.assertEquals(createdTable.partitioning().length, hiveTab.getPartitionKeys().size());
     List<String> partitionKeys =
         Arrays.stream(createdTable.partitioning())
-            .map(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0])
+            .map(p -> ((Transform.SingleFieldTransform) p).fieldName()[0])
             .collect(Collectors.toList());
     List<String> hivePartitionKeys =
         hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -914,7 +911,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 createProperties(),
-                new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+                new Transform[] {Transforms.identity(columns[2].name())});
     Assertions.assertNull(createdTable.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
@@ -1059,7 +1056,7 @@ public class CatalogHiveIT extends AbstractIT {
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Schema schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertNull(schema.auditInfo().lastModifier());
@@ -1087,7 +1084,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   void testLoadEntityWithSamePrefix() {
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertNotNull(catalog);
 
@@ -1142,7 +1139,7 @@ public class CatalogHiveIT extends AbstractIT {
   void testAlterEntityName() {
     String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
     client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
-    final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    final GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
     // Test rename metalake
@@ -1264,7 +1261,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1289,7 +1286,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1316,7 +1313,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1343,7 +1340,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1363,5 +1360,30 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  void testCustomCatalogOperations() {
+    String catalogName = "custom_catalog";
+    Assertions.assertDoesNotThrow(
+        () -> createCatalogWithCustomOperation(catalogName, HiveCatalogOperations.class.getName()));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class,
+        () ->
+            createCatalogWithCustomOperation(
+                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
+  }
+
+  private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
+
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
   }
 }

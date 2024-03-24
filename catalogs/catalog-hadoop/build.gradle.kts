@@ -16,15 +16,16 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
   }
 
-  implementation(libs.hadoop2.hdfs) {
+  implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
   }
+  implementation(libs.hadoop3.client)
 
   implementation(libs.slf4j.api)
 
@@ -95,7 +96,7 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.9")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
