@@ -339,6 +339,21 @@ public interface TableChange {
   }
 
   /**
+   * Create a TableChange for updating the default value of a field.
+   *
+   * <p>The name is used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName The field name of the column to update.
+   * @param newDefaultValue The new default value.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnDefaultValue(String[] fieldName, String newDefaultValue) {
+    return new UpdateColumnDefaultValue(fieldName, newDefaultValue);
+  }
+
+  /**
    * Create a TableChange for updating the type of a field that is nullable.
    *
    * <p>The field name are used to find the field to update.
@@ -1120,6 +1135,71 @@ public interface TableChange {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+  }
+
+  /**
+   * A TableChange to update the default of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class UpdateColumnDefaultValue implements ColumnChange {
+    private final String[] fieldName;
+    private final String newDefaultValue;
+
+    private UpdateColumnDefaultValue(String[] fieldName, String newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /**
+     * Retrieves the field name of the column whose default value is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    /**
+     * Retrieves the new default value for the column.
+     *
+     * @return The new default value of the column.
+     */
+    public String getNewDefaultValue() {
+      return newDefaultValue;
+    }
+
+    /**
+     * Compares this UpdateColumnDefaultValue instance with another object for equality. The
+     * comparison is based on the field name array and the new default value.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same default value update; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnDefaultValue that = (UpdateColumnDefaultValue) o;
+      return Arrays.equals(fieldName, that.fieldName)
+          && Objects.equals(newDefaultValue, that.newDefaultValue);
+    }
+
+    /**
+     * Generates a hash code for this UpdateColumnDefaultValue instance. The hash code is based on
+     * both the hierarchical field name and the new default value.
+     *
+     * @return A hash code value for this default value update operation.
+     */
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newDefaultValue);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
   }
 

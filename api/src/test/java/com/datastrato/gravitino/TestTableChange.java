@@ -21,6 +21,7 @@ import com.datastrato.gravitino.rel.TableChange.RenameColumn;
 import com.datastrato.gravitino.rel.TableChange.RenameTable;
 import com.datastrato.gravitino.rel.TableChange.SetProperty;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnComment;
+import com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnType;
 import com.datastrato.gravitino.rel.TableChange.UpdateComment;
@@ -204,6 +205,28 @@ public class TestTableChange {
   }
 
   @Test
+  public void testUpdateColumnDefaultValue() {
+    String[] fieldName = {"existing_column"};
+    String newDefaultValue = "default_value";
+    UpdateColumnDefaultValue updateColumnDefaultValue =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+
+    assertArrayEquals(fieldName, updateColumnDefaultValue.fieldName());
+    assertEquals(newDefaultValue, updateColumnDefaultValue.getNewDefaultValue());
+  }
+
+  @Test
+  public void testUpdateNestedColumnDefaultValue() {
+    String[] fieldName = {"nested", "existing_column"};
+    String newDefaultValue = "default_value";
+    UpdateColumnDefaultValue updateColumnType =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+
+    assertArrayEquals(fieldName, updateColumnType.fieldName());
+    assertEquals(newDefaultValue, updateColumnType.getNewDefaultValue());
+  }
+
+  @Test
   public void testUpdateColumnType() {
     String[] fieldName = {"existing_column"};
     Type dataType = Types.StringType.get();
@@ -352,6 +375,39 @@ public class TestTableChange {
     RenameColumn columnA = (RenameColumn) TableChange.renameColumn(nameA, newName);
     String[] nameB = {"Family Name"};
     RenameColumn columnB = (RenameColumn) TableChange.renameColumn(nameB, newName);
+
+    assertFalse(columnA.equals(null));
+    assertFalse(columnA.equals(columnB));
+    assertFalse(columnB.equals(columnA));
+    assertNotEquals(columnA.hashCode(), columnB.hashCode());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValueEqualsAndHashCode() {
+    String[] nameA = {"Column Name"};
+    String newDefaultValueA = "Default Value";
+    UpdateColumnDefaultValue columnA =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameA, newDefaultValueA);
+    String[] nameB = {"Column Name"};
+    String newDefaultValueB = "Default Value";
+    UpdateColumnDefaultValue columnB =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameB, newDefaultValueB);
+
+    assertTrue(columnA.equals(columnB));
+    assertTrue(columnB.equals(columnA));
+    assertEquals(columnA.hashCode(), columnB.hashCode());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValueNotEqualsAndHashCode() {
+    String[] nameA = {"Column Name A"};
+    String newDefaultValueA = "New Default Value A";
+    UpdateColumnDefaultValue columnA =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameA, newDefaultValueA);
+    String[] nameB = {"Column Name B"};
+    String newDefaultValueB = "New Default Value B";
+    UpdateColumnDefaultValue columnB =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameB, newDefaultValueB);
 
     assertFalse(columnA.equals(null));
     assertFalse(columnA.equals(columnB));
