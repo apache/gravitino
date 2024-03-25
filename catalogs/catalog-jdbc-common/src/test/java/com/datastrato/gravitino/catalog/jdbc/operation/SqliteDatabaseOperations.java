@@ -15,7 +15,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
@@ -91,10 +90,5 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
     return null;
-  }
-
-  @Override
-  protected ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
-    throw new UnsupportedOperationException("Not supported for SQLite");
   }
 }

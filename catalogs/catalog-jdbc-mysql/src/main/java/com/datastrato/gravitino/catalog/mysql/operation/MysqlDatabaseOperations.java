@@ -11,15 +11,14 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -54,11 +53,6 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 Properties will be unified in the future.
       throw new UnsupportedOperationException("Properties are not supported yet");
-      //      sqlBuilder.append("\n");
-      //      sqlBuilder.append(
-      //          properties.entrySet().stream()
-      //              .map(entry -> entry.getKey() + " " + entry.getValue())
-      //              .collect(Collectors.joining("\n")));
     }
     String result = sqlBuilder.toString();
     LOG.info("Generated create database:{} sql: {}", databaseName, result);
@@ -92,38 +86,20 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  protected ResultSet getSchema(Connection connection, String databaseName) throws SQLException {
-    final DatabaseMetaData metaData = connection.getMetaData();
-    // It'd indeed need to call getCatalogs() to get the schema not `getSchemas()` for MySQL.
-    return metaData.getCatalogs();
-  }
-
-  @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    try (final Connection connection = this.dataSource.getConnection()) {
-      ResultSet resultSet = getSchema(connection, databaseName);
+    List<String> allDatabases = listDatabases();
+    String dbName =
+        allDatabases.stream()
+            .filter(db -> db.equals(databaseName))
+            .findFirst()
+            .orElseThrow(
+                () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
 
-      boolean found = false;
-      while (resultSet.next()) {
-        if (Objects.equals(resultSet.getString(1), databaseName)) {
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        throw new NoSuchSchemaException("Database %s could not be found", databaseName);
-      }
-
-      return JdbcSchema.builder()
-          .withName(databaseName)
-          .withProperties(ImmutableMap.of())
-          .withAuditInfo(AuditInfo.EMPTY)
-          .build();
-
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
+    return JdbcSchema.builder()
+        .withName(dbName)
+        .withProperties(ImmutableMap.of())
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   @Override

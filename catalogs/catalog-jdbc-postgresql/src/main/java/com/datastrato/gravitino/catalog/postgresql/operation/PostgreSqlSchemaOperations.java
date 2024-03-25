@@ -115,8 +115,15 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return sqlBuilder.toString();
   }
 
-  @Override
-  protected ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
+  /**
+   * Get the schema with the given name.
+   *
+   * <p>Database in PG corresponds to Catalog in JDBC. Schema in PG corresponds to Schema in JDBC.
+   *
+   * @param connection the connection to the database
+   * @param schemaName the name of the schema
+   */
+  private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
     return metaData.getSchemas(database, schemaName);
   }
