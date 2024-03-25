@@ -193,7 +193,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     hiveTable.supportPartitions().addPartition(partition3);
 
     // test drop one partition: city=2/dt=2020-01-01
-    hiveTable.supportPartitions().dropPartition(partitionName1, true);
+    hiveTable.supportPartitions().dropPartition(partitionName1, false);
     NoSuchPartitionException exception1 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -205,7 +205,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         exception1.getMessage());
 
     // test drop cascade partitions: city=3
-    hiveTable.supportPartitions().dropPartition(partitionName2, true);
+    hiveTable.supportPartitions().dropPartition("city=3", false);
     NoSuchPartitionException exception2 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -215,7 +215,6 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         String.format("Hive partition %s does not exist in Hive Metastore", partitionName2),
         exception2.getMessage());
-    hiveTable.supportPartitions().dropPartition(partitionName3, true);
     NoSuchPartitionException exception3 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -226,7 +225,9 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         String.format("Hive partition %s does not exist in Hive Metastore", partitionName3),
         exception3.getMessage());
 
-    // test exception
+    // test not exist partition
+    Assertions.assertTrue(
+        hiveTable.supportPartitions().dropPartition("does_not_exist_partition", true));
     NoSuchPartitionException exception4 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -236,5 +237,15 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         "Hive partition does_not_exist_partition does not exist in Hive Metastore",
         exception4.getMessage());
+
+    Assertions.assertTrue(hiveTable.supportPartitions().dropPartition("city=not_exist", true));
+    NoSuchPartitionException exception5 =
+        Assertions.assertThrows(
+            NoSuchPartitionException.class,
+            () -> {
+              hiveTable.supportPartitions().dropPartition("city=not_exist", false);
+            });
+    Assertions.assertEquals(
+        "Hive partition city=not_exist does not exist in Hive Metastore", exception5.getMessage());
   }
 }

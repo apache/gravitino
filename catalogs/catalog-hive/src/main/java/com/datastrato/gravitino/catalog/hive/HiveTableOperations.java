@@ -17,6 +17,7 @@ import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +26,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.common.FileUtils;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -225,17 +225,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   public boolean dropPartition(String partitionName, boolean ifExists)
       throws NoSuchPartitionException {
     try {
-      // Check the partition exists
-      boolean partitionExists = partitionExists(partitionName);
-      if (!partitionExists) {
-        if (ifExists) {
-          return true;
-        } else {
-          throw new NoSuchPartitionException(
-              "Hive partition %s does not exist in Hive Metastore", partitionName);
-        }
-      }
-
       // Get all children partitions for one parent partition name,
       // cascade delete the parent partition of all its children partitions
       Table hiveTable = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
@@ -247,9 +236,12 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                       c.listPartitions(
                           table.schemaName(),
                           table.name(),
-                          getFilterPartitionList(hiveTable, partitionName),
+                          getFilterPartitionValueList(hiveTable, partitionName),
                           (short) -1));
-
+      if (partitions.isEmpty()) {
+        throw new NoSuchPartitionException(
+            "Hive partition %s does not exist in Hive Metastore", partitionName);
+      }
       // Delete partitions iteratively
       for (org.apache.hadoop.hive.metastore.api.Partition partition : partitions) {
         table
@@ -262,6 +254,13 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                         partition.getValues(),
                         false));
       }
+    } catch (NoSuchPartitionException e) {
+      if (ifExists) {
+        return true;
+      }
+      throw new NoSuchPartitionException(
+          "Hive partition %s does not exist in Hive Metastore", partitionName);
+
     } catch (UnknownTableException e) {
       throw new NoSuchTableException(
           e, "Hive table %s does not exist in Hive Metastore", table.name());
@@ -278,12 +277,12 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     return true;
   }
 
-  private List<String> getFilterPartitionList(Table dropTable, String partitionSpec)
+  private List<String> getFilterPartitionValueList(Table dropTable, String partitionSpec)
       throws NoSuchPartitionException {
     Map<String, String> partMap = new HashMap<>();
-    String[] parts = partitionSpec.split("/");
+    String[] parts = partitionSpec.split(PARTITION_NAME_DELIMITER);
     for (String part : parts) {
-      String[] keyValue = part.split("=");
+      String[] keyValue = part.split(PARTITION_VALUE_DELIMITER);
       if (keyValue.length == 2) {
         partMap.put(keyValue[0], keyValue[1]);
       } else {
@@ -292,7 +291,25 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
             "Hive partition %s does not exist in Hive Metastore", partitionSpec);
       }
     }
-    return MetaStoreUtils.getPvals(dropTable.getPartitionKeys(), partMap);
+    List<String> partKeys =
+        dropTable.getPartitionKeys().stream()
+            .map(FieldSchema::getName)
+            .collect(Collectors.toCollection(ArrayList::new));
+    List<String> partValues = new ArrayList<>();
+    for (Map.Entry<String, String> entry : partMap.entrySet()) {
+      if (!partKeys.contains(entry.getKey())) {
+        throw new NoSuchPartitionException(
+            "Hive partition %s does not exist in Hive Metastore", partitionSpec);
+      }
+    }
+    for (String partKey : partKeys) {
+      String val = partMap.get(partKey);
+      if (val == null) {
+        val = "";
+      }
+      partValues.add(val);
+    }
+    return partValues;
   }
 
   @Override
