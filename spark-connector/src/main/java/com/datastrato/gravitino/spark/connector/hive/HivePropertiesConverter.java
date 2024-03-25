@@ -51,13 +51,11 @@ public class HivePropertiesConverter implements PropertiesConverter {
     String storeAs = gravitinoTableProperties.get(HivePropertyConstants.SPARK_HIVE_STORED_AS);
     String fileFormat = Optional.ofNullable(storeAs).orElse(provider);
     if (fileFormat != null) {
-      String gravitinoFormat =
-          fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
+      String gravitinoFormat = fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
       if (gravitinoFormat != null) {
         gravitinoTableProperties.put(HivePropertyConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
       } else {
-        throw new NotSupportedException(
-            "Doesn't support hive file format: " + fileFormat);
+        throw new NotSupportedException("Doesn't support hive file format: " + fileFormat);
       }
     }
 
