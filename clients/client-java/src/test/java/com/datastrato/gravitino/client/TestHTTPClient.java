@@ -67,7 +67,7 @@ public class TestHTTPClient {
   public static void beforeClass() {
     mockServer = startClientAndServer();
     restClient =
-        HTTPClient.builder()
+        HTTPClient.builder(ImmutableMap.of())
             .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
             .build();
   }

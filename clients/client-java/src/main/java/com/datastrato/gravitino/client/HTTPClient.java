@@ -634,10 +634,11 @@ public class HTTPClient implements RESTClient {
   /**
    * Creates a new instance of the HTTPClient.Builder with the specified properties.
    *
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
    * @return A new instance of HTTPClient.Builder with the provided properties.
    */
-  public static Builder builder() {
-    return new Builder();
+  public static Builder builder(Map<String, String> properties) {
+    return new Builder(properties);
   }
 
   /**
@@ -647,12 +648,17 @@ public class HTTPClient implements RESTClient {
    * URI, request headers, and ObjectMapper.
    */
   public static class Builder {
+    @SuppressWarnings("UnusedVariable")
+    private final Map<String, String> properties;
+
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
     private AuthDataProvider authDataProvider;
 
-    private Builder() {}
+    private Builder(Map<String, String> properties) {
+      this.properties = properties;
+    }
 
     /**
      * Sets the base URI for the HTTP client.

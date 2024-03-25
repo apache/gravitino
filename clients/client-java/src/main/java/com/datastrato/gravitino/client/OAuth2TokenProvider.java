@@ -9,6 +9,7 @@ import com.datastrato.gravitino.auth.AuthConstants;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -102,7 +103,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     @Override
     public T build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuth2TokenProvider must set url");
-      client = HTTPClient.builder().uri(uri).build();
+      client = HTTPClient.builder(Collections.emptyMap()).uri(uri).build();
       T t = internalBuild();
       return t;
     }
