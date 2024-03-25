@@ -42,7 +42,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 public class TestSparkTypeConverter {
 
   private HashMap<Type, DataType> gravitinoToSparkTypeMapper = new HashMap<>();
-  private Set<Type> notSupportGravitinoTypes = ImmutableSet.of(NullType.get());
+  private Set<Type> notSupportGravitinoTypes = ImmutableSet.of();
 
   private Set<DataType> notSupportSparkTypes = ImmutableSet.of();
 
@@ -69,6 +69,7 @@ public class TestSparkTypeConverter {
         MapType.of(IntegerType.get(), StringType.get(), true),
         DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
     gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
+    gravitinoToSparkTypeMapper.put(NullType.get(), DataTypes.NullType);
   }
 
   @Test
