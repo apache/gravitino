@@ -278,6 +278,7 @@ subprojects {
         "BoxedPrimitiveEquality",
         "ChainingConstructorIgnoresParameter",
         "CheckNotNullMultipleTimes",
+        "ClassCanBeStatic",
         "CollectionIncompatibleType",
         "CollectionToArraySafeParameter",
         "ComparingThisWithNull",
