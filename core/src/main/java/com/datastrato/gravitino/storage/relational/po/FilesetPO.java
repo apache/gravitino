@@ -105,7 +105,7 @@ public class FilesetPO {
   public static class Builder {
     private final FilesetPO filesetPO;
 
-    public Builder() {
+    private Builder() {
       filesetPO = new FilesetPO();
     }
 
@@ -197,5 +197,14 @@ public class FilesetPO {
       validate();
       return filesetPO;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

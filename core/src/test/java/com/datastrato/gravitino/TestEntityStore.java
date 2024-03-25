@@ -151,7 +151,7 @@ public class TestEntityStore {
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(1L)
             .withName("metalake")
             .withAuditInfo(auditInfo)
@@ -169,7 +169,7 @@ public class TestEntityStore {
             .build();
 
     SchemaEntity schemaEntity =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(1L)
             .withName("schema")
             .withNamespace(Namespace.of("metalake", "catalog"))
@@ -177,7 +177,7 @@ public class TestEntityStore {
             .build();
 
     TableEntity tableEntity =
-        new TableEntity.Builder()
+        TableEntity.builder()
             .withId(1L)
             .withName("table")
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
@@ -185,7 +185,7 @@ public class TestEntityStore {
             .build();
 
     FilesetEntity filesetEntity =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(1L)
             .withName("fileset")
             .withFilesetType(Fileset.Type.MANAGED)

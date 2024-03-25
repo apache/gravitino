@@ -94,7 +94,7 @@ public class MetalakeDTO implements Metalake {
     protected AuditDTO audit;
 
     /** Default constructor. */
-    public Builder() {}
+    protected Builder() {}
 
     /**
      * Sets the name of the Metalake DTO.
@@ -187,5 +187,10 @@ public class MetalakeDTO implements Metalake {
   @Override
   public int hashCode() {
     return Objects.hashCode(name, comment, audit);
+  }
+
+  /** @return the builder for creating a new instance of MetalakeDTO. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

@@ -32,7 +32,7 @@ public class TestConvertUtil extends TestBaseConvert {
     Column[] columns = createColumns("col_1", "col_2", "col_3", "col_4");
     String col5Name = "col_5";
     IcebergColumn col5 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName(col5Name)
             .withType(
                 com.datastrato.gravitino.rel.types.Types.MapType.valueNullable(
@@ -46,7 +46,7 @@ public class TestConvertUtil extends TestBaseConvert {
     columns = ArrayUtils.add(columns, col5);
     SortOrder[] sortOrder = createSortOrder("col_1", "col_2", "col_3", "col_4", "col_5");
     IcebergTable icebergTable =
-        new IcebergTable.Builder()
+        IcebergTable.builder()
             .withName(TEST_NAME)
             .withAuditInfo(
                 AuditInfo.builder().withCreator(TEST_NAME).withCreateTime(Instant.now()).build())

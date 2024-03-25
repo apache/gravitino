@@ -27,7 +27,7 @@ public class WebDriverManager {
 
     // wait for webpage load compiled.
     try {
-      (new WebDriverWait(driver, AbstractWebIT.MAX_IMPLICIT_WAIT))
+      (new WebDriverWait(driver, AbstractWebIT.MAX_TIMEOUT))
           .until(
               d -> {
                 String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();

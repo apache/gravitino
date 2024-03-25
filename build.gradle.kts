@@ -338,6 +338,7 @@ subprojects {
         "SelfComparison",
         "SelfEquals",
         "SizeGreaterThanOrEqualsZero",
+        "StaticGuardedByInstance",
         "StreamToString",
         "StringBuilderInitWithChar",
         "SubstringOfZero",
@@ -364,7 +365,7 @@ subprojects {
     options.locale = "en_US"
 
     val projectName = project.name
-    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+    if (projectName == "common" || projectName == "api" || projectName == "client-java" || projectName == "filesystem-hadoop3") {
       options {
         (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
         isFailOnError = true
@@ -426,6 +427,11 @@ subprojects {
   }
 
   configure<SigningExtension> {
+    val taskNames = gradle.getStartParameter().getTaskNames()
+    taskNames.forEach() {
+      if (it.contains("publishToMavenLocal")) setRequired(false)
+    }
+
     val gpgId = System.getenv("GPG_ID")
     val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
@@ -640,7 +646,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "spark-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -653,6 +659,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("filesystem") &&
         it.name != "trino-connector" &&
         it.name != "spark-connector" &&
         it.name != "integration-test" &&

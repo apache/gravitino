@@ -1,4 +1,4 @@
-name: Integration Test
+name: Backend Integration Test
 
 # Controls when the workflow will run
 on:
@@ -59,7 +59,6 @@ jobs:
         java-version: [ 8, 11, 17 ]
         test-mode: [ embedded, deploy ]
     env:
-      DOCKER_RUN_NAME: hive-amd64
       PLATFORM: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v3
@@ -81,10 +80,10 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
         uses: csexton/debugger-action@master
 
-      - name: Integration Test
+      - name: Backend Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

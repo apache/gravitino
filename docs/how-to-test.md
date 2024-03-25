@@ -69,8 +69,9 @@ Deploy the Gravitino server locally to run the integration tests. Follow these s
 ## Skip tests
 
 * You can skip unit tests by using the `./gradlew build -PskipTests` command.
-* You can skip integration tests by using the `./gradlew build -PskipITs` command.
-* You can skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
+* You can skip backend and web frontend integration tests by using the `./gradlew build -PskipITs` command.
+* You can only skip web frontend integration tests by using the `./gradlew build -PskipWebITs` command.
+* You can skip both unit tests and all integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
 ## Docker test environment
 

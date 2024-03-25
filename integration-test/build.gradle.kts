@@ -135,9 +135,14 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
+  val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    if (skipWebITs) {
+      exclude("**/integration/test/web/ui/**")
+    }
+
     dependsOn(":trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
@@ -191,7 +196,6 @@ tasks.clean {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
   mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {

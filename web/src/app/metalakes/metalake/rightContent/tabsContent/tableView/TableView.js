@@ -40,7 +40,7 @@ const EmptyText = () => {
 const TableView = () => {
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
-  const metalake = searchParams['metalake'] || ''
+  const metalake = searchParams.get('metalake') || ''
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]

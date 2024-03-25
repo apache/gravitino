@@ -25,7 +25,7 @@ const AppBar = () => {
       <Box className={'layout-navbar twc-w-full'}>
         <Toolbar className={'navbar-content-container twc-mx-auto [@media(min-width:1440px)]:twc-max-w-[1440px]'}>
           <Box className={'app-bar-content twc-w-full twc-flex twc-items-center twc-justify-between'}>
-            <Link href='/' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
+            <Link href='/metalakes' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
               <Image
                 src={process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'}
                 width={32}

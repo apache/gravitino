@@ -4,6 +4,7 @@
  */
 
 import { useState, forwardRef, useEffect } from 'react'
+import { updateMetalake } from '@/lib/store/metalakes'
 
 import {
   Box,
@@ -53,7 +54,7 @@ const Transition = forwardRef(function Transition(props, ref) {
 })
 
 const CreateMetalakeDialog = props => {
-  const { open, setOpen, data = {}, updateMetalake, type = 'create' } = props
+  const { open, setOpen, data = {}, type = 'create' } = props
 
   const dispatch = useAppDispatch()
 
@@ -223,7 +224,6 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
-                      id='metalakeNameField'
                       data-refer='metalake-name-field'
                       label='Name'
                       onChange={onChange}
@@ -249,7 +249,7 @@ const CreateMetalakeDialog = props => {
                   render={({ field: { value, onChange } }) => (
                     <TextField
                       value={value}
-                      id='metalakeCommentField'
+                      data-refer='metalake-comment-field'
                       label='Comment'
                       multiline
                       rows={2}
@@ -326,10 +326,16 @@ const CreateMetalakeDialog = props => {
           </Grid>
         </DialogContent>
         <DialogActions className={' twc-px-5 md:twc-px-15 twc-pb-5 md:twc-pb-[12.5 0.25 rem]'}>
-          <Button variant='contained' type='submit' id='submitHandleMetalake'>
+          <Button variant='contained' type='submit' data-refer='submit-handle-metalake'>
             {typeText === 'Edit' ? 'Update' : typeText}
           </Button>
-          <Button variant='outlined' className={'twc-ml-1'} onClick={handleClose} type='reset'>
+          <Button
+            variant='outlined'
+            className={'twc-ml-1'}
+            onClick={handleClose}
+            type='reset'
+            data-refer='cancel-handle-metalake'
+          >
             Cancel
           </Button>
         </DialogActions>

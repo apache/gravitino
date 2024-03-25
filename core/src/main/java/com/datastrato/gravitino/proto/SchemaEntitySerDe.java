@@ -29,7 +29,7 @@ public class SchemaEntitySerDe implements ProtoSerDe<SchemaEntity, Schema> {
   @Override
   public SchemaEntity deserialize(Schema p) {
     SchemaEntity.Builder builder =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(p.getId())
             .withName(p.getName())
             .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
