@@ -392,6 +392,4 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
     Assertions.assertEquals(NoSuchPartitionException.class.getSimpleName(), errorResp.getType());
   }
-
-
 }

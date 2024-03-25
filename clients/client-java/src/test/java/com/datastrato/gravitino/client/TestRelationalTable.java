@@ -46,7 +46,6 @@ import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Maps;
-import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -276,5 +275,4 @@ public class TestRelationalTable extends TestRelationalCatalog {
             () -> table.supportPartitions().dropPartition(partitionName, false));
     Assertions.assertEquals("partition not found", exception.getMessage());
   }
-
 }
