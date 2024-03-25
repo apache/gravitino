@@ -219,7 +219,7 @@ Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#
 
 #### Alter table operations
 
-The Gravitino Supports these alter table operations:
+Gravitino supports these table alteration operations:
 
 - `RenameTable`
 - `UpdateComment`
@@ -233,9 +233,6 @@ The Gravitino Supports these alter table operations:
 - `SetProperty`
 
 :::info
-You cannot submit the `RenameTable` operation at the same time as other operations.
-:::
-
-:::caution
-If you update a nullability column to non-nullability, there may be compatibility issues.
+ - You cannot submit the `RenameTable` operation at the same time as other operations.
+ - If you update a nullability column to non-nullability, there may be compatibility issues.
 :::
