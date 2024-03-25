@@ -90,7 +90,6 @@ public class AccessControlManager {
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If deleting the User encounters storage issues.
    */
-  @Override
   public boolean removeUser(String metalake, String userName) {
 
     try {
