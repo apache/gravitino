@@ -77,10 +77,6 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           new String[] {TABLE.getShortName() + "/", "/", "/", "/"},
           FILESET,
           new String[] {FILESET.getShortName() + "/", "/", "/", "/"},
-          // As the name of users and catalogs shares the same ID if their names are the same, we
-          // must be cautious
-          // that we should NOT drop the id when remove a user or catalog, for more please refer to
-          // `KvNameMappingService`
           USER,
           new String[] {USER.getShortName() + "/", "/"});
 
