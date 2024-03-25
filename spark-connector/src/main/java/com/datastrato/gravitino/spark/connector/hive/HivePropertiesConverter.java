@@ -17,8 +17,8 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 /** Transform hive catalog properties between Spark and Gravitino. */
 public class HivePropertiesConverter implements PropertiesConverter {
 
-  // Transform Spark format to Gravitino format
-  static final Map<String, String> hiveTableFormatMap =
+  // Transform Spark hive file format to Gravitino hive file format
+  static final Map<String, String> fileFormatMap =
       ImmutableMap.of(
           "sequencefile", "SEQUENCEFILE",
           "rcfile", "RCFILE",
@@ -49,15 +49,15 @@ public class HivePropertiesConverter implements PropertiesConverter {
         PropertiesConverter.transformOptionProperties(properties);
     String provider = gravitinoTableProperties.get(TableCatalog.PROP_PROVIDER);
     String storeAs = gravitinoTableProperties.get(HivePropertyConstants.SPARK_HIVE_STORED_AS);
-    String sparkHiveTableFormat = Optional.ofNullable(storeAs).orElse(provider);
-    if (sparkHiveTableFormat != null) {
+    String fileFormat = Optional.ofNullable(storeAs).orElse(provider);
+    if (fileFormat != null) {
       String gravitinoFormat =
-          hiveTableFormatMap.get(sparkHiveTableFormat.toLowerCase(Locale.ROOT));
+          fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
       if (gravitinoFormat != null) {
         gravitinoTableProperties.put(HivePropertyConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
       } else {
         throw new NotSupportedException(
-            "Doesn't support spark hive table format: " + sparkHiveTableFormat);
+            "Doesn't support hive file format: " + fileFormat);
       }
     }
 
