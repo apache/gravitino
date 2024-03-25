@@ -650,6 +650,7 @@ public class HTTPClient implements RESTClient {
   public static class Builder {
     @SuppressWarnings("UnusedVariable")
     private final Map<String, String> properties;
+
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
