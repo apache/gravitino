@@ -85,7 +85,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql("USE " + getCatalogName());
     getDatabases()
         .forEach(
-            databaseName -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", databaseName)));
+            databaseName -> {
+              listTableNames(databaseName).forEach(this::dropTableIfExists);
+              dropDatabaseIfExists(databaseName);
+            });
   }
 
   @Test
