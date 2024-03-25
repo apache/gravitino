@@ -158,27 +158,25 @@ public class CatalogConnectorManager {
       }
     }
 
+    // Load new catalogs belows to the metalake.
     Arrays.stream(catalogNames)
         .forEach(
             (NameIdentifier nameIdentifier) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(nameIdentifier);
                 GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
-                if (!catalogConnectors.containsKey(gravitinoCatalog.getFullName())) {
-                  // Load new catalogs belows to the metalake.
+                if (catalogConnectors.containsKey(gravitinoCatalog.getFullName())) {
+                  // Reload catalogs that have been updated in Gravitino server.
+                  reloadCatalog(metalake, gravitinoCatalog);
+
+                } else {
                   if (catalog.type() == Catalog.Type.RELATIONAL) {
                     loadCatalog(metalake, gravitinoCatalog);
                   }
-                } else {
-                  // Reload catalogs that have been updated in Gravitino server.
-                  reloadCatalog(metalake, gravitinoCatalog);
                 }
               } catch (Exception e) {
                 LOG.error(
-                    "Failed to load metalake {}'s catalog {}.",
-                    metalake.name(),
-                    nameIdentifier.toString(),
-                    e);
+                    "Failed to load metalake {}'s catalog {}.", metalake.name(), nameIdentifier, e);
               }
             });
   }
@@ -194,22 +192,22 @@ public class CatalogConnectorManager {
     catalogInjector.removeCatalogConnector(catalog.getFullName());
     catalogConnectors.remove(catalog.getFullName());
 
-    CatalogConnectorContext catalogConnectorContext =
-        catalogConnectorFactory.loadCatalogConnector(metalake, catalog);
-
-    catalogConnectors.put(catalogFullName, catalogConnectorContext);
-    catalogInjector.injectCatalogConnector(catalogFullName);
+    loadCatalogImpl(metalake, catalog);
     LOG.info("Update catalog '{}' in metalake {} successfully.", catalog, metalake.name());
   }
 
   private void loadCatalog(GravitinoMetalake metalake, GravitinoCatalog catalog) {
+    loadCatalogImpl(metalake, catalog);
+    LOG.info(
+        "Load catalog {} in metalake {} successfully.", catalog.getFullName(), metalake.name());
+  }
+
+  private void loadCatalogImpl(GravitinoMetalake metalake, GravitinoCatalog catalog) {
     CatalogConnectorContext catalogConnectorContext =
         catalogConnectorFactory.loadCatalogConnector(metalake, catalog);
 
     catalogConnectors.put(catalog.getFullName(), catalogConnectorContext);
     catalogInjector.injectCatalogConnector(catalog.getFullName());
-    LOG.info(
-        "Load catalog {} in metalake {} successfully.", catalog.getFullName(), metalake.name());
   }
 
   private void unloadCatalog(GravitinoMetalake metalake, String catalogFullName) {

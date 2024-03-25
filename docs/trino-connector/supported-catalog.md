@@ -58,7 +58,7 @@ alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROP
 - SET_PROPERTIES: The properties to be set.
 - REMOVE_PROPERTIES: The properties to be removed.
 
-These stored procedures are under the `gravitino` connector, and the `system` schema.
+These stored procedures are under the `gravitino` connector and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
 
 
