@@ -208,7 +208,7 @@ public class HiveTable extends BaseTable {
     Map<String, String> parameters = Maps.newHashMap(properties());
     Optional.ofNullable(comment).ifPresent(c -> parameters.put(COMMENT, c));
 
-    if(EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))) {
+    if (EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))) {
       parameters.put(EXTERNAL, "TRUE");
     } else {
       parameters.put(EXTERNAL, "FALSE");
