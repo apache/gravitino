@@ -121,7 +121,8 @@ public class SparkTableInfoChecker {
                       .forEach(
                           (k, v) -> {
                             Assertions.assertTrue(
-                                realTableProperties.containsKey(k), k + " not exits");
+                                realTableProperties.containsKey(k),
+                                k + " not exits," + realTableProperties);
                             Assertions.assertEquals(v, realTableProperties.get(k));
                           });
                   break;

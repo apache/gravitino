@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -245,9 +246,9 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
             .withName(tableName)
             .withTableProperties(
                 ImmutableMap.of(
-                    "serialization.format",
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
                     "@",
-                    "field.delim",
+                    TableCatalog.OPTION_PREFIX + "field.delim",
                     ",",
                     HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
                     HivePropertyConstants.PARQUET_INPUT_FORMAT_CLASS,
@@ -286,15 +287,15 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
             .withName(tableName)
             .withTableProperties(
                 ImmutableMap.of(
-                    "field.delim",
+                    TableCatalog.OPTION_PREFIX + "field.delim",
                     ",",
-                    "escape.delim",
+                    TableCatalog.OPTION_PREFIX + "escape.delim",
                     ";",
-                    "mapkey.delim",
+                    TableCatalog.OPTION_PREFIX + "mapkey.delim",
                     ":",
-                    "serialization.format",
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
                     ",",
-                    "colelction.delim",
+                    TableCatalog.OPTION_PREFIX + "colelction.delim",
                     "@",
                     HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
                     HivePropertyConstants.TEXT_INPUT_FORMAT_CLASS,

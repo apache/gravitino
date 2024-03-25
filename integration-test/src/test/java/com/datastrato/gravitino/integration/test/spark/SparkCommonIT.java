@@ -19,6 +19,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -116,6 +117,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   void testAlterSchema() {
     String testDatabaseName = "t_alter";
+    dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName);
     Assertions.assertTrue(
         StringUtils.isBlank(getDatabaseMetadata(testDatabaseName).get("Properties")));
@@ -174,6 +176,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     createDatabaseIfNotExists(databaseName);
     String tableIdentifier = String.join(".", databaseName, tableName);
 
+    dropTableIfExists(tableIdentifier);
     createSimpleTable(tableIdentifier);
     SparkTableInfo tableInfo = getTableInfo(tableIdentifier);
     SparkTableInfoChecker checker =
@@ -187,6 +190,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     createDatabaseIfNotExists(databaseName);
 
     sql("USE " + databaseName);
+    dropTableIfExists(tableName);
     createSimpleTable(tableName);
     tableInfo = getTableInfo(tableName);
     checker =
@@ -257,6 +261,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
+    dropTableIfExists(table1);
+    dropTableIfExists(table2);
     createSimpleTable(table1);
     createSimpleTable(table2);
     Set<String> tables = listTableNames();
@@ -268,6 +274,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String table3 = "list3";
     String table4 = "list4";
     createDatabaseIfNotExists(database);
+    dropTableIfExists(String.join(".", database, table3));
+    dropTableIfExists(String.join(".", database, table4));
     createSimpleTable(String.join(".", database, table3));
     createSimpleTable(String.join(".", database, table4));
     tables = listTableNames(database);
@@ -602,7 +610,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
-            .withTableProperties(ImmutableMap.of("a", "b"));
+            .withTableProperties(ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "b"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
   }

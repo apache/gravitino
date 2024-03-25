@@ -6,11 +6,12 @@
 package com.datastrato.gravitino.spark.connector.hive;
 
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
@@ -45,8 +46,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
    */
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    Map<String, String> gravitinoTableProperties =
-        PropertiesConverter.transformOptionProperties(properties);
+    Map<String, String> gravitinoTableProperties = fromOptionProperties(properties);
     String provider = gravitinoTableProperties.get(TableCatalog.PROP_PROVIDER);
     String storeAs = gravitinoTableProperties.get(HivePropertyConstants.SPARK_HIVE_STORED_AS);
     String fileFormat = Optional.ofNullable(storeAs).orElse(provider);
@@ -72,6 +72,43 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
-    return new HashMap<>(properties);
+    return toOptionProperties(properties);
+  }
+
+  @VisibleForTesting
+  static Map<String, String> toOptionProperties(Map<String, String> properties) {
+    return properties.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entry -> {
+                  String key = entry.getKey();
+                  if (key.startsWith(HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX)) {
+                    return TableCatalog.OPTION_PREFIX
+                        + key.substring(
+                            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX.length());
+                  } else {
+                    return key;
+                  }
+                },
+                entry -> entry.getValue(),
+                (existingValue, newValue) -> newValue));
+  }
+
+  @VisibleForTesting
+  static Map<String, String> fromOptionProperties(Map<String, String> properties) {
+    return properties.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entry -> {
+                  String key = entry.getKey();
+                  if (key.startsWith(TableCatalog.OPTION_PREFIX)) {
+                    return HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX
+                        + key.substring(TableCatalog.OPTION_PREFIX.length());
+                  } else {
+                    return key;
+                  }
+                },
+                entry -> entry.getValue(),
+                (existingValue, newValue) -> newValue));
   }
 }

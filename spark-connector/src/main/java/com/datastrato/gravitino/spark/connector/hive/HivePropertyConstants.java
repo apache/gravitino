@@ -10,6 +10,7 @@ public class HivePropertyConstants {
   public static final String GRAVITINO_HIVE_INPUT_FORMAT = "input-format";
   public static final String GRAVITINO_HIVE_OUTPUT_FORMAT = "output-format";
   public static final String GRAVITINO_HIVE_SERDE_LIB = "serde-lib";
+  public static final String GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX = "serde.parameter.";
 
   public static final String SPARK_HIVE_STORED_AS = "hive.stored-as";
   public static final String SPARK_HIVE_INPUT_FORMAT = "input-format";

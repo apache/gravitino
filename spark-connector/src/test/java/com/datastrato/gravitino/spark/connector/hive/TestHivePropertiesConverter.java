@@ -25,7 +25,7 @@ public class TestHivePropertiesConverter {
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(HivePropertyConstants.SPARK_HIVE_STORED_AS, "PARQUET"));
     Assertions.assertEquals(
-        ImmutableMap.of(HivePropertyConstants.GRAVITINO_HIVE_FORMAT, "PARQUET"), hiveProperties);
+        hiveProperties.get(HivePropertyConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
         () ->
@@ -61,7 +61,35 @@ public class TestHivePropertiesConverter {
 
     hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
-            ImmutableMap.of("option.a", "a", "b", "b"));
-    Assertions.assertEquals(ImmutableMap.of("a", "a", "b", "b"), hiveProperties);
+            ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"));
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"),
+        hiveProperties);
+
+    hiveProperties =
+        hivePropertiesConverter.toSparkTableProperties(
+            ImmutableMap.of(
+                HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"));
+    Assertions.assertEquals(
+        ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"), hiveProperties);
+  }
+
+  @Test
+  void testOptionProperties() {
+    Map<String, String> properties =
+        HivePropertiesConverter.fromOptionProperties(
+            ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "1", "b", "2"));
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "1", "b", "2"),
+        properties);
+
+    properties =
+        HivePropertiesConverter.toOptionProperties(
+            ImmutableMap.of(
+                HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "1", "b", "2"));
+    Assertions.assertEquals(
+        ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "1", "b", "2"), properties);
   }
 }
