@@ -22,7 +22,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.commons.io)
-  testImplementation(libs.kafka.get2().get12())
+  testImplementation(libs.kafka)
   testImplementation(libs.curator.test)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

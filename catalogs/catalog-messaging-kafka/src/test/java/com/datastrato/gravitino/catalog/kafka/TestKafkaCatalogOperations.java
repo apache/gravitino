@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.common.config.TopicConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -234,18 +235,28 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, "test_create_topic");
     String comment = "test comment";
-    Map<String, String> properties = ImmutableMap.of(PARTITION_COUNT, "3", REPLICATION_FACTOR, "1");
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PARTITION_COUNT,
+            "3",
+            REPLICATION_FACTOR,
+            "1",
+            TopicConfig.COMPRESSION_TYPE_CONFIG,
+            "producer");
     Topic createdTopic = kafkaCatalogOperations.createTopic(ident, comment, null, properties);
     Assertions.assertNotNull(createdTopic);
     Assertions.assertEquals(ident.name(), createdTopic.name());
     Assertions.assertEquals("3", createdTopic.properties().get(PARTITION_COUNT));
     Assertions.assertEquals("1", createdTopic.properties().get(REPLICATION_FACTOR));
+    Assertions.assertEquals(
+        "producer", createdTopic.properties().get(TopicConfig.COMPRESSION_TYPE_CONFIG));
   }
 
   @Test
   public void testCreateTopicException() {
     Map<String, String> properties = ImmutableMap.of(PARTITION_COUNT, "3", REPLICATION_FACTOR, "1");
 
+    // test topic already exists
     Exception exception =
         Assertions.assertThrows(
             TopicAlreadyExistsException.class,
@@ -259,6 +270,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
         "Topic metalake.test_kafka_catalog.default.kafka-test-topic-1 already exists",
         exception.getMessage());
 
+    // test schema not exists
     exception =
         Assertions.assertThrows(
             NoSuchSchemaException.class,
@@ -297,6 +309,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertEquals(TOPIC_1, topic.name());
     Assertions.assertEquals("1", topic.properties().get(PARTITION_COUNT));
     Assertions.assertEquals("1", topic.properties().get(REPLICATION_FACTOR));
+    Assertions.assertTrue(topic.properties().size() > 2);
   }
 
   @Test
@@ -359,7 +372,15 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, "test_alter_topic");
     Map<String, String> properties =
-        ImmutableMap.of(PARTITION_COUNT, "2", REPLICATION_FACTOR, "1", "tag", "test");
+        ImmutableMap.of(
+            PARTITION_COUNT,
+            "2",
+            REPLICATION_FACTOR,
+            "1",
+            TopicConfig.COMPRESSION_TYPE_CONFIG,
+            "gzip",
+            TopicConfig.RETENTION_MS_CONFIG,
+            "43200000");
     Topic createdTopic = kafkaCatalogOperations.createTopic(ident, null, null, properties);
 
     Topic alteredTopic =
@@ -367,12 +388,28 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
             ident,
             TopicChange.updateComment("new comment"),
             TopicChange.setProperty(PARTITION_COUNT, "3"),
-            TopicChange.removeProperty("tag"));
+            TopicChange.setProperty(TopicConfig.COMPRESSION_TYPE_CONFIG, "producer"),
+            TopicChange.removeProperty(TopicConfig.RETENTION_MS_CONFIG));
     Assertions.assertEquals(createdTopic.name(), alteredTopic.name());
     Assertions.assertEquals("new comment", alteredTopic.comment());
     Assertions.assertEquals("3", alteredTopic.properties().get(PARTITION_COUNT));
     Assertions.assertEquals("1", alteredTopic.properties().get(REPLICATION_FACTOR));
-    Assertions.assertFalse(alteredTopic.properties().containsKey("tag"));
+    Assertions.assertEquals(
+        "producer", alteredTopic.properties().get(TopicConfig.COMPRESSION_TYPE_CONFIG));
+    Assertions.assertNull(alteredTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
+
+    // reload topic and check if the changes are applied
+    alteredTopic = kafkaCatalogOperations.loadTopic(ident);
+    Assertions.assertEquals(createdTopic.name(), alteredTopic.name());
+    // comment is null because it is not stored in the topic
+    Assertions.assertNull(alteredTopic.comment());
+    Assertions.assertEquals("3", alteredTopic.properties().get(PARTITION_COUNT));
+    Assertions.assertEquals("1", alteredTopic.properties().get(REPLICATION_FACTOR));
+    Assertions.assertEquals(
+        "producer", alteredTopic.properties().get(TopicConfig.COMPRESSION_TYPE_CONFIG));
+    // retention.ms overridden was removed, so it should be the default value
+    Assertions.assertEquals(
+        "604800000", alteredTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
 
     // test exception
     Exception exception =

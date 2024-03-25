@@ -155,7 +155,7 @@ immutables-value = { module = "org.immutables:value", version.ref = "immutables-
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
 kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka" }
-kafka_2_12 = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
+kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }

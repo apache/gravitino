@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.kafka;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
+import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Entity;
@@ -40,6 +41,7 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -53,14 +55,21 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.AlterConfigOp;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DescribeConfigsResult;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.TopicExistsException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,19 +146,28 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);
     } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException("Failed to list topics under namespace " + namespace, e);
+      throw new RuntimeException("Failed to list topics under the schema " + namespace, e);
     }
   }
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
     DescribeTopicsResult result = adminClient.describeTopics(Collections.singleton(ident.name()));
+    ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, ident.name());
+    DescribeConfigsResult configsResult =
+        adminClient.describeConfigs(Collections.singleton(configResource));
     int partitions;
     int replicationFactor;
+    Map<String, String> properties = Maps.newHashMap();
     try {
       TopicDescription topicDescription = result.topicNameValues().get(ident.name()).get();
       partitions = topicDescription.partitions().size();
       replicationFactor = topicDescription.partitions().get(0).replicas().size();
+
+      Config topicConfigs = configsResult.all().get().get(configResource);
+      topicConfigs.entries().forEach(e -> properties.put(e.name(), e.value()));
+      properties.put(PARTITION_COUNT, String.valueOf(partitions));
+      properties.put(REPLICATION_FACTOR, String.valueOf(replicationFactor));
     } catch (ExecutionException e) {
       if (e.getCause() instanceof org.apache.kafka.common.errors.UnknownTopicOrPartitionException) {
         throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
@@ -164,10 +182,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
     return KafkaTopic.builder()
         .withName(ident.name())
-        .withProperties(
-            ImmutableMap.of(
-                KafkaTopicPropertiesMetadata.PARTITION_COUNT, String.valueOf(partitions),
-                KafkaTopicPropertiesMetadata.REPLICATION_FACTOR, String.valueOf(replicationFactor)))
+        .withProperties(properties)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -197,9 +212,15 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (ExecutionException e) {
       if (e.getCause() instanceof TopicExistsException) {
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
+
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
         throw new IllegalArgumentException(
             "Invalid replication factor for topic " + ident + e.getCause().getMessage(), e);
+
+      } else if (e.getCause() instanceof InvalidConfigurationException) {
+        throw new IllegalArgumentException(
+            "Invalid properties for topic " + ident + e.getCause().getMessage(), e);
+
       } else {
         throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
       }
@@ -226,23 +247,47 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     String newComment = topic.comment();
     int oldPartitionCount = Integer.parseInt(topic.properties().get(PARTITION_COUNT));
     int newPartitionCount = oldPartitionCount;
-    Map<String, String> newProperties = Maps.newHashMap(topic.properties());
+    Map<String, String> alteredProperties = Maps.newHashMap(topic.properties());
+    List<AlterConfigOp> alterConfigOps = Lists.newArrayList();
     for (TopicChange change : changes) {
       if (change instanceof TopicChange.UpdateTopicComment) {
         newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
 
       } else if (change instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) change;
-        newProperties.put(setProperty.getProperty(), setProperty.getValue());
+        // alter partition count
         if (PARTITION_COUNT.equals(setProperty.getProperty())) {
-          newPartitionCount = Integer.parseInt(setProperty.getValue());
+          int targetPartitionCount = Integer.parseInt(setProperty.getValue());
+          if (targetPartitionCount == newPartitionCount) {
+            continue;
+          } else if (targetPartitionCount < newPartitionCount) {
+            throw new IllegalArgumentException(
+                "Cannot reduce partition count from "
+                    + newPartitionCount
+                    + " to "
+                    + targetPartitionCount);
+          } else {
+            newPartitionCount = targetPartitionCount;
+            alteredProperties.put(PARTITION_COUNT, setProperty.getValue());
+            continue;
+          }
         }
+
+        // alter other properties
+        alteredProperties.put(setProperty.getProperty(), setProperty.getValue());
+        alterConfigOps.add(
+            new AlterConfigOp(
+                new ConfigEntry(setProperty.getProperty(), setProperty.getValue()),
+                AlterConfigOp.OpType.SET));
 
       } else if (change instanceof TopicChange.RemoveProperty) {
         TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) change;
         Preconditions.checkArgument(
             !PARTITION_COUNT.equals(removeProperty.getProperty()), "Cannot remove partition count");
-        newProperties.remove(removeProperty.getProperty());
+        alteredProperties.remove(removeProperty.getProperty());
+        alterConfigOps.add(
+            new AlterConfigOp(
+                new ConfigEntry(removeProperty.getProperty(), null), AlterConfigOp.OpType.DELETE));
 
       } else {
         throw new IllegalArgumentException("Unsupported topic change: " + change);
@@ -251,25 +296,37 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
     // increase partition count
     if (newPartitionCount != oldPartitionCount) {
-      if (newPartitionCount < oldPartitionCount) {
-        throw new IllegalArgumentException(
-            "Cannot reduce partition count from " + oldPartitionCount + " to " + newPartitionCount);
-      }
       try {
         adminClient
             .createPartitions(
                 Collections.singletonMap(ident.name(), NewPartitions.increaseTo(newPartitionCount)))
             .all()
             .get();
-      } catch (ExecutionException | InterruptedException e) {
-        throw new RuntimeException("Failed to alter topic " + ident.name() + " in Kafka", e);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Failed to increase partition count for topic " + ident.name(), e);
+      }
+    }
+
+    // alter topic properties
+    if (!alterConfigOps.isEmpty()) {
+      ConfigResource topicResource = new ConfigResource(ConfigResource.Type.TOPIC, ident.name());
+      try {
+        adminClient
+            .incrementalAlterConfigs(Collections.singletonMap(topicResource, alterConfigOps))
+            .all()
+            .get();
+      } catch (UnknownTopicOrPartitionException e) {
+        throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to alter topic properties for topic " + ident.name(), e);
       }
     }
 
     return KafkaTopic.builder()
         .withName(ident.name())
         .withComment(newComment)
-        .withProperties(newProperties)
+        .withProperties(alteredProperties)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(topic.auditInfo().creator())
@@ -394,10 +451,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
             (int) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, PARTITION_COUNT));
     Optional<Short> replicationFactor =
         Optional.ofNullable(
-            (short)
-                TOPIC_PROPERTIES_METADATA.getOrDefault(
-                    properties, KafkaTopicPropertiesMetadata.REPLICATION_FACTOR));
-    return new NewTopic(ident.name(), partitionCount, replicationFactor);
+            (short) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, REPLICATION_FACTOR));
+    NewTopic newTopic = new NewTopic(ident.name(), partitionCount, replicationFactor);
+    return newTopic.configs(buildNewTopicConfigs(properties));
+  }
+
+  private Map<String, String> buildNewTopicConfigs(Map<String, String> properties) {
+    Map<String, String> topicConfigs = Maps.newHashMap(properties);
+    topicConfigs.remove(PARTITION_COUNT);
+    topicConfigs.remove(REPLICATION_FACTOR);
+    return topicConfigs;
   }
 
   private void createDefaultSchema() {
