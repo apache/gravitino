@@ -26,66 +26,52 @@ SOFTWARE.
  * Referred from types/axios.d.ts
  */
 
-export const ErrorMessageMode = 'none' | 'modal' | 'message' | undefined;
+/**
+ * @typedef {'none' | 'modal' | 'message' | undefined} ErrorMessageMode
+ */
 
-export const SuccessMessageMode = ErrorMessageMode;
+/**
+ * @typedef {ErrorMessageMode} SuccessMessageMode
+ */
 
-export const RequestOptions = {
-  joinParamsToUrl: false,
+/**
+ * @typedef {Object} RequestOptions
+ * @property {boolean} [joinParamsToUrl] - Whether to join parameters to URL.
+ * @property {boolean} [formatDate] - Whether to format request parameter time.
+ * @property {boolean} [isTransformResponse] - Whether to process the request result.
+ * @property {boolean} [isReturnNativeResponse] - Whether to return native response headers.
+ * @property {boolean} [joinPrefix] - Whether to join URL prefix.
+ * @property {string} [apiUrl] - The interface address.
+ * @property {string} [urlPrefix] - The concatenating path for the request.
+ * @property {ErrorMessageMode} [errorMessageMode] - The error message prompt type.
+ * @property {SuccessMessageMode} [successMessageMode] - The success message prompt type.
+ * @property {boolean} [joinTime] - Whether to add a timestamp.
+ * @property {boolean} [ignoreCancelToken] - Whether to ignore cancel token.
+ * @property {boolean} [withToken] - Whether to send token in header.
+ * @property {RetryRequest} [retryRequest] - Retry mechanism for requests.
+ */
 
-  // ** Format request parameter time
-  formatDate: false,
+/**
+ * @typedef {Object} RetryRequest
+ * @property {boolean} isOpenRetry - Whether retry mechanism is open or not.
+ * @property {number} count - The number of retries.
+ * @property {number} waitTime - The waiting time between retries.
+ */
 
-  // ** Whether to process the request result
-  isTransformResponse: false,
+/**
+ * @template T
+ * @typedef {Object} Result
+ * @property {number} code - The result code.
+ * @property {'success' | 'error' | 'warning'} type - The type of result.
+ * @property {string} message - The result message.
+ * @property {T} result - The result data.
+ */
 
-  // ** Whether to return native response headers
-  // ** For example: use this attribute when you need to get the response headers
-  isReturnNativeResponse: false,
+/**
+ * @typedef {Object} UploadFileParams
+ * @property {Record<string, any>} [data] - The data to upload.
+ * @property {string} [name] - The name of the file.
+ * @property {File | Blob} file - The file to upload.
+ * @property {string} [filename] - The filename.
+ */
 
-  // ** Whether to join url
-  joinPrefix: false,
-
-  // ** interface address, use the default apiUrl if you leave it blank
-  apiUrl: undefined,
-
-  // ** Concatenating Path for the Request
-  urlPrefix: undefined,
-
-  // ** Error message prompt type
-  errorMessageMode: ErrorMessageMode,
-
-  // ** Success message prompt type
-  successMessageMode: SuccessMessageMode,
-
-  // ** Whether to add a timestamp
-  joinTime: boolean,
-  ignoreCancelToken: boolean,
-
-  // ** Whether to send token in header
-  withToken: boolean,
-
-  // ** Retry Mechanism for Requests
-  retryRequest: RetryRequest
-}
-
-export const RetryRequest = {
-  isOpenRetry: false,
-  count: 0,
-  waitTime: 0,
-}
-
-export const Result = {
-  code: number,
-  type: 'success' | 'error' | 'warning',
-  message: string,
-  result: null
-}
-
-// ** multipart/form-data: upload file
-export const UploadFileParams = {
-  data: {},
-  name: undefined,
-  file: null,
-  filename: undefined,
-};
