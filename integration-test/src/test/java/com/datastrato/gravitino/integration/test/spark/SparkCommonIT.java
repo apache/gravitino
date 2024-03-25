@@ -310,7 +310,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(
         String.format(
             "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
-    getSparkSession().sql("desc extended test_rename_column").show(false);
     ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
     renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
     checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
@@ -417,7 +416,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + "USING PARQUET PARTITIONED BY (name, age)";
+    createTableSQL =
+        String.format("%s %s PARTITIONED BY (name, age)", createTableSQL, getUsingClause());
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
