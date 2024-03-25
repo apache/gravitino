@@ -285,14 +285,6 @@ public class TestEntityProtoSerDe {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withProperties(props)
-            .withFirstName("first")
-            .withLastName("last")
-            .withDisplayName("display")
-            .withEmailAddress("123@abc.com")
-            .withComment("comment")
-            .withDefaultRole("role")
-            .withActive(true)
             .withGroups(Lists.newArrayList("group"))
             .withRoles(Lists.newArrayList("role"))
             .build();
@@ -301,21 +293,9 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(managedUser, managedUserFromBytes);
 
     ManagedUser managedUserWithoutFields =
-        ManagedUser.builder()
-            .withId(userId)
-            .withName(userName)
-            .withAuditInfo(auditInfo)
-            .withFirstName("first")
-            .withLastName("last")
-            .withDisplayName("display")
-            .withEmailAddress("123@abc.com")
-            .withComment("comment")
-            .withDefaultRole("role")
-            .withActive(true)
-            .build();
+        ManagedUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
     userBytes = protoEntitySerDe.serialize(managedUserWithoutFields);
     managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
     Assertions.assertEquals(managedUserWithoutFields, managedUserFromBytes);
-    Assertions.assertNull(managedUserFromBytes.properties());
   }
 }

@@ -105,15 +105,7 @@ message Topic {
 message User {
   uint64 id = 1;
   string name = 2;
-  map<string, string> properties = 3;
-  string first_name = 4;
-  string last_name = 5;
-  string display_name = 6;
-  string email_address = 7;
-  bool active = 8;
-  optional string default_role = 9;
-  optional string comment = 10;
-  repeated string groups = 11;
-  repeated string roles = 12;
-  AuditInfo audit_info = 13;
+  repeated string groups = 3;
+  repeated string roles = 4;
+  AuditInfo audit_info = 5;
 }

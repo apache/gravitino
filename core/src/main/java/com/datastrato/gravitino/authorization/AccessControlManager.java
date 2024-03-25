@@ -18,7 +18,6 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,50 +46,23 @@ public class AccessControlManager implements SupportsUserManagement {
   }
 
   /**
-   * Creates a new User.
+   * Adds a new User.
    *
    * @param metalake The Metalake of the User.
    * @param name The name of the User.
-   * @param firstName The first name of the User.
-   * @param lastName The last name of the User.
-   * @param displayName The display name of the User.
-   * @param emailAddress The email address of the User.
-   * @param active The status of the User is whether active or not.
-   * @param defaultRole The default role of the User.
-   * @param comment The comment of the User.
-   * @param properties Additional properties for the User.
    * @return The created User instance.
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
    * @throws RuntimeException If creating the User encounters storage issues.
    */
   @Override
-  public User createUser(
-      String metalake,
-      String name,
-      String firstName,
-      String lastName,
-      String displayName,
-      String emailAddress,
-      boolean active,
-      String defaultRole,
-      String comment,
-      Map<String, String> properties)
-      throws UserAlreadyExistsException {
+  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
     ManagedUser managedUser =
         ManagedUser.builder()
             .withId(idGenerator.nextId())
             .withName(name)
             .withMetalake(metalake)
-            .withProperties(properties)
-            .withFirstName(firstName)
-            .withLastName(lastName)
-            .withDisplayName(displayName)
-            .withEmailAddress(emailAddress)
-            .withActive(active)
             .withGroups(Lists.newArrayList())
             .withRoles(Lists.newArrayList())
-            .withDefaultRole(defaultRole)
-            .withComment(comment)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -112,7 +84,7 @@ public class AccessControlManager implements SupportsUserManagement {
   }
 
   /**
-   * Deletes a User.
+   * Removes a User.
    *
    * @param metalake The Metalake of the User.
    * @param userName THe name of the User.
@@ -120,7 +92,7 @@ public class AccessControlManager implements SupportsUserManagement {
    * @throws RuntimeException If deleting the User encounters storage issues.
    */
   @Override
-  public boolean dropUser(String metalake, String userName) {
+  public boolean removeUser(String metalake, String userName) {
 
     try {
       return store.delete(NameIdentifier.of(metalake, userName), Entity.EntityType.USER);

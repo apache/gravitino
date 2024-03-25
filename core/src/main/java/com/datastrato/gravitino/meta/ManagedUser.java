@@ -25,29 +25,8 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, " The unique id of the user entity.");
   public static final Field NAME =
       Field.required("name", String.class, "The name of the user entity.");
-  public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the user entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
-
-  public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the user entity.");
-
-  public static final Field FIRST_NAME =
-      Field.required("first_name", String.class, "The first name of the user entity.");
-
-  public static final Field LAST_NAME =
-      Field.required("last_name", String.class, "The last name of the user entity");
-
-  public static final Field DISPLAY_NAME =
-      Field.required("display_name", String.class, "The display name of the user entity");
-
-  public static final Field EMAIL_ADDRESS =
-      Field.required("email_address", String.class, "The email address of the user entity");
-
-  public static final Field ACTIVE =
-      Field.required(
-          "active", Boolean.class, "The status of the user entity is whether active or not.");
 
   public static final Field GROUPS =
       Field.optional("groups", List.class, "The groups of the user entity");
@@ -55,23 +34,12 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   public static final Field ROLES =
       Field.optional("roles", List.class, "The roles of the user entity");
 
-  public static final Field DEFAULT_ROLE =
-      Field.optional("default_role", String.class, "The default role of the user entity");
-
   private Long id;
   private String name;
-  private Map<String, String> properties;
   private AuditInfo auditInfo;
   private String metalake;
-  private String comment;
-  private String firstName;
-  private String lastName;
-  private String displayName;
-  private String emailAddress;
-  private boolean active;
   private List<String> groups;
   private List<String> roles;
-  private String defaultRole;
 
   private ManagedUser() {}
 
@@ -86,16 +54,8 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(PROPERTIES, properties);
-    fields.put(COMMENT, comment);
-    fields.put(DEFAULT_ROLE, defaultRole);
     fields.put(ROLES, roles);
     fields.put(GROUPS, groups);
-    fields.put(FIRST_NAME, firstName);
-    fields.put(LAST_NAME, lastName);
-    fields.put(DISPLAY_NAME, displayName);
-    fields.put(EMAIL_ADDRESS, emailAddress);
-    fields.put(ACTIVE, active);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -140,85 +100,6 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the properties of the user entity.
-   *
-   * @return The properties of the user entity.
-   */
-  public Map<String, String> properties() {
-    return properties;
-  }
-
-  /**
-   * The first name of the user.
-   *
-   * @return The first name of the user.
-   */
-  @Override
-  public String firstName() {
-    return firstName;
-  }
-
-  /**
-   * The last name of the user.
-   *
-   * @return The last name of the user.
-   */
-  @Override
-  public String lastName() {
-    return lastName;
-  }
-
-  /**
-   * The display name of the user.
-   *
-   * @return The display name of the user.
-   */
-  @Override
-  public String displayName() {
-    return displayName;
-  }
-
-  /**
-   * The email address of the user.
-   *
-   * @return The email address of the user.
-   */
-  @Override
-  public String emailAddress() {
-    return emailAddress;
-  }
-
-  /**
-   * The comment of the user.
-   *
-   * @return The comment of the user.
-   */
-  @Override
-  public String comment() {
-    return comment;
-  }
-
-  /**
-   * The default role of the user.
-   *
-   * @return The default role of the user.
-   */
-  @Override
-  public String defaultRole() {
-    return defaultRole;
-  }
-
-  /**
-   * The status of the user is whether active or not.
-   *
-   * @return The status of the user is whether active or not
-   */
-  @Override
-  public boolean active() {
-    return active;
-  }
-
-  /**
    * The roles of the user.
    *
    * @return The roles of the user.
@@ -247,34 +128,13 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(properties, that.properties)
-        && Objects.equals(firstName, that.firstName)
-        && Objects.equals(lastName, that.lastName)
-        && Objects.equals(displayName, that.displayName)
-        && Objects.equals(emailAddress, that.emailAddress)
-        && Objects.equals(comment, that.comment)
-        && Objects.equals(active, that.active)
         && Objects.equals(roles, that.roles)
-        && Objects.equals(groups, that.groups)
-        && Objects.equals(defaultRole, that.defaultRole);
+        && Objects.equals(groups, that.groups);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        id,
-        name,
-        properties,
-        auditInfo,
-        firstName,
-        lastName,
-        displayName,
-        emailAddress,
-        comment,
-        active,
-        roles,
-        groups,
-        defaultRole);
+    return Objects.hash(id, name, auditInfo, roles, groups);
   }
 
   @Override
@@ -316,17 +176,6 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the properties of the user entity.
-     *
-     * @param properties The properties of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withProperties(Map<String, String> properties) {
-      managedUser.properties = properties;
-      return this;
-    }
-
-    /**
      * Sets the audit details of the user entity.
      *
      * @param auditInfo The audit details of the user entity.
@@ -345,83 +194,6 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withMetalake(String metalake) {
       managedUser.metalake = metalake;
-      return this;
-    }
-
-    /**
-     * Sets the first name of the user entity.
-     *
-     * @param firstName The first name of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withFirstName(String firstName) {
-      managedUser.firstName = firstName;
-      return this;
-    }
-
-    /**
-     * Sets the last name of the user entity.
-     *
-     * @param lastName The last name of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withLastName(String lastName) {
-      managedUser.lastName = lastName;
-      return this;
-    }
-
-    /**
-     * Sets the display name of the user entity.
-     *
-     * @param displayName The display name of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withDisplayName(String displayName) {
-      managedUser.displayName = displayName;
-      return this;
-    }
-
-    /**
-     * Sets the email address of the user entity.
-     *
-     * @param emailAddress The email address of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withEmailAddress(String emailAddress) {
-      managedUser.emailAddress = emailAddress;
-      return this;
-    }
-
-    /**
-     * Sets the comment of the user entity.
-     *
-     * @param comment The comment of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withComment(String comment) {
-      managedUser.comment = comment;
-      return this;
-    }
-
-    /**
-     * Sets the status of the user entity.
-     *
-     * @param active The status of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withActive(boolean active) {
-      managedUser.active = active;
-      return this;
-    }
-
-    /**
-     * Sets the default role of the user entity.
-     *
-     * @param defaultRole The default role of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withDefaultRole(String defaultRole) {
-      managedUser.defaultRole = defaultRole;
       return this;
     }
 

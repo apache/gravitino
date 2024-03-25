@@ -6,7 +6,6 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
@@ -67,89 +66,31 @@ public class TestAccessControlManager {
   public void testCreateUser() {
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
-    User user =
-        accessControlManager.createUser(
-            "metalake",
-            "testCreate",
-            "first",
-            "last",
-            "display",
-            "123@abc.com",
-            true,
-            null,
-            null,
-            props);
+    User user = accessControlManager.addUser("metalake", "testCreate");
     Assertions.assertEquals("testCreate", user.name());
-    testProperties(props, user.properties());
-    Assertions.assertEquals("first", user.firstName());
-    Assertions.assertEquals("last", user.lastName());
-    Assertions.assertEquals("display", user.displayName());
-    Assertions.assertTrue(user.active());
     Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
-    Assertions.assertNull(user.defaultRole());
-    Assertions.assertNull(user.comment());
 
-    user =
-        accessControlManager.createUser(
-            "metalake",
-            "testCreateWithOptionalField",
-            "first",
-            "last",
-            "display",
-            "123@abc.com",
-            true,
-            "role",
-            "comment",
-            props);
+    user = accessControlManager.addUser("metalake", "testCreateWithOptionalField");
 
     Assertions.assertEquals("testCreateWithOptionalField", user.name());
-    testProperties(props, user.properties());
-    Assertions.assertEquals("first", user.firstName());
-    Assertions.assertEquals("last", user.lastName());
-    Assertions.assertEquals("display", user.displayName());
     Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
-    Assertions.assertTrue(user.active());
-    Assertions.assertEquals("role", user.defaultRole());
-    Assertions.assertEquals("comment", user.comment());
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
         UserAlreadyExistsException.class,
-        () ->
-            accessControlManager.createUser(
-                "metalake",
-                "testCreate",
-                "first",
-                "last",
-                "display",
-                "123@abc.com",
-                true,
-                "role",
-                "comment",
-                props));
+        () -> accessControlManager.addUser("metalake", "testCreate"));
   }
 
   @Test
   public void testLoadUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-    accessControlManager.createUser(
-        "metalake",
-        "testLoad",
-        "first",
-        "last",
-        "display",
-        "123@abc.com",
-        true,
-        "role",
-        "comment",
-        props);
+    accessControlManager.addUser("metalake", "testLoad");
 
     User user = accessControlManager.loadUser("metalake", "testLoad");
     Assertions.assertEquals("testLoad", user.name());
-    testProperties(props, user.properties());
 
     // Test load non-existed user
     Throwable exception =
@@ -163,33 +104,14 @@ public class TestAccessControlManager {
   public void testDropUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-    accessControlManager.createUser(
-        "metalake",
-        "testDrop",
-        "first",
-        "last",
-        "display",
-        "123@abc.com",
-        true,
-        "role",
-        "comment",
-        props);
+    accessControlManager.addUser("metalake", "testDrop");
 
     // Test drop user
-    boolean dropped = accessControlManager.dropUser("metalake", "testDrop");
+    boolean dropped = accessControlManager.removeUser("metalake", "testDrop");
     Assertions.assertTrue(dropped);
 
     // Test drop non-existed user
-    boolean dropped1 = accessControlManager.dropUser("metalake", "no-exist");
+    boolean dropped1 = accessControlManager.removeUser("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
-  }
-
-  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
-    expectedProps.forEach(
-        (k, v) -> {
-          Assertions.assertEquals(v, testProps.get(k));
-        });
-
-    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
   }
 }

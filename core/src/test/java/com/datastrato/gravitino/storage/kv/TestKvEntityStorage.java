@@ -100,10 +100,6 @@ public class TestKvEntityStorage {
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
         .withGroups(Lists.newArrayList())
-        .withFirstName("first")
-        .withLastName("last")
-        .withDisplayName("display")
-        .withEmailAddress("123@abc.om")
         .build();
   }
 
