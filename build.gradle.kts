@@ -427,6 +427,11 @@ subprojects {
   }
 
   configure<SigningExtension> {
+    val taskNames = gradle.getStartParameter().getTaskNames()
+    taskNames.forEach() {
+      if (it.contains("publishToMavenLocal")) setRequired(false)
+    }
+
     val gpgId = System.getenv("GPG_ID")
     val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
