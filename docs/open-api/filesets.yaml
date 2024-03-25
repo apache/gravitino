@@ -183,22 +183,23 @@ components:
       properties:
         name:
           type: string
-          description: The name of the fileset
+          description: The name of the fileset. Can not be empty.
         type:
           type: string
-          description: The type of the fileset
+          description: The type of the fileset. The value of type should be EXTERNAL or MANAGED
           nullable: true
         comment:
           type: string
-          description: The comment of the fileset
+          description: The comment of the fileset. Can be empty.
           nullable: true
         storageLocation:
           type: string
-          description: The location of the fileset
+          description: The location of the fileset. If the storage location of managed fileset is empty, it will \
+            use the location of namespace. The storage location of external fileset must be set.
           nullable: true
         properties:
           type: object
-          description: The properties of the fileset
+          description: The properties of the fileset. Can be empty.
           nullable: true
           default: {}
           additionalProperties:
@@ -350,7 +351,7 @@ components:
           "name": "fileset1",
           "type": "managed",
           "comment": "This is a comment",
-          "storageLocation": "s3://bucket/path",
+          "storageLocation": "hdfs://host/user/s_fileset/schema/fileset1",
           "properties": {
             "key1": "value1",
             "key2": "value2"
