@@ -310,6 +310,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(
         String.format(
             "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+    getSparkSession().sql("desc extended test_rename_column").show(false);
     ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
     renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
     checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
