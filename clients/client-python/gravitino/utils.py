@@ -34,3 +34,16 @@ class HTTPClient:
 
     def put(self, endpoint, json=None, **kwargs):
         return self._request("put", endpoint, json=json, **kwargs)
+
+
+def unpack(path: str):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            rv = func(*args, **kwargs)
+            for p in path.split('.'):
+                if p not in rv:
+                    raise KeyError(f"The path '{path}' can't find in dict")
+                rv = rv.get(p)
+            return rv
+        return wrapper
+    return decorator
