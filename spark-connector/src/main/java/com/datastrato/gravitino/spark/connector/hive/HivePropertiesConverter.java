@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 /** Transform hive catalog properties between Spark and Gravitino. */
 public class HivePropertiesConverter implements PropertiesConverter {
@@ -46,15 +47,17 @@ public class HivePropertiesConverter implements PropertiesConverter {
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
     Map<String, String> gravitinoTableProperties =
         PropertiesConverter.transformOptionProperties(properties);
-    String provider = gravitinoTableProperties.get(HivePropertyConstants.SPARK_PROVIDER);
-    String storeAs = gravitinoTableProperties.remove(HivePropertyConstants.SPARK_HIVE_STORED_AS);
-    String sparkFormat = Optional.ofNullable(storeAs).orElse(provider);
-    if (sparkFormat != null) {
-      String gravitinoFormat = hiveTableFormatMap.get(sparkFormat.toLowerCase(Locale.ROOT));
+    String provider = gravitinoTableProperties.get(TableCatalog.PROP_PROVIDER);
+    String storeAs = gravitinoTableProperties.get(HivePropertyConstants.SPARK_HIVE_STORED_AS);
+    String sparkHiveTableFormat = Optional.ofNullable(storeAs).orElse(provider);
+    if (sparkHiveTableFormat != null) {
+      String gravitinoFormat =
+          hiveTableFormatMap.get(sparkHiveTableFormat.toLowerCase(Locale.ROOT));
       if (gravitinoFormat != null) {
         gravitinoTableProperties.put(HivePropertyConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
       } else {
-        throw new NotSupportedException("Doesn't support spark format: " + sparkFormat);
+        throw new NotSupportedException(
+            "Doesn't support spark hive table format: " + sparkHiveTableFormat);
       }
     }
 

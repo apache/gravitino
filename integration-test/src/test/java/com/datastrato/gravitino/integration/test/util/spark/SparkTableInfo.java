@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.hive.HivePropertyConstants;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,6 +17,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
@@ -45,7 +45,7 @@ public class SparkTableInfo {
   }
 
   public String getTableLocation() {
-    return tableProperties.get(HivePropertyConstants.GRAVITINO_HIVE_LOCATION);
+    return tableProperties.get(TableCatalog.PROP_LOCATION);
   }
 
   // Include database name and table name

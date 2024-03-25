@@ -5,9 +5,9 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.spark.connector.hive.HivePropertyConstants;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 /** Transform table properties between Gravitino and Spark. */
 public interface PropertiesConverter {
@@ -22,8 +22,8 @@ public interface PropertiesConverter {
             Collectors.toMap(
                 entry -> {
                   String key = entry.getKey();
-                  if (key.startsWith(HivePropertyConstants.SPARK_OPTION_PREFIX)) {
-                    return key.substring(HivePropertyConstants.SPARK_OPTION_PREFIX.length());
+                  if (key.startsWith(TableCatalog.OPTION_PREFIX)) {
+                    return key.substring(TableCatalog.OPTION_PREFIX.length());
                   } else {
                     return key;
                   }
