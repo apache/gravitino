@@ -602,7 +602,7 @@ public class GravitinoMockServer implements AutoCloseable {
     }
   }
 
-  class Metalake {
+  static class Metalake {
     GravitinoMetalake metalake;
     Map<String, Catalog> catalogs = new HashMap<>();
 
