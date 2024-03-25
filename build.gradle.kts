@@ -270,7 +270,6 @@ subprojects {
       options.errorprone.disableWarningsInGeneratedCode.set(true)
       options.errorprone.enable(
         "AnnotateFormatMethod",
-        "FormatStringAnnotation",
         "AlwaysThrows",
         "ArrayEquals",
         "ArrayToString",
@@ -290,15 +289,18 @@ subprojects {
         "DangerousLiteralNull",
         "DeadException",
         "DeadThread",
+        "DefaultCharset",
         "DoNotCall",
         "DoNotMock",
         "DuplicateMapKeys",
+        "EqualsGetClass",
         "EqualsNaN",
         "EqualsNull",
         "EqualsReference",
         "EqualsWrongThing",
         "ForOverride",
         "FormatString",
+        "FormatStringAnnotation",
         "GetClassOnAnnotation",
         "GetClassOnClass",
         "HashtableContains",
@@ -310,6 +312,7 @@ subprojects {
         "IncompatibleArgumentType",
         "IndexOfChar",
         "InfiniteRecursion",
+        "InlineFormatString",
         "InvalidJavaTimeConstant",
         "InvalidPatternSyntax",
         "IsInstanceIncompatibleType",
@@ -352,13 +355,10 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
-        "UseCorrectAssertInTests",
         "UnusedVariable",
+        "UseCorrectAssertInTests",
         "VarTypeName",
-        "XorPower",
-        "EqualsGetClass",
-        "DefaultCharset",
-        "InlineFormatString"
+        "XorPower"
       )
     }
   }
