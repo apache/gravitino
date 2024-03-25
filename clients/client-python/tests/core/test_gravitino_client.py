@@ -5,7 +5,7 @@ This software is licensed under the Apache License version 2.
 import pytest
 import requests
 from unittest.mock import MagicMock
-from gravitino_client.core import GravitinoClient, VersionDTO
+from gravitino import Service, VersionDTO
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_get_version_success(mock_get):
         }
     }
 
-    client = GravitinoClient(base_url="http://localhost:8090")
+    client = Service(base_url="http://localhost:8090")
     version_data = client.getVersion()
 
     assert version_data == expected_version_dto
@@ -39,7 +39,7 @@ def test_get_version_success(mock_get):
 def test_get_version_http_error(mock_get):
     mock_get.side_effect = requests.exceptions.HTTPError
 
-    client = GravitinoClient(base_url="http://localhost:8090")
+    client = Service(base_url="http://localhost:8090")
 
     with pytest.raises(requests.exceptions.HTTPError):
         client.getVersion()
