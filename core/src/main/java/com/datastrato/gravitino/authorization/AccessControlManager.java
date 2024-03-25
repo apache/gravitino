@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * AccessControlManager is used for manage users, roles, grant information, this class is an
  * important class for tenant management.
  */
-public class AccessControlManager implements SupportsUserManagement {
+public class AccessControlManager {
 
   private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
 
@@ -50,11 +50,10 @@ public class AccessControlManager implements SupportsUserManagement {
    *
    * @param metalake The Metalake of the User.
    * @param name The name of the User.
-   * @return The created User instance.
+   * @return The added User instance.
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
    * @throws RuntimeException If creating the User encounters storage issues.
    */
-  @Override
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
     ManagedUser managedUser =
         ManagedUser.builder()
@@ -88,7 +87,7 @@ public class AccessControlManager implements SupportsUserManagement {
    *
    * @param metalake The Metalake of the User.
    * @param userName THe name of the User.
-   * @return `true` if the User was successfully deleted, `false` otherwise.
+   * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If deleting the User encounters storage issues.
    */
   @Override
@@ -115,7 +114,6 @@ public class AccessControlManager implements SupportsUserManagement {
    * @throws NoSuchUserException If the User with the given identifier does not exist.
    * @throws RuntimeException If loading the User encounters storage issues.
    */
-  @Override
   public User loadUser(String metalake, String userName) throws NoSuchUserException {
     try {
       return store.get(

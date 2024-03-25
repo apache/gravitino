@@ -63,8 +63,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testCreateUser() {
-    Map<String, String> props = ImmutableMap.of("key1", "value1");
+  public void testAddUser() {
 
     User user = accessControlManager.addUser("metalake", "testCreate");
     Assertions.assertEquals("testCreate", user.name());
@@ -85,7 +84,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testLoadUser() {
-    Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.addUser("metalake", "testLoad");
 
@@ -101,7 +99,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testDropUser() {
+  public void testRemoveUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.addUser("metalake", "testDrop");
