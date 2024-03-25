@@ -123,6 +123,40 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
   }
 
+  public Catalog toBasicCatalog() {
+    return new Catalog() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public Type type() {
+        return type;
+      }
+
+      @Override
+      public String provider() {
+        return provider;
+      }
+
+      @Override
+      public String comment() {
+        return comment;
+      }
+
+      @Override
+      public Map<String, String> properties() {
+        return properties;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return auditInfo;
+      }
+    };
+  }
+
   /** Builder class for creating instances of {@link CatalogEntity}. */
   public static class Builder {
 
