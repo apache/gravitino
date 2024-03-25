@@ -8,11 +8,11 @@ from gravitino.typing import JSON_ro
 from gravitino.constants import TIMEOUT
 
 
-class Service:
+class _Service:
     def __init__(
-        self,
-        url: str,
-        timeout: int = TIMEOUT,
+            self,
+            url: str,
+            timeout: int = TIMEOUT,
     ) -> None:
         self.base_url = url
         self.http_client = HTTPClient(timeout=timeout)
@@ -68,3 +68,12 @@ class Service:
         return self.http_client.get(
             f"{self.base_url}/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions"
         )
+
+
+service = {}
+
+
+def initialize_service(url: str, timeout: int = TIMEOUT):
+    global service
+    if not service:
+        service['service'] = _Service(url, timeout)

@@ -6,27 +6,81 @@ This software is licensed under the Apache License version 2.
 import re
 
 from gravitino.constants import TIMEOUT
-from gravitino.service import Service
+from gravitino.service import initialize_service, service
+from gravitino.typing import JSON_ro
 
 
 class MetaLake:
-    pass
+    def __init__(self, payload: JSON_ro):
+        self.name = payload.get("name")
+        self.payload = payload
+        self.service = service["service"]
+        self.catalogs = self.service.get_catalogs(self.name)
+
+    def __repr__(self):
+        return f"MetaLake<{self.name}>"
+
+    def __getattr__(self, catalog_name):
+        if catalog_name in dir(self):
+            return Catalog(self.name, catalog_name)
+
+    def __dir__(self):
+        return [catalog["name"] for catalog in self.catalogs]
 
 
 class Catalog:
-    pass
+    def __init__(self, metalake_name: str, catalog_name: str):
+        self.metalake_name = metalake_name
+        self.catalog_name = catalog_name
+        self.name = catalog_name
+        self.service = service["service"]
+        self.schemas = self.service.get_schemas(metalake_name, catalog_name)
+
+    def __repr__(self):
+        return f"Catalog<{self.name}>"
+
+    def __getattr__(self, schema_name):
+        if schema_name in dir(self):
+            return Schema(self.metalake_name, self.catalog_name, schema_name)
+
+    def __dir__(self):
+        return [schema["name"] for schema in self.schemas]
 
 
 class Schema:
-    pass
+    def __init__(self, metalake_name: str, catalog_name: str, schema_name: str):
+        self.metalake_name = metalake_name
+        self.catalog_name = catalog_name
+        self.schema_name = schema_name
+        self.name = schema_name
+        self.service = service["service"]
+        self.tables = self.service.get_tables(metalake_name, catalog_name, schema_name)
+
+    def __repr__(self):
+        return f"Schema<{self.name}>"
+
+    def __getattr__(self, table_name):
+        if table_name in dir(self):
+            return Table(self.metalake_name, self.catalog_name, self.schema_name, table_name)
+
+    def __dir__(self):
+        return [table["name"] for table in self.tables]
 
 
 class Table:
-    pass
+    def __init__(self, metalake_name: str, catalog_name: str, schema_name: str, table_name: str):
+        self.metalake_name = metalake_name
+        self.catalog_name = catalog_name
+        self.schema_name = schema_name
+        self.table_name = table_name
+        self.name = schema_name
+        self.service = service["service"]
 
+    def __repr__(self):
+        return f"Table<{self.name}>"
 
-class Partition:
-    pass
+    def info(self):
+        return self.service.get_table(self.metalake_name, self.catalog_name, self.schema_name, self.table_name)
 
 
 class GravitinoClient:
@@ -48,21 +102,16 @@ class GravitinoClient:
             _host = f"{_host}:{port}"
 
         _base_url = f"{_host}/{prefix.strip('/')}"
-        self.service = Service(_base_url, timeout)
+        initialize_service(_base_url, timeout)
+        self.service = service["service"]
         self.debug = debug
 
     @property
     def version(self):
         return self.service.get_version()
 
-    def get_metalakes(self):
-        return self.service.get_metalakes()
+    def get_metalakes(self) -> [MetaLake]:
+        return [MetaLake(metalake) for metalake in self.service.get_metalakes()]
 
-    def get_metalake(self, metalake: str):
-        return self.service.get_metalake(metalake)
-
-    # def __getattr__(self, metalake):
-    #     return self.service.get_metalake(metalake)
-    #
-    # def __dir__(self):
-    #     return ['the_first_metalake', 'metalake_demo']
+    def get_metalake(self, metalake: str) -> MetaLake:
+        return MetaLake(self.service.get_metalake(metalake))
