@@ -11,21 +11,23 @@ import java.util.List;
 public interface User extends Auditable {
 
   /**
-   * The name of the user.
+   * The name of the user. It's the identifier of User. It must be unique. Usually the name comes
+   * from a external user management system like LDAP, IAM and so on.
    *
    * @return The name of the user.
    */
   String name();
 
   /**
-   * The roles of the user.
+   * The roles of the user. A user can have multiple roles. Every role binds several privileges.
    *
    * @return The roles of the user.
    */
   List<String> roles();
 
   /**
-   * The groups of the user.
+   * The groups of the user. A user can be added to different groups. Every group also has different
+   * roles.
    *
    * @return The groups of the user.
    */
