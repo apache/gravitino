@@ -5,21 +5,23 @@
 
 package com.datastrato.gravitino.storage.relational;
 
+import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+
 import com.datastrato.gravitino.Config;
 import com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.Closeable;
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.*;
-
-import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.dbcp2.DelegatingConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class RelationalGarbageCollector implements Closeable {
 
@@ -45,7 +47,7 @@ public final class RelationalGarbageCollector implements Closeable {
   }
 
   public void start() {
-    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -67,12 +69,14 @@ public final class RelationalGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveOldVersionData() throws SQLException {
-    long deleteTimeLine = System.currentTimeMillis() - STORE_DELETE_AFTER_TIME;
+    long deleteTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
 
-    List<String> tables = Arrays.asList("metalake", "catalog", "schema", "table", "fileset");
+    for (AllTables.TABLE_NAMES table : AllTables.TABLE_NAMES.values()) {
+      System.out.println(table.getTableName());
 
-    for (String table : tables) {
+      /*
       String sql = "SELECT * FROM " + table + " WHERE deleted_at != 0 AND deleted_at < ?";
+      DelegatingConnection<Connection> connection = null;
       try (PreparedStatement stmt = connection.prepareStatement(sql)) {
         stmt.setLong(1, deleteTimeLine);
         try (ResultSet rs = stmt.executeQuery()) {
@@ -89,7 +93,8 @@ public final class RelationalGarbageCollector implements Closeable {
               try (ResultSet checkRs = checkStmt.executeQuery()) {
                 if (checkRs.next()) {
                   String deleteOldVersionSql = "DELETE FROM " + table + " WHERE id = ?";
-                  try (PreparedStatement deleteOldVersionStmt = connection.prepareStatement(deleteOldVersionSql)) {
+                  try (PreparedStatement deleteOldVersionStmt =
+                      connection.prepareStatement(deleteOldVersionSql)) {
                     deleteOldVersionStmt.setLong(1, rs.getLong("id"));
                     deleteOldVersionStmt.executeUpdate();
                   }
@@ -98,10 +103,9 @@ public final class RelationalGarbageCollector implements Closeable {
             }
           }
         }
-      }
+      } */
     }
   }
-
 
   @Override
   public void close() throws IOException {

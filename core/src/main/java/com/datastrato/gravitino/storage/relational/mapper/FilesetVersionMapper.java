@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
+import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -19,7 +20,7 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface FilesetVersionMapper {
-  String VERSION_TABLE_NAME = "fileset_version_info";
+  String VERSION_TABLE_NAME = AllTables.FILESET_VERSION_TABLE_NAME;
 
   @Insert(
       "INSERT INTO "
