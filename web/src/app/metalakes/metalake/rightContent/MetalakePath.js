@@ -71,7 +71,7 @@ const MetalakePath = props => {
             underline='hover'
           >
             <Icon icon='bx:book' fontSize={20} />
-            <Text>{catalog}</Text>
+            <Text data-refer={`nav-to-catalog-${catalog}`}>{catalog}</Text>
           </MUILink>
         </Tooltip>
       )}
@@ -79,7 +79,7 @@ const MetalakePath = props => {
         <Tooltip title={schema} placement='top'>
           <MUILink component={Link} href={schemaUrl} onClick={event => handleClick(event, schemaUrl)} underline='hover'>
             <Icon icon='bx:coin-stack' fontSize={20} />
-            <Text>{schema}</Text>
+            <Text data-refer={`nav-to-schema-${schema}`}>{schema}</Text>
           </MUILink>
         </Tooltip>
       )}
@@ -87,7 +87,7 @@ const MetalakePath = props => {
         <Tooltip title={table} placement='top'>
           <MUILink component={Link} href={tableUrl} onClick={event => handleClick(event, tableUrl)} underline='hover'>
             <Icon icon='bx:table' fontSize={20} />
-            <Text>{table}</Text>
+            <Text data-refer={`nav-to-table-${table}`}>{table}</Text>
           </MUILink>
         </Tooltip>
       )}

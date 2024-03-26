@@ -6,6 +6,8 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.junit.jupiter.api.Assertions;
@@ -28,8 +30,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected String getUsingClause() {
-    return "USING ICEBERG";
+  protected boolean supportsSparkSQLClusteredBy() {
+    return false;
   }
 
   @Test
@@ -42,7 +44,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
     String properties = databaseMeta.get("Properties");
-    Assertions.assertEquals("((owner,datastrato))", properties);
+    Assertions.assertEquals(
+        "((hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
+        properties);
 
     testDatabaseName = "t_create2";
     dropDatabaseIfExists(testDatabaseName);
@@ -58,7 +62,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
     Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
-    Assertions.assertEquals("((owner,datastrato),(ID,001))", properties);
+    Assertions.assertEquals(
+        "((ID,001), (hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
+        properties);
   }
 
   @Test
@@ -66,11 +72,13 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String testDatabaseName = "t_alter";
     sql("CREATE DATABASE " + testDatabaseName);
     Assertions.assertEquals(
-        "((owner,datastrato))", getDatabaseMetadata(testDatabaseName).get("Properties"));
+        "((hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
+        getDatabaseMetadata(testDatabaseName).get("Properties"));
 
     sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
     Assertions.assertEquals(
-        "((owner,datastrato),(ID,001))", getDatabaseMetadata(testDatabaseName).get("Properties"));
+        "((ID,001), (hive.metastore.database.owner,datastrato), (hive.metastore.database.owner-type,USER))",
+        getDatabaseMetadata(testDatabaseName).get("Properties"));
 
     // Hive metastore doesn't support alter database location, therefore this test method
     // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
@@ -78,6 +86,25 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertThrowsExactly(
         NoSuchNamespaceException.class,
         () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
+  }
+
+  @Test
+  void testCreateIcebergDatasourceFormatPartitionTable() {
+    String tableName = "datasource_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " USING ICEBERG PARTITIONED BY (name, age)";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withIdentifyPartition(Arrays.asList("name", "age"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
   }
 
   @Test
