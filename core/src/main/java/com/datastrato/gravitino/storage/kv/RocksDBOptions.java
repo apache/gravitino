@@ -17,53 +17,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RocksDBOptions {
-    public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
-    @Getter
-    private final Map<String, BiConsumer<RocksDBOptions, String>> optionSetters;
-    @Getter
-    private Options options;
+  public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
+  @Getter private final Map<String, BiConsumer<RocksDBOptions, String>> optionSetters;
+  @Getter private Options options;
 
-    @Getter
-    private WriteOptions writeOptions;
+  @Getter private WriteOptions writeOptions;
 
   @Getter private ReadOptions readOptions;
 
-    public RocksDBOptions() {
-        this.options = new Options();
-        this.writeOptions = new WriteOptions();
-        this.readOptions = new ReadOptions();
-        this.optionSetters = new HashMap<>();
-        initializeOptionSetters();
-    }
+  public RocksDBOptions() {
+    this.options = new Options();
+    this.writeOptions = new WriteOptions();
+    this.readOptions = new ReadOptions();
+    this.optionSetters = new HashMap<>();
+    initializeOptionSetters();
+  }
 
-    public RocksDBOptions(Options options, WriteOptions writeOptions, ReadOptions readOptions) {
-        this.options = options;
-        this.writeOptions = writeOptions;
-        this.readOptions = readOptions;
-        this.optionSetters = new HashMap<>();
-        initializeOptionSetters();
-    }
+  public RocksDBOptions(Options options, WriteOptions writeOptions, ReadOptions readOptions) {
+    this.options = options;
+    this.writeOptions = writeOptions;
+    this.readOptions = readOptions;
+    this.optionSetters = new HashMap<>();
+    initializeOptionSetters();
+  }
 
-    
-    private void initializeOptionSetters() {
-        // Each option name maps to a lambda that applies the setting to the appropriate
-        // option object
-        // and the syntax of optionKey should be:
-        // .<className>.<optionName>
-        // e.g. .Options.maxBackgroundJobs
-        optionSetters.put(
-                ".Options.maxBackgroundJobs",
-                (holder, value) -> {
-                    holder.options.setMaxBackgroundJobs(Integer.parseInt(value));
-                });
-    }
+  private void initializeOptionSetters() {
+    // Each option name maps to a lambda that applies the setting to the appropriate
+    // option object
+    // and the syntax of optionKey should be:
+    // .<className>.<optionName>
+    // e.g. .Options.maxBackgroundJobs
+    optionSetters.put(
+        ".Options.maxBackgroundJobs",
+        (holder, value) -> {
+          holder.options.setMaxBackgroundJobs(Integer.parseInt(value));
+        });
+  }
 
-    
-    
-    
-    
-
-    //
+  //
   /**
    * Apply user-defined options to option if this options is configurable. TODO: List all
    * configurable options.
