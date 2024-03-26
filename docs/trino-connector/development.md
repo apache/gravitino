@@ -50,7 +50,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
-5. Change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module.
+5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -58,7 +58,6 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
  Copyright 2024 Datastrato Pvt Ltd.
  This software is licensed under the Apache License version 2.
 -->
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
@@ -77,6 +76,26 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
     </properties>
 
     <dependencies>
+        <!--
+        The following dependencies are required for the Gravitino connector. You can install them
+        locally (./gradlew publishToMavenLocal) or just use the release version like 0.4.0
+        -->
+        <dependency>
+            <groupId>com.datastrato.gravitino</groupId>
+            <artifactId>bundled-catalog</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.datastrato.gravitino</groupId>
+            <artifactId>client-java-runtime</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
@@ -92,8 +111,8 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
             <artifactId>bootstrap</artifactId>
             <exclusions>
                 <exclusion>
-                    <artifactId>log4j-to-slf4j</artifactId>
                     <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-to-slf4j</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -116,6 +135,29 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>4.9.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.2.1</version>
         </dependency>
 
         <dependency>
@@ -155,37 +197,9 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
         </dependency>
 
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>node</artifactId>
             <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.httpcomponents.client5</groupId>
-            <artifactId>httpclient5</artifactId>
-            <version>5.2.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.antlr</groupId>
-            <artifactId>antlr4-runtime</artifactId>
-            <version>4.9.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.trino</groupId>
@@ -198,26 +212,10 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
             <scope>test</scope>
         </dependency>
 
-        <!--
-        The following dependencies are required for the Gravitino connector. You can install them
-        locally (./gradlew publishToMavenLocal) or just use the release version like 0.5.0
-        -->
         <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>client-java-runtime</artifactId>
-            <version>0.5.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>bundled-catalog</artifactId>
-            <version>0.5.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-collections4</artifactId>
-            <version>4.4</version>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
@@ -306,7 +304,9 @@ plugin.bundles=\
 node-scheduler.include-coordinator=true
 ```
 
-
+:::note
+Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not recorded in the `/etc/config.properties`. For the hive plugin, please use  `plugin/trino-hive/pom.xml` after release version 435. Others should use `plugin/trino-hive-hadoop2/pom.xml`.
+:::
 
 8. Start the Trino server and connect to the Gravitino server.
 ![](../assets/trino/start-trino.jpg)
