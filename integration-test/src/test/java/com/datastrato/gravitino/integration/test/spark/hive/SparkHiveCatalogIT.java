@@ -35,11 +35,6 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     return "hive";
   }
 
-  @Override
-  protected String getUsingClause() {
-    return "USING PARQUET";
-  }
-
   @Test
   void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";

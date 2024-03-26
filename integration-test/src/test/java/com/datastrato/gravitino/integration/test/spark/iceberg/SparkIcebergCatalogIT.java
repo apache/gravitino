@@ -31,11 +31,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     return false;
   }
 
-  @Override
-  protected String getUsingClause() {
-    return "USING ICEBERG";
-  }
-
   @Test
   void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";

@@ -60,8 +60,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
-  protected abstract String getUsingClause();
-
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -308,7 +306,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
     sql(
         String.format(
-            "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+            "ALTER TABLE %s RENAME COLUMN %s TO %s", tableName, oldColumnName, newColumnName));
     ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
     renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
     checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
@@ -327,8 +325,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') %s",
-            tableName, getUsingClause()));
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '')",
+            tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
@@ -415,8 +413,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL =
-        String.format("%s %s PARTITIONED BY (name, age)", createTableSQL, getUsingClause());
+    createTableSQL = createTableSQL + " PARTITIONED BY (name, age)";
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
