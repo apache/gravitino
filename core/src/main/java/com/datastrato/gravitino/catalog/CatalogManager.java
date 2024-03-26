@@ -231,7 +231,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     try {
       return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
-          .map(CatalogEntity::toBasicCatalog)
+          .map(CatalogEntity::toCatalogInfo)
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
