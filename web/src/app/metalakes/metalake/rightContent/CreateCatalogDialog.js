@@ -382,6 +382,7 @@ const CreateCatalogDialog = props => {
                       onChange={onChange}
                       placeholder=''
                       error={Boolean(errors.name)}
+                      data-refer='catalog-name-field'
                     />
                   )}
                 />
@@ -463,13 +464,14 @@ const CreateCatalogDialog = props => {
                       onChange={onChange}
                       placeholder=''
                       error={Boolean(errors.comment)}
+                      data-refer='catalog-comment-field'
                     />
                   )}
                 />
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} data-refer='catalog-props-layout'>
               <Typography sx={{ mb: 2 }} variant='body2'>
                 Properties
               </Typography>
@@ -480,7 +482,10 @@ const CreateCatalogDialog = props => {
                       <Grid item xs={12} sx={{ '& + &': { mt: 2 } }}>
                         <FormControl fullWidth>
                           <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box
+                              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                              data-refer={`catalog-props-${index}`}
+                            >
                               <Box>
                                 <TextField
                                   size='small'
@@ -490,6 +495,7 @@ const CreateCatalogDialog = props => {
                                   disabled={item.required}
                                   onChange={event => handleFormChange({ index, event })}
                                   error={item.hasDuplicateKey}
+                                  data-refer={`props-key-${index}`}
                                 />
                               </Box>
                               <Box>
@@ -501,6 +507,8 @@ const CreateCatalogDialog = props => {
                                     sx={{ width: 195 }}
                                     disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
+                                    data-refer={`props-value-${index}`}
+                                    data-prev-refer={`props-${item.key}`}
                                   >
                                     {item.select.map(selectItem => (
                                       <MenuItem key={selectItem} value={selectItem}>
@@ -517,6 +525,8 @@ const CreateCatalogDialog = props => {
                                     value={item.value}
                                     disabled={item.disabled}
                                     onChange={event => handleFormChange({ index, event })}
+                                    data-refer={`props-value-${index}`}
+                                    data-prev-refer={`props-${item.key}`}
                                   />
                                 )}
                               </Box>
@@ -563,6 +573,7 @@ const CreateCatalogDialog = props => {
                 onClick={addFields}
                 variant='outlined'
                 startIcon={<Icon icon='mdi:plus-circle-outline' />}
+                data-refer='add-catalog-props'
               >
                 Add Property
               </Button>
@@ -576,7 +587,7 @@ const CreateCatalogDialog = props => {
             pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
-          <Button variant='contained' sx={{ mr: 1 }} type='submit'>
+          <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-catalog'>
             {type === 'create' ? 'Create' : 'Update'}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
