@@ -183,12 +183,20 @@ const DetailsDrawer = props => {
                   <TableCell sx={{ py: 2 }}>Value</TableCell>
                 </TableRow>
               </TableHead>
-              <TableBody>
+              <TableBody data-refer='details-props-table'>
                 {properties.map((item, index) => {
                   return (
-                    <TableRow key={index}>
-                      <TableCell className={'twc-py-[0.7rem]'}>{item.key}</TableCell>
-                      <TableCell className={'twc-py-[0.7rem]'}>{item.value}</TableCell>
+                    <TableRow key={index} data-refer={`details-props-index-${index}`}>
+                      <TableCell className={'twc-py-[0.7rem]'} data-refer={`details-props-key-${item.key}`}>
+                        {item.key}
+                      </TableCell>
+                      <TableCell
+                        className={'twc-py-[0.7rem]'}
+                        data-refer={`details-props-value-${item.value}`}
+                        data-prev-refer={`details-props-key-${item.key}`}
+                      >
+                        {item.value}
+                      </TableCell>
                     </TableRow>
                   )
                 })}

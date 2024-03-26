@@ -80,14 +80,14 @@ const TabsContent = () => {
     <TabContext value={tab}>
       <Box sx={{ px: 6, py: 2, borderBottom: 1, borderColor: 'divider' }}>
         <TabList onChange={handleChangeTab} aria-label='tabs'>
-          <CustomTab icon='mdi:list-box-outline' label={tableTitle} value='table' />
-          <CustomTab icon='mdi:clipboard-text-outline' label='Details' value='details' />
+          <CustomTab icon='mdi:list-box-outline' label={tableTitle} value='table' data-refer='tab-table' />
+          <CustomTab icon='mdi:clipboard-text-outline' label='Details' value='details' data-refer='tab-details' />
         </TabList>
       </Box>
-      <CustomTabPanel value='table'>
+      <CustomTabPanel value='table' data-refer='tab-table-panel'>
         <TableView />
       </CustomTabPanel>
-      <CustomTabPanel value='details'>
+      <CustomTabPanel value='details' data-refer='tab-details-panel'>
         <DetailsView />
       </CustomTabPanel>
     </TabContext>
