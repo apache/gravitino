@@ -74,9 +74,12 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(col5Field.type().isNestedType());
     Assertions.assertTrue(col5Field.type().isMapType());
     Types.MapType mapType = col5Field.type().asMapType();
+    Assertions.assertTrue(mapType.isValueOptional());
     Assertions.assertTrue(mapType.keyType().isListType());
     Assertions.assertFalse(mapType.keyType().asListType().elementType().isNestedType());
+    Assertions.assertTrue(mapType.keyType().asListType().isElementOptional());
     Assertions.assertTrue(mapType.valueType().isMapType());
+    Assertions.assertTrue(mapType.valueType().asMapType().isValueOptional());
     Assertions.assertTrue(mapType.valueType().asMapType().keyType().isPrimitiveType());
     Assertions.assertTrue(mapType.valueType().asMapType().valueType().isPrimitiveType());
   }
@@ -86,7 +89,7 @@ public class TestConvertUtil extends TestBaseConvert {
     ByteType byteType = ByteType.get();
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, byteType));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(byteType));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -95,64 +98,63 @@ public class TestConvertUtil extends TestBaseConvert {
     ShortType shortType = ShortType.get();
     exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(true, shortType));
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergType(shortType));
     Assertions.assertTrue(
         exception
             .getMessage()
             .contains("Iceberg do not support Byte and Short Type, use Integer instead"));
 
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.BooleanType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.BooleanType.get())
             instanceof Types.BooleanType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.StringType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.StringType.get())
             instanceof Types.StringType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.IntegerType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.IntegerType.get())
             instanceof Types.IntegerType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.LongType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.LongType.get())
             instanceof Types.LongType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.FloatType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.FloatType.get())
             instanceof Types.FloatType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.DoubleType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.DoubleType.get())
             instanceof Types.DoubleType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.DateType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.DateType.get())
             instanceof Types.DateType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.TimeType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.TimeType.get())
             instanceof Types.TimeType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.BinaryType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.BinaryType.get())
             instanceof Types.BinaryType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.UUIDType.get())
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.UUIDType.get())
             instanceof Types.UUIDType);
 
     Type timestampTZ =
         ConvertUtil.toIcebergType(
-            true, com.datastrato.gravitino.rel.types.Types.TimestampType.withTimeZone());
+            com.datastrato.gravitino.rel.types.Types.TimestampType.withTimeZone());
     Assertions.assertTrue(timestampTZ instanceof Types.TimestampType);
     Assertions.assertTrue(((Types.TimestampType) timestampTZ).shouldAdjustToUTC());
 
     Type timestamp =
         ConvertUtil.toIcebergType(
-            true, com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone());
+            com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone());
     Assertions.assertTrue(timestamp instanceof Types.TimestampType);
     Assertions.assertFalse(((Types.TimestampType) timestamp).shouldAdjustToUTC());
 
     Type decimalType =
-        ConvertUtil.toIcebergType(
-            true, com.datastrato.gravitino.rel.types.Types.DecimalType.of(9, 2));
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.DecimalType.of(9, 2));
     Assertions.assertTrue(decimalType instanceof Types.DecimalType);
     Assertions.assertEquals(9, ((Types.DecimalType) decimalType).precision());
     Assertions.assertEquals(2, ((Types.DecimalType) decimalType).scale());
 
     Type fixedCharType =
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.FixedType.of(9));
+        ConvertUtil.toIcebergType(com.datastrato.gravitino.rel.types.Types.FixedType.of(9));
     Assertions.assertTrue(fixedCharType instanceof Types.FixedType);
     Assertions.assertEquals(9, ((Types.FixedType) fixedCharType).length());
 
@@ -161,7 +163,7 @@ public class TestConvertUtil extends TestBaseConvert {
             com.datastrato.gravitino.rel.types.Types.StringType.get(),
             com.datastrato.gravitino.rel.types.Types.IntegerType.get(),
             true);
-    Type convertedMapType = ConvertUtil.toIcebergType(true, mapType);
+    Type convertedMapType = ConvertUtil.toIcebergType(mapType);
     Assertions.assertTrue(convertedMapType instanceof Types.MapType);
     Assertions.assertTrue(((Types.MapType) convertedMapType).keyType() instanceof Types.StringType);
     Assertions.assertTrue(
@@ -169,7 +171,6 @@ public class TestConvertUtil extends TestBaseConvert {
 
     Type listType =
         ConvertUtil.toIcebergType(
-            true,
             com.datastrato.gravitino.rel.types.Types.ListType.of(
                 com.datastrato.gravitino.rel.types.Types.FloatType.get(), true));
     Assertions.assertTrue(listType instanceof Types.ListType);
