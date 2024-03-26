@@ -159,6 +159,7 @@ public class TestDynFields {
     public String name;
     public static String staticField = "Hello";
     public Integer age;
+
     @SuppressWarnings("UnusedVariable")
     private String hidden = "secret";
 
