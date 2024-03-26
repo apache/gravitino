@@ -256,7 +256,7 @@ public class TestConvertUtil extends TestBaseConvert {
                     com.datastrato.gravitino.rel.types.Types.ListType.of(
                         com.datastrato.gravitino.rel.types.Types.FloatType.get(), false))));
     Assertions.assertTrue(structTypeNotNull instanceof Types.StructType);
-    structTypeNullable.asStructType().fields().forEach(f -> Assertions.assertTrue(f.isRequired()));
+    structTypeNotNull.asStructType().fields().forEach(f -> Assertions.assertTrue(f.isRequired()));
     Assertions.assertTrue(
         structTypeNotNull.asStructType().fields().get(0).type() instanceof Types.MapType);
     Assertions.assertTrue(
