@@ -12,7 +12,7 @@ const VersionView = () => {
   const store = useAppSelector(state => state.sys)
 
   return (
-    <Typography variant='subtitle2' id='gravitino_version' sx={{ width: 200 }}>
+    <Typography variant='subtitle2' id='gravitino_version' className={'twc-flex twc-justify-end'} sx={{ width: 200 }}>
       {store.version}
     </Typography>
   )
