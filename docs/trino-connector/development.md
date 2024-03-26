@@ -50,7 +50,179 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
-5. Change the `pom.xml` file in the `trino-gravitino` module accordingly. This is a [example](../assets/trino/pom.xml) of the `pom.xml` file in the `trino-gravitino` module.
+5. Change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright 2024 Datastrato Pvt Ltd.
+ This software is licensed under the Apache License version 2.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.trino</groupId>
+        <artifactId>trino-root</artifactId>
+        <version>426</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>trino-gravitino</artifactId>
+    <packaging>trino-plugin</packaging>
+    <description>Trino - Graviton Connector</description>
+
+    <properties>
+        <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>bootstrap</artifactId>
+            <exclusions>
+                <exclusion>
+                    <artifactId>log4j-to-slf4j</artifactId>
+                    <groupId>org.apache.logging.log4j</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>configuration</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>json</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-plugin-toolkit</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>slice</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-context</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-spi</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>node</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.2.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>4.9.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-memory</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+        The following dependencies are required for the Gravitino connector. You can install them
+        locally (./gradlew publishToMavenLocal) or just use the release version like 0.5.0
+        -->
+        <dependency>
+            <groupId>com.datastrato.gravitino</groupId>
+            <artifactId>client-java-runtime</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.datastrato.gravitino</groupId>
+            <artifactId>bundled-catalog</artifactId>
+            <version>0.5.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.4</version>
+        </dependency>
+    </dependencies>
+</project>
+```
+
 6. Try to compile module `trino-gravitino` to see if there are any errors. 
 ```shell
 # build the whole trino project
@@ -63,7 +235,74 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
 ![](../assets/trino/add-config.jpg)
 
-The corresponding configuration files are here: [gravitino.properties](../assets/trino/gravitino.properties) and [config.properties](../assets/trino/config.properties).
+The corresponding configuration files are here:
+
+- Gravitino properties file: `gravitino.properties`
+```properties
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+# the connector name is always 'gravitino'
+connector.name=gravitino
+
+# uri of the gravitino server, you need to change it according to your environment
+gravitino.uri=http://localhost:8090
+
+# The name of the metalake to which the connector is connected, you need to change it according to your environment
+gravitino.metalake=test
+```
+- Trino configuration file: `config.properties`
+```properties
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+#
+# WARNING
+# ^^^^^^^
+# This configuration file is for development only and should NOT be used
+# in production. For example configuration, see the Trino documentation.
+# sample nodeId to provide consistency across test runs
+node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
+node.environment=test
+node.internal-address=localhost
+experimental.concurrent-startup=true
+
+# Default port is 8080, We change it to 8180
+http-server.http.port=8180
+
+discovery.uri=http://localhost:8180
+
+exchange.http-client.max-connections=1000
+exchange.http-client.max-connections-per-server=1000
+exchange.http-client.connect-timeout=1m
+exchange.http-client.idle-timeout=1m
+
+scheduler.http-client.max-connections=1000
+scheduler.http-client.max-connections-per-server=1000
+scheduler.http-client.connect-timeout=1m
+scheduler.http-client.idle-timeout=1m
+
+query.client.timeout=5m
+query.min-expire-age=30m
+
+# We removed several catalogs that won't be used in Gravitino
+plugin.bundles=\
+  ../../plugin/trino-iceberg/pom.xml,\
+  ../../plugin/trino-hive/pom.xml,\
+  ../../plugin/trino-local-file/pom.xml, \
+  ../../plugin/trino-mysql/pom.xml,\
+  ../../plugin/trino-postgresql/pom.xml, \
+  ../../plugin/trino-exchange-filesystem/pom.xml, \
+  ../../plugin/trino-gravitino/pom.xml
+
+node-scheduler.include-coordinator=true
+```
+
+
 
 8. Start the Trino server and connect to the Gravitino server.
 ![](../assets/trino/start-trino.jpg)
