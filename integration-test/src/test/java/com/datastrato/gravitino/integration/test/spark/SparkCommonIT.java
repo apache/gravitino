@@ -50,20 +50,20 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   // To generate test data for update table.
   private static final Map<DataType, String> typeNewConstant =
-          ImmutableMap.of(
-                  DataTypes.IntegerType,
-                  "2",
-                  DataTypes.StringType,
-                  "'gravitino_it_test_new'",
-                  DataTypes.createArrayType(DataTypes.IntegerType),
-                  "array(4, 5, 6)",
-                  DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-                  "map('b', 2)",
-                  DataTypes.createStructType(
-                          Arrays.asList(
-                                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-                                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
-                  "struct(2, 'b')");
+      ImmutableMap.of(
+          DataTypes.IntegerType,
+          "2",
+          DataTypes.StringType,
+          "'gravitino_it_test_new'",
+          DataTypes.createArrayType(DataTypes.IntegerType),
+          "array(4, 5, 6)",
+          DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+          "map('b', 2)",
+          DataTypes.createStructType(
+              Arrays.asList(
+                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
+          "struct(2, 'b')");
 
   private static String getInsertWithoutPartitionSql(String tableName, String values) {
     return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
@@ -80,25 +80,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   private static String getRowLevelUpdateTableSql(
-          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-            "MERGE INTO %s "
-                    + "USING (SELECT %s) %s "
-                    + "ON %s "
-                    + "WHEN MATCHED THEN UPDATE SET * "
-                    + "WHEN NOT MATCHED THEN INSERT *",
-            targetTableName, selectClause, sourceTableName, onClause);
+        "MERGE INTO %s "
+            + "USING (SELECT %s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN UPDATE SET * "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
   }
 
   private static String getRowLevelDeleteTableSql(
-          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-            "MERGE INTO %s "
-                    + "USING (SELECT %s) %s "
-                    + "ON %s "
-                    + "WHEN MATCHED THEN DELETE "
-                    + "WHEN NOT MATCHED THEN INSERT *",
-            targetTableName, selectClause, sourceTableName, onClause);
+        "MERGE INTO %s "
+            + "USING (SELECT %s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN DELETE "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
   }
 
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
@@ -370,7 +370,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '')", tableName));
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '')",
+            tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
@@ -450,7 +451,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     checkTableReadWrite(tableInfo);
   }
-
 
   @Test
   void testCreateDatasourceFormatPartitionTable() {

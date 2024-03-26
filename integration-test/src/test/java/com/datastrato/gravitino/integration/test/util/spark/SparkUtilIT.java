@@ -131,7 +131,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     }
   }
 
-  private static String getSelectAllSql(String tableName) {
+  protected static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
 
