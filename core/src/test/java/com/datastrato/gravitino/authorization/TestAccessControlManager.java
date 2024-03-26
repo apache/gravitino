@@ -93,8 +93,7 @@ public class TestAccessControlManager {
     // Test to get non-existed user
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchUserException.class,
-            () -> accessControlManager.getUser("metalake", "not-exist"));
+            NoSuchUserException.class, () -> accessControlManager.getUser("metalake", "not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("User not-exist does not exist"));
   }
 
