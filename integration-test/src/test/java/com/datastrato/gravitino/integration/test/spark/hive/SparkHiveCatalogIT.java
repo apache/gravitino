@@ -8,7 +8,7 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
-import com.datastrato.gravitino.spark.connector.hive.HivePropertyConstants;
+import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -166,12 +166,12 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
             .withName(tableName)
             .withTableProperties(
                 ImmutableMap.of(
-                    HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
-                    HivePropertyConstants.TEXT_INPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_OUTPUT_FORMAT,
-                    HivePropertyConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_SERDE_LIB,
-                    HivePropertyConstants.LAZY_SIMPLE_SERDE_CLASS));
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
   }
@@ -190,12 +190,12 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
             .withName(tableName)
             .withTableProperties(
                 ImmutableMap.of(
-                    HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_INPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_OUTPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_OUTPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_SERDE_LIB,
-                    HivePropertyConstants.PARQUET_SERDE_CLASS));
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
     checkParquetFile(tableInfo);
@@ -215,12 +215,12 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
             .withName(tableName)
             .withTableProperties(
                 ImmutableMap.of(
-                    HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_INPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_OUTPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_OUTPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_SERDE_LIB,
-                    HivePropertyConstants.PARQUET_SERDE_CLASS));
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
     checkParquetFile(tableInfo);
@@ -235,9 +235,9 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
         String.format(
             "%s ROW FORMAT SERDE '%s' WITH SERDEPROPERTIES ('serialization.format'='@', 'field.delim' = ',') STORED AS INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
             createTableSql,
-            HivePropertyConstants.PARQUET_SERDE_CLASS,
-            HivePropertyConstants.PARQUET_INPUT_FORMAT_CLASS,
-            HivePropertyConstants.PARQUET_OUTPUT_FORMAT_CLASS);
+            HivePropertiesConstants.PARQUET_SERDE_CLASS,
+            HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+            HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS);
     sql(createTableSql);
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
@@ -250,12 +250,12 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
                     "@",
                     TableCatalog.OPTION_PREFIX + "field.delim",
                     ",",
-                    HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_INPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_OUTPUT_FORMAT,
-                    HivePropertyConstants.PARQUET_OUTPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_SERDE_LIB,
-                    HivePropertyConstants.PARQUET_SERDE_CLASS));
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
     checkParquetFile(tableInfo);
@@ -297,12 +297,12 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
                     ",",
                     TableCatalog.OPTION_PREFIX + "colelction.delim",
                     "@",
-                    HivePropertyConstants.SPARK_HIVE_INPUT_FORMAT,
-                    HivePropertyConstants.TEXT_INPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_OUTPUT_FORMAT,
-                    HivePropertyConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
-                    HivePropertyConstants.SPARK_HIVE_SERDE_LIB,
-                    HivePropertyConstants.LAZY_SIMPLE_SERDE_CLASS));
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
 

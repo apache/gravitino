@@ -30,6 +30,7 @@ dependencies {
   implementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   implementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   implementation("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
+  implementation(project(mapOf("path" to ":catalogs:catalog-hive")))
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)

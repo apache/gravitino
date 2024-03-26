@@ -23,21 +23,21 @@ public class TestHivePropertiesConverter {
     // stored as
     Map<String, String> hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
-            ImmutableMap.of(HivePropertyConstants.SPARK_HIVE_STORED_AS, "PARQUET"));
+            ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_STORED_AS, "PARQUET"));
     Assertions.assertEquals(
-        hiveProperties.get(HivePropertyConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
+        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
         () ->
             hivePropertiesConverter.toGravitinoTableProperties(
-                ImmutableMap.of(HivePropertyConstants.SPARK_HIVE_STORED_AS, "notExists")));
+                ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_STORED_AS, "notExists")));
 
     // using
     hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "PARQUET"));
     Assertions.assertEquals(
-        hiveProperties.get(HivePropertyConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
+        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
         () ->
@@ -51,11 +51,11 @@ public class TestHivePropertiesConverter {
                 "hive.input-format", "a", "hive.output-format", "b", "hive.serde", "c"));
     Assertions.assertEquals(
         ImmutableMap.of(
-            HivePropertyConstants.GRAVITINO_HIVE_INPUT_FORMAT,
+            HivePropertiesConstants.GRAVITINO_HIVE_INPUT_FORMAT,
             "a",
-            HivePropertyConstants.GRAVITINO_HIVE_OUTPUT_FORMAT,
+            HivePropertiesConstants.GRAVITINO_HIVE_OUTPUT_FORMAT,
             "b",
-            HivePropertyConstants.GRAVITINO_HIVE_SERDE_LIB,
+            HivePropertiesConstants.GRAVITINO_HIVE_SERDE_LIB,
             "c"),
         hiveProperties);
 
@@ -64,13 +64,16 @@ public class TestHivePropertiesConverter {
             ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"));
     Assertions.assertEquals(
         ImmutableMap.of(
-            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"),
+            HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"),
         hiveProperties);
 
     hiveProperties =
         hivePropertiesConverter.toSparkTableProperties(
             ImmutableMap.of(
-                HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"));
+                HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a",
+                "a",
+                "b",
+                "b"));
     Assertions.assertEquals(
         ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"), hiveProperties);
   }
@@ -82,13 +85,16 @@ public class TestHivePropertiesConverter {
             ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "1", "b", "2"));
     Assertions.assertEquals(
         ImmutableMap.of(
-            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "1", "b", "2"),
+            HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "1", "b", "2"),
         properties);
 
     properties =
         HivePropertiesConverter.toOptionProperties(
             ImmutableMap.of(
-                HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "1", "b", "2"));
+                HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a",
+                "1",
+                "b",
+                "2"));
     Assertions.assertEquals(
         ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "1", "b", "2"), properties);
   }

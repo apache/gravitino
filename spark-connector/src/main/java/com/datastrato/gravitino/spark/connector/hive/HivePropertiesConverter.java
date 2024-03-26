@@ -21,39 +21,46 @@ public class HivePropertiesConverter implements PropertiesConverter {
   // Transform Spark hive file format to Gravitino hive file format
   static final Map<String, String> fileFormatMap =
       ImmutableMap.of(
-          "sequencefile", "SEQUENCEFILE",
-          "rcfile", "RCFILE",
-          "orc", "ORC",
-          "parquet", "PARQUET",
-          "textfile", "TEXTFILE",
-          "avro", "AVRO");
+          "sequencefile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_SEQUENCEFILE,
+          "rcfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_RCFILE,
+          "orc", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_ORC,
+          "parquet", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_PARQUET,
+          "textfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
+          "json", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_JSON,
+          "csv", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_CSV,
+          "avro", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_AVRO);
 
   static final Map<String, String> sparkToGravitinoPropertyMap =
       ImmutableMap.of(
           "hive.output-format",
-          HivePropertyConstants.GRAVITINO_HIVE_OUTPUT_FORMAT,
+          HivePropertiesConstants.GRAVITINO_HIVE_OUTPUT_FORMAT,
           "hive.input-format",
-          HivePropertyConstants.GRAVITINO_HIVE_INPUT_FORMAT,
+          HivePropertiesConstants.GRAVITINO_HIVE_INPUT_FORMAT,
           "hive.serde",
-          HivePropertyConstants.GRAVITINO_HIVE_SERDE_LIB);
+          HivePropertiesConstants.GRAVITINO_HIVE_SERDE_LIB);
 
   /**
-   * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored.as" = "PARQUET" in property. CREATE
-   * TABLE xxx USING PARQUET will save "provider" = "PARQUET" in property. CREATE TABLE xxx ROW
-   * FORMAT SERDE xx STORED AS INPUTFORMAT xx OUTPUTFORMAT xx will save "hive.input-format",
-   * "hive.output-format", "hive.serde" in property. CREATE TABLE xxx ROW FORMAT DELIMITED FIELDS
-   * TERMINATED xx will save "option.xx" in property.
+   * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored.as" = "PARQUET" in property.
+   *
+   * <p>CREATE TABLE xxx USING PARQUET will save "provider" = "PARQUET" in property.
+   *
+   * <p>CREATE TABLE xxx ROW FORMAT SERDE xx STORED AS INPUTFORMAT xx OUTPUTFORMAT xx will save
+   * "hive.input-format", "hive.output-format", "hive.serde" in property.
+   *
+   * <p>CREATE TABLE xxx ROW FORMAT DELIMITED FIELDS TERMINATED xx will save "option.xx" in
+   * property.
    */
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
     Map<String, String> gravitinoTableProperties = fromOptionProperties(properties);
     String provider = gravitinoTableProperties.get(TableCatalog.PROP_PROVIDER);
-    String storeAs = gravitinoTableProperties.get(HivePropertyConstants.SPARK_HIVE_STORED_AS);
+    String storeAs = gravitinoTableProperties.get(HivePropertiesConstants.SPARK_HIVE_STORED_AS);
     String fileFormat = Optional.ofNullable(storeAs).orElse(provider);
     if (fileFormat != null) {
       String gravitinoFormat = fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
       if (gravitinoFormat != null) {
-        gravitinoTableProperties.put(HivePropertyConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
+        gravitinoTableProperties.put(
+            HivePropertiesConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
       } else {
         throw new NotSupportedException("Doesn't support hive file format: " + fileFormat);
       }
@@ -82,10 +89,11 @@ public class HivePropertiesConverter implements PropertiesConverter {
             Collectors.toMap(
                 entry -> {
                   String key = entry.getKey();
-                  if (key.startsWith(HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX)) {
+                  if (key.startsWith(
+                      HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX)) {
                     return TableCatalog.OPTION_PREFIX
                         + key.substring(
-                            HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX.length());
+                            HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX.length());
                   } else {
                     return key;
                   }
@@ -102,7 +110,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
                 entry -> {
                   String key = entry.getKey();
                   if (key.startsWith(TableCatalog.OPTION_PREFIX)) {
-                    return HivePropertyConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX
+                    return HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX
                         + key.substring(TableCatalog.OPTION_PREFIX.length());
                   } else {
                     return key;
