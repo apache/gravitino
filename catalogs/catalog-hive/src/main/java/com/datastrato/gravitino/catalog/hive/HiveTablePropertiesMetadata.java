@@ -57,11 +57,11 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   @VisibleForTesting
   public static final String ORC_SERDE_CLASS = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
 
-  private static final String PARQUET_INPUT_FORMAT_CLASS =
+  public static final String PARQUET_INPUT_FORMAT_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
-  private static final String PARQUET_OUTPUT_FORMAT_CLASS =
+  public static final String PARQUET_OUTPUT_FORMAT_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat";
-  private static final String PARQUET_SERDE_CLASS =
+  public static final String PARQUET_SERDE_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
   private static final String COLUMNAR_SERDE_CLASS =
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
