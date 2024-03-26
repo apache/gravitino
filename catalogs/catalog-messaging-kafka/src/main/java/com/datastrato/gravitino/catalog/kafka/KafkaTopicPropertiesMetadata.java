@@ -24,7 +24,7 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
                 PARTITION_COUNT,
                 "The number of partitions for the topic, if not specified, "
                     + "will use the num.partition property in the broker",
-                true /* immutable */,
+                false /* immutable */,
                 null /* default value */,
                 false /* hidden */),
             // TODO: make REPLICATION_FACTOR mutable if needed
