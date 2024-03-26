@@ -50,6 +50,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
+
 5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module.
 
 ```xml
@@ -58,6 +59,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
  Copyright 2024 Datastrato Pvt Ltd.
  This software is licensed under the Apache License version 2.
 -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
