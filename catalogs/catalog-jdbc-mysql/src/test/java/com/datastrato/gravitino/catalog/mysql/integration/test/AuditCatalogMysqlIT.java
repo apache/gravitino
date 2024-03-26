@@ -88,7 +88,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_catalog");
     Catalog catalog = createCatalog(catalogName);
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
-    Assertions.assertNull(catalog.auditInfo().lastModifier());
+    Assertions.assertEquals(catalog.auditInfo().creator(), catalog.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        catalog.auditInfo().createTime(), catalog.auditInfo().lastModifiedTime());
     catalog =
         metalake.alterCatalog(
             NameIdentifier.of(metalakeName, catalogName),
