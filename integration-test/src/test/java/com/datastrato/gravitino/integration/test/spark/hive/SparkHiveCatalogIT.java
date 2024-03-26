@@ -5,17 +5,17 @@
 package com.datastrato.gravitino.integration.test.spark.hive;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
-import java.util.Map;
-import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
-import org.junit.jupiter.api.Assertions;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -102,10 +102,10 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(columns)
-                    .withIdentifyPartition(Arrays.asList("age_p1", "age_p2"));
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(columns)
+            .withIdentifyPartition(Arrays.asList("age_p1", "age_p2"));
     checker.check(tableInfo);
     // write to static partition
     checkTableReadWrite(tableInfo);
@@ -125,8 +125,8 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
 
     // write data to dynamic partition
     String insertData =
-            String.format(
-                    "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
+        String.format(
+            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);

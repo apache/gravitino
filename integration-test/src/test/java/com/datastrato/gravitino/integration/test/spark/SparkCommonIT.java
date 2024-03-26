@@ -56,9 +56,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   private static String getInsertWithPartitionSql(
-          String tableName, String partitionString, String values) {
+      String tableName, String partitionString, String values) {
     return String.format(
-            "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
+        "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
   }
 
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
@@ -487,12 +487,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected void checkTableColumns(
-          String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
+      String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(columnInfos)
-            .withComment(null)
-            .check(tableInfo);
+        .withName(tableName)
+        .withColumns(columnInfos)
+        .withComment(null)
+        .check(tableInfo);
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
