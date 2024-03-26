@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
@@ -23,7 +24,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * AccessControlManager is used for manage users, roles, grant information, this class is an
- * important class for tenant management.
+ * entrance class for tenant management.
  */
 public class AccessControlManager {
 
@@ -60,6 +61,11 @@ public class AccessControlManager {
             .withId(idGenerator.nextId())
             .withName(name)
             .withMetalake(metalake)
+            .withNamespace(
+                Namespace.of(
+                    metalake,
+                    AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
+                    AuthorizationConstants.USER_SCHEMA_NAME))
             .withGroups(Lists.newArrayList())
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
@@ -93,7 +99,12 @@ public class AccessControlManager {
   public boolean removeUser(String metalake, String user) {
 
     try {
-      return store.delete(NameIdentifier.of(metalake, user), Entity.EntityType.USER);
+      return store.delete(
+          NameIdentifier.of(
+              metalake,
+              AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
+              AuthorizationConstants.USER_SCHEMA_NAME),
+          Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -105,14 +116,20 @@ public class AccessControlManager {
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
-   * @param user THe name of the User.
+   * @param user The name of the User.
    * @return The getting User instance.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      return store.get(NameIdentifier.of(metalake, user), Entity.EntityType.USER, UserEntity.class);
+      return store.get(
+          NameIdentifier.of(
+              metalake,
+              AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
+              AuthorizationConstants.USER_SCHEMA_NAME),
+          Entity.EntityType.USER,
+          UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("user {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);

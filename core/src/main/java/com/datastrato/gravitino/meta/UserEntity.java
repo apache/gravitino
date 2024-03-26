@@ -8,7 +8,7 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.User;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -42,6 +42,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   private String metalake;
   private List<String> groups;
   private List<String> roles;
+  private Namespace namespace;
 
   private UserEntity() {}
 
@@ -93,6 +94,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   }
 
   /**
+   * Returns the namespace of the user.
+   *
+   * @return The namespace of the user.
+   */
+  @Override
+  public Namespace namespace() {
+    return namespace;
+  }
+
+  /**
    * Returns the audit details of the user.
    *
    * @return The audit details of the user.
@@ -137,11 +148,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   @Override
   public int hashCode() {
     return Objects.hash(id, name, auditInfo, roles, groups);
-  }
-
-  @Override
-  public NameIdentifier nameIdentifier() {
-    return NameIdentifier.of(metalake, name);
   }
 
   public static Builder builder() {
@@ -218,6 +224,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withGroups(List<String> groups) {
       userEntity.groups = groups;
+      return this;
+    }
+    /**
+     * Sets the namespace of the user entity.
+     *
+     * @param namespace The namespace of the user entity.
+     * @return The builder instance.
+     */
+    public Builder withNamespace(Namespace namespace) {
+      userEntity.namespace = namespace;
       return this;
     }
 
