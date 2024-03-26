@@ -72,6 +72,8 @@ public class AbstractIT {
   private static final String META_DATA = "metadata";
   private static MySQLContainer<?> MYSQL_CONTAINER;
 
+  protected static String serverUri;
+
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -195,28 +197,28 @@ public class AbstractIT {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
-    String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
+    serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     if (AuthenticatorType.OAUTH
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
-      client = GravitinoAdminClient.builder(uri).withOAuth(mockDataProvider).build();
+      client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
     } else if (AuthenticatorType.SIMPLE
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
-      client = GravitinoAdminClient.builder(uri).withSimpleAuth().build();
+      client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
     } else if (AuthenticatorType.KERBEROS
         .name()
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
-      uri = "http://localhost:" + jettyServerConfig.getHttpPort();
+      serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client =
-          GravitinoAdminClient.builder(uri)
+          GravitinoAdminClient.builder(serverUri)
               .withKerberosAuth(KerberosProviderHelper.getProvider())
               .build();
     } else {
-      client = GravitinoAdminClient.builder(uri).build();
+      client = GravitinoAdminClient.builder(serverUri).build();
     }
   }
 
