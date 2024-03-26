@@ -87,8 +87,8 @@ public interface SupportsPartitions {
 
   /**
    * If the table supports purging, drop a partition with specified name and completely remove
-   * partition data by skipping a trash. If the table is an external table don't support purge
-   * partition, {@link UnsupportedOperationException} is thrown.
+   * partition data by skipping a trash. If the table is an external table or does not support
+   * purging partitions, {@link UnsupportedOperationException} is thrown.
    *
    * @param partitionName The name of the partition.
    * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists

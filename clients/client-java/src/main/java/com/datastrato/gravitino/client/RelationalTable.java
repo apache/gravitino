@@ -33,12 +33,9 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.SneakyThrows;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Represents a relational table. */
 public class RelationalTable implements Table, SupportsPartitions {
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalTable.class);
 
   /**
    * Creates a new RelationalTable.

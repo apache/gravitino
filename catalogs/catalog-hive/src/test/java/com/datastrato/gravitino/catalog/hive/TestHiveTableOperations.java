@@ -191,6 +191,28 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
             new String[][] {fieldCity3, fieldDt3}, new Literal<?>[] {valueCity3, valueDt3});
     hiveTable.supportPartitions().addPartition(partition3);
 
+    // add partition: city=4/dt=2020-01-01
+    String partitionName4 = "city=4/dt=2020-01-01";
+    String[] fieldCity4 = new String[] {columns[1].name()};
+    Literal<?> valueCity4 = Literals.byteLiteral((byte) 4);
+    String[] fieldDt4 = new String[] {columns[2].name()};
+    Literal<?> valueDt4 = Literals.dateLiteral(LocalDate.parse("2020-01-01"));
+    Partition partition4 =
+        Partitions.identity(
+            new String[][] {fieldCity4, fieldDt4}, new Literal<?>[] {valueCity4, valueDt4});
+    hiveTable.supportPartitions().addPartition(partition4);
+
+    // add partition: city=4/dt=2020-01-02
+    String partitionName5 = "city=4/dt=2020-01-02";
+    String[] fieldCity5 = new String[] {columns[1].name()};
+    Literal<?> valueCity5 = Literals.byteLiteral((byte) 4);
+    String[] fieldDt5 = new String[] {columns[2].name()};
+    Literal<?> valueDt5 = Literals.dateLiteral(LocalDate.parse("2020-01-02"));
+    Partition partition5 =
+        Partitions.identity(
+            new String[][] {fieldCity5, fieldDt5}, new Literal<?>[] {valueCity5, valueDt5});
+    hiveTable.supportPartitions().addPartition(partition5);
+
     // test drop one partition: city=2/dt=2020-01-01
     hiveTable.supportPartitions().dropPartition(partitionName1, false);
     NoSuchPartitionException exception1 =
@@ -224,27 +246,49 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         String.format("Hive partition %s does not exist in Hive Metastore", partitionName3),
         exception3.getMessage());
 
-    // test not exist partition
-    Assertions.assertTrue(
-        hiveTable.supportPartitions().dropPartition("does_not_exist_partition", true));
+    // test drop one partition: city=4/dt=2020-01-01
+    // check city=4/dt=2020-01-02 is still exist
+    hiveTable.supportPartitions().dropPartition(partitionName4, false);
     NoSuchPartitionException exception4 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
             () -> {
+              hiveTable.supportPartitions().getPartition(partitionName4);
+            });
+    Assertions.assertEquals(
+        String.format("Hive partition %s does not exist in Hive Metastore", partitionName4),
+        exception4.getMessage());
+    Assertions.assertTrue(hiveTable.supportPartitions().partitionExists(partitionName5));
+
+    // test not exist partition
+    Assertions.assertTrue(
+        hiveTable.supportPartitions().dropPartition("does_not_exist_partition", true));
+    IllegalArgumentException exception5 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
               hiveTable.supportPartitions().dropPartition("does_not_exist_partition", false);
             });
     Assertions.assertEquals(
-        "Hive partition does_not_exist_partition does not exist in Hive Metastore",
-        exception4.getMessage());
+        "Error partition format: does_not_exist_partition", exception5.getMessage());
 
     Assertions.assertTrue(hiveTable.supportPartitions().dropPartition("city=not_exist", true));
-    NoSuchPartitionException exception5 =
+    NoSuchPartitionException exception6 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
             () -> {
               hiveTable.supportPartitions().dropPartition("city=not_exist", false);
             });
     Assertions.assertEquals(
-        "Hive partition city=not_exist does not exist in Hive Metastore", exception5.getMessage());
+        "Hive partition city=not_exist does not exist in Hive Metastore", exception6.getMessage());
+  }
+
+  @Test
+  public void testPurgePartition() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          hiveTable.supportPartitions().purgePartition("city=1", false);
+        });
   }
 }
