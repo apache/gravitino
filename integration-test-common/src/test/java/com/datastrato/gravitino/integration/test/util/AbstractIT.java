@@ -124,7 +124,7 @@ public class AbstractIT {
       final Statement statement = connection.createStatement();
       statement.execute("drop database if exists " + META_DATA);
       statement.execute("create database " + META_DATA);
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
           FileUtils.readFileToString(
               new File(gravitinoHome + "/core/src/main/resources/mysql/mysql_init.sql"), "UTF-8");
