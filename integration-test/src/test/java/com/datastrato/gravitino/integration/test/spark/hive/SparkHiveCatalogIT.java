@@ -113,6 +113,25 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testCreateDatasourceFormatPartitionTable() {
+    String tableName = "datasource_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " USING PARQUET PARTITIONED BY (name, age)";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withIdentifyPartition(Arrays.asList("name", "age"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
+  }
+
+  @Test
   public void testWriteHiveDynamicPartition() {
     String tableName = "hive_dynamic_partition_table";
 

@@ -408,25 +408,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testCreateDatasourceFormatPartitionTable() {
-    String tableName = "datasource_partition_table";
-
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name, age)";
-    sql(createTableSQL);
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withIdentifyPartition(Arrays.asList("name", "age"));
-    checker.check(tableInfo);
-    checkTableReadWrite(tableInfo);
-    checkPartitionDirExists(tableInfo);
-  }
-
-  @Test
   @EnabledIf("supportsSparkSQLClusteredBy")
   void testCreateBucketTable() {
     String tableName = "bucket_table";
