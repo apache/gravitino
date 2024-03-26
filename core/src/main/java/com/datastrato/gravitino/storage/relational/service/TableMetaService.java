@@ -143,12 +143,6 @@ public class TableMetaService {
       throw re;
     }
 
-    LOG.info(
-        "yuqiabc, Updated table: {}, oldTable: {}, updateResult: {}",
-        newEntity,
-        oldTableEntity,
-        updateResult);
-
     if (updateResult > 0) {
       return newEntity;
     } else {
