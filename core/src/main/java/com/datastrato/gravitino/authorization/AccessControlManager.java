@@ -96,10 +96,7 @@ public class AccessControlManager {
       return store.delete(NameIdentifier.of(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
-          "Removing user {} in the metalake {} failed due to storage issues",
-          user,
-          metalake,
-          ioe);
+          "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -115,8 +112,7 @@ public class AccessControlManager {
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      return store.get(
-          NameIdentifier.of(metalake, user), Entity.EntityType.USER, UserEntity.class);
+      return store.get(NameIdentifier.of(metalake, user), Entity.EntityType.USER, UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("user {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
