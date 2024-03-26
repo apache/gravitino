@@ -50,8 +50,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ![trino-gravitino-structure](../assets/trino/add-link.jpg)
 
-
-5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module.
+5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and change the `pom.xml` file in the `trino-gravitino` module accordingly. This is an example content of the `pom.xml` file in the `trino-gravitino` module. Ensure that the version of trino-root is identical to the version of trino.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
