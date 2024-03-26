@@ -178,6 +178,94 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testToNestedType() {
+    Type listTypeNullable =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.ListType.of(
+                com.datastrato.gravitino.rel.types.Types.FloatType.get(), true));
+    Assertions.assertTrue(listTypeNullable instanceof Types.ListType);
+    Assertions.assertTrue(listTypeNullable.asListType().elementType() instanceof Types.FloatType);
+    Assertions.assertTrue(listTypeNullable.asListType().isElementOptional());
+
+    Type listTypeNotNull =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.ListType.of(
+                com.datastrato.gravitino.rel.types.Types.FloatType.get(), false));
+    Assertions.assertTrue(listTypeNotNull instanceof Types.ListType);
+    Assertions.assertTrue(listTypeNotNull.asListType().elementType() instanceof Types.FloatType);
+    Assertions.assertTrue(listTypeNotNull.asListType().isElementRequired());
+
+    Type mapTypeNullable =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.MapType.of(
+                com.datastrato.gravitino.rel.types.Types.StringType.get(),
+                com.datastrato.gravitino.rel.types.Types.IntegerType.get(),
+                true));
+    Assertions.assertTrue(mapTypeNullable instanceof Types.MapType);
+    Assertions.assertTrue(mapTypeNullable.asMapType().keyType() instanceof Types.StringType);
+    Assertions.assertTrue(mapTypeNullable.asMapType().valueType() instanceof Types.IntegerType);
+    Assertions.assertTrue(mapTypeNullable.asMapType().isValueOptional());
+
+    Type mapTypeNotNull =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.MapType.of(
+                com.datastrato.gravitino.rel.types.Types.StringType.get(),
+                com.datastrato.gravitino.rel.types.Types.IntegerType.get(),
+                false));
+    Assertions.assertTrue(mapTypeNotNull instanceof Types.MapType);
+    Assertions.assertTrue(mapTypeNotNull.asMapType().keyType() instanceof Types.StringType);
+    Assertions.assertTrue(mapTypeNotNull.asMapType().valueType() instanceof Types.IntegerType);
+    Assertions.assertTrue(mapTypeNotNull.asMapType().isValueRequired());
+
+    Type structTypeNullable =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.StructType.of(
+                com.datastrato.gravitino.rel.types.Types.StructType.Field.nullableField(
+                    "col1",
+                    com.datastrato.gravitino.rel.types.Types.MapType.of(
+                        com.datastrato.gravitino.rel.types.Types.StringType.get(),
+                        com.datastrato.gravitino.rel.types.Types.IntegerType.get(),
+                        true)),
+                com.datastrato.gravitino.rel.types.Types.StructType.Field.nullableField(
+                    "col2",
+                    com.datastrato.gravitino.rel.types.Types.ListType.of(
+                        com.datastrato.gravitino.rel.types.Types.FloatType.get(), true))));
+
+    Assertions.assertTrue(structTypeNullable instanceof Types.StructType);
+    Assertions.assertTrue(
+        structTypeNullable.asStructType().fields().get(0).type() instanceof Types.MapType);
+    Assertions.assertTrue(
+        structTypeNullable.asStructType().fields().get(0).type().asMapType().isValueOptional());
+    Assertions.assertTrue(
+        structTypeNullable.asStructType().fields().get(1).type() instanceof Types.ListType);
+    Assertions.assertTrue(
+        structTypeNullable.asStructType().fields().get(1).type().asListType().isElementOptional());
+
+    Type structTypeNotNull =
+        ConvertUtil.toIcebergType(
+            com.datastrato.gravitino.rel.types.Types.StructType.of(
+                com.datastrato.gravitino.rel.types.Types.StructType.Field.notNullField(
+                    "col1",
+                    com.datastrato.gravitino.rel.types.Types.MapType.of(
+                        com.datastrato.gravitino.rel.types.Types.StringType.get(),
+                        com.datastrato.gravitino.rel.types.Types.IntegerType.get(),
+                        false)),
+                com.datastrato.gravitino.rel.types.Types.StructType.Field.notNullField(
+                    "col2",
+                    com.datastrato.gravitino.rel.types.Types.ListType.of(
+                        com.datastrato.gravitino.rel.types.Types.FloatType.get(), false))));
+    Assertions.assertTrue(structTypeNotNull instanceof Types.StructType);
+    Assertions.assertTrue(
+        structTypeNotNull.asStructType().fields().get(0).type() instanceof Types.MapType);
+    Assertions.assertTrue(
+        structTypeNotNull.asStructType().fields().get(0).type().asMapType().isValueRequired());
+    Assertions.assertTrue(
+        structTypeNotNull.asStructType().fields().get(1).type() instanceof Types.ListType);
+    Assertions.assertTrue(
+        structTypeNotNull.asStructType().fields().get(1).type().asListType().isElementRequired());
+  }
+
+  @Test
   public void testFormIcebergType() {
     Assertions.assertTrue(
         ConvertUtil.formIcebergType(Types.StringType.get())
