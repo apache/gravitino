@@ -98,10 +98,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-            SparkTableInfoChecker.create()
-                    .withName(tableName)
-                    .withColumns(getSimpleTableColumn())
-                    .withIdentifyPartition(Arrays.asList("name", "age"));
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withIdentifyPartition(Arrays.asList("name", "age"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
     checkPartitionDirExists(tableInfo);
