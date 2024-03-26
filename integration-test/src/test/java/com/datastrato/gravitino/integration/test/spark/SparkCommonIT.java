@@ -732,7 +732,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         String.format(
             "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
 
-    sql(getRowLevelDeleteTableSql(name, sourceTableName, selectClause, onClause));
+    sql(getRowLevelDeleteTableSql(name, selectClause, sourceTableName, onClause));
 
     List<Object[]> queryResult = sql(getSelectAllSql(name));
     Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
@@ -763,7 +763,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         String.format(
             "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
 
-    sql(getRowLevelDeleteTableSql(name, sourceTableName, selectClause, onClause));
+    sql(getRowLevelDeleteTableSql(name, selectClause, sourceTableName, onClause));
 
     // do something to match the query result:
     // 1. remove "'" from values, such as 'a' is trans to a

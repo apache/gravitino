@@ -120,7 +120,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelUpdateOperations() {
-    String tableName = "test_merge_table";
+    String tableName = "test_merge_update_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
@@ -131,7 +131,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelDeleteOperations() {
-    String tableName = "test_merge_table";
+    String tableName = "test_merge_delete_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
@@ -142,7 +142,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelInsertOperations() {
-    String tableName = "test_merge_table";
+    String tableName = "test_merge_insert_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 

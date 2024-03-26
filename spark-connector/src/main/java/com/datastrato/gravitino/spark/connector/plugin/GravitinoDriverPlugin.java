@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
@@ -46,7 +47,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     Set<String> catalogs = catalogManager.listCatalogs();
     registerGravitinoCatalogs(conf, catalogs);
-    registerSqlExtensions();
+    registerSqlExtensions(sc);
     return Collections.emptyMap();
   }
 
@@ -69,6 +70,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         });
   }
 
-  // Todo inject Iceberg extensions
-  private void registerSqlExtensions() {}
+  private void registerSqlExtensions(SparkContext sc) {
+    sc.getConf()
+        .setIfMissing("spark.sql.extensions", IcebergSparkSessionExtensions.class.getName());
+  }
 }
