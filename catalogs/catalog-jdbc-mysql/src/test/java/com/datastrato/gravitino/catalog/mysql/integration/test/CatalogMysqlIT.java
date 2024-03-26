@@ -61,8 +61,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.shaded.org.apache.commons.lang3.RandomUtils;
 
@@ -70,7 +68,6 @@ import org.testcontainers.shaded.org.apache.commons.lang3.RandomUtils;
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogMysqlIT.class);
   private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
@@ -543,45 +540,38 @@ public class CatalogMysqlIT extends AbstractIT {
   @Test
   void testAlterAndDropMysqlTable() {
     Column[] columns = createColumns();
-    Table t1 =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                columns,
-                table_comment,
-                createProperties());
-    Exception exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              catalog
-                  .asTableCatalog()
-                  .alterTable(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                      TableChange.rename(alertTableName),
-                      TableChange.updateComment(table_comment + "_new"));
-            });
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            table_comment,
+            createProperties());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .alterTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                  TableChange.rename(alertTableName),
+                  TableChange.updateComment(table_comment + "_new"));
+        });
 
-    LOG.info("yuqiabc, ----> start");
-    Table t2 =
-        catalog
-            .asTableCatalog()
-            .alterTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                TableChange.rename(alertTableName));
-    LOG.info("yuqiabc, ----> end, t2.audi = {}", t2.auditInfo());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.rename(alertTableName));
 
-    Table t3 =
-        catalog
-            .asTableCatalog()
-            .alterTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
-                TableChange.updateComment(table_comment + "_new"),
-                TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
-                TableChange.renameColumn(new String[] {MYSQL_COL_NAME2}, "col_2_new"),
-                TableChange.updateColumnType(
-                    new String[] {MYSQL_COL_NAME1}, Types.IntegerType.get()));
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+            TableChange.updateComment(table_comment + "_new"),
+            TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
+            TableChange.renameColumn(new String[] {MYSQL_COL_NAME2}, "col_2_new"),
+            TableChange.updateColumnType(new String[] {MYSQL_COL_NAME1}, Types.IntegerType.get()));
 
     Table table =
         catalog
