@@ -86,18 +86,18 @@ public class AccessControlManager {
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
-   * @param userName THe name of the User.
+   * @param user THe name of the User.
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  public boolean removeUser(String metalake, String userName) {
+  public boolean removeUser(String metalake, String user) {
 
     try {
-      return store.delete(NameIdentifier.of(metalake, userName), Entity.EntityType.USER);
+      return store.delete(NameIdentifier.of(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues",
-          userName,
+          user,
           metalake,
           ioe);
       throw new RuntimeException(ioe);
@@ -108,20 +108,20 @@ public class AccessControlManager {
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
-   * @param userName THe name of the User.
+   * @param user THe name of the User.
    * @return The getting User instance.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
-  public User getUser(String metalake, String userName) throws NoSuchUserException {
+  public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       return store.get(
-          NameIdentifier.of(metalake, userName), Entity.EntityType.USER, UserEntity.class);
+          NameIdentifier.of(metalake, user), Entity.EntityType.USER, UserEntity.class);
     } catch (NoSuchEntityException e) {
-      LOG.warn("user {} does not exist in the metalake {}", userName, metalake, e);
-      throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, userName, metalake);
+      LOG.warn("user {} does not exist in the metalake {}", user, metalake, e);
+      throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
-      LOG.error("Getting user {} failed due to storage issues", userName, ioe);
+      LOG.error("Getting user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
     }
   }
