@@ -2,29 +2,14 @@ name: 'Python CI'
 
 on:
   push:
-    branches:
-      - 'main'
+    branches: [ "main", "branch-*" ]
+
   pull_request:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'clients/client-python/**'
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: [ '3.8', '3.9', '3.10', '3.11' ]
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            source_changes:
-              - clients/client-python
-
-    outputs:
-      source_changes: ${{ steps.filter.outputs.source_changes }}
-
   test:
     runs-on: ubuntu-latest
     strategy:
