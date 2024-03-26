@@ -12,6 +12,7 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
 import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
+import com.datastrato.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
 import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -96,8 +97,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
       catalogConnectorManager.addMetalake(metalake);
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
+          new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
 
-      return new GravitinoSystemConnector(metalake, catalogConnectorManager);
+      return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
     }
   }
 
