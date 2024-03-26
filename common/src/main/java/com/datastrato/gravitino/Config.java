@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -31,12 +32,27 @@ public abstract class Config {
 
   private final ConcurrentMap<String, String> configMap;
 
+  private final Map<String, DeprecatedConfig> deprecatedConfigMap;
+  // Constant Array to hold all deprecated configurations
+  private final DeprecatedConfig[] deprecatedConfigs = {
+    // Example deprecated configuration
+    //    new DeprecatedConfig(
+    //        "gravitino.test.string",
+    //        "1.0",
+    //        "Please use gravitino.test.string1 instead."),
+  };
+
   /**
    * Constructs a Config instance.
    *
    * @param loadDefaults Set to true if default configurations should be loaded.
    */
   protected Config(boolean loadDefaults) {
+    deprecatedConfigMap = new HashMap<>();
+    for (DeprecatedConfig config : deprecatedConfigs) {
+      deprecatedConfigMap.put(config.key, config);
+    }
+
     configMap = new ConcurrentHashMap<>();
     if (loadDefaults) {
       loadFromProperties(System.getProperties());
@@ -88,13 +104,6 @@ public abstract class Config {
    * @throws NoSuchElementException If the configuration entry is not found.
    */
   public <T> T get(ConfigEntry<T> entry) throws NoSuchElementException {
-    if (entry.isDeprecated() && LOG.isWarnEnabled()) {
-      LOG.warn("Config {} is deprecated.", entry.getKey());
-      if (!entry.getAlternatives().isEmpty() && LOG.isWarnEnabled()) {
-        LOG.warn("Please use {} instead.", String.join(", ", entry.getAlternatives()));
-      }
-    }
-
     return entry.readFrom(configMap);
   }
 
@@ -149,15 +158,19 @@ public abstract class Config {
    * @param <T> The type of the configuration value.
    */
   public <T> void set(ConfigEntry<T> entry, T value) {
-    if (entry.isDeprecated() && LOG.isWarnEnabled()) {
-      LOG.warn("Config {} is deprecated.", entry.getKey());
-      if (!entry.getAlternatives().isEmpty() && LOG.isWarnEnabled()) {
-        LOG.warn("Please use {} instead.", String.join(", ", entry.getAlternatives()));
-      }
+    if (entry.isDeprecated()
+        && deprecatedConfigMap.containsKey(entry.getKey())
+        && LOG.isWarnEnabled()) {
+      LOG.warn(
+          "Config {} is deprecated since Gravitino {}. {}",
+          entry.getKey(),
+          deprecatedConfigMap.get(entry.getKey()).version,
+          deprecatedConfigMap.get(entry.getKey()).deprecationMessage);
     }
 
     if (value == null && LOG.isWarnEnabled()) {
       LOG.warn("Config {} value to set is null, ignore setting to Config.", entry.getKey());
+      return;
     }
 
     entry.writeTo(configMap, value);
@@ -189,7 +202,21 @@ public abstract class Config {
    */
   @VisibleForTesting
   public void loadFromProperties(Properties properties) {
-    loadFromMap(Maps.fromProperties(properties), k -> k.startsWith(CONFIG_PREPEND));
+    loadFromMap(
+        Maps.fromProperties(properties),
+        k -> {
+          if (k.startsWith(CONFIG_PREPEND)) {
+            if (deprecatedConfigMap.containsKey(k) && LOG.isWarnEnabled()) {
+              LOG.warn(
+                  "Config {} is deprecated since Gravitino {}. {}",
+                  k,
+                  deprecatedConfigMap.get(k).version,
+                  deprecatedConfigMap.get(k).deprecationMessage);
+            }
+            return true;
+          }
+          return false;
+        });
   }
 
   /**
@@ -209,6 +236,26 @@ public abstract class Config {
     } catch (Exception e) {
       LOG.error("Failed to load properties from {}", file.getAbsolutePath(), e);
       throw new IOException("Failed to load properties from " + file.getAbsolutePath(), e);
+    }
+  }
+
+  /** The DeprecatedConfig class represents a configuration entry that has been deprecated. */
+  private static class DeprecatedConfig {
+    private final String key;
+    private final String version;
+    private final String deprecationMessage;
+
+    /**
+     * Constructs a DeprecatedConfig instance.
+     *
+     * @param key The key of the deprecated configuration.
+     * @param version The version in which the configuration was deprecated.
+     * @param deprecationMessage Message to indicate the deprecation warning.
+     */
+    private DeprecatedConfig(String key, String version, String deprecationMessage) {
+      this.key = key;
+      this.version = version;
+      this.deprecationMessage = deprecationMessage;
     }
   }
 }

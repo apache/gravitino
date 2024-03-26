@@ -14,8 +14,11 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -28,11 +31,12 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  protected FileSystem hdfs;
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
-  private String hiveMetastoreUri;
-  private String gravitinoUri;
+  private String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  private String gravitinoUri = "http://127.0.0.1:8090";
   private String warehouse;
 
   protected abstract String getCatalogName();
@@ -48,6 +52,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   @BeforeAll
   void startUp() {
     initHiveEnv();
+    initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
     initSparkEnv();
@@ -59,6 +64,13 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   @AfterAll
   void stop() {
+    if (hdfs != null) {
+      try {
+        hdfs.close();
+      } catch (IOException e) {
+        LOG.warn("Close HDFS filesystem failed,", e);
+      }
+    }
     if (sparkSession != null) {
       sparkSession.close();
     }
@@ -99,6 +111,22 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             "hdfs://%s:%d/user/hive/warehouse",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+  }
+
+  private void initHdfsFileSystem() {
+    Configuration conf = new Configuration();
+    conf.set(
+        "fs.defaultFS",
+        String.format(
+            "hdfs://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    try {
+      hdfs = FileSystem.get(conf);
+    } catch (IOException e) {
+      LOG.error("Create HDFS filesystem failed", e);
+      throw new RuntimeException(e);
+    }
   }
 
   private void initSparkEnv() {

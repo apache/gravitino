@@ -58,7 +58,7 @@ public class TestClientPool {
     assertEquals(2, clientPool.poolSize());
   }
 
-  private final class ClientPoolImplExtension extends ClientPoolImpl<ClientMock, Exception> {
+  private static final class ClientPoolImplExtension extends ClientPoolImpl<ClientMock, Exception> {
     private ClientPoolImplExtension(
         int poolSize, Class<? extends Exception> reconnectExc, boolean retryByDefault) {
       super(poolSize, reconnectExc, retryByDefault);

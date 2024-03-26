@@ -9,12 +9,14 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.Spark
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -25,41 +27,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 public abstract class SparkCommonIT extends SparkEnvIT {
-  private static String getSelectAllSql(String tableName) {
-    return String.format("SELECT * FROM %s", tableName);
-  }
-
-  private static String getInsertWithoutPartitionSql(String tableName, String values) {
-    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
-  }
-
-  private static String getUpdateTableSql(String tableName, String setClause, String whereClause) {
-    return String.format("UPDATE %s SET %s WHERE %s", tableName, setClause, whereClause);
-  }
-
-  private static String getRowLevelUpdateTableSql(
-      String targetTableName, String selectClause, String sourceTableName, String onClause) {
-    return String.format(
-        "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
-            + "ON %s "
-            + "WHEN MATCHED THEN UPDATE SET * "
-            + "WHEN NOT MATCHED THEN INSERT *",
-        targetTableName, selectClause, sourceTableName, onClause);
-  }
-
-  private static String getRowLevelDeleteTableSql(
-      String targetTableName, String selectClause, String sourceTableName, String onClause) {
-    return String.format(
-        "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
-            + "ON %s "
-            + "WHEN MATCHED THEN DELETE "
-            + "WHEN NOT MATCHED THEN INSERT *",
-        targetTableName, selectClause, sourceTableName, onClause);
-  }
 
   // To generate test data for write&read table.
   private static final Map<DataType, String> typeConstant =
@@ -78,24 +48,61 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
-  // To generate test data for write&read table.
+  // To generate test data for update table.
   private static final Map<DataType, String> typeNewConstant =
-      ImmutableMap.of(
-          DataTypes.IntegerType,
-          "2",
-          DataTypes.StringType,
-          "'gravitino_it_test_new'",
-          DataTypes.createArrayType(DataTypes.IntegerType),
-          "array(4, 5, 6)",
-          DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-          "map('b', 2)",
-          DataTypes.createStructType(
-              Arrays.asList(
-                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
-          "struct(2, 'b')");
+          ImmutableMap.of(
+                  DataTypes.IntegerType,
+                  "2",
+                  DataTypes.StringType,
+                  "'gravitino_it_test_new'",
+                  DataTypes.createArrayType(DataTypes.IntegerType),
+                  "array(4, 5, 6)",
+                  DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                  "map('b', 2)",
+                  DataTypes.createStructType(
+                          Arrays.asList(
+                                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
+                                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
+                  "struct(2, 'b')");
 
-  protected abstract String getUsingClause();
+  private static String getInsertWithoutPartitionSql(String tableName, String values) {
+    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
+  }
+
+  private static String getInsertWithPartitionSql(
+      String tableName, String partitionString, String values) {
+    return String.format(
+        "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
+  }
+
+  private static String getUpdateTableSql(String tableName, String setClause, String whereClause) {
+    return String.format("UPDATE %s SET %s WHERE %s", tableName, setClause, whereClause);
+  }
+
+  private static String getRowLevelUpdateTableSql(
+          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+    return String.format(
+            "MERGE INTO %s "
+                    + "USING (SELECT %s) %s "
+                    + "ON %s "
+                    + "WHEN MATCHED THEN UPDATE SET * "
+                    + "WHEN NOT MATCHED THEN INSERT *",
+            targetTableName, selectClause, sourceTableName, onClause);
+  }
+
+  private static String getRowLevelDeleteTableSql(
+          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+    return String.format(
+            "MERGE INTO %s "
+                    + "USING (SELECT %s) %s "
+                    + "ON %s "
+                    + "WHEN MATCHED THEN DELETE "
+                    + "WHEN NOT MATCHED THEN INSERT *",
+            targetTableName, selectClause, sourceTableName, onClause);
+  }
+
+  // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
+  protected abstract boolean supportsSparkSQLClusteredBy();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -121,10 +128,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     getDatabases()
         .forEach(
             databaseName -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", databaseName)));
-  }
-
-  protected String getDefaultDatabase() {
-    return "default_db";
   }
 
   @Test
@@ -367,8 +370,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '') %s",
-            tableName, getUsingClause()));
+            "CREATE TABLE %s (id STRING COMMENT '', name STRING COMMENT '', age STRING COMMENT '')", tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
@@ -449,24 +451,98 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
-  protected void checkTableColumns(
-      String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
-    SparkTableInfoChecker.create()
-        .withName(tableName)
-        .withColumns(columnInfos)
-        .withComment(null)
-        .check(tableInfo);
+
+  @Test
+  void testCreateDatasourceFormatPartitionTable() {
+    String tableName = "datasource_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "USING PARQUET PARTITIONED BY (name, age)";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withIdentifyPartition(Arrays.asList("name", "age"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
   }
 
-  private void checkTableReadWrite(SparkTableInfo table) {
+  @Test
+  @EnabledIf("supportsSparkSQLClusteredBy")
+  void testCreateBucketTable() {
+    String tableName = "bucket_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "CLUSTERED BY (id, name) INTO 4 buckets;";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withBucket(4, Arrays.asList("id", "name"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  @EnabledIf("supportsSparkSQLClusteredBy")
+  void testCreateSortBucketTable() {
+    String tableName = "sort_bucket_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL =
+        createTableSQL + "CLUSTERED BY (id, name) SORTED BY (name, id) INTO 4 buckets;";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withBucket(4, Arrays.asList("id", "name"), Arrays.asList("name", "id"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  protected void checkPartitionDirExists(SparkTableInfo table) {
+    Assertions.assertTrue(table.isPartitionTable(), "Not a partition table");
+    String tableLocation = table.getTableLocation();
+    String partitionExpression = getPartitionExpression(table, "/").replace("'", "");
+    Path partitionPath = new Path(tableLocation, partitionExpression);
+    checkDirExists(partitionPath);
+  }
+
+  protected void checkDirExists(Path dir) {
+    try {
+      Assertions.assertTrue(hdfs.exists(dir), "HDFS directory not exists," + dir);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
+    boolean isPartitionTable = table.isPartitionTable();
     String insertValues =
-        table.getColumns().stream()
+        table.getUnPartitionedColumns().stream()
             .map(columnInfo -> typeConstant.get(columnInfo.getType()))
             .map(Object::toString)
             .collect(Collectors.joining(","));
 
-    sql(getInsertWithoutPartitionSql(name, insertValues));
+    String insertDataSQL = "";
+    if (isPartitionTable) {
+      String partitionExpressions = getPartitionExpression(table, ",");
+      insertDataSQL = getInsertWithPartitionSql(name, partitionExpressions, insertValues);
+    } else {
+      insertDataSQL = getInsertWithoutPartitionSql(name, insertValues);
+    }
+    sql(insertDataSQL);
 
     // do something to match the query result:
     // 1. remove "'" from values, such as 'a' is trans to a
@@ -499,23 +575,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                 })
             .collect(Collectors.joining(","));
 
-    List<String> queryResult =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
+    List<String> queryResult = getTableData(name);
     Assertions.assertTrue(
         queryResult.size() == 1, "Should just one row, table content: " + queryResult);
     Assertions.assertEquals(checkValues, queryResult.get(0));
@@ -780,7 +840,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResultWithInsert.get(0));
   }
 
-  private String getCreateSimpleTableString(String tableName) {
+  protected String getCreateSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
         tableName);
@@ -793,10 +853,30 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 
+  protected String getDefaultDatabase() {
+    return "default_db";
+  }
+
   // Helper method to create a simple table, and could use corresponding
   // getSimpleTableColumn to check table column.
   protected void createSimpleTable(String identifier) {
     String createTableSql = getCreateSimpleTableString(identifier);
     sql(createTableSql);
+  }
+
+  private void checkTableColumns(
+      String tableName, List<SparkColumnInfo> columns, SparkTableInfo tableInfo) {
+    SparkTableInfoChecker.create()
+        .withName(tableName)
+        .withColumns(columns)
+        .withComment(null)
+        .check(tableInfo);
+  }
+
+  // partition expression may contain "'", like a='s'/b=1
+  private String getPartitionExpression(SparkTableInfo table, String delimiter) {
+    return table.getPartitionedColumns().stream()
+        .map(column -> column.getName() + "=" + typeConstant.get(column.getType()))
+        .collect(Collectors.joining(delimiter));
   }
 }
