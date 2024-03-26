@@ -133,3 +133,18 @@ server distribution package.
     ```
 
    This creates `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
+
+6. Assemble the Gravitino Spark connector package
+
+   ```shell
+    ./gradlew assembleSparkConnector
+    ```
+
+   or
+
+    ```shell
+    ./gradlew assembleDistribution
+    ```
+
+   This creates `gravitino-spark-connector-runtime-{version}.jar` and `gravitino-spark-connector-runtime-{version}.tar.gz.sha256` under the `distribution` directory.
+

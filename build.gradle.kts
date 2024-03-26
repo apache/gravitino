@@ -608,7 +608,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector")
+    dependsOn("assembleTrinoConnector", "assembleSparkConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -629,9 +629,17 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val assembleSparkConnector by register("assembleSparkConnector", Copy::class) {
+    dependsOn("spark-connector:shadowJar")
+    group = "gravitino distribution"
+    finalizedBy("checksumSparkConnector")
+    from("spark-connector/build/libs/${rootProject.name}-spark-connector-runtime-$version.jar")
+    into(projectDir.dir("distribution"))
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumSparkConnector")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -648,6 +656,10 @@ tasks {
   register("checksumTrinoConnector") {
     group = "gravitino distribution"
     dependsOn(assembleTrinoConnector)
+    // To fix gradle assembleDistribution errors: "Task ':checksumTrinoConnector' uses this output
+    // of task ':assembleSparkConnector' without declaring an explicit or implicit dependency", this
+    // will not add depends on assembleSparkConnector.
+    mustRunAfter(assembleSparkConnector)
     val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -657,6 +669,21 @@ tasks {
     doLast {
       checksumFile.get().writeText(
         serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
+  register("checksumSparkConnector") {
+    group = "gravitino distribution"
+    dependsOn(assembleSparkConnector)
+    val sparkJarName = "${rootProject.name}-spark-connector-runtime-$version.jar"
+    var sparkJarFile = projectDir.dir("distribution").asFile.resolve(sparkJarName)
+    var checksumFile = file("$sparkJarFile.sha256")
+    inputs.file(sparkJarFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.writeText(
+        serviceOf<ChecksumService>().sha256(sparkJarFile).toString()
       )
     }
   }
