@@ -208,8 +208,8 @@ public class TestEntity {
 
   @Test
   public void testUser() {
-    ManagedUser testManagedUser =
-        ManagedUser.builder()
+    UserEntity testUserEntity =
+        UserEntity.builder()
             .withMetalake("metalake")
             .withId(userId)
             .withName(userName)
@@ -218,22 +218,22 @@ public class TestEntity {
             .withRoles(Lists.newArrayList("role"))
             .build();
 
-    Map<Field, Object> fields = testManagedUser.fields();
-    Assertions.assertEquals(userId, fields.get(ManagedUser.ID));
-    Assertions.assertEquals(userName, fields.get(ManagedUser.NAME));
-    Assertions.assertEquals(auditInfo, fields.get(ManagedUser.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(ManagedUser.ROLES));
-    Assertions.assertEquals(Lists.newArrayList("group"), fields.get(ManagedUser.GROUPS));
+    Map<Field, Object> fields = testUserEntity.fields();
+    Assertions.assertEquals(userId, fields.get(UserEntity.ID));
+    Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
+    Assertions.assertEquals(Lists.newArrayList("group"), fields.get(UserEntity.GROUPS));
 
-    ManagedUser testManagedUserWithoutFields =
-        ManagedUser.builder()
+    UserEntity testUserEntityWithoutFields =
+        UserEntity.builder()
             .withMetalake("metalake")
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .build();
 
-    Assertions.assertNull(testManagedUserWithoutFields.roles());
-    Assertions.assertNull(testManagedUserWithoutFields.groups());
+    Assertions.assertNull(testUserEntityWithoutFields.roles());
+    Assertions.assertNull(testUserEntityWithoutFields.groups());
   }
 }

@@ -27,14 +27,8 @@ import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.FilesetEntity;
-import com.datastrato.gravitino.meta.ManagedUser;
-import com.datastrato.gravitino.meta.SchemaEntity;
-import com.datastrato.gravitino.meta.SchemaVersion;
-import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.*;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.StorageLayoutVersion;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -92,8 +86,8 @@ public class TestKvEntityStorage {
         .build();
   }
 
-  public static ManagedUser createUser(String metalake, String name, AuditInfo auditInfo) {
-    return ManagedUser.builder()
+  public static UserEntity createUser(String metalake, String name, AuditInfo auditInfo) {
+    return UserEntity.builder()
         .withId(1L)
         .withMetalake(metalake)
         .withName(name)
@@ -643,9 +637,9 @@ public class TestKvEntityStorage {
 
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       store.put(metalake);
-      ManagedUser oneUser = createUser("metalake", "oneUser", auditInfo);
+      UserEntity oneUser = createUser("metalake", "oneUser", auditInfo);
       store.put(oneUser);
-      ManagedUser anotherUser = createUser("metalake", "anotherUser", auditInfo);
+      UserEntity anotherUser = createUser("metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
       Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), EntityType.USER));
       Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), EntityType.USER));

@@ -65,36 +65,36 @@ public class TestAccessControlManager {
   @Test
   public void testAddUser() {
 
-    User user = accessControlManager.addUser("metalake", "testCreate");
-    Assertions.assertEquals("testCreate", user.name());
+    User user = accessControlManager.addUser("metalake", "testAdd");
+    Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
 
-    user = accessControlManager.addUser("metalake", "testCreateWithOptionalField");
+    user = accessControlManager.addUser("metalake", "testAddWithOptionalField");
 
-    Assertions.assertEquals("testCreateWithOptionalField", user.name());
+    Assertions.assertEquals("testAddWithOptionalField", user.name());
     Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
         UserAlreadyExistsException.class,
-        () -> accessControlManager.addUser("metalake", "testCreate"));
+        () -> accessControlManager.addUser("metalake", "testAdd"));
   }
 
   @Test
-  public void testLoadUser() {
+  public void testGetUser() {
 
-    accessControlManager.addUser("metalake", "testLoad");
+    accessControlManager.addUser("metalake", "testGet");
 
-    User user = accessControlManager.loadUser("metalake", "testLoad");
-    Assertions.assertEquals("testLoad", user.name());
+    User user = accessControlManager.getUser("metalake", "testGet");
+    Assertions.assertEquals("testGet", user.name());
 
-    // Test load non-existed user
+    // Test to get non-existed user
     Throwable exception =
         Assertions.assertThrows(
             NoSuchUserException.class,
-            () -> accessControlManager.loadUser("metalake", "not-exist"));
+            () -> accessControlManager.getUser("metalake", "not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("User not-exist does not exist"));
   }
 
@@ -102,13 +102,13 @@ public class TestAccessControlManager {
   public void testRemoveUser() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-    accessControlManager.addUser("metalake", "testDrop");
+    accessControlManager.addUser("metalake", "testRemove");
 
-    // Test drop user
-    boolean dropped = accessControlManager.removeUser("metalake", "testDrop");
+    // Test to remove user
+    boolean dropped = accessControlManager.removeUser("metalake", "testRemove");
     Assertions.assertTrue(dropped);
 
-    // Test drop non-existed user
+    // Test to remove non-existed user
     boolean dropped1 = accessControlManager.removeUser("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
   }

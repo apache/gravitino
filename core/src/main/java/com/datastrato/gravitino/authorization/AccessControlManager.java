@@ -12,7 +12,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.ManagedUser;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
@@ -52,11 +52,11 @@ public class AccessControlManager {
    * @param name The name of the User.
    * @return The added User instance.
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If creating the User encounters storage issues.
+   * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    ManagedUser managedUser =
-        ManagedUser.builder()
+    UserEntity userEntity =
+        UserEntity.builder()
             .withId(idGenerator.nextId())
             .withName(name)
             .withMetalake(metalake)
@@ -69,15 +69,15 @@ public class AccessControlManager {
                     .build())
             .build();
     try {
-      store.put(managedUser, false /* overwritten */);
-      return managedUser;
+      store.put(userEntity, false /* overwritten */);
+      return userEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
       throw new UserAlreadyExistsException(
           "User %s in the metalake %s already exists", name, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Creating user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
+          "Adding user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -88,7 +88,7 @@ public class AccessControlManager {
    * @param metalake The Metalake of the User.
    * @param userName THe name of the User.
    * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If deleting the User encounters storage issues.
+   * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeUser(String metalake, String userName) {
 
@@ -96,7 +96,7 @@ public class AccessControlManager {
       return store.delete(NameIdentifier.of(metalake, userName), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
-          "Deleting user {} in the metalake {} failed due to storage issues",
+          "Removing user {} in the metalake {} failed due to storage issues",
           userName,
           metalake,
           ioe);
@@ -105,23 +105,23 @@ public class AccessControlManager {
   }
 
   /**
-   * Loads a User.
+   * Gets a User.
    *
    * @param metalake The Metalake of the User.
    * @param userName THe name of the User.
-   * @return The loaded User instance.
+   * @return The getting User instance.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException If loading the User encounters storage issues.
+   * @throws RuntimeException If getting the User encounters storage issues.
    */
-  public User loadUser(String metalake, String userName) throws NoSuchUserException {
+  public User getUser(String metalake, String userName) throws NoSuchUserException {
     try {
       return store.get(
-          NameIdentifier.of(metalake, userName), Entity.EntityType.USER, ManagedUser.class);
+          NameIdentifier.of(metalake, userName), Entity.EntityType.USER, UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("user {} does not exist in the metalake {}", userName, metalake, e);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, userName, metalake);
     } catch (IOException ioe) {
-      LOG.error("Loading user {} failed due to storage issues", userName, ioe);
+      LOG.error("Getting user {} failed due to storage issues", userName, ioe);
       throw new RuntimeException(ioe);
     }
   }

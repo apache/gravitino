@@ -4,34 +4,34 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.meta.ManagedUser;
+import com.datastrato.gravitino.meta.UserEntity;
 import java.util.Collection;
 
-public class ManagedUserSerDe implements ProtoSerDe<ManagedUser, User> {
+public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
 
   @Override
-  public User serialize(ManagedUser managedUser) {
+  public User serialize(UserEntity userEntity) {
     User.Builder builder =
         User.newBuilder()
-            .setId(managedUser.id())
-            .setName(managedUser.name())
-            .setAuditInfo(new AuditInfoSerDe().serialize(managedUser.auditInfo()));
+            .setId(userEntity.id())
+            .setName(userEntity.name())
+            .setAuditInfo(new AuditInfoSerDe().serialize(userEntity.auditInfo()));
 
-    if (isCollectionNotEmpty(managedUser.groups())) {
-      builder.addAllGroups(managedUser.groups());
+    if (isCollectionNotEmpty(userEntity.groups())) {
+      builder.addAllGroups(userEntity.groups());
     }
 
-    if (isCollectionNotEmpty(managedUser.roles())) {
-      builder.addAllRoles(managedUser.roles());
+    if (isCollectionNotEmpty(userEntity.roles())) {
+      builder.addAllRoles(userEntity.roles());
     }
 
     return builder.build();
   }
 
   @Override
-  public ManagedUser deserialize(User user) {
-    ManagedUser.Builder builder =
-        ManagedUser.builder()
+  public UserEntity deserialize(User user) {
+    UserEntity.Builder builder =
+        UserEntity.builder()
             .withId(user.getId())
             .withName(user.getName())
             .withAuditInfo(new AuditInfoSerDe().deserialize(user.getAuditInfo()));

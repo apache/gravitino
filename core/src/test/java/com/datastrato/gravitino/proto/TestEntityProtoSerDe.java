@@ -6,7 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
-import com.datastrato.gravitino.meta.ManagedUser;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -280,22 +280,22 @@ public class TestEntityProtoSerDe {
     // Test UserEntity
     Long userId = 1L;
     String userName = "user";
-    ManagedUser managedUser =
-        ManagedUser.builder()
+    UserEntity userEntity =
+        UserEntity.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
             .withGroups(Lists.newArrayList("group"))
             .withRoles(Lists.newArrayList("role"))
             .build();
-    byte[] userBytes = protoEntitySerDe.serialize(managedUser);
-    ManagedUser managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
-    Assertions.assertEquals(managedUser, managedUserFromBytes);
+    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
+    UserEntity userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntity, userEntityFromBytes);
 
-    ManagedUser managedUserWithoutFields =
-        ManagedUser.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
-    userBytes = protoEntitySerDe.serialize(managedUserWithoutFields);
-    managedUserFromBytes = protoEntitySerDe.deserialize(userBytes, ManagedUser.class);
-    Assertions.assertEquals(managedUserWithoutFields, managedUserFromBytes);
+    UserEntity userEntityWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
+    userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
   }
 }

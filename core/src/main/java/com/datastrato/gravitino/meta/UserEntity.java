@@ -19,7 +19,7 @@ import lombok.ToString;
 
 /** A class representing a user metadata entity in Gravitino. */
 @ToString
-public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
+public class UserEntity implements User, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, " The unique id of the user entity.");
@@ -43,7 +43,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   private List<String> groups;
   private List<String> roles;
 
-  private ManagedUser() {}
+  private UserEntity() {}
 
   /**
    * Returns a map of fields and their corresponding values for this user entity.
@@ -124,9 +124,9 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof ManagedUser)) return false;
+    if (!(o instanceof UserEntity)) return false;
 
-    ManagedUser that = (ManagedUser) o;
+    UserEntity that = (UserEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
@@ -149,10 +149,10 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
   }
 
   public static class Builder {
-    private final ManagedUser managedUser;
+    private final UserEntity userEntity;
 
     private Builder() {
-      this.managedUser = new ManagedUser();
+      this.userEntity = new UserEntity();
     }
 
     /**
@@ -162,7 +162,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withId(Long id) {
-      managedUser.id = id;
+      userEntity.id = id;
       return this;
     }
 
@@ -173,7 +173,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withName(String name) {
-      managedUser.name = name;
+      userEntity.name = name;
       return this;
     }
 
@@ -184,7 +184,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withAuditInfo(AuditInfo auditInfo) {
-      managedUser.auditInfo = auditInfo;
+      userEntity.auditInfo = auditInfo;
       return this;
     }
 
@@ -195,7 +195,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withMetalake(String metalake) {
-      managedUser.metalake = metalake;
+      userEntity.metalake = metalake;
       return this;
     }
 
@@ -206,7 +206,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withRoles(List<String> roles) {
-      managedUser.roles = roles;
+      userEntity.roles = roles;
       return this;
     }
 
@@ -217,7 +217,7 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withGroups(List<String> groups) {
-      managedUser.groups = groups;
+      userEntity.groups = groups;
       return this;
     }
 
@@ -226,9 +226,9 @@ public class ManagedUser implements User, Entity, Auditable, HasIdentifier {
      *
      * @return The built user entity.
      */
-    public ManagedUser build() {
-      managedUser.validate();
-      return managedUser;
+    public UserEntity build() {
+      userEntity.validate();
+      return userEntity;
     }
   }
 }
