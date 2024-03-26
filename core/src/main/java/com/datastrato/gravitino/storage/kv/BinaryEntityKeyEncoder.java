@@ -10,6 +10,8 @@ import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
+import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
 import static com.datastrato.gravitino.Entity.EntityType.USER;
 
 import com.datastrato.gravitino.Entity.EntityType;
@@ -81,7 +83,9 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           USER,
           new String[] {USER.getShortName() + "/", "/", "/", "/"},
           GROUP,
-          new String[] {GROUP.getShortName() + "/", "/", "/", "/"});
+          new String[] {GROUP.getShortName() + "/", "/", "/", "/"},
+          TOPIC,
+          new String[] {TOPIC.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 
