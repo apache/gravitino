@@ -8,12 +8,12 @@ tasks.withType(Exec::class) {
 }
 
 tasks {
-  val printPythonVersion by registering(Exec::class) {
+  val pythonVersion by registering(Exec::class) {
     commandLine("python", "--version")
   }
 
   val installPip by registering(Exec::class) {
-    dependsOn(printPythonVersion)
+    dependsOn(pythonVersion)
     commandLine("python", "-m", "pip", "install", "--upgrade", "pip")
   }
 
