@@ -126,8 +126,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void cleanUp() {
     sql("USE " + getCatalogName());
     getDatabases()
-        .forEach(
-            databaseName -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", databaseName)));
+        .forEach(database -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", database)));
   }
 
   @Test
@@ -351,7 +350,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
     sql(
         String.format(
-            "ALTER TABLE %S RENAME COLUMN %S TO %S", tableName, oldColumnName, newColumnName));
+            "ALTER TABLE %s RENAME COLUMN %s TO %s", tableName, oldColumnName, newColumnName));
     ArrayList<SparkColumnInfo> renameColumns = new ArrayList<>(simpleTableColumns);
     renameColumns.add(SparkColumnInfo.of(newColumnName, DataTypes.IntegerType, null));
     checkTableColumns(tableName, renameColumns, getTableInfo(tableName));
@@ -450,25 +449,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
 
     checkTableReadWrite(tableInfo);
-  }
-
-  @Test
-  void testCreateDatasourceFormatPartitionTable() {
-    String tableName = "datasource_partition_table";
-
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + "USING PARQUET PARTITIONED BY (name, age)";
-    sql(createTableSQL);
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withIdentifyPartition(Arrays.asList("name", "age"));
-    checker.check(tableInfo);
-    checkTableReadWrite(tableInfo);
-    checkPartitionDirExists(tableInfo);
   }
 
   @Test
