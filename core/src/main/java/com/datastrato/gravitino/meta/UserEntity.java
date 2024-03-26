@@ -39,7 +39,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   private Long id;
   private String name;
   private AuditInfo auditInfo;
-  private String metalake;
   private List<String> groups;
   private List<String> roles;
   private Namespace namespace;
@@ -191,17 +190,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withAuditInfo(AuditInfo auditInfo) {
       userEntity.auditInfo = auditInfo;
-      return this;
-    }
-
-    /**
-     * Sets the metalake of the user entity.
-     *
-     * @param metalake The metalake of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withMetalake(String metalake) {
-      userEntity.metalake = metalake;
       return this;
     }
 

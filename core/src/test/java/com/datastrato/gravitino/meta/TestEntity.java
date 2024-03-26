@@ -210,7 +210,6 @@ public class TestEntity {
   public void testUser() {
     UserEntity testUserEntity =
         UserEntity.builder()
-            .withMetalake("metalake")
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
@@ -226,12 +225,7 @@ public class TestEntity {
     Assertions.assertEquals(Lists.newArrayList("group"), fields.get(UserEntity.GROUPS));
 
     UserEntity testUserEntityWithoutFields =
-        UserEntity.builder()
-            .withMetalake("metalake")
-            .withId(userId)
-            .withName(userName)
-            .withAuditInfo(auditInfo)
-            .build();
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(testUserEntityWithoutFields.roles());
     Assertions.assertNull(testUserEntityWithoutFields.groups());

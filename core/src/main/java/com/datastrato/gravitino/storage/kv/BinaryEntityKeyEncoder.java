@@ -78,7 +78,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           FILESET,
           new String[] {FILESET.getShortName() + "/", "/", "/", "/"},
           USER,
-          new String[] {USER.getShortName() + "/", "/"});
+          new String[] {USER.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 

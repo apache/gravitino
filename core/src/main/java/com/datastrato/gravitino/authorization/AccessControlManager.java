@@ -60,7 +60,6 @@ public class AccessControlManager {
         UserEntity.builder()
             .withId(idGenerator.nextId())
             .withName(name)
-            .withMetalake(metalake)
             .withNamespace(
                 Namespace.of(
                     metalake,
@@ -99,12 +98,7 @@ public class AccessControlManager {
   public boolean removeUser(String metalake, String user) {
 
     try {
-      return store.delete(
-          NameIdentifier.of(
-              metalake,
-              AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
-              AuthorizationConstants.USER_SCHEMA_NAME),
-          Entity.EntityType.USER);
+      return store.delete(ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -123,13 +117,7 @@ public class AccessControlManager {
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      return store.get(
-          NameIdentifier.of(
-              metalake,
-              AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
-              AuthorizationConstants.USER_SCHEMA_NAME),
-          Entity.EntityType.USER,
-          UserEntity.class);
+      return store.get(ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("user {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
@@ -137,5 +125,13 @@ public class AccessControlManager {
       LOG.error("Getting user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private NameIdentifier ofUser(String metalake, String user) {
+    return NameIdentifier.of(
+        metalake,
+        AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
+        AuthorizationConstants.USER_SCHEMA_NAME,
+        user);
   }
 }
