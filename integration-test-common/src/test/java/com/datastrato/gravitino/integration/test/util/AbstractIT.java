@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -34,12 +37,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.MySQLContainer;
 
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
@@ -59,6 +64,10 @@ public class AbstractIT {
   protected static Map<String, String> customConfigs = new HashMap<>();
 
   protected static boolean ignoreIcebergRestService = true;
+
+  private static final String MYSQL_DOCKER_IMAGE_VERSION = "mysql:8.0";
+  private static final String META_DATA = "metadata";
+  private static MySQLContainer<?> MYSQL_CONTAINER;
 
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -96,6 +105,40 @@ public class AbstractIT {
     Files.move(tmpPath, configPath);
   }
 
+  private static void setMySQLBackend() {
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl();
+    customConfigs.put(Configs.ENTITY_STORE.getKey(), "relational");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_STORE.getKey(), "JDBCBackend");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL.getKey(), mysqlUrl);
+    customConfigs.put(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER.getKey(), "root");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD.getKey(), "root");
+
+    LOG.info("MySQL URL: {}", mysqlUrl);
+    // Connect to the mysql docker and create a databases
+    try (Connection connection =
+        DriverManager.getConnection(
+            StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root")) {
+
+      final Statement statement = connection.createStatement();
+      statement.execute("drop database if exists " + META_DATA);
+      statement.execute("create database " + META_DATA);
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String mysqlContent =
+          FileUtils.readFileToString(
+              new File(gravitinoHome + "/core/src/main/resources/mysql/mysql_init.sql"), "UTF-8");
+      String[] sqls = mysqlContent.split(";");
+      sqls = ArrayUtils.addFirst(sqls, "use " + META_DATA + ";");
+      for (String sql : sqls) {
+        statement.execute(sql);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to create database in mysql", e);
+      throw new RuntimeException(e);
+    }
+  }
+
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
@@ -104,6 +147,18 @@ public class AbstractIT {
             : System.getProperty(ITUtils.TEST_MODE);
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
+
+    if ("true".equals(System.getenv("jdbcBackend"))) {
+      // start mysql docker
+      MYSQL_CONTAINER =
+          new MySQLContainer<>(MYSQL_DOCKER_IMAGE_VERSION)
+              .withDatabaseName(META_DATA)
+              .withUsername("root")
+              .withPassword("root");
+      MYSQL_CONTAINER.start();
+
+      setMySQLBackend();
+    }
 
     serverConfig = new ServerConfig();
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
@@ -166,6 +221,10 @@ public class AbstractIT {
     }
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
+
+    if (MYSQL_CONTAINER != null) {
+      MYSQL_CONTAINER.stop();
+    }
   }
 
   public static GravitinoAdminClient getGravitinoClient() {

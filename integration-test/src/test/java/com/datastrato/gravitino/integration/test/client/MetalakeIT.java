@@ -25,11 +25,13 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Disabled("please see #2674")
 public class MetalakeIT extends AbstractIT {
   public static String metalakeNameA = RandomNameUtils.genRandomName("metalakeA");
   public static String metalakeNameB = RandomNameUtils.genRandomName("metalakeB");

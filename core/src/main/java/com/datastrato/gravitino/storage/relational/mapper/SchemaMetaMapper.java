@@ -120,7 +120,7 @@ public interface SchemaMetaMapper {
           + " AND schema_name = #{oldSchemaMeta.schemaName}"
           + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
           + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-          + " AND schema_comment = #{oldSchemaMeta.schemaComment}"
+          + " AND (schema_comment IS NULL OR schema_comment = #{oldSchemaMeta.schemaComment})"
           + " AND properties = #{oldSchemaMeta.properties}"
           + " AND audit_info = #{oldSchemaMeta.auditInfo}"
           + " AND current_version = #{oldSchemaMeta.currentVersion}"
