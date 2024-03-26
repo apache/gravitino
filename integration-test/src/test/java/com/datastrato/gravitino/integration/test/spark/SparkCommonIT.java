@@ -844,7 +844,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(createTableSql);
   }
 
-  private void checkTableColumns(
+  protected void checkTableColumns(
       String tableName, List<SparkColumnInfo> columns, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
         .withName(tableName)
