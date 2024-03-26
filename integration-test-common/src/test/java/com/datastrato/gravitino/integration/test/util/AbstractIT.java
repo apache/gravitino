@@ -66,6 +66,9 @@ public class AbstractIT {
   protected static boolean ignoreIcebergRestService = true;
 
   private static final String MYSQL_DOCKER_IMAGE_VERSION = "mysql:8.0";
+  private static final String DOWNLOAD_JDBC_DRIVER_URL =
+      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
+
   private static final String META_DATA = "metadata";
   private static MySQLContainer<?> MYSQL_CONTAINER;
 
@@ -103,6 +106,14 @@ public class AbstractIT {
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
     Files.deleteIfExists(configPath);
     Files.move(tmpPath, configPath);
+  }
+
+  protected static void downLoadMySQLDriver(String relativeDeployLibsPath) throws IOException {
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      java.nio.file.Path tmpPath = Paths.get(gravitinoHome, relativeDeployLibsPath);
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    }
   }
 
   private static void setMySQLBackend() {
@@ -170,6 +181,7 @@ public class AbstractIT {
     } else {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
+      downLoadMySQLDriver("/libs");
       try {
         FileUtils.deleteDirectory(
             FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
