@@ -12,6 +12,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogOperations.CLIENT_ID_TEMPLATE;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
@@ -130,7 +131,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
         MOCK_CATALOG_PROPERTIES.get(BOOTSTRAP_SERVERS),
         ops.adminClientConfig.get(BOOTSTRAP_SERVERS));
     Assertions.assertEquals(
-        MOCK_CATALOG_PROPERTIES.get(ID_KEY), ops.adminClientConfig.get("client.id"));
+        String.format(
+            CLIENT_ID_TEMPLATE,
+            MOCK_CATALOG_PROPERTIES.get(ID_KEY),
+            catalogEntity.namespace(),
+            catalogName),
+        ops.adminClientConfig.get("client.id"));
   }
 
   @Test

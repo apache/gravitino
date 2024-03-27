@@ -82,6 +82,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       new KafkaSchemaPropertiesMetadata();
   private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
+  @VisibleForTesting static final String CLIENT_ID_TEMPLATE = "%s-%s.%s";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -127,7 +128,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     // use gravitino catalog id as the admin client id
     adminClientConfig.put(
         AdminClientConfig.CLIENT_ID_CONFIG,
-        config.get(ID_KEY) + "-" + info.namespace() + "." + info.name());
+        String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));
 
     createDefaultSchema();
     adminClient = AdminClient.create(adminClientConfig);
