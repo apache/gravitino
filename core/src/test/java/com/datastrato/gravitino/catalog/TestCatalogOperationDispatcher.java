@@ -27,7 +27,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestColumn;
-import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -47,6 +46,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -82,7 +82,7 @@ public class TestCatalogOperationDispatcher {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
-    entityStore = spy(new TestEntityStore.InMemoryEntityStore());
+    entityStore = spy(new TestMemoryEntityStore.InMemoryEntityStore());
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
