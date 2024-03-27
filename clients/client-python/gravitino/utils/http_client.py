@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 import json as _json
 
+from gravitino.typing import JSON_ro
 from gravitino.utils.exceptions import handle_error
 from gravitino.constants import TIMEOUT
 
@@ -144,7 +145,7 @@ class HTTPClient:
 
 def unpack(path: str):
     def decorator(func):
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> JSON_ro:
             resp = func(*args, **kwargs)
             rv = resp.json()
             for p in path.split("."):

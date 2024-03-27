@@ -3,8 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-from gravitino.utils.http_client import HTTPClient, unpack
-from gravitino.typing import JSON_ro
+from gravitino.utils import HTTPClient, unpack, Response
 from gravitino.constants import TIMEOUT
 
 
@@ -17,37 +16,37 @@ class _Service:
         self.http_client = HTTPClient(url, timeout=timeout)
 
     @unpack("version")
-    def get_version(self) -> JSON_ro:
+    def get_version(self) -> Response:
         return self.http_client.get("/version")
 
     @unpack("metalakes")
-    def get_metalakes(self) -> JSON_ro:
+    def get_metalakes(self) -> Response:
         return self.http_client.get("/metalakes")
 
     @unpack("metalake")
-    def get_metalake(self, metalake: str) -> JSON_ro:
+    def get_metalake(self, metalake: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}")
 
     @unpack("identifiers")
-    def get_catalogs(self, metalake: str) -> JSON_ro:
+    def get_catalogs(self, metalake: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/")
 
     @unpack("catalog")
-    def get_catalog(self, metalake: str, catalog: str) -> JSON_ro:
+    def get_catalog(self, metalake: str, catalog: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/{catalog}")
 
     @unpack("identifiers")
-    def get_schemas(self, metalake: str, catalog: str) -> JSON_ro:
+    def get_schemas(self, metalake: str, catalog: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/{catalog}/schemas")
 
     @unpack("schema")
-    def get_schema(self, metalake: str, catalog: str, schema: str) -> JSON_ro:
+    def get_schema(self, metalake: str, catalog: str, schema: str) -> Response:
         return self.http_client.get(
             f"/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}"
         )
 
     @unpack("identifiers")
-    def get_tables(self, metalake: str, catalog: str, schema: str) -> JSON_ro:
+    def get_tables(self, metalake: str, catalog: str, schema: str) -> Response:
         return self.http_client.get(
             f"/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables"
         )
@@ -55,7 +54,7 @@ class _Service:
     @unpack("table")
     def get_table(
         self, metalake: str, catalog: str, schema: str, table: str
-    ) -> JSON_ro:
+    ) -> Response:
         return self.http_client.get(
             f"/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}"
         )
@@ -63,7 +62,7 @@ class _Service:
     @unpack("names")
     def get_partitions(
         self, metalake: str, catalog: str, schema: str, table: str
-    ) -> JSON_ro:
+    ) -> Response:
         return self.http_client.get(
             f"/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions"
         )
