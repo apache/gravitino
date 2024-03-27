@@ -23,7 +23,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
@@ -40,10 +39,10 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.UserEntity;
-import com.datastrato.gravitino.storage.kv.KvEntityStore;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -56,8 +55,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
-import com.google.common.collect.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -392,12 +389,10 @@ public class TestEntityStorage {
     init(type, config);
 
     AuditInfo auditInfo =
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
@@ -412,6 +407,7 @@ public class TestEntityStorage {
       Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
     }
   }
+
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testEntityDelete(String type) throws IOException {
@@ -866,15 +862,15 @@ public class TestEntityStorage {
 
   private static UserEntity createUser(String metalake, String name, AuditInfo auditInfo) {
     return UserEntity.builder()
-            .withId(1L)
-            .withNamespace(
-                    Namespace.of(
-                            metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME))
-            .withName(name)
-            .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList())
-            .withGroups(Lists.newArrayList())
-            .build();
+        .withId(1L)
+        .withNamespace(
+            Namespace.of(
+                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME))
+        .withName(name)
+        .withAuditInfo(auditInfo)
+        .withRoles(Lists.newArrayList())
+        .withGroups(Lists.newArrayList())
+        .build();
   }
 
   private void validateDeleteFilesetCascade(EntityStore store, FilesetEntity fileset1)
