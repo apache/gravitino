@@ -7,7 +7,7 @@ package com.datastrato.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** An exception thrown when a resource already exists. */
+/** An exception thrown when a user already exists. */
 public class UserAlreadyExistsException extends AlreadyExistsException {
 
   /**

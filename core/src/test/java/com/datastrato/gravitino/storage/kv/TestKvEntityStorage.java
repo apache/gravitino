@@ -23,7 +23,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.AuthorizationConstants;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -99,8 +98,8 @@ public class TestKvEntityStorage {
         .withNamespace(
             Namespace.of(
                 metalake,
-                AuthorizationConstants.SYSTEM_CATALOG_RESERVED_NAME,
-                AuthorizationConstants.USER_SCHEMA_NAME))
+                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                UserEntity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
