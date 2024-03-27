@@ -17,16 +17,13 @@ import com.datastrato.gravitino.storage.NameMappingService;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,25 +34,27 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  *     Key                                Value
- * ml_{ml_id}               -----    metalake info
- * ml_{ml_id}               -----    metalake info
- * ca_{ml_id}_{ca_id}       -----    catalog_info
- * ca_{ml_id}_{ca_id}       -----    catalog_info
- * sc_{ml_id}_{ca_id}_{sc_id} ---    schema_info
- * sc_{ml_id}_{ca_id}_{sc_id} ---    schema_info
- * br_{ml_id}_{ca_id}_{br_id} ---    broker_info
- * br_{ml_id}_{ca_id}_{br_id} ---    broker_info
+ * ml/{ml_id}               -----    metalake info
+ * ml/{ml_id}               -----    metalake info
+ * ca/{ml_id}/{ca_id}       -----    catalog_info
+ * ca/{ml_id}/{ca_id}       -----    catalog_info
+ * sc/{ml_id}/{ca_id}/{sc_id} ---    schema_info
+ * sc/{ml_id}/{ca_id}/{sc_id} ---    schema_info
+ * br/{ml_id}/{ca_id}/{br_id} ---    broker_info
+ * br/{ml_id}/{ca_id}/{br_id} ---    broker_info
  *
- * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    -----    table_info
- * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    -----    table_info
- * to_{ml_id}_{ca_id}_{br_id}_{to_id}       -----    topic_info
- * to_{ml_id}_{ca_id}_{br_id}_{to_id}       -----    topic_info
+ * ta/{ml_id}/{ca_id}/{sc_id}/{table_id}    -----    table_info
+ * ta/{ml_id}/{ca_id}/{sc_id}/{table_id}    -----    table_info
+ * to/{ml_id}/{ca_id}/{br_id}/{to_id}       -----    topic_info
+ * to/{ml_id}/{ca_id}/{br_id}/{to_id}       -----    topic_info
  * </pre>
  */
 public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public static final Logger LOG = LoggerFactory.getLogger(BinaryEntityKeyEncoder.class);
 
   public static final String NAMESPACE_SEPARATOR = "/";
+
+  public static final String TYPE_AND_NAME_SEPARATOR = "_";
 
   @VisibleForTesting
   static final byte[] BYTABLE_NAMESPACE_SEPARATOR =
@@ -78,14 +77,6 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     this.nameMappingService = nameMappingService;
   }
 
-  private String generateMappingKey(long[] namespaceIds, String name) {
-    String context =
-        Joiner.on(NAMESPACE_SEPARATOR)
-            .join(
-                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
-    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
-  }
-
   /**
    * Encode entity key for KV backend, e.g., RocksDB. The key is used to store the entity in the
    * backend.
@@ -100,8 +91,11 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
       NameIdentifier identifier, EntityType entityType, boolean nullIfMissing) throws IOException {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
+    List<EntityType> parentEntityTypes = EntityType.getParentEntityTypes(entityType);
     for (int i = 0; i < nameSpace.length; i++) {
-      String nameKey = generateMappingKey(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
+      String nameKey =
+          BinaryEntityEncoderUtil.concatIdAndName(
+              ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i], parentEntityTypes.get(i));
       if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
         return null;
       }
@@ -121,7 +115,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-    String nameKey = generateMappingKey(namespaceIds, identifier.name());
+    String nameKey =
+        BinaryEntityEncoderUtil.concatIdAndName(namespaceIds, identifier.name(), entityType);
     if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
       return null;
     }
@@ -227,9 +222,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // method generateMappingKey in this class.
     String[] names = new String[ids.length];
     for (int i = 0; i < ids.length; i++) {
-      // The format of name is like '{metalake_id}/{catalog_id}/schema_name'
+      // The format of name is like '{metalake_id}/{catalog_id}/sc_schema_name'
       String name = nameMappingService.getNameById(ids[i]);
-      names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
+      // extract the real name from the name mapping service
+      names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);
     }
 
     NameIdentifier nameIdentifier = NameIdentifier.of(names);
