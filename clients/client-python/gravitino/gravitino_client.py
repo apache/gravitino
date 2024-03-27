@@ -61,14 +61,18 @@ class Schema:
 
     def __getattr__(self, table_name):
         if table_name in dir(self):
-            return Table(self.metalake_name, self.catalog_name, self.schema_name, table_name)
+            return Table(
+                self.metalake_name, self.catalog_name, self.schema_name, table_name
+            )
 
     def __dir__(self):
         return [table["name"] for table in self.tables]
 
 
 class Table:
-    def __init__(self, metalake_name: str, catalog_name: str, schema_name: str, table_name: str):
+    def __init__(
+        self, metalake_name: str, catalog_name: str, schema_name: str, table_name: str
+    ):
         self.metalake_name = metalake_name
         self.catalog_name = catalog_name
         self.schema_name = schema_name
@@ -80,14 +84,17 @@ class Table:
         return f"Table<{self.name}>"
 
     def info(self):
-        return self.service.get_table(self.metalake_name, self.catalog_name, self.schema_name, self.table_name)
+        return self.service.get_table(
+            self.metalake_name, self.catalog_name, self.schema_name, self.table_name
+        )
 
 
 class GravitinoClient:
     def __init__(
         self,
         host: str,
-        protocol: str = 'http',
+        *,
+        protocol: str = "http",
         port: int = 8090,
         prefix: str = "/api",
         timeout: int = TIMEOUT,
@@ -106,6 +113,29 @@ class GravitinoClient:
         self.service = service["service"]
         self.debug = debug
 
+    @classmethod
+    def initialize_metalake(
+        cls,
+        host: str,
+        metalake_name: str,
+        *,
+        protocol: str = "http",
+        port: int = 8090,
+        prefix: str = "/api",
+        timeout: int = TIMEOUT,
+        debug: bool = False,
+    ) -> MetaLake:
+        # keep in mind, all constructors should include same interface as __init__ function
+        client = cls(
+            host,
+            protocol=protocol,
+            port=port,
+            prefix=prefix,
+            timeout=timeout,
+            debug=debug,
+        )
+        return client.get_metalake(metalake_name)
+
     @property
     def version(self):
         return self.service.get_version()
@@ -115,3 +145,24 @@ class GravitinoClient:
 
     def get_metalake(self, metalake: str) -> MetaLake:
         return MetaLake(self.service.get_metalake(metalake))
+
+
+def gravitino_metalake(
+    host: str,
+    metalake_name: str,
+    *,
+    protocol: str = "http",
+    port: int = 8090,
+    prefix: str = "/api",
+    timeout: int = TIMEOUT,
+    debug: bool = False,
+) -> MetaLake:
+    return GravitinoClient.initialize_metalake(
+        host,
+        metalake_name,
+        protocol=protocol,
+        port=port,
+        prefix=prefix,
+        timeout=timeout,
+        debug=debug,
+    )
