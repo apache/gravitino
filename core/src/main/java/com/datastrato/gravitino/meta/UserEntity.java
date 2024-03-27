@@ -32,16 +32,12 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
 
-  public static final Field GROUPS =
-      Field.optional("groups", List.class, "The groups of the user entity");
-
   public static final Field ROLES =
       Field.optional("roles", List.class, "The roles of the user entity");
 
   private Long id;
   private String name;
   private AuditInfo auditInfo;
-  private List<String> groups;
   private List<String> roles;
   private Namespace namespace;
 
@@ -59,7 +55,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ROLES, roles);
-    fields.put(GROUPS, groups);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -123,16 +118,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     return roles;
   }
 
-  /**
-   * The groups of the user.
-   *
-   * @return The groups of the user.
-   */
-  @Override
-  public List<String> groups() {
-    return groups;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -142,13 +127,12 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roles, that.roles)
-        && Objects.equals(groups, that.groups);
+        && Objects.equals(roles, that.roles);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roles, groups);
+    return Objects.hash(id, name, auditInfo, roles);
   }
 
   public static Builder builder() {
@@ -206,16 +190,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    /**
-     * Sets the groups of the user entity.
-     *
-     * @param groups The groups of the user entity.
-     * @return The builder instance.
-     */
-    public Builder withGroups(List<String> groups) {
-      userEntity.groups = groups;
-      return this;
-    }
     /**
      * Sets the namespace of the user entity.
      *

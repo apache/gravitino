@@ -17,10 +17,6 @@ public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
             .setName(userEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize(userEntity.auditInfo()));
 
-    if (isCollectionNotEmpty(userEntity.groups())) {
-      builder.addAllGroups(userEntity.groups());
-    }
-
     if (isCollectionNotEmpty(userEntity.roles())) {
       builder.addAllRoles(userEntity.roles());
     }
@@ -38,10 +34,6 @@ public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
 
     if (user.getRolesCount() > 0) {
       builder.withRoles(user.getRolesList());
-    }
-
-    if (user.getGroupsCount() > 0) {
-      builder.withGroups(user.getGroupsList());
     }
 
     return builder.build();

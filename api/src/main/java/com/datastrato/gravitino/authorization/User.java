@@ -24,12 +24,4 @@ public interface User extends Auditable {
    * @return The roles of the user.
    */
   List<String> roles();
-
-  /**
-   * The groups of the user. A user can be added to different groups. Every group also has different
-   * roles.
-   *
-   * @return The groups of the user.
-   */
-  List<String> groups();
 }
