@@ -93,10 +93,6 @@ public class IcebergAdaptor implements GravitinoCatalogAdaptor {
     icebergProperties.put(
         GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_PASSWORD, jdbcPasswrod);
     icebergProperties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_DRIVER, jdbcDriver);
-    icebergProperties.put(
-        GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_INITIALIZE,
-        gravitinoProperties.getOrDefault(
-            GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_INITIALIZE, "true"));
   }
 
   @Override
