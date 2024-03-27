@@ -32,7 +32,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public abstract class SparkCommonIT extends SparkEnvIT {
 
   // To generate test data for write&read table.
-  private static final Map<DataType, String> typeConstant =
+  protected static final Map<DataType, String> typeConstant =
       ImmutableMap.of(
           DataTypes.IntegerType,
           "2",
