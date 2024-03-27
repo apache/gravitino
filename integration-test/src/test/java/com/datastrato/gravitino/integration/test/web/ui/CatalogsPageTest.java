@@ -169,7 +169,6 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
   }
 
-
   @Test
   @Order(11)
   public void testBackHomePage() throws InterruptedException {
