@@ -49,6 +49,10 @@ public class HivePropertiesConverter implements PropertiesConverter {
    *
    * <p>CREATE TABLE xxx ROW FORMAT DELIMITED FIELDS TERMINATED xx will save "option.xx" in
    * property.
+   *
+   * <p>Please refer to
+   * https://github.com/apache/spark/blob/7d87a94dd77f43120701e48a371324a4f5f2064b/sql/catalyst/src/main/scala/org/apache/spark/sql/connector/catalog/CatalogV2Util.scala#L397
+   * for more details.
    */
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
