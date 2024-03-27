@@ -303,7 +303,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
     String oldColumnName = "col1";
-    String newColumnName = "col1_new";
+    String newColumnName = "col2";
 
     sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
     sql(
