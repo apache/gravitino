@@ -141,9 +141,9 @@ public class AbstractIT {
       String mysqlContent =
           FileUtils.readFileToString(
               new File(gravitinoHome + "/core/src/main/resources/mysql/mysql_init.sql"), "UTF-8");
-      String[] sqls = mysqlContent.split(";");
-      sqls = ArrayUtils.addFirst(sqls, "use " + META_DATA + ";");
-      for (String sql : sqls) {
+      String[] initMySQLBackendSqls = mysqlContent.split(";");
+      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
+      for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
       }
     } catch (Exception e) {
@@ -162,7 +162,7 @@ public class AbstractIT {
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
     if ("true".equals(System.getenv("jdbcBackend"))) {
-      // start mysql docker
+      // Start MySQL docker instance.
       MYSQL_CONTAINER =
           new MySQLContainer<>(MYSQL_DOCKER_IMAGE_VERSION)
               .withDatabaseName(META_DATA)

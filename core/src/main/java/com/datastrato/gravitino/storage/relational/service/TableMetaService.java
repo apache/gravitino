@@ -20,12 +20,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
-  private static final Logger LOG = LoggerFactory.getLogger(TableMetaService.class);
   private static final TableMetaService INSTANCE = new TableMetaService();
 
   public static TableMetaService getInstance() {
