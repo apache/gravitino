@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+/** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
   private static final TableMetaService INSTANCE = new TableMetaService();
 
