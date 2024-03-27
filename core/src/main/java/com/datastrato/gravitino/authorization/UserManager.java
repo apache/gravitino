@@ -126,9 +126,6 @@ public class UserManager {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake,
-        CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-        UserEntity.USER_SCHEMA_NAME,
-        user);
+        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
   }
 }
