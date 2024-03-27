@@ -17,8 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Referred from Apache Arrow's util_free_space.sh implementation
-# ci/scripts/util_free_space.sh
+# Copied from Apache Arrow: ci/scripts/util_free_space.sh
 
 set -eux
 
