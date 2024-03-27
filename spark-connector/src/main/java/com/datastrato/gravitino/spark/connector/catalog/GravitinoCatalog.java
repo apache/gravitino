@@ -416,7 +416,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
           updateColumnComment.fieldNames(), updateColumnComment.newComment());
     } else if (change instanceof TableChange.UpdateColumnNullability) {
       TableChange.UpdateColumnNullability updateColumnNullability =
-              (TableChange.UpdateColumnNullability) change;
+          (TableChange.UpdateColumnNullability) change;
       return com.datastrato.gravitino.rel.TableChange.updateColumnNullability(
           updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
     } else {

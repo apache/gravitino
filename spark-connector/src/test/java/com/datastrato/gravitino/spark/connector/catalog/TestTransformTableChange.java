@@ -227,19 +227,21 @@ public class TestTransformTableChange {
   @Test
   void testTransformUpdateColumnNullability() {
     TableChange.UpdateColumnNullability sparkUpdateColumnNullability =
-            (TableChange.UpdateColumnNullability)
-                    TableChange.updateColumnNullability(new String[] {"col1"}, true);
+        (TableChange.UpdateColumnNullability)
+            TableChange.updateColumnNullability(new String[] {"col1"}, true);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-            GravitinoCatalog.transformTableChange(sparkUpdateColumnNullability);
+        GravitinoCatalog.transformTableChange(sparkUpdateColumnNullability);
 
     Assertions.assertTrue(
-            gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability);
-    com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability gravitinoUpdateColumnNullability =
+        gravitinoChange
+            instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability);
+    com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability
+        gravitinoUpdateColumnNullability =
             (com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability) gravitinoChange;
 
     Assertions.assertArrayEquals(
-            sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
+        sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
     Assertions.assertEquals(
-            sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
+        sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
   }
 }
