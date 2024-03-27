@@ -6,13 +6,13 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -45,7 +45,7 @@ public class TestAccessControlManager {
   public static void setUp() throws Exception {
     config = new Config(false) {};
 
-    entityStore = new TestEntityStore.InMemoryEntityStore();
+    entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
