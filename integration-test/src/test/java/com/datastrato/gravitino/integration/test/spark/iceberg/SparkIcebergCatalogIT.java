@@ -17,6 +17,14 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogIT extends SparkCommonIT {
 
+  private void createIcebergV2SimpleTable(String tableName) {
+    String createSql =
+        String.format(
+            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TABPROPERTIES('format.version'='2')",
+            tableName);
+    sql(createSql);
+  }
+
   @Override
   protected String getCatalogName() {
     return "iceberg";
@@ -93,9 +101,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testUpdateOperations() {
-    String tableName = "test_update_table";
+    String tableName = "test_update_v2_table";
     dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+    createIcebergV2SimpleTable(tableName);
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -104,9 +112,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelUpdateOperations() {
-    String tableName = "test_merge_update_table";
+    String tableName = "test_merge_update_v2_table";
     dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+    createIcebergV2SimpleTable(tableName);
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -115,9 +123,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelDeleteOperations() {
-    String tableName = "test_merge_delete_table";
+    String tableName = "test_merge_delete_v2_table";
     dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+    createIcebergV2SimpleTable(tableName);
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -126,12 +134,23 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testRowLevelInsertOperations() {
-    String tableName = "test_merge_insert_table";
+    String tableName = "test_merge_insert_v2_table";
+    dropTableIfExists(tableName);
+    createIcebergV2SimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableRowLevelInsert(table);
+  }
+
+  @Test
+  void testInsertForV1Table() {
+    String tableName = "test_insert_v1_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
-    checkTableRowLevelInsert(table);
+    checkTableReadWrite(table);
   }
 }
