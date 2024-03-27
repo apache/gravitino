@@ -93,7 +93,7 @@ public class TestRelationalEntityStore {
     entityStore.initialize(config);
 
     // Read the ddl sql to create table
-    String scriptPath = "h2/h2-init.sql";
+    String scriptPath = "relational-entity-store/jdbc/h2/schema-0.5.0-h2.sql";
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
