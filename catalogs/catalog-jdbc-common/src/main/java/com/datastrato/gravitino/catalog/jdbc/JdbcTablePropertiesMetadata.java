@@ -22,7 +22,8 @@ public abstract class JdbcTablePropertiesMetadata extends BasePropertiesMetadata
     return resultProperties;
   }
 
-  protected Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
+  @VisibleForTesting
+  public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
     return properties;
   }
 }
