@@ -455,28 +455,22 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   @EnabledIf("supportPartition")
-  public void testWriteHiveDynamicPartition() {
-    String tableName = "hive_dynamic_partition_table";
+  void testCreateDatasourceFormatPartitionTable() {
+    String tableName = "datasource_partition_table";
 
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    createTableSQL = createTableSQL + " USING PARQUET PARTITIONED BY (name, age)";
     sql(createTableSQL);
-
     SparkTableInfo tableInfo = getTableInfo(tableName);
-
-    // write data to dynamic partition
-    String insertData =
-        String.format(
-            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
-    sql(insertData);
-    List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
-    Assertions.assertEquals("1,a,3,1,b", queryResult.get(0));
-    String location = tableInfo.getTableLocation();
-    String partitionExpression = "age_p1=1/age_p2=b";
-    Path partitionPath = new Path(location, partitionExpression);
-    checkDirExists(partitionPath);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withIdentifyPartition(Arrays.asList("name", "age"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
   }
 
   @Test
@@ -563,6 +557,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportPartition")
   void testInsertDatasourceFormatPartitionTableAsSelect() {
     String tableName = "insert_select_partition_table";
     String newTableName = "new_" + tableName;

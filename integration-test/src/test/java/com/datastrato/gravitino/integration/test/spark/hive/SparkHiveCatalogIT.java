@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -70,22 +71,28 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testCreateDatasourceFormatPartitionTable() {
-    String tableName = "datasource_partition_table";
+  public void testWriteHiveDynamicPartition() {
+    String tableName = "hive_dynamic_partition_table";
 
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " USING PARQUET PARTITIONED BY (name, age)";
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
     sql(createTableSQL);
+
     SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withIdentifyPartition(Arrays.asList("name", "age"));
-    checker.check(tableInfo);
-    checkTableReadWrite(tableInfo);
-    checkPartitionDirExists(tableInfo);
+
+    // write data to dynamic partition
+    String insertData =
+        String.format(
+            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals("1,a,3,1,b", queryResult.get(0));
+    String location = tableInfo.getTableLocation();
+    String partitionExpression = "age_p1=1/age_p2=b";
+    Path partitionPath = new Path(location, partitionExpression);
+    checkDirExists(partitionPath);
   }
 
   @Test
