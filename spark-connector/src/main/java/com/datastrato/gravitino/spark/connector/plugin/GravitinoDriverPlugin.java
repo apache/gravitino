@@ -73,7 +73,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   private void registerSqlExtensions(SparkContext sc) {
-    sc.getConf()
+    sc.conf()
         .setIfMissing(SPARK_SESSION_EXTENSIONS, IcebergSparkSessionExtensions.class.getName());
   }
 }
