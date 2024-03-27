@@ -52,7 +52,7 @@ You can see the connector directory `gravitino-trino-connector-<version>` after 
 Copy the connector directory to the Trino container's plugin directory.
 
 ```shell
-docker copy  /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
+docker cp /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
 ```
 
 Check the plugin directory in the container.
@@ -99,7 +99,7 @@ docker restart trino-gravitino
 Use the Trino CLI to connect to the Trino container and run a query.
 
 ```text
-docker exec -it trino trino
+docker exec -it trino-gravitino trino
 trino> SHOW CATALOGS;
 Catalog
 ------------------------
@@ -116,7 +116,7 @@ You can see the `gravitino` catalog in the result set. This signifies the succes
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
-docker exec -it trino trino
+docker exec -it trino-gravitino trino
 trino> SHOW CATALOGS;
 Catalog
 ------------------------
