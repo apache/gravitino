@@ -60,6 +60,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
+  protected abstract boolean supportPartition();
+
   // Use a custom database not the original default database because SparkIT couldn't read&write
   // data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -405,6 +407,32 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
 
     checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  @EnabledIf("supportPartition")
+  public void testWriteHiveDynamicPartition() {
+    String tableName = "hive_dynamic_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    sql(createTableSQL);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    // write data to dynamic partition
+    String insertData =
+        String.format(
+            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
+    sql(insertData);
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals("1,a,3,1,b", queryResult.get(0));
+    String location = tableInfo.getTableLocation();
+    String partitionExpression = "age_p1=1/age_p2=b";
+    Path partitionPath = new Path(location, partitionExpression);
+    checkDirExists(partitionPath);
   }
 
   @Test
