@@ -32,5 +32,7 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
