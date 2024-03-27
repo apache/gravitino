@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -87,6 +86,11 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  @Override
+  protected boolean supportPartition() {
+    return true;
+  }
+
   @Test
   public void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
@@ -132,27 +136,66 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testWriteHiveDynamicPartition() {
-    String tableName = "hive_dynamic_partition_table";
+  public void testInsertHiveFormatPartitionTableAsSelect() {
+    String tableName = "insert_hive_partition_table";
+    String newTableName = "new_" + tableName;
 
+    // create source table
     dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
-    sql(createTableSQL);
-
+    createSimpleTable(tableName);
     SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
 
-    // write data to dynamic partition
-    String insertData =
+    // insert into partition ((name = %s, age = %s) select xx
+    dropTableIfExists(newTableName);
+    String createTableSql =
         String.format(
-            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
-    sql(insertData);
-    List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
-    Assertions.assertEquals("1,a,3,1,b", queryResult.get(0));
-    String location = tableInfo.getTableLocation();
-    String partitionExpression = "age_p1=1/age_p2=b";
-    Path partitionPath = new Path(location, partitionExpression);
-    checkDirExists(partitionPath);
+            "CREATE TABLE %s (id INT) PARTITIONED BY (name STRING, age INT)", newTableName);
+    sql(createTableSql);
+    String insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age = %s) SELECT id FROM %s",
+            newTableName,
+            typeConstant.get(DataTypes.StringType),
+            typeConstant.get(DataTypes.IntegerType),
+            tableName);
+    sql(insertPartitionSql);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    String expectedData = getExpectedTableData(newTableInfo);
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name = %s, age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age) SELECT id, age FROM %s",
+            newTableName, typeConstant.get(DataTypes.StringType), tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name,  age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name , age) SELECT * FROM %s",
+            newTableName, tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
   }
 }

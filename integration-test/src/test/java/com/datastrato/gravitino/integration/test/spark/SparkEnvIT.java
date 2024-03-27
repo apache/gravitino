@@ -144,6 +144,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config("spark.plugins", GravitinoSparkPlugin.class.getName())
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
+            .config("hive.exec.dynamic.partition.mode", "nonstrict")
             .config("spark.sql.warehouse.dir", warehouse)
             .enableHiveSupport()
             .getOrCreate();
