@@ -14,8 +14,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.TestEntityStore;
-import com.datastrato.gravitino.TestEntityStore.InMemoryEntityStore;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -23,6 +21,8 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -64,7 +64,7 @@ public class TestCatalogManager {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
-    entityStore = new TestEntityStore.InMemoryEntityStore();
+    entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
