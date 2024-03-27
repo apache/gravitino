@@ -28,6 +28,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   CatalogsPage catalogsPage = new CatalogsPage();
 
   private static final String metalakeName = "metalake_name";
+  private static final String metalakeSelectName = "metalake_select_name";
   String catalogName = "catalog_name";
   String modifiedCatalogName = catalogName + "_edited";
   String schemaName = "default";
@@ -63,6 +64,12 @@ public class CatalogsPageTest extends AbstractWebIT {
     clickAndWait(metalakePage.createMetalakeBtn);
     metalakePage.setMetalakeNameField(metalakeName);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
+
+    // Create another metalake for select option
+    clickAndWait(metalakePage.createMetalakeBtn);
+    metalakePage.setMetalakeNameField(metalakeSelectName);
+    clickAndWait(metalakePage.submitHandleMetalakeBtn);
+
     metalakePage.clickMetalakeLink(metalakeName);
     // Create catalog
     clickAndWait(catalogsPage.createCatalogBtn);
@@ -145,6 +152,16 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(9)
+  public void testSelectMetalake() throws InterruptedException {
+    catalogsPage.metalakeSelectChange(metalakeSelectName);
+    Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
+
+    catalogsPage.metalakeSelectChange(metalakeName);
+    Assertions.assertTrue(catalogsPage.verifyCreateHiveCatalog(modifiedCatalogName));
+  }
+
+  @Test
+  @Order(10)
   public void testDeleteCatalog() throws InterruptedException {
     catalogsPage.clickBreadCrumbsToCatalogs();
     catalogsPage.clickDeleteCatalogBtn(modifiedCatalogName);
@@ -152,8 +169,9 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
   }
 
+
   @Test
-  @Order(10)
+  @Order(11)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

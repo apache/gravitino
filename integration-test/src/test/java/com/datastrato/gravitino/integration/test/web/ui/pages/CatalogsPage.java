@@ -23,6 +23,9 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='back-home-btn']")
   public WebElement backHomeBtn;
 
+  @FindBy(xpath = "//*[@data-refer='select-metalake']")
+  public WebElement metalakeSelect;
+
   @FindBy(xpath = "//div[@data-refer='table-grid']")
   public WebElement tableGrid;
 
@@ -88,6 +91,17 @@ public class CatalogsPage extends AbstractWebIT {
 
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
+  }
+
+  public void metalakeSelectChange(String metalakeName) {
+    try {
+      clickAndWait(metalakeSelect);
+      String keyPath = "//li[@data-refer='select-option-" + metalakeName + "']";
+      WebElement selectOption = driver.findElement(By.xpath(keyPath));
+      clickAndWait(selectOption);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void setCatalogNameField(String nameField) {

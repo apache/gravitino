@@ -24,7 +24,8 @@ import VersionView from './VersionView'
 import LogoutButton from './Logout'
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
-import { useAppSelector } from '@/lib/hooks/useStore'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { fetchMetalakes } from '@/lib/store/metalakes'
 
 import { useState, useEffect } from 'react'
 
@@ -32,10 +33,14 @@ const AppBar = () => {
   const searchParams = useSearchParams()
   const metalake = searchParams.get('metalake')
   const store = useAppSelector(state => state.metalakes)
+  const dispatch = useAppDispatch()
   const [metalakes, setMetalakes] = useState([])
   const router = useRouter()
 
   useEffect(() => {
+    if (!store.metalakes.length) {
+      dispatch(fetchMetalakes())
+    }
     const metalakeItems = store.metalakes.map(i => i.name)
     setMetalakes(metalakeItems)
   }, [store.metalakes])
@@ -81,7 +86,12 @@ const AppBar = () => {
                     >
                       {metalakes.map(item => {
                         return (
-                          <MenuItem value={item} key={item} onClick={() => router.push('/metalakes?metalake=' + item)}>
+                          <MenuItem
+                            value={item}
+                            key={item}
+                            data-refer={'select-option-' + item}
+                            onClick={() => router.push('/metalakes?metalake=' + item)}
+                          >
                             {item}
                           </MenuItem>
                         )
