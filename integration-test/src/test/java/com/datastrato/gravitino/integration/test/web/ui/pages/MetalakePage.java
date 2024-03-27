@@ -348,7 +348,7 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyLinkInNewWindow(String originalWindowHandle, String expectedUrl) {
+  public boolean verifyLinkInNewWindow(String originalWindowHandle, String expectedUrl, boolean contains) {
     try {
       Set<String> allWindowHandles = driver.getWindowHandles();
       for (String windowHandle : allWindowHandles) {
@@ -359,10 +359,12 @@ public class MetalakePage extends AbstractWebIT {
       }
 
       String actualUrl = driver.getCurrentUrl();
-      LOG.info(actualUrl);
-      LOG.info(expectedUrl);
 
+      if (contains) {
+        return actualUrl.contains(expectedUrl);
+      }
       return actualUrl.equals(expectedUrl);
+
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;

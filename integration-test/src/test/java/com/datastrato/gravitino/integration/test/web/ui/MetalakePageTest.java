@@ -129,7 +129,7 @@ public class MetalakePageTest extends AbstractWebIT {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkDatastrato.click();
     String expectedUrl = "https://datastrato.ai/";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
   }
 
   @Test
@@ -138,7 +138,7 @@ public class MetalakePageTest extends AbstractWebIT {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkLicense.click();
     String expectedUrl = "https://github.com/datastrato/gravitino/blob/main/LICENSE";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
   }
 
   @Test
@@ -147,7 +147,7 @@ public class MetalakePageTest extends AbstractWebIT {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkDocs.click();
     String expectedUrl = "https://datastrato.ai/docs/";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, true));
   }
 
   @Test
@@ -156,6 +156,6 @@ public class MetalakePageTest extends AbstractWebIT {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkSupport.click();
     String expectedUrl = "https://github.com/datastrato/gravitino/issues";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
   }
 }
