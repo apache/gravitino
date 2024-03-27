@@ -67,13 +67,11 @@ public class TestAccessControlManager {
 
     User user = accessControlManager.addUser("metalake", "testAdd");
     Assertions.assertEquals("testAdd", user.name());
-    Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
 
     user = accessControlManager.addUser("metalake", "testAddWithOptionalField");
 
     Assertions.assertEquals("testAddWithOptionalField", user.name());
-    Assertions.assertTrue(user.groups().isEmpty());
     Assertions.assertTrue(user.roles().isEmpty());
 
     // Test with UserAlreadyExistsException

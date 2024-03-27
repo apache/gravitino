@@ -285,7 +285,6 @@ public class TestEntityProtoSerDe {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withGroups(Lists.newArrayList("group"))
             .withRoles(Lists.newArrayList("role"))
             .build();
     byte[] userBytes = protoEntitySerDe.serialize(userEntity);

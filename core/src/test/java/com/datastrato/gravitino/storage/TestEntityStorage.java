@@ -869,7 +869,6 @@ public class TestEntityStorage {
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
-        .withGroups(Lists.newArrayList())
         .build();
   }
 

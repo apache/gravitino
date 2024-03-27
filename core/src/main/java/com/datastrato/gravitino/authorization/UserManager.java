@@ -62,7 +62,6 @@ public class UserManager {
                     metalake,
                     CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
                     UserEntity.USER_SCHEMA_NAME))
-            .withGroups(Lists.newArrayList())
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()

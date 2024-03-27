@@ -213,7 +213,6 @@ public class TestEntity {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withGroups(Lists.newArrayList("group"))
             .withRoles(Lists.newArrayList("role"))
             .build();
 
@@ -222,12 +221,10 @@ public class TestEntity {
     Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
     Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
-    Assertions.assertEquals(Lists.newArrayList("group"), fields.get(UserEntity.GROUPS));
 
     UserEntity testUserEntityWithoutFields =
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(testUserEntityWithoutFields.roles());
-    Assertions.assertNull(testUserEntityWithoutFields.groups());
   }
 }
