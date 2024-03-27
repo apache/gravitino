@@ -5,9 +5,12 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Auditable;
+import com.datastrato.gravitino.annotation.Evolving;
+
 import java.util.List;
 
 /** The interface of a user. The user is the entity which executes every operation. */
+@Evolving
 public interface User extends Auditable {
 
   /**
