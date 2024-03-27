@@ -75,7 +75,7 @@ public class MetalakePage extends AbstractWebIT {
           "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]")
   public WebElement metalakeTableWrapper;
 
-  @FindBy(xpath = "//button[@data-refer='back-home-btn']")
+  @FindBy(xpath = "//*[@data-refer='back-home-btn']")
   public WebElement backHomeBtn;
 
   @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
@@ -334,6 +334,11 @@ public class MetalakePage extends AbstractWebIT {
       boolean isPageTitle = pageTitle.equals("Metalakes");
       if (!isPageTitle) {
         LOG.error("No match with title, get {}", pageTitle);
+        return false;
+      }
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+      if (dataList.isEmpty()) {
+        LOG.error("Table List should not be empty");
         return false;
       }
       return true;
