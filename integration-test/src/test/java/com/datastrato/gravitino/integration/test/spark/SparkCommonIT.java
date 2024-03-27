@@ -104,7 +104,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
-  protected abstract boolean supportPartition();
+  protected abstract boolean supportsPartition();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -135,6 +135,56 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(getCatalogName()));
+  }
+
+  @Test
+  void testCreateAndLoadSchema() {
+    String testDatabaseName = "t_create1";
+    dropDatabaseIfExists(testDatabaseName);
+    sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
+    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
+    Assertions.assertFalse(databaseMeta.containsKey("Comment"));
+    Assertions.assertTrue(databaseMeta.containsKey("Location"));
+    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    String properties = databaseMeta.get("Properties");
+    Assertions.assertTrue(properties.contains("(ID,001)"));
+
+    testDatabaseName = "t_create2";
+    dropDatabaseIfExists(testDatabaseName);
+    String testDatabaseLocation = "/tmp/" + testDatabaseName;
+    sql(
+        String.format(
+            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=002);",
+            testDatabaseName, testDatabaseLocation));
+    databaseMeta = getDatabaseMetadata(testDatabaseName);
+    String comment = databaseMeta.get("Comment");
+    Assertions.assertEquals("comment", comment);
+    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
+    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
+    properties = databaseMeta.get("Properties");
+    Assertions.assertTrue(properties.contains("(ID,002)"));
+  }
+
+  @Test
+  void testAlterSchema() {
+    String testDatabaseName = "t_alter";
+    sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
+    Assertions.assertTrue(
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,001)"));
+
+    sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName));
+    Assertions.assertFalse(
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,001)"));
+    Assertions.assertTrue(
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,002)"));
+
+    // Hive metastore doesn't support alter database location, therefore this test method
+    // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
+
+    Assertions.assertThrowsExactly(
+        NoSuchNamespaceException.class,
+        () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
   }
 
   @Test
@@ -454,7 +504,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportPartition")
+  @EnabledIf("supportsPartition")
   void testCreateDatasourceFormatPartitionTable() {
     String tableName = "datasource_partition_table";
 
@@ -557,7 +607,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportPartition")
+  @EnabledIf("supportsPartition")
   void testInsertDatasourceFormatPartitionTableAsSelect() {
     String tableName = "insert_select_partition_table";
     String newTableName = "new_" + tableName;

@@ -86,17 +86,13 @@ public class IcebergAdaptor implements GravitinoCatalogAdaptor {
             + " from iceberg catalog properties");
     icebergProperties.put(
         GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_TYPE,
-        catalogBackend.toLowerCase(Locale.ENGLISH));
+        catalogBackend.toLowerCase(Locale.ROOT));
     icebergProperties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_URI, jdbcUri);
     icebergProperties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, jdbcWarehouse);
     icebergProperties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_USER, jdbcUser);
     icebergProperties.put(
         GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_PASSWORD, jdbcPasswrod);
     icebergProperties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_DRIVER, jdbcDriver);
-    icebergProperties.put(
-        GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_INITIALIZE,
-        gravitinoProperties.getOrDefault(
-            GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_JDBC_INITIALIZE, "true"));
   }
 
   @Override

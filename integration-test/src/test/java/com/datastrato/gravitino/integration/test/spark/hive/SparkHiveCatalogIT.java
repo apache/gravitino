@@ -11,15 +11,12 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecke
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.hadoop.fs.Path;
-import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.platform.commons.util.StringUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -41,7 +38,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportPartition() {
+  protected boolean supportsPartition() {
     return true;
   }
 
