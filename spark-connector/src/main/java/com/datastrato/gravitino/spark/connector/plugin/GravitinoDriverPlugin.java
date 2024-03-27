@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.plugin;
 
+import static com.datastrato.gravitino.spark.connector.ConnectorConstants.SPARK_SESSION_EXTENSIONS;
+
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalog;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
@@ -72,6 +74,6 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private void registerSqlExtensions(SparkContext sc) {
     sc.getConf()
-        .setIfMissing("spark.sql.extensions", IcebergSparkSessionExtensions.class.getName());
+        .setIfMissing(SPARK_SESSION_EXTENSIONS, IcebergSparkSessionExtensions.class.getName());
   }
 }
