@@ -113,4 +113,49 @@ public class MetalakePageTest extends AbstractWebIT {
     metalakePage.clickMetalakeLink(name);
     Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
   }
+
+  @Test
+  @Order(9)
+  public void testRefreshPage() {
+    driver.navigate().refresh();
+
+    Assertions.assertEquals(driver.getTitle(), "Gravitino");
+    Assertions.assertTrue(metalakePage.verifyRefreshPage());
+  }
+
+  @Test
+  @Order(10)
+  public void testCheckLinkDatastrato() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkDatastrato.click();
+    String expectedUrl = "https://datastrato.ai/";
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+  }
+
+  @Test
+  @Order(11)
+  public void testCheckLinkLicense() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkLicense.click();
+    String expectedUrl = "https://github.com/datastrato/gravitino/blob/main/LICENSE";
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+  }
+
+  @Test
+  @Order(12)
+  public void testCheckLinkDocs() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkDocs.click();
+    String expectedUrl = "https://datastrato.ai/docs/";
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+  }
+
+  @Test
+  @Order(13)
+  public void testCheckLinkSupport() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkSupport.click();
+    String expectedUrl = "https://github.com/datastrato/gravitino/issues";
+    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl));
+  }
 }
