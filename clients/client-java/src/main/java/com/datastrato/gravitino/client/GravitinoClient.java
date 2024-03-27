@@ -60,6 +60,11 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    return getMetalake().listCatalogsInfo(namespace);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return getMetalake().loadCatalog(ident);
   }
