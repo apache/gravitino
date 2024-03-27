@@ -11,11 +11,11 @@ import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
-import static com.datastrato.gravitino.storage.TestEntityStorage.createBaseMakeLake;
-import static com.datastrato.gravitino.storage.TestEntityStorage.createCatalog;
-import static com.datastrato.gravitino.storage.TestEntityStorage.createFilesetEntity;
-import static com.datastrato.gravitino.storage.TestEntityStorage.createSchemaEntity;
-import static com.datastrato.gravitino.storage.TestEntityStorage.createTableEntity;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createBaseMakeLake;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createCatalog;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createFilesetEntity;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createSchemaEntity;
+import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createTableEntity;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
