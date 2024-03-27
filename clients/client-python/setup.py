@@ -1,3 +1,7 @@
+"""
+Copyright 2024 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2.
+"""
 import io
 import os
 from setuptools import find_packages, setup
