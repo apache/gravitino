@@ -103,7 +103,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
     Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
     String properties = databaseMeta.get("Properties");
-    Assertions.assertTrue(properties.contains("ID=001"));
+    Assertions.assertTrue(properties.contains("(ID,001)"));
 
     testDatabaseName = "t_create2";
     dropDatabaseIfExists(testDatabaseName);
@@ -119,7 +119,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
     Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
-    Assertions.assertTrue(properties.contains("((ID,002))"));
+    Assertions.assertTrue(properties.contains("(ID,002)"));
   }
 
   @Test
@@ -127,13 +127,13 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String testDatabaseName = "t_alter";
     sql("CREATE DATABASE " + testDatabaseName + " WITH DBPROPERTIES (ID=001);");
     Assertions.assertTrue(
-        getDatabaseMetadata(testDatabaseName).get("Properties").contains("ID=002"));
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,001)"));
 
     sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='002')", testDatabaseName));
     Assertions.assertFalse(
-        getDatabaseMetadata(testDatabaseName).get("Properties").contains("((ID,001))"));
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,001)"));
     Assertions.assertTrue(
-        getDatabaseMetadata(testDatabaseName).get("Properties").contains("((ID,002))"));
+        getDatabaseMetadata(testDatabaseName).get("Properties").contains("(ID,002)"));
 
     // Hive metastore doesn't support alter database location, therefore this test method
     // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
