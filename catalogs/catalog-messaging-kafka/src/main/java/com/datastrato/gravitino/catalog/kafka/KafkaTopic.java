@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 
-import com.datastrato.gravitino.catalog.messaging.BaseTopic;
+import com.datastrato.gravitino.connector.BaseTopic;
 import java.util.Optional;
 import org.apache.kafka.clients.admin.NewTopic;
 
