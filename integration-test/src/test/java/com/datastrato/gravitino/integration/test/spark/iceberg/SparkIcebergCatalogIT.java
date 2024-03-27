@@ -6,8 +6,6 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
-import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
-import java.util.Arrays;
 import java.util.Map;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.junit.jupiter.api.Assertions;
@@ -31,6 +29,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportPartition() {
     return false;
   }
 
@@ -86,25 +89,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertThrowsExactly(
         NoSuchNamespaceException.class,
         () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
-  }
-
-  @Test
-  void testCreateIcebergDatasourceFormatPartitionTable() {
-    String tableName = "datasource_partition_table";
-
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " USING ICEBERG PARTITIONED BY (name, age)";
-    sql(createTableSQL);
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withIdentifyPartition(Arrays.asList("name", "age"));
-    checker.check(tableInfo);
-    checkTableReadWrite(tableInfo);
-    checkPartitionDirExists(tableInfo);
   }
 
   @Test

@@ -23,6 +23,7 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":clients:filesystem-hadoop3"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))

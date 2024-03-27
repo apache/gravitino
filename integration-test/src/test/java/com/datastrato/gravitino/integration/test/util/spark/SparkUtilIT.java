@@ -131,6 +131,14 @@ public abstract class SparkUtilIT extends AbstractIT {
     }
   }
 
+  protected void createTableAsSelect(String tableName, String newName) {
+    sql(String.format("CREATE TABLE %s AS SELECT * FROM %s", newName, tableName));
+  }
+
+  protected void insertTableAsSelect(String tableName, String newName) {
+    sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
+  }
+
   protected static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
