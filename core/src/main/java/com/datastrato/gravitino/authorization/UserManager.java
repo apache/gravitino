@@ -23,7 +23,11 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** UserManager is used for manage users */
+/**
+ * UserManager is used for add, remove and get users from one metalake. UserManager doesn't manage
+ * users, just setup the relationship between the metalake and the user. Metalake is like a concept
+ * of the organization. `AddUser` means that a user enter an organization.
+ */
 public class UserManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserManager.class);
@@ -32,12 +36,6 @@ public class UserManager {
   private final EntityStore store;
   private final IdGenerator idGenerator;
 
-  /**
-   * Constructs a User instance.
-   *
-   * @param store The EntityStore to use for managing access control.
-   * @param idGenerator The IdGenerator to use for generating identifiers.
-   */
   public UserManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;

@@ -8,8 +8,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * AccessControlManager is used for manage users, roles, grant information, this class is an
@@ -17,16 +15,8 @@ import org.slf4j.LoggerFactory;
  */
 public class AccessControlManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AccessControlManager.class);
-
   private final UserManager userManager;
 
-  /**
-   * Constructs a AccessControlManager instance.
-   *
-   * @param store The EntityStore to use for managing access control.
-   * @param idGenerator The IdGenerator to use for generating identifiers.
-   */
   public AccessControlManager(EntityStore store, IdGenerator idGenerator) {
     this.userManager = new UserManager(store, idGenerator);
   }
