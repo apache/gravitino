@@ -82,11 +82,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       new KafkaSchemaPropertiesMetadata();
   private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
+  private static final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting static final String CLIENT_ID_TEMPLATE = "%s-%s.%s";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
   private CatalogInfo info;
@@ -137,10 +137,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
-    if (!schemaExists(schemaIdent)) {
-      LOG.warn("Kafka catalog schema {} does not exist", schemaIdent);
-      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
-    }
+    checkSchemaExists(schemaIdent);
 
     try {
       ListTopicsResult result = adminClient.listTopics();
@@ -155,6 +152,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    checkSchemaExists(schemaIdent);
+
     DescribeTopicsResult result = adminClient.describeTopics(Collections.singleton(ident.name()));
     ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, ident.name());
     DescribeConfigsResult configsResult =
@@ -199,10 +199,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    if (!schemaExists(schemaIdent)) {
-      LOG.warn("Kafka catalog schema {} does not exist", schemaIdent);
-      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
-    }
+    checkSchemaExists(schemaIdent);
 
     try {
       CreateTopicsResult createTopicsResult =
@@ -246,6 +243,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    checkSchemaExists(schemaIdent);
+
     KafkaTopic topic = (KafkaTopic) loadTopic(ident);
     String newComment = topic.comment();
     int oldPartitionCount = Integer.parseInt(topic.properties().get(PARTITION_COUNT));
@@ -298,6 +298,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public boolean dropTopic(NameIdentifier ident) throws NoSuchTopicException {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    checkSchemaExists(schemaIdent);
+
     try {
       adminClient.deleteTopics(Collections.singleton(ident.name())).all().get();
       return true;
@@ -402,6 +405,19 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Kafka catalog does not support table operations");
+  }
+
+  /**
+   * Make sure the schema exists, otherwise throw an exception.
+   *
+   * @param ident The schema identifier.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  private void checkSchemaExists(NameIdentifier ident) throws NoSuchSchemaException {
+    if (!schemaExists(ident)) {
+      LOG.warn("Kafka catalog schema {} does not exist", ident);
+      throw new NoSuchSchemaException("Schema %s does not exist", ident);
+    }
   }
 
   /**
