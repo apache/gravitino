@@ -80,11 +80,18 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
-    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
-    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
-    properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
-
+    switch (getProvider()) {
+      case "hive":
+        properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
+        break;
+      case "lakehouse-iceberg":
+        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
+        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
+        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported provider: " + getProvider());
+    }
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, getCatalogName()),
         Catalog.Type.RELATIONAL,
@@ -138,7 +145,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
             .config("hive.exec.dynamic.partition.mode", "nonstrict")
-                .config("spark.sql.warehouse.dir", warehouse)
+            .config("spark.sql.warehouse.dir", warehouse)
             .enableHiveSupport()
             .getOrCreate();
   }

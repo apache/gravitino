@@ -37,6 +37,11 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  @Override
+  protected boolean supportsPartition() {
+    return true;
+  }
+
   @Test
   public void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";

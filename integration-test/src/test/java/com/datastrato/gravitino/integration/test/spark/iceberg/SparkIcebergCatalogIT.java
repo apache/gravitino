@@ -30,6 +30,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     return "lakehouse-iceberg";
   }
 
+  @Override
+  protected boolean supportsSparkSQLClusteredBy() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportsPartition() {
+    return false;
+  }
+
   // TODO
   @Test
   void testMetadataColumns() {
