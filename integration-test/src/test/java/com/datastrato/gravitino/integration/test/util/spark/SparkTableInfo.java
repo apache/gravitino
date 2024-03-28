@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +18,15 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.expressions.IdentityTransform;
+import org.apache.spark.sql.connector.expressions.BucketTransform;
+import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
+import org.apache.spark.sql.connector.expressions.HoursTransform;
+import org.apache.spark.sql.connector.expressions.DaysTransform;
+import org.apache.spark.sql.connector.expressions.MonthsTransform;
+import org.apache.spark.sql.connector.expressions.YearsTransform;
+import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.types.DataType;
 import org.junit.jupiter.api.Assertions;
 
@@ -37,6 +47,7 @@ public class SparkTableInfo {
   private Transform truncate;
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
+  private SparkMetadataColumn[] metadataColumns;
 
   public SparkTableInfo() {}
 
@@ -144,6 +155,19 @@ public class SparkTableInfo {
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
+    if (baseTable instanceof SparkIcebergTable) {
+      SparkIcebergTable icebergTable = (SparkIcebergTable) baseTable;
+      SparkMetadataColumn[] sparkMetadataColumns =
+          Arrays.stream(icebergTable.metadataColumns())
+              .map(
+                  metadataColumn ->
+                      new SparkMetadataColumn(
+                          metadataColumn.name(),
+                          metadataColumn.dataType(),
+                          metadataColumn.isNullable()))
+              .toArray(SparkMetadataColumn[]::new);
+      sparkTableInfo.metadataColumns = sparkMetadataColumns;
+    }
     return sparkTableInfo;
   }
 

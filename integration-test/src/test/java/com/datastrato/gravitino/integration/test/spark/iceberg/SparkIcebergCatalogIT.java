@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
+import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import java.io.File;
@@ -14,12 +15,6 @@ import java.util.List;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
-import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.catalyst.analysis.ResolvedTable;
-import org.apache.spark.sql.catalyst.plans.logical.CommandResult;
-import org.apache.spark.sql.catalyst.plans.logical.DescribeRelation;
-import org.apache.spark.sql.connector.catalog.Table;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -235,19 +230,29 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     checkDirExists(partitionPath);
   }
 
-  // TODO
   @Test
   void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+    String createTableSQL = getCreateIcebergSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+    sql(createTableSQL);
 
-    Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
-    CommandResult result = (CommandResult) ds.logicalPlan();
-    DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
-    ResolvedTable table = (ResolvedTable) relation.child();
-    Table table1 = table.table();
-    Assertions.assertTrue(table1 instanceof SparkIcebergTable);
-    SparkIcebergTable icebergTable = (SparkIcebergTable) table1;
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkMetadataColumn[] metadataColumns =
+        new SparkMetadataColumn[] {
+          new SparkMetadataColumn("_spec_id", DataTypes.IntegerType, false),
+          new SparkMetadataColumn("_partition", DataTypes.StringType, true),
+          new SparkMetadataColumn("_file", DataTypes.StringType, false),
+          new SparkMetadataColumn("_pos", DataTypes.LongType, false),
+          new SparkMetadataColumn("_deleted", DataTypes.BooleanType, false)
+        };
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getIcebergSimpleTableColumn())
+            .withMetadataColumns(metadataColumns);
+    checker.check(tableInfo);
   }
 }
