@@ -172,7 +172,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       properties.put(PARTITION_COUNT, String.valueOf(partitions));
       properties.put(REPLICATION_FACTOR, String.valueOf(replicationFactor));
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof org.apache.kafka.common.errors.UnknownTopicOrPartitionException) {
+      if (e.getCause() instanceof UnknownTopicOrPartitionException) {
         throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
       } else {
         throw new RuntimeException("Failed to load topic " + ident.name() + " from Kafka", e);
@@ -305,7 +305,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       adminClient.deleteTopics(Collections.singleton(ident.name())).all().get();
       return true;
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof org.apache.kafka.common.errors.UnknownTopicOrPartitionException) {
+      if (e.getCause() instanceof UnknownTopicOrPartitionException) {
         throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
       } else {
         throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
