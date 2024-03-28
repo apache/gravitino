@@ -239,6 +239,10 @@ class DTOConverters {
       return new TableUpdateRequest.RenameTableColumnRequest(
           renameColumn.fieldName(), renameColumn.getNewName());
 
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      return new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+          change.fieldName(), ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue());
+
     } else if (change instanceof TableChange.UpdateColumnType) {
       return new TableUpdateRequest.UpdateTableColumnTypeRequest(
           change.fieldName(), ((TableChange.UpdateColumnType) change).getNewDataType());

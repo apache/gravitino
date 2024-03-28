@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -207,6 +208,34 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Column.of("date", Types.DateType.get(), "date"),
       Column.of("time", Types.TimeType.get(), "time"),
       Column.of("binary", Types.TimestampType.withoutTimeZone(), "binary")
+    };
+  }
+
+  private Column[] columnsWithDefaultValue() {
+    return new Column[] {
+      Column.of(
+          "col_1",
+          Types.FloatType.get(),
+          "col_1_comment",
+          false,
+          false,
+          FunctionExpression.of("random")),
+      Column.of("col_2", Types.VarCharType.of(255), "col_2_comment", true, false, Literals.NULL),
+      Column.of("col_3", Types.StringType.get(), "col_3_comment", false, false, null),
+      Column.of(
+          "col_4",
+          Types.IntegerType.get(),
+          "col_4_comment",
+          true,
+          false,
+          Literals.integerLiteral(1000)),
+      Column.of(
+          "col_5",
+          Types.TimestampType.withoutTimeZone(),
+          "col_5_comment",
+          true,
+          false,
+          Literals.NULL)
     };
   }
 
@@ -745,6 +774,55 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         createdTable.columns()[4].defaultValue());
     Assertions.assertEquals(
         Literals.integerLiteral(1000), createdTable.columns()[5].defaultValue());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValue() {
+    Column[] columns = columnsWithDefaultValue();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                table_comment,
+                createProperties());
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()},
+                toFunctionArg(Literals.of("1.234", Types.FloatType.get()))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()},
+                toFunctionArg(Literals.of("hello", Types.VarCharType.of(255)))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()},
+                toFunctionArg(Literals.of("world", Types.StringType.get()))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()},
+                toFunctionArg(Literals.of(2000, Types.IntegerType.get()))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()},
+                toFunctionArg(FunctionExpression.of("current_timestamp"))));
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Assertions.assertEquals(
+        Literals.of("1.234", Types.FloatType.get()), table.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("hello", Types.VarCharType.of(255)), table.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("world", Types.StringType.get()), table.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of(2000, Types.IntegerType.get()), table.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        FunctionExpression.of("current_timestamp"), table.columns()[4].defaultValue());
   }
 
   @Test

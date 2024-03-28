@@ -27,6 +27,12 @@ public class TestTableUpdatesRequest {
             new TableUpdateRequest.RemoveTablePropertyRequest("key"),
             new TableUpdateRequest.RenameTableColumnRequest(
                 new String[] {"oldColumn"}, "newColumn"),
+            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+                new String[] {"column"},
+                LiteralDTO.builder()
+                    .withDataType(Types.DateType.get())
+                    .withValue("2023-04-01")
+                    .build()),
             new TableUpdateRequest.UpdateTableColumnTypeRequest(
                 new String[] {"column"}, Types.StringType.get()),
             new TableUpdateRequest.UpdateTableColumnCommentRequest(
@@ -65,6 +71,17 @@ public class TestTableUpdatesRequest {
             + "        \"oldColumn\"\n"
             + "      ],\n"
             + "      \"newFieldName\": \"newColumn\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"@type\": \"updateColumnDefaultValue\",\n"
+            + "      \"fieldName\": [\n"
+            + "        \"column\"\n"
+            + "      ],\n"
+            + "      \"newDefaultValue\": {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2023-04-01\"\n"
+            + "      }\n"
             + "    },\n"
             + "    {\n"
             + "      \"@type\": \"updateColumnType\",\n"

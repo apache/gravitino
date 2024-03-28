@@ -349,7 +349,7 @@ public interface TableChange {
    * @param newDefaultValue The new default value.
    * @return A TableChange for the update.
    */
-  static TableChange updateColumnDefaultValue(String[] fieldName, String newDefaultValue) {
+  static TableChange updateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
     return new UpdateColumnDefaultValue(fieldName, newDefaultValue);
   }
 
@@ -1147,9 +1147,9 @@ public interface TableChange {
    */
   final class UpdateColumnDefaultValue implements ColumnChange {
     private final String[] fieldName;
-    private final String newDefaultValue;
+    private final Expression newDefaultValue;
 
-    private UpdateColumnDefaultValue(String[] fieldName, String newDefaultValue) {
+    private UpdateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
       this.fieldName = fieldName;
       this.newDefaultValue = newDefaultValue;
     }
@@ -1169,7 +1169,7 @@ public interface TableChange {
      *
      * @return The new default value of the column.
      */
-    public String getNewDefaultValue() {
+    public Expression getNewDefaultValue() {
       return newDefaultValue;
     }
 
