@@ -22,7 +22,7 @@
 
 Fix: # (issue)
 
-### Does this PR introduce any user-facing change?
+### Does this PR introduce _any_ user-facing change?
 
 (Please list the user-facing changes introduced by your change, including
   1. Change in user-facing APIs.
