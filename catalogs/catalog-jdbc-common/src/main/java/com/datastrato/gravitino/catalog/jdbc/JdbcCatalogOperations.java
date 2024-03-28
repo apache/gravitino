@@ -69,8 +69,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
 
-  private CatalogInfo info;
-
   private final JdbcExceptionConverter exceptionConverter;
 
   private final JdbcTypeConverter jdbcTypeConverter;
@@ -116,7 +114,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
-    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 

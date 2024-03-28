@@ -17,7 +17,7 @@ RUN apt-get update -y &&  DEBIAN_FRONTEND=noninteractive apt-get install -y --no
     curl wget less vim htop iproute2 numactl jq iotop sysstat tzdata xz-utils \
     tcpdump iputils-ping dnsutils strace lsof blktrace \
     bpfcc-tools linux-headers-realtime linux-tools-realtime silversearcher-ag \
-    net-tools openjdk-8-jdk && \
+    net-tools netcat openjdk-8-jdk && \
     rm -rf /var/lib/apt/lists/*
 
 ################################################################################

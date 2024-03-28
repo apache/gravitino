@@ -149,7 +149,7 @@ public class IcebergTableOpsHelper {
         "Cannot update missing field: %s",
         fieldName);
 
-    boolean nullable = icebergTableSchema.findField(fieldName).isOptional();
+    icebergTableSchema.findField(fieldName).isOptional();
     org.apache.iceberg.types.Type type =
         ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
     Preconditions.checkArgument(
