@@ -17,7 +17,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   private void createIcebergV2SimpleTable(String tableName) {
     String createSql =
         String.format(
-            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TABPROPERTIES('format.version'='2')",
+            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TBLPROPERTIES('format.version'='2')",
             tableName);
     sql(createSql);
   }
