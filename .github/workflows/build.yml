@@ -9,7 +9,7 @@ on:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-build
   cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
