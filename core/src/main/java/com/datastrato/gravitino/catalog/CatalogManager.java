@@ -137,6 +137,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       }
 
       classLoader.close();
+      // Let GC can collect the class loader.
+      classLoader = null;
     }
 
     private SupportsSchemas asSchemas() {
