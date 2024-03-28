@@ -62,30 +62,26 @@ public class DorisContainer extends BaseContainer {
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
     int nRetry = 0;
-    boolean isDorisContainerReady = false;
 
     String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", getContainerIpAddress(), FE_MYSQL_PORT);
     LOG.info("Doris url is " + dorisJdbcUrl);
 
     while (nRetry++ < retryLimit) {
-      try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "")) {
+      try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
+          Statement statement = connection.createStatement()) {
 
         // execute `SHOW PROC '/backends';` to check if backends is ready
         String query = "SHOW PROC '/backends';";
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(query);
-        while (resultSet.next()) {
-          String alive = resultSet.getString("Alive");
-          if (alive.equalsIgnoreCase("true")) {
-            LOG.info("Doris container startup success!");
-            isDorisContainerReady = true;
-            break;
+        try (ResultSet resultSet = statement.executeQuery(query)) {
+          while (resultSet.next()) {
+            String alive = resultSet.getString("Alive");
+            if (alive.equalsIgnoreCase("true")) {
+              LOG.info("Doris container startup success!");
+              return true;
+            }
           }
         }
 
-        if (isDorisContainerReady) {
-          break;
-        }
         LOG.info("Doris container is not ready yet!");
         Thread.sleep(5000);
       } catch (Exception e) {
@@ -93,26 +89,25 @@ public class DorisContainer extends BaseContainer {
       }
     }
 
-    return isDorisContainerReady;
+    return false;
   }
 
   private boolean changePassword() {
-    boolean result = false;
     String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", getContainerIpAddress(), FE_MYSQL_PORT);
 
     // change password for root user, Gravitino API must set password in catalog properties
-    try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "")) {
+    try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
+        Statement statement = connection.createStatement()) {
 
       String query = String.format("SET PASSWORD FOR '%s' = PASSWORD('%s');", USER_NAME, PASSWORD);
-      Statement statement = connection.createStatement();
       statement.execute(query);
       LOG.info("Doris container password has been changed");
-      result = true;
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
 
-    return result;
+    return false;
   }
 
   public static class Builder
