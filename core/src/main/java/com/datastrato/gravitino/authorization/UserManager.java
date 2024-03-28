@@ -25,8 +25,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * UserManager is used for add, remove and get users from one metalake. UserManager doesn't manage
- * users, just sets up the relationship between the metalake and the user. Metalake is like a concept
- * of the organization. `AddUser` means that a user enter an organization.
+ * users, just sets up the relationship between the metalake and the user. Metalake is like a
+ * concept of the organization. `AddUser` means that a user enter an organization.
  */
 public class UserManager {
 
