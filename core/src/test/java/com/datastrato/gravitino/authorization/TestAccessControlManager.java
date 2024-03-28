@@ -97,7 +97,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testRemoveUser() {
-    Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.addUser("metalake", "testRemove");
 
