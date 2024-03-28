@@ -258,72 +258,28 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
       } else if (change instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) change;
-        // alter partition count
         if (PARTITION_COUNT.equals(setProperty.getProperty())) {
-          int targetPartitionCount = Integer.parseInt(setProperty.getValue());
-          if (targetPartitionCount == newPartitionCount) {
-            continue;
-          } else if (targetPartitionCount < newPartitionCount) {
-            throw new IllegalArgumentException(
-                "Cannot reduce partition count from "
-                    + newPartitionCount
-                    + " to "
-                    + targetPartitionCount);
-          } else {
-            newPartitionCount = targetPartitionCount;
-            alteredProperties.put(PARTITION_COUNT, setProperty.getValue());
-            continue;
-          }
+          // alter partition count
+          newPartitionCount = setPartitionCount(setProperty, newPartitionCount, alteredProperties);
+        } else {
+          // alter other properties
+          setProperty(setProperty, alteredProperties, alterConfigOps);
         }
 
-        // alter other properties
-        alteredProperties.put(setProperty.getProperty(), setProperty.getValue());
-        alterConfigOps.add(
-            new AlterConfigOp(
-                new ConfigEntry(setProperty.getProperty(), setProperty.getValue()),
-                AlterConfigOp.OpType.SET));
-
       } else if (change instanceof TopicChange.RemoveProperty) {
-        TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) change;
-        Preconditions.checkArgument(
-            !PARTITION_COUNT.equals(removeProperty.getProperty()), "Cannot remove partition count");
-        alteredProperties.remove(removeProperty.getProperty());
-        alterConfigOps.add(
-            new AlterConfigOp(
-                new ConfigEntry(removeProperty.getProperty(), null), AlterConfigOp.OpType.DELETE));
+        removeProperty((TopicChange.RemoveProperty) change, alteredProperties, alterConfigOps);
 
       } else {
         throw new IllegalArgumentException("Unsupported topic change: " + change);
       }
     }
 
-    // increase partition count
     if (newPartitionCount != oldPartitionCount) {
-      try {
-        adminClient
-            .createPartitions(
-                Collections.singletonMap(ident.name(), NewPartitions.increaseTo(newPartitionCount)))
-            .all()
-            .get();
-      } catch (Exception e) {
-        throw new RuntimeException(
-            "Failed to increase partition count for topic " + ident.name(), e);
-      }
+      doPartitionCountIncrement(ident.name(), newPartitionCount);
     }
 
-    // alter topic properties
     if (!alterConfigOps.isEmpty()) {
-      ConfigResource topicResource = new ConfigResource(ConfigResource.Type.TOPIC, ident.name());
-      try {
-        adminClient
-            .incrementalAlterConfigs(Collections.singletonMap(topicResource, alterConfigOps))
-            .all()
-            .get();
-      } catch (UnknownTopicOrPartitionException e) {
-        throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to alter topic properties for topic " + ident.name(), e);
-      }
+      doAlterTopicConfig(ident.name(), alterConfigOps);
     }
 
     return KafkaTopic.builder()
@@ -446,6 +402,85 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Kafka catalog does not support table operations");
+  }
+
+  /**
+   * Set the new partition count for the topic if it is greater than the current partition count.
+   *
+   * @param setProperty The property change to set the partition count.
+   * @param currentPartitionCount The current partition count.
+   * @param properties The properties map to update.
+   * @return The new partition count.
+   */
+  private int setPartitionCount(
+      TopicChange.SetProperty setProperty,
+      int currentPartitionCount,
+      Map<String, String> properties) {
+    Preconditions.checkArgument(
+        PARTITION_COUNT.equals(setProperty.getProperty()), "Invalid property: %s", setProperty);
+
+    int targetPartitionCount = Integer.parseInt(setProperty.getValue());
+    if (targetPartitionCount == currentPartitionCount) {
+      return currentPartitionCount;
+    } else if (targetPartitionCount < currentPartitionCount) {
+      throw new IllegalArgumentException(
+          "Cannot reduce partition count from "
+              + currentPartitionCount
+              + " to "
+              + targetPartitionCount);
+    } else {
+      properties.put(PARTITION_COUNT, setProperty.getValue());
+      return targetPartitionCount;
+    }
+  }
+
+  private void setProperty(
+      TopicChange.SetProperty setProperty,
+      Map<String, String> alteredProperties,
+      List<AlterConfigOp> alterConfigOps) {
+    alteredProperties.put(setProperty.getProperty(), setProperty.getValue());
+    alterConfigOps.add(
+        new AlterConfigOp(
+            new ConfigEntry(setProperty.getProperty(), setProperty.getValue()),
+            AlterConfigOp.OpType.SET));
+  }
+
+  private void removeProperty(
+      TopicChange.RemoveProperty removeProperty,
+      Map<String, String> alteredProperties,
+      List<AlterConfigOp> alterConfigOps) {
+    Preconditions.checkArgument(
+        !PARTITION_COUNT.equals(removeProperty.getProperty()), "Cannot remove partition count");
+    alteredProperties.remove(removeProperty.getProperty());
+    alterConfigOps.add(
+        new AlterConfigOp(
+            new ConfigEntry(removeProperty.getProperty(), null), AlterConfigOp.OpType.DELETE));
+  }
+
+  private void doPartitionCountIncrement(String topicName, int newPartitionCount) {
+    try {
+      adminClient
+          .createPartitions(
+              Collections.singletonMap(topicName, NewPartitions.increaseTo(newPartitionCount)))
+          .all()
+          .get();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to increase partition count for topic " + topicName, e);
+    }
+  }
+
+  private void doAlterTopicConfig(String topicName, List<AlterConfigOp> alterConfigOps) {
+    ConfigResource topicResource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+    try {
+      adminClient
+          .incrementalAlterConfigs(Collections.singletonMap(topicResource, alterConfigOps))
+          .all()
+          .get();
+    } catch (UnknownTopicOrPartitionException e) {
+      throw new NoSuchTopicException(e, "Topic %s does not exist", topicName);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to alter topic properties for topic " + topicName, e);
+    }
   }
 
   private NewTopic buildNewTopic(NameIdentifier ident, Map<String, String> properties) {
