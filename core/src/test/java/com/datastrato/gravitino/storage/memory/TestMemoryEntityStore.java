@@ -42,9 +42,6 @@ public class TestMemoryEntityStore {
 
   public static class InMemoryEntityStore implements EntityStore {
     private final Map<NameIdentifier, Entity> entityMap;
-
-    private EntitySerDe serde;
-
     private final Lock lock;
 
     public InMemoryEntityStore() {
@@ -57,14 +54,10 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public void initialize(Config config) throws RuntimeException {
-      this.serde = Mockito.mock(EntitySerDe.class);
-    }
+    public void initialize(Config config) throws RuntimeException {}
 
     @Override
-    public void setSerDe(EntitySerDe entitySerDe) {
-      this.serde = entitySerDe;
-    }
+    public void setSerDe(EntitySerDe entitySerDe) {}
 
     @Override
     public <E extends Entity & HasIdentifier> List<E> list(

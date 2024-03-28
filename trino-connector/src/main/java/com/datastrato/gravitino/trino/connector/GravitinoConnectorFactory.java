@@ -32,7 +32,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   private CatalogConnectorManager catalogConnectorManager;
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   @Override
   public String getName() {
@@ -73,7 +72,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.setGravitinoClient(clientProvider().get());
           catalogConnectorManager.start();
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+          new GravitinoSystemTableFactory(catalogConnectorManager);
 
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);

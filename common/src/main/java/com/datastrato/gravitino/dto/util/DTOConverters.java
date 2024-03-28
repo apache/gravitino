@@ -463,6 +463,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Catalogs to an array of CatalogDTOs.
+   *
+   * @param catalogs The catalogs to be converted.
+   * @return The array of CatalogDTOs.
+   */
+  public static CatalogDTO[] toDTOs(Catalog[] catalogs) {
+    if (ArrayUtils.isEmpty(catalogs)) {
+      return new CatalogDTO[0];
+    }
+    return Arrays.stream(catalogs).map(DTOConverters::toDTO).toArray(CatalogDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.
