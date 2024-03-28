@@ -68,8 +68,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_METADATA =
       new HadoopFilesetPropertiesMetadata();
 
-  private CatalogInfo info;
-
   private final EntityStore store;
 
   @VisibleForTesting Configuration hadoopConf;
@@ -87,7 +85,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
-    this.info = info;
     // Initialize Hadoop Configuration.
     this.hadoopConf = new Configuration();
     Map<String, String> bypassConfigs =
