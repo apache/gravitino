@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.hive.dyn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.datastrato.gravitino.catalog.hive.dyn.DynFields.UnboundField;
 import org.junit.jupiter.api.Test;
 
 public class TestDynFields {
@@ -101,7 +100,7 @@ public class TestDynFields {
     testObject.setAge(30);
 
     builder.defaultAlwaysNull();
-    UnboundField<Object> nameField = builder.impl(TestObject.class, "lastname").buildChecked();
+    builder.impl(TestObject.class, "lastname").buildChecked();
   }
 
   @Test
@@ -160,6 +159,8 @@ public class TestDynFields {
     public String name;
     public static String staticField = "Hello";
     public Integer age;
+
+    @SuppressWarnings("UnusedVariable")
     private String hidden = "secret";
 
     public String getName() {

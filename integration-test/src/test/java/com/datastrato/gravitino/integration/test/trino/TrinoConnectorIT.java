@@ -463,17 +463,15 @@ public class TrinoConnectorIT extends AbstractIT {
                         containerSuite.getHiveContainer().getContainerIpAddress(),
                         HiveContainer.HIVE_METASTORE_PORT))
                 .build());
-    Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
-                ImmutableMap.<String, String>builder()
-                    .put(
-                        "location",
-                        "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
-                    .build());
+
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder()
+                .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
+                .build());
 
     String sql =
         String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);

@@ -18,7 +18,7 @@ import java.util.Map;
  * CatalogInfo)}, users can leverage this object to get the information about the catalog.
  */
 @Evolving
-public final class CatalogInfo {
+public final class CatalogInfo implements Catalog {
 
   private final Long id;
 
@@ -61,31 +61,37 @@ public final class CatalogInfo {
   }
 
   /** @return The name of the catalog. */
+  @Override
   public String name() {
     return name;
   }
 
   /** @return The type of the catalog. */
+  @Override
   public Catalog.Type type() {
     return type;
   }
 
   /** @return The provider of the catalog. */
+  @Override
   public String provider() {
     return provider;
   }
 
   /** @return The comment or description for the catalog. */
+  @Override
   public String comment() {
     return comment;
   }
 
   /** @return The associated properties of the catalog. */
+  @Override
   public Map<String, String> properties() {
     return properties;
   }
 
   /** @return The audit details of the catalog. */
+  @Override
   public Audit auditInfo() {
     return auditInfo;
   }
