@@ -33,6 +33,11 @@ public class SparkTableInfoChecker {
     COLUMN,
     PARTITION,
     BUCKET,
+    HOUR,
+    DAY,
+    MONTH,
+    YEAR,
+    TRUNCATE,
     COMMENT,
   }
 
@@ -76,6 +81,43 @@ public class SparkTableInfoChecker {
     return this;
   }
 
+  public SparkTableInfoChecker withHour(List<String> partitionColumns) {
+    Transform hourTransform = Expressions.hours(partitionColumns.get(0));
+    this.expectedTableInfo.setHour(hourTransform);
+    this.checkFields.add(CheckField.HOUR);
+    return this;
+  }
+
+  public SparkTableInfoChecker withDay(List<String> partitionColumns) {
+    Transform dayTransform = Expressions.days(partitionColumns.get(0));
+    this.expectedTableInfo.setDay(dayTransform);
+    this.checkFields.add(CheckField.DAY);
+    return this;
+  }
+
+  public SparkTableInfoChecker withMonth(List<String> partitionColumns) {
+    Transform monthTransform = Expressions.months(partitionColumns.get(0));
+    this.expectedTableInfo.setMonth(monthTransform);
+    this.checkFields.add(CheckField.MONTH);
+    return this;
+  }
+
+  public SparkTableInfoChecker withYear(List<String> partitionColumns) {
+    Transform yearTransform = Expressions.years(partitionColumns.get(0));
+    this.expectedTableInfo.setYear(yearTransform);
+    this.checkFields.add(CheckField.YEAR);
+    return this;
+  }
+
+  public SparkTableInfoChecker withTruncate(int width, List<String> partitionColumns) {
+    Transform truncateTransform =
+        Expressions.apply(
+            "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));
+    this.expectedTableInfo.setTruncate(truncateTransform);
+    this.checkFields.add(CheckField.TRUNCATE);
+    return this;
+  }
+
   public SparkTableInfoChecker withComment(String comment) {
     this.expectedTableInfo.setComment(comment);
     this.checkFields.add(CheckField.COMMENT);
@@ -101,6 +143,22 @@ public class SparkTableInfoChecker {
                   break;
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
+                  break;
+                case HOUR:
+                  Assertions.assertEquals(expectedTableInfo.getHour(), realTableInfo.getHour());
+                  break;
+                case DAY:
+                  Assertions.assertEquals(expectedTableInfo.getDay(), realTableInfo.getDay());
+                  break;
+                case MONTH:
+                  Assertions.assertEquals(expectedTableInfo.getMonth(), realTableInfo.getMonth());
+                  break;
+                case YEAR:
+                  Assertions.assertEquals(expectedTableInfo.getYear(), realTableInfo.getYear());
+                  break;
+                case TRUNCATE:
+                  Assertions.assertEquals(
+                      expectedTableInfo.getTruncate(), realTableInfo.getTruncate());
                   break;
                 case COMMENT:
                   Assertions.assertEquals(

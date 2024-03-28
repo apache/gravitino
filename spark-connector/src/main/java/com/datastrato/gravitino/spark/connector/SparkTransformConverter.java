@@ -21,11 +21,9 @@ import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.spark.sql.connector.expressions.BucketTransform;
-import org.apache.spark.sql.connector.expressions.Expressions;
-import org.apache.spark.sql.connector.expressions.IdentityTransform;
-import org.apache.spark.sql.connector.expressions.LogicalExpressions;
-import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
+import org.apache.spark.sql.connector.expressions.*;
+import org.apache.spark.sql.types.IntegerType;
+import org.apache.spark.sql.types.LongType;
 import scala.collection.JavaConverters;
 
 /**
@@ -68,6 +66,23 @@ public class SparkTransformConverter {
               if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
+              } else if (transform instanceof HoursTransform) {
+                HoursTransform hoursTransform = (HoursTransform) transform;
+                return Transforms.hour(hoursTransform.reference().fieldNames());
+              } else if (transform instanceof DaysTransform) {
+                DaysTransform daysTransform = (DaysTransform) transform;
+                return Transforms.day(daysTransform.reference().fieldNames());
+              } else if (transform instanceof MonthsTransform) {
+                MonthsTransform monthsTransform = (MonthsTransform) transform;
+                return Transforms.month(monthsTransform.reference().fieldNames());
+              } else if (transform instanceof YearsTransform) {
+                YearsTransform yearsTransform = (YearsTransform) transform;
+                return Transforms.year(yearsTransform.reference().fieldNames());
+              } else if (transform instanceof ApplyTransform
+                  && "truncate".equals(transform.name())) {
+                return Transforms.truncate(
+                    findWidth(transform),
+                    String.join(ConnectorConstants.DOT, transform.references()[0].fieldNames()));
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());
@@ -122,6 +137,33 @@ public class SparkTransformConverter {
                   sparkTransforms.add(
                       createSparkIdentityTransform(
                           String.join(ConnectorConstants.DOT, identityTransform.fieldName())));
+                } else if (transform instanceof Transforms.HourTransform) {
+                  Transforms.HourTransform hourTransform = (Transforms.HourTransform) transform;
+                  sparkTransforms.add(createSparkHoursTransform(hourTransform.fieldName()));
+                } else if (transform instanceof Transforms.BucketTransform) {
+                  Transforms.BucketTransform bucketTransform =
+                      (Transforms.BucketTransform) transform;
+                  int numBuckets = bucketTransform.numBuckets();
+                  String[] fieldNames =
+                      Arrays.stream(bucketTransform.fieldNames())
+                          .map(f -> String.join(ConnectorConstants.DOT, f))
+                          .toArray(String[]::new);
+                  sparkTransforms.add(createSparkBucketTransform(numBuckets, fieldNames));
+                } else if (transform instanceof Transforms.DayTransform) {
+                  Transforms.DayTransform dayTransform = (Transforms.DayTransform) transform;
+                  sparkTransforms.add(createSparkDaysTransform(dayTransform.fieldName()));
+                } else if (transform instanceof Transforms.MonthTransform) {
+                  Transforms.MonthTransform monthTransform = (Transforms.MonthTransform) transform;
+                  sparkTransforms.add(createSparkMonthsTransform(monthTransform.fieldName()));
+                } else if (transform instanceof Transforms.YearTransform) {
+                  Transforms.YearTransform yearTransform = (Transforms.YearTransform) transform;
+                  sparkTransforms.add(createSparkYearsTransform(yearTransform.fieldName()));
+                } else if (transform instanceof Transforms.TruncateTransform) {
+                  Transforms.TruncateTransform truncateTransform =
+                      (Transforms.TruncateTransform) transform;
+                  int width = truncateTransform.width();
+                  String[] fieldName = truncateTransform.fieldName();
+                  sparkTransforms.add(createSparkTruncateTransform("truncate", width, fieldName));
                 } else {
                   throw new UnsupportedOperationException(
                       "Doesn't support Gravitino partition: "
@@ -224,6 +266,38 @@ public class SparkTransformConverter {
     return IdentityTransform.apply(Expressions.column(columnName));
   }
 
+  public static HoursTransform createSparkHoursTransform(String[] fieldName) {
+    return LogicalExpressions.hours(
+        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+  }
+
+  public static BucketTransform createSparkBucketTransform(int numBuckets, String[] fieldNames) {
+    return LogicalExpressions.bucket(numBuckets, createSparkNamedReference(fieldNames));
+  }
+
+  public static DaysTransform createSparkDaysTransform(String[] fieldName) {
+    return LogicalExpressions.days(
+        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+  }
+
+  public static MonthsTransform createSparkMonthsTransform(String[] fieldName) {
+    return LogicalExpressions.months(
+        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+  }
+
+  public static YearsTransform createSparkYearsTransform(String[] FieldName) {
+    return LogicalExpressions.years(
+        Expressions.column(String.join(ConnectorConstants.DOT, FieldName)));
+  }
+
+  public static org.apache.spark.sql.connector.expressions.Transform createSparkTruncateTransform(
+      String functionName, int width, String[] fieldName) {
+    return Expressions.apply(
+        functionName,
+        Expressions.literal(width),
+        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+  }
+
   private static org.apache.spark.sql.connector.expressions.NamedReference[]
       createSparkNamedReference(String[] fields) {
     return Arrays.stream(fields)
@@ -240,5 +314,32 @@ public class SparkTransformConverter {
   private static boolean isBucketTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
     return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
+  }
+
+  // Referred from org.apache.iceberg.spark.Spark3Util
+  private static int findWidth(org.apache.spark.sql.connector.expressions.Transform transform) {
+    for (org.apache.spark.sql.connector.expressions.Expression expr : transform.arguments()) {
+      if (expr instanceof Literal) {
+        if (((Literal) expr).dataType() instanceof IntegerType) {
+          Literal<Integer> lit = (Literal<Integer>) expr;
+          Preconditions.checkArgument(
+              lit.value() > 0, "Unsupported width for transform: %s", transform.describe());
+          return lit.value();
+
+        } else if (((Literal) expr).dataType() instanceof LongType) {
+          Literal<Long> lit = (Literal<Long>) expr;
+          Preconditions.checkArgument(
+              lit.value() > 0 && lit.value() < Integer.MAX_VALUE,
+              "Unsupported width for transform: %s",
+              transform.describe());
+          if (lit.value() > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException();
+          }
+          return lit.value().intValue();
+        }
+      }
+    }
+
+    throw new IllegalArgumentException("Cannot find width for transform: " + transform.describe());
   }
 }
