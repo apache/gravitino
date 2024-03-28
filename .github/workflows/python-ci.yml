@@ -9,7 +9,7 @@ on:
     paths:
       - 'clients/client-python/**'
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-python-ci
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
 
 jobs:
