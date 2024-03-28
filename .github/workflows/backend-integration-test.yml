@@ -26,7 +26,10 @@ jobs:
               - api/**
               - bin/**
               - catalogs/**
-              - clients/**
+              - clients/client-java/**
+              - clients/client-java-runtime/**
+              - clients/filesystem-hadoop3/**
+              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
@@ -79,6 +82,10 @@ jobs:
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
         uses: csexton/debugger-action@master
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
 
       - name: Backend Integration Test
         id: integrationTest

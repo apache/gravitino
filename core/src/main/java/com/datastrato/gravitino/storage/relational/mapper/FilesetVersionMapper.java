@@ -73,28 +73,28 @@ public interface FilesetVersionMapper {
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
 }

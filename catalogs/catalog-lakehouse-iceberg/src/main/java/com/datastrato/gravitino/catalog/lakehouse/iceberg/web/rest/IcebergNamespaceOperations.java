@@ -43,7 +43,9 @@ public class IcebergNamespaceOperations {
 
   private IcebergTableOps icebergTableOps;
 
-  @Context private HttpServletRequest httpRequest;
+  @SuppressWarnings("UnusedVariable")
+  @Context
+  private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergNamespaceOperations(IcebergTableOps icebergTableOps) {

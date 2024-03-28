@@ -8,12 +8,14 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -23,19 +25,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.platform.commons.util.StringUtils;
 
 public abstract class SparkCommonIT extends SparkEnvIT {
-  private static String getSelectAllSql(String tableName) {
-    return String.format("SELECT * FROM %s", tableName);
-  }
-
-  private static String getInsertWithoutPartitionSql(String tableName, String values) {
-    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
-  }
 
   // To generate test data for write&read table.
-  private static final Map<DataType, String> typeConstant =
+  protected static final Map<DataType, String> typeConstant =
       ImmutableMap.of(
           DataTypes.IntegerType,
           "2",
@@ -51,8 +47,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
-  // Use a custom database not the original default database because SparkCommonIT couldn't
-  // read&write data to tables in default database. The main reason is default database location is
+  private static String getInsertWithoutPartitionSql(String tableName, String values) {
+    return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
+  }
+
+  private static String getInsertWithPartitionSql(
+      String tableName, String partitionString, String values) {
+    return String.format(
+        "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
+  }
+
+  // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
+  protected abstract boolean supportsSparkSQLClusteredBy();
+
+  // Use a custom database not the original default database because SparkIT couldn't read&write
+  // data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
   // not real HDFS address. The location of tables created under default database is like
   // hdfs://localhost:9000/xxx which couldn't read write data from SparkCommonIT. Will use default
@@ -67,10 +76,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   void init() {
     sql("USE " + getCatalogName());
     sql("USE " + getDefaultDatabase());
-  }
-
-  protected String getDefaultDatabase() {
-    return "default_db";
   }
 
   @Test
@@ -442,89 +447,222 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
-  private void checkTableColumns(
-      String tableName, List<SparkColumnInfo> columnInfos, SparkTableInfo tableInfo) {
-    SparkTableInfoChecker.create()
-        .withName(tableName)
-        .withColumns(columnInfos)
-        .withComment(null)
-        .check(tableInfo);
+  @Test
+  void testCreateDatasourceFormatPartitionTable() {
+    String tableName = "datasource_partition_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "USING PARQUET PARTITIONED BY (name, age)";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withIdentifyPartition(Arrays.asList("name", "age"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkPartitionDirExists(tableInfo);
   }
 
-  private void checkTableReadWrite(SparkTableInfo table) {
+  @Test
+  @EnabledIf("supportsSparkSQLClusteredBy")
+  void testCreateBucketTable() {
+    String tableName = "bucket_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "CLUSTERED BY (id, name) INTO 4 buckets;";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withBucket(4, Arrays.asList("id", "name"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  @EnabledIf("supportsSparkSQLClusteredBy")
+  void testCreateSortBucketTable() {
+    String tableName = "sort_bucket_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL =
+        createTableSQL + "CLUSTERED BY (id, name) SORTED BY (name, id) INTO 4 buckets;";
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withBucket(4, Arrays.asList("id", "name"), Arrays.asList("name", "id"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  // Spark CTAS doesn't copy table properties and partition schema from source table.
+  @Test
+  void testCreateTableAsSelect() {
+    String tableName = "ctas_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
+
+    String newTableName = "new_" + tableName;
+    dropTableIfExists(newTableName);
+    createTableAsSelect(tableName, newTableName);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create().withName(newTableName).withColumns(getSimpleTableColumn());
+    checker.check(newTableInfo);
+
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(getExpectedTableData(newTableInfo), tableData.get(0));
+  }
+
+  @Test
+  void testInsertTableAsSelect() {
+    String tableName = "insert_select_table";
+    String newTableName = "new_" + tableName;
+
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
+
+    dropTableIfExists(newTableName);
+    createSimpleTable(newTableName);
+    insertTableAsSelect(tableName, newTableName);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    String expectedTableData = getExpectedTableData(newTableInfo);
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedTableData, tableData.get(0));
+  }
+
+  @Test
+  void testInsertDatasourceFormatPartitionTableAsSelect() {
+    String tableName = "insert_select_partition_table";
+    String newTableName = "new_" + tableName;
+    dropTableIfExists(tableName);
+    dropTableIfExists(newTableName);
+
+    createSimpleTable(tableName);
+    String createTableSql = getCreateSimpleTableString(newTableName);
+    createTableSql += "PARTITIONED BY (name, age)";
+    sql(createTableSql);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
+
+    insertTableAsSelect(tableName, newTableName);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    String expectedTableData = getExpectedTableData(newTableInfo);
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedTableData, tableData.get(0));
+  }
+
+  protected void checkPartitionDirExists(SparkTableInfo table) {
+    Assertions.assertTrue(table.isPartitionTable(), "Not a partition table");
+    String tableLocation = table.getTableLocation();
+    String partitionExpression = getPartitionExpression(table, "/").replace("'", "");
+    Path partitionPath = new Path(tableLocation, partitionExpression);
+    checkDirExists(partitionPath);
+  }
+
+  protected void checkDirExists(Path dir) {
+    try {
+      Assertions.assertTrue(hdfs.exists(dir), "HDFS directory not exists," + dir);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
+    boolean isPartitionTable = table.isPartitionTable();
     String insertValues =
-        table.getColumns().stream()
+        table.getUnPartitionedColumns().stream()
             .map(columnInfo -> typeConstant.get(columnInfo.getType()))
             .map(Object::toString)
             .collect(Collectors.joining(","));
 
-    sql(getInsertWithoutPartitionSql(name, insertValues));
+    String insertDataSQL = "";
+    if (isPartitionTable) {
+      String partitionExpressions = getPartitionExpression(table, ",");
+      insertDataSQL = getInsertWithPartitionSql(name, partitionExpressions, insertValues);
+    } else {
+      insertDataSQL = getInsertWithoutPartitionSql(name, insertValues);
+    }
+    sql(insertDataSQL);
 
-    // do something to match the query result:
-    // 1. remove "'" from values, such as 'a' is trans to a
-    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
-    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
-    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
-    String checkValues =
-        table.getColumns().stream()
-            .map(columnInfo -> typeConstant.get(columnInfo.getType()))
-            .map(Object::toString)
-            .map(
-                s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
-                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
-                    return tmp;
-                  } else if (tmp.startsWith("array")) {
-                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
-                  } else if (tmp.startsWith("map")) {
-                    return tmp.replace("map", "")
-                        .replace("(", "{")
-                        .replace(")", "}")
-                        .replace(", ", "=");
-                  } else if (tmp.startsWith("struct")) {
-                    return tmp.replace("struct", "")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(", ", ",");
-                  }
-                  return tmp;
-                })
-            .collect(Collectors.joining(","));
+    String checkValues = getExpectedTableData(table);
 
-    List<String> queryResult =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
+    List<String> queryResult = getTableData(name);
     Assertions.assertTrue(
         queryResult.size() == 1, "Should just one row, table content: " + queryResult);
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
-  private String getCreateSimpleTableString(String tableName) {
+  protected String getExpectedTableData(SparkTableInfo table) {
+    // Do something to match the query result:
+    // 1. remove "'" from values, such as 'a' is trans to a
+    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
+    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
+    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
+    return table.getColumns().stream()
+        .map(columnInfo -> typeConstant.get(columnInfo.getType()))
+        .map(Object::toString)
+        .map(
+            s -> {
+              String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
+              if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
+                return tmp;
+              } else if (tmp.startsWith("array")) {
+                return tmp.replace("array", "").replace("(", "[").replace(")", "]");
+              } else if (tmp.startsWith("map")) {
+                return tmp.replace("map", "")
+                    .replace("(", "{")
+                    .replace(")", "}")
+                    .replace(", ", "=");
+              } else if (tmp.startsWith("struct")) {
+                return tmp.replace("struct", "")
+                    .replace("(", "")
+                    .replace(")", "")
+                    .replace(", ", ",");
+              }
+              return tmp;
+            })
+        .collect(Collectors.joining(","));
+  }
+
+  protected String getCreateSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
         tableName);
   }
 
-  private List<SparkColumnInfo> getSimpleTableColumn() {
+  protected List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
         SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
         SparkColumnInfo.of("name", DataTypes.StringType, ""),
         SparkColumnInfo.of("age", DataTypes.IntegerType, null));
+  }
+
+  protected String getDefaultDatabase() {
+    return "default_db";
   }
 
   // Helper method to create a simple table, and could use corresponding
@@ -532,5 +670,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected void createSimpleTable(String identifier) {
     String createTableSql = getCreateSimpleTableString(identifier);
     sql(createTableSql);
+  }
+
+  private void checkTableColumns(
+      String tableName, List<SparkColumnInfo> columns, SparkTableInfo tableInfo) {
+    SparkTableInfoChecker.create()
+        .withName(tableName)
+        .withColumns(columns)
+        .withComment(null)
+        .check(tableInfo);
+  }
+
+  // partition expression may contain "'", like a='s'/b=1
+  private String getPartitionExpression(SparkTableInfo table, String delimiter) {
+    return table.getPartitionedColumns().stream()
+        .map(column -> column.getName() + "=" + typeConstant.get(column.getType()))
+        .collect(Collectors.joining(delimiter));
   }
 }

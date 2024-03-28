@@ -166,6 +166,9 @@ You can use this image to test Apache Doris.
 
 Changelog
 
+- gravitino-ci-doris:0.1.1
+    - Optimize `start.sh`, add disk space check before starting Doris, exit when FE or BE start failed, add log to stdout
+
 - gravitino-ci-doris:0.1.0
     - Docker image `datastrato/gravitino-ci-doris:0.1.0`
     - Start Doris BE & FE in one container

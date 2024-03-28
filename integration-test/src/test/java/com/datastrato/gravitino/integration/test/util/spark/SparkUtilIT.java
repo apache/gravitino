@@ -21,6 +21,7 @@ package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,6 +84,26 @@ public abstract class SparkUtilIT extends AbstractIT {
     return rowsToJava(rows);
   }
 
+  // columns data are joined by ','
+  protected List<String> getTableData(String tableName) {
+    return sql(getSelectAllSql(tableName)).stream()
+        .map(
+            line ->
+                Arrays.stream(line)
+                    .map(
+                        item -> {
+                          if (item instanceof Object[]) {
+                            return Arrays.stream((Object[]) item)
+                                .map(Object::toString)
+                                .collect(Collectors.joining(","));
+                          } else {
+                            return item.toString();
+                          }
+                        })
+                    .collect(Collectors.joining(",")))
+        .collect(Collectors.toList());
+  }
+
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
   protected SparkTableInfo getTableInfo(String tableName) {
     Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
@@ -108,6 +129,18 @@ public abstract class SparkUtilIT extends AbstractIT {
       }
       throw e;
     }
+  }
+
+  protected void createTableAsSelect(String tableName, String newName) {
+    sql(String.format("CREATE TABLE %s AS SELECT * FROM %s", newName, tableName));
+  }
+
+  protected void insertTableAsSelect(String tableName, String newName) {
+    sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
+  }
+
+  private static String getSelectAllSql(String tableName) {
+    return String.format("SELECT * FROM %s", tableName);
   }
 
   private List<Object[]> rowsToJava(List<Row> rows) {
