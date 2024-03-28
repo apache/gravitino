@@ -365,12 +365,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
         "Topic metalake.test_kafka_catalog.default.test_drop_topic does not exist",
         exception.getMessage());
 
-    exception =
-        Assertions.assertThrows(
-            NoSuchTopicException.class, () -> kafkaCatalogOperations.dropTopic(ident));
-    Assertions.assertEquals(
-        "Topic metalake.test_kafka_catalog.default.test_drop_topic does not exist",
-        exception.getMessage());
+    Assertions.assertFalse(kafkaCatalogOperations.dropTopic(ident));
   }
 
   @Test

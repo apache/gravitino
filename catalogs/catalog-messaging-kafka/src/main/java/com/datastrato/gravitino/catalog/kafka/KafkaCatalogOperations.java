@@ -306,7 +306,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       return true;
     } catch (ExecutionException e) {
       if (e.getCause() instanceof UnknownTopicOrPartitionException) {
-        throw new NoSuchTopicException(e, "Topic %s does not exist", ident);
+        return false;
       } else {
         throw new RuntimeException("Failed to drop topic " + ident.name() + " from Kafka", e);
       }
