@@ -35,6 +35,7 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -578,6 +579,25 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(
         columns[0].name(),
         ((Transform.SingleFieldTransform) table.partitioning()[0]).fieldName()[0]);
+
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"newColumn"}, Types.ByteType.get(), "comment", Literals.NULL);
+    RuntimeException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(
+                        NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+                        withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Iceberg does not support column default value. Illegal column:"),
+        "The exception message is: " + exception.getMessage());
 
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");

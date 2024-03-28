@@ -1395,4 +1395,51 @@ public class CatalogMysqlIT extends AbstractIT {
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
   }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", true, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "comment", true, false, null);
+    String tableName = "default_value_table";
+    Column[] newColumns = new Column[] {col1, col2, col3};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col4 =
+        Column.of("col_4", Types.LongType.get(), "col4", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    newColumns = new Column[] {col1, col2, col3, col4};
+
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+  }
 }
