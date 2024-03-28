@@ -521,7 +521,8 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
-    "clients/client-python/.pytest_cache/*"
+    "clients/client-python/.pytest_cache/*",
+    ".pytest_cache/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
