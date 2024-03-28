@@ -170,6 +170,7 @@ public class SparkTableInfoChecker {
                 case METADATACOLUMN:
                   Assertions.assertEquals(
                       expectedTableInfo.getMetadataColumns(), realTableInfo.getMetadataColumns());
+                  break;
                 case COMMENT:
                   Assertions.assertEquals(
                       expectedTableInfo.getComment(), realTableInfo.getComment());
