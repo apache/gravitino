@@ -29,6 +29,7 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   private static final String metalakeName = "metalake_name";
   String catalogName = "catalog_name";
+  String catalogType = "relational";
   String modifiedCatalogName = catalogName + "_edited";
   String schemaName = "default";
   String tableName = "employee";
@@ -124,21 +125,22 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(6)
   public void testClickCatalogLink() {
-    catalogsPage.clickCatalogLink(metalakeName, modifiedCatalogName);
+    catalogsPage.clickCatalogLink(metalakeName, modifiedCatalogName, catalogType);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
   }
 
   @Test
   @Order(7)
   public void testClickSchemaLink() {
-    catalogsPage.clickSchemaLink(metalakeName, modifiedCatalogName, schemaName);
+    catalogsPage.clickSchemaLink(metalakeName, modifiedCatalogName, catalogType, schemaName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
   }
 
   @Test
   @Order(8)
   public void testClickTableLink() {
-    catalogsPage.clickTableLink(metalakeName, modifiedCatalogName, schemaName, tableName);
+    catalogsPage.clickTableLink(
+        metalakeName, modifiedCatalogName, catalogType, schemaName, tableName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }
