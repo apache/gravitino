@@ -271,11 +271,10 @@ public class TestMetalakeOperations extends JerseyTest {
         Lists.newArrayList(
             new MetalakeUpdateRequest.RenameMetalakeRequest("newTest"),
             new MetalakeUpdateRequest.UpdateMetalakeCommentRequest("newComment"));
-    MetalakeChange[] changes =
-        updateRequests.stream()
-            .map(MetalakeUpdateRequest::metalakeChange)
-            .toArray(MetalakeChange[]::new);
 
+    updateRequests.stream()
+        .map(MetalakeUpdateRequest::metalakeChange)
+        .toArray(MetalakeChange[]::new);
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);

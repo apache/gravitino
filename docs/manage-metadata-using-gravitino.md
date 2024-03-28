@@ -392,6 +392,36 @@ NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCat
 </TabItem>
 </Tabs>
 
+### List all catalogs' information in a metalake
+
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?detail=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
+
+<Tabs>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/metalake/catalogs?detail=true
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+
+Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
+// ...
+```
+
+</TabItem>
+</Tabs>
+
+
 ## Schema operations
 
 :::tip

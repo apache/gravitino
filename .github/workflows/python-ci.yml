@@ -1,0 +1,25 @@
+name: 'Python CI'
+
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+
+  pull_request:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'clients/client-python/**'
+concurrency:
+  group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [ '3.8', '3.9', '3.10', '3.11' ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: ./gradlew clean clients:client-python:test

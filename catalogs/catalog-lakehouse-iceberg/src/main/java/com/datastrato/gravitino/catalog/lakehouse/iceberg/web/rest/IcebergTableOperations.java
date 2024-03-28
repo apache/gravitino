@@ -48,7 +48,9 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
 
-  @Context private HttpServletRequest httpRequest;
+  @SuppressWarnings("UnusedVariable")
+  @Context
+  private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
