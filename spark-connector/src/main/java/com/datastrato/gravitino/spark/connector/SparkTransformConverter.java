@@ -21,6 +21,7 @@ import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.spark.sql.connector.expressions.*;
 import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.LongType;
 import scala.collection.JavaConverters;
