@@ -23,9 +23,9 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
-              - **/*.java
-              - **/*.kts
+              - '.github/**'
+              - '**/*.java'
+              - '**/*.kts'
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
