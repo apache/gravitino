@@ -202,5 +202,21 @@ public class TestSparkTransformConverter {
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkIdentityTransform("a.b"),
         Transforms.identity(new String[] {"a", "b"}));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkHoursTransform(new String[] {"date"}),
+        Transforms.hour("date"));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkDaysTransform(new String[] {"date"}),
+        Transforms.day("date"));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkMonthsTransform(new String[] {"date"}),
+        Transforms.month("date"));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkYearsTransform(new String[] {"date"}),
+        Transforms.year("date"));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkTruncateTransform(
+            "truncate", 10, new String[] {"package"}),
+        Transforms.truncate(10, "package"));
   }
 }
