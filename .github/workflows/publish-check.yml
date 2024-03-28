@@ -45,4 +45,4 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Gradle
-        run: ./gradlew publishToMavenLocal -PjdkVersion={matrix.java-version}
+        run: ./gradlew publishToMavenLocal -PjdkVersion=${{ matrix.java-version }}

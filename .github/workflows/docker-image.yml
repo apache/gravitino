@@ -1,84 +1,84 @@
-name: Publish Docker Image
-
-on:
-  workflow_dispatch:
-    inputs:
-      image:
-        type: choice
-        description: 'Choose the image to build'
-        required: true
-        default: 'gravitino'
-        options:
-          - 'gravitino'
-          - 'gravitino-ci-hive'
-          - 'gravitino-ci-trino'
-          - 'gravitino-ci-doris'
-          - 'trino'
-          - 'hive'
-      tag:
-        description: 'Docker tag to apply to this image'
-        required: true
-        type: string
-      token:
-        description: 'Publish Docker token'
-        required: true
-        type: string
-
-jobs:
-  publish-docker-image:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      input_token: ${{ github.event.inputs.token }}
-      secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
-    steps:
-      - name: Set environment variables
-        run: |
-          if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
-            echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
-            echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
-            echo "image_type=doris" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
-            echo "image_type=gravitino" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "trino" ]; then
-            echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=datastrato/trino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "hive" ]; then
-            echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=datastrato/hive" >> $GITHUB_ENV
-          fi
-
-      - name: Check publish Docker token
-        run: |
-          if [[ "${secrets_token}" != "${input_token}" ]]; then
-            echo "You have entered an incorrect token. Please re-enter it."
-            exit 1
-          fi
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: datastrato
-          password: ${{ secrets.DOCKER_REPOSITORY_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-java@v3
-        with:
-          java-version: '8'
-          distribution: 'temurin'
-
-      - name: Build and Push the Docker image
-        run: sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/hostedtoolcache/CodeQL && ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
+#name: Publish Docker Image
+#
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      image:
+#        type: choice
+#        description: 'Choose the image to build'
+#        required: true
+#        default: 'gravitino'
+#        options:
+#          - 'gravitino'
+#          - 'gravitino-ci-hive'
+#          - 'gravitino-ci-trino'
+#          - 'gravitino-ci-doris'
+#          - 'trino'
+#          - 'hive'
+#      tag:
+#        description: 'Docker tag to apply to this image'
+#        required: true
+#        type: string
+#      token:
+#        description: 'Publish Docker token'
+#        required: true
+#        type: string
+#
+#jobs:
+#  publish-docker-image:
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 120
+#    env:
+#      input_token: ${{ github.event.inputs.token }}
+#      secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
+#    steps:
+#      - name: Set environment variables
+#        run: |
+#          if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
+#            echo "image_type=hive" >> $GITHUB_ENV
+#            echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
+#          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
+#            echo "image_type=trino" >> $GITHUB_ENV
+#            echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
+#          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
+#            echo "image_type=doris" >> $GITHUB_ENV
+#            echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
+#          elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
+#            echo "image_type=gravitino" >> $GITHUB_ENV
+#            echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
+#          elif [ "${{ github.event.inputs.image }}" == "trino" ]; then
+#            echo "image_type=trino" >> $GITHUB_ENV
+#            echo "image_name=datastrato/trino" >> $GITHUB_ENV
+#          elif [ "${{ github.event.inputs.image }}" == "hive" ]; then
+#            echo "image_type=hive" >> $GITHUB_ENV
+#            echo "image_name=datastrato/hive" >> $GITHUB_ENV
+#          fi
+#
+#      - name: Check publish Docker token
+#        run: |
+#          if [[ "${secrets_token}" != "${input_token}" ]]; then
+#            echo "You have entered an incorrect token. Please re-enter it."
+#            exit 1
+#          fi
+#
+#      - name: Set up QEMU
+#        uses: docker/setup-qemu-action@v2
+#
+#      - name: Login to Docker Hub
+#        uses: docker/login-action@v2
+#        with:
+#          username: datastrato
+#          password: ${{ secrets.DOCKER_REPOSITORY_PASSWORD }}
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v2
+#
+#      - uses: actions/checkout@v3
+#
+#      - uses: actions/setup-java@v3
+#        with:
+#          java-version: '8'
+#          distribution: 'temurin'
+#
+#      - name: Build and Push the Docker image
+#        run: sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/hostedtoolcache/CodeQL && ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
