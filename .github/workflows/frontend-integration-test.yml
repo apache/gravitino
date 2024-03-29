@@ -26,10 +26,7 @@ jobs:
               - api/**
               - bin/**
               - catalogs/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
+              - clients/**
               - common/**
               - conf/**
               - core/**

@@ -26,10 +26,7 @@ jobs:
               - api/**
               - bin/**
               - catalogs/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
+              - clients/**
               - common/**
               - conf/**
               - core/**
@@ -55,7 +52,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
         architecture: [linux/amd64]
