@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -46,6 +47,10 @@ public class TestEntity {
   // Topic test data
   private final Long topicId = 1L;
   private final String topicName = "testTopic";
+
+  // User test data
+  private final Long userId = 1L;
+  private final String userName = "testUser";
 
   @Test
   public void testMetalake() {
@@ -199,5 +204,27 @@ public class TestEntity {
         TopicEntity.builder().withId(topicId).withName(topicName).withAuditInfo(auditInfo).build();
     Assertions.assertNull(testTopic1.comment());
     Assertions.assertNull(testTopic1.properties());
+  }
+
+  @Test
+  public void testUser() {
+    UserEntity testUserEntity =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+
+    Map<Field, Object> fields = testUserEntity.fields();
+    Assertions.assertEquals(userId, fields.get(UserEntity.ID));
+    Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
+
+    UserEntity testUserEntityWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+
+    Assertions.assertNull(testUserEntityWithoutFields.roles());
   }
 }

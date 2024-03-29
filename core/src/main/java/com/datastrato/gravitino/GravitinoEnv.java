@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
@@ -34,6 +35,8 @@ public class GravitinoEnv {
   private CatalogOperationDispatcher catalogOperationDispatcher;
 
   private MetalakeManager metalakeManager;
+
+  private AccessControlManager accessControlManager;
 
   private IdGenerator idGenerator;
 
@@ -96,6 +99,9 @@ public class GravitinoEnv {
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.catalogOperationDispatcher =
         new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    // Create and initialize access control related modules
+    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
@@ -172,6 +178,15 @@ public class GravitinoEnv {
 
   public LockManager getLockManager() {
     return lockManager;
+  }
+
+  /**
+   * Get the AccessControlManager associated with the Gravitino environment.
+   *
+   * @return The AccessControlManager instance.
+   */
+  public AccessControlManager accessControlManager() {
+    return accessControlManager;
   }
 
   public void start() {

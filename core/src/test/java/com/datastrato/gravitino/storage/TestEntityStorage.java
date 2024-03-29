@@ -38,9 +38,11 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -58,6 +60,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -374,6 +377,34 @@ public class TestEntityStorage {
       validateNotChangedEntity(store, schema2);
 
       destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  public void testUserEntityDelete(String type) throws IOException {
+    // User entity only supports kv store.
+    Assumptions.assumeTrue(Configs.DEFAULT_ENTITY_STORE.equals(type));
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
+      store.put(metalake);
+      UserEntity oneUser = createUser("metalake", "oneUser", auditInfo);
+      store.put(oneUser);
+      UserEntity anotherUser = createUser("metalake", "anotherUser", auditInfo);
+      store.put(anotherUser);
+      Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
+      Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
+      store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
+      Assertions.assertFalse(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
+      Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
     }
   }
 
@@ -826,6 +857,18 @@ public class TestEntityStorage {
         .withComment("")
         .withProperties(null)
         .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static UserEntity createUser(String metalake, String name, AuditInfo auditInfo) {
+    return UserEntity.builder()
+        .withId(1L)
+        .withNamespace(
+            Namespace.of(
+                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME))
+        .withName(name)
+        .withAuditInfo(auditInfo)
+        .withRoles(Lists.newArrayList())
         .build();
   }
 
