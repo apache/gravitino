@@ -28,6 +28,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
   public static final Field ROLES =
       Field.optional("roles", List.class, "The roles of the group entity.");
+
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the group entity.");
 
