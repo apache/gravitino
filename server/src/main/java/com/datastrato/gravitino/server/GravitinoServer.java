@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.server;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
@@ -57,6 +58,11 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initialize(serverConfig);
+
+    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization && serverConfig.get(Configs.SERVICE_ADMIN) == null) {
+      throw new IllegalArgumentException("The service admin can't be null");
+    }
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);

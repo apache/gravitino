@@ -265,10 +265,16 @@ public class ExceptionHandlers {
     private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
 
     private static String getUserErrorMsg(
-        String fileset, String operation, String metalake, String reason) {
-      return String.format(
-          "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
-          fileset, operation, metalake, reason);
+        String user, String operation, String metalake, String reason) {
+      if (metalake == null) {
+        return String.format(
+                "Failed to operate metalake admin user %s operation [%s], reason [%s]",
+                user, operation, reason);
+      } else {
+        return String.format(
+                "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
+                user, operation, metalake, reason);
+      }
     }
 
     @Override

@@ -14,10 +14,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.GroupEntity;
-import com.datastrato.gravitino.meta.UserEntity;
+import com.datastrato.gravitino.meta.*;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
@@ -67,7 +64,7 @@ public class UserGroupManager {
                 Namespace.of(
                     metalake,
                     CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    UserEntity.USER_SCHEMA_NAME))
+                    SchemaEntity.USER_SCHEMA_NAME))
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -147,7 +144,7 @@ public class UserGroupManager {
                 Namespace.of(
                     metalake,
                     CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    GroupEntity.GROUP_SCHEMA_NAME))
+                    SchemaEntity.GROUP_SCHEMA_NAME))
             .withRoles(Collections.emptyList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -213,11 +210,11 @@ public class UserGroupManager {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
+        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.USER_SCHEMA_NAME, user);
   }
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.GROUP_SCHEMA_NAME, group);
   }
 }

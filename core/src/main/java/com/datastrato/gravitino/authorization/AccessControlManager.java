@@ -12,15 +12,17 @@ import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
 
 /**
- * AccessControlManager is used for manage users, roles, grant information, this class is an
+ * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
  * entrance class for tenant management.
  */
 public class AccessControlManager {
 
   private final UserGroupManager userGroupManager;
+  private final AdminManager adminManager;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
+    this.adminManager = new AdminManager(store, idGenerator);
   }
 
   /**
@@ -97,5 +99,21 @@ public class AccessControlManager {
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
     return userGroupManager.getGroup(metalake, group);
+  }
+
+  public User addMetalakeAdmin(String user) {
+    return adminManager.addMetalakeAdmin(user);
+  }
+
+  public boolean removeMetalakeAdmin(String user) {
+    return adminManager.removeMetalakeAdmin(user);
+  }
+
+  public boolean isServiceAdmin(String user) {
+    return adminManager.isServiceAdmin(user);
+  }
+
+  public boolean isMetalakeAdmin(String user) {
+    return adminManager.isMetalakeAdmin(user);
   }
 }

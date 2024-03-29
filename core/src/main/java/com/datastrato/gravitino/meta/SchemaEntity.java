@@ -27,6 +27,9 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
       Field.optional("comment", String.class, "The comment or description of the schema");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the schema");
+  public static final String USER_SCHEMA_NAME = "user";
+  public static final String GROUP_SCHEMA_NAME = "group";
+  public static final String ADMIN_SCHEMA_NAME = "admin";
 
   private Long id;
 
