@@ -35,6 +35,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -382,8 +383,8 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  public void testUserEntityDelete(String type) throws IOException {
-    // User entity only supports kv store.
+  public void testAuthorizationEntityDelete(String type) throws IOException {
+    // User and Group entity only support kv store.
     Assumptions.assumeTrue(Configs.DEFAULT_ENTITY_STORE.equals(type));
     Config config = Mockito.mock(Config.class);
     init(type, config);
@@ -400,11 +401,19 @@ public class TestEntityStorage {
       store.put(oneUser);
       UserEntity anotherUser = createUser("metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
+      GroupEntity oneGroup = createGroup("metalake", "oneGroup", auditInfo);
+      store.put(oneGroup);
+      GroupEntity anotherGroup = createGroup("metalake", "anotherGroup", auditInfo);
+      store.put(anotherGroup);
       Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
+      Assertions.assertTrue(store.exists(oneGroup.nameIdentifier(), Entity.EntityType.GROUP));
+      Assertions.assertTrue(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
       store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
       Assertions.assertFalse(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
+      Assertions.assertFalse(store.exists(oneGroup.nameIdentifier(), Entity.EntityType.GROUP));
+      Assertions.assertFalse(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
     }
   }
 
@@ -866,6 +875,20 @@ public class TestEntityStorage {
         .withNamespace(
             Namespace.of(
                 metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME))
+        .withName(name)
+        .withAuditInfo(auditInfo)
+        .withRoles(Lists.newArrayList())
+        .build();
+  }
+
+  private static GroupEntity createGroup(String metalake, String name, AuditInfo auditInfo) {
+    return GroupEntity.builder()
+        .withId(1L)
+        .withNamespace(
+            Namespace.of(
+                metalake,
+                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                GroupEntity.GROUP_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())

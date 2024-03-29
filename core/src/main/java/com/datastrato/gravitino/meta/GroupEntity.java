@@ -174,9 +174,9 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the users of the group entity.
+     * Sets the roles of the group entity.
      *
-     * @param roles The users of the group entity.
+     * @param roles The roles of the group entity.
      * @return The builder instance.
      */
     public Builder withRoles(List<String> roles) {
