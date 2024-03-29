@@ -28,17 +28,16 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SchemaOperationDispatcher extends CatalogOperationDispatcher
-    implements SupportsSchemas {
+public class SchemaOperationDispatcher extends OperationDispatcher implements SupportsSchemas {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
   /**
-   * Creates a new CatalogOperationDispatcher instance.
+   * Creates a new SchemaOperationDispatcher instance.
    *
-   * @param catalogManager The CatalogManager instance to be used for catalog operations.
-   * @param store The EntityStore instance to be used for catalog operations.
-   * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param catalogManager The CatalogManager instance to be used for schema operations.
+   * @param store The EntityStore instance to be used for schema operations.
+   * @param idGenerator The IdGenerator instance to be used for schema operations.
    */
   public SchemaOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {

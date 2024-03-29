@@ -36,16 +36,16 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TableOperationDispatcher extends CatalogOperationDispatcher implements TableCatalog {
+public class TableOperationDispatcher extends OperationDispatcher implements TableCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperationDispatcher.class);
 
   /**
-   * Creates a new CatalogOperationDispatcher instance.
+   * Creates a new TableOperationDispatcher instance.
    *
-   * @param catalogManager The CatalogManager instance to be used for catalog operations.
-   * @param store The EntityStore instance to be used for catalog operations.
-   * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param catalogManager The CatalogManager instance to be used for table operations.
+   * @param store The EntityStore instance to be used for table operations.
+   * @param idGenerator The IdGenerator instance to be used for table operations.
    */
   public TableOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
@@ -317,6 +317,19 @@ public class TableOperationDispatcher extends CatalogOperationDispatcher impleme
     return true;
   }
 
+  /**
+   * Drop a table from the catalog and completely remove its data. Removes both the metadata and the
+   * directory associated with the table completely and skipping trash. If the table is an external
+   * table or the catalogs don't support purge table, {@link UnsupportedOperationException} is
+   * thrown.
+   *
+   * <p>If the catalog supports to purge a table, this method should be overridden. The default
+   * implementation throws an {@link UnsupportedOperationException}.
+   *
+   * @param ident A table identifier.
+   * @return True if the table was purged, false if the table did not exist.
+   * @throws UnsupportedOperationException If the catalog does not support to purge a table.
+   */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     boolean purged =

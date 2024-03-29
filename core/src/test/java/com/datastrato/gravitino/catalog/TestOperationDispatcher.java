@@ -35,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
-public abstract class TestCatalogOperationDispatcher {
+public abstract class TestOperationDispatcher {
 
   protected static EntityStore entityStore;
 
@@ -95,7 +95,7 @@ public abstract class TestCatalogOperationDispatcher {
 
   @Test
   public void testGetCatalogIdentifier() {
-    CatalogOperationDispatcher dispatcher = new CatalogOperationDispatcher(null, null, null) {};
+    OperationDispatcher dispatcher = new OperationDispatcher(null, null, null) {};
 
     NameIdentifier id1 = NameIdentifier.of("a");
     assertThrows(IllegalNamespaceException.class, () -> dispatcher.getCatalogIdentifier(id1));

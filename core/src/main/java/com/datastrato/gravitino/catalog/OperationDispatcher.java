@@ -34,12 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog
- * implementation.
+ * An operation dispatcher that dispatches the operations to the underlying catalog implementation.
  */
-public abstract class CatalogOperationDispatcher {
+public abstract class OperationDispatcher {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogOperationDispatcher.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OperationDispatcher.class);
 
   private final CatalogManager catalogManager;
 
@@ -54,7 +53,7 @@ public abstract class CatalogOperationDispatcher {
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
    */
-  public CatalogOperationDispatcher(
+  public OperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     this.catalogManager = catalogManager;
     this.store = store;

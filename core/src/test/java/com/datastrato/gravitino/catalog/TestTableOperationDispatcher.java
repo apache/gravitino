@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestTableOperationDispatcher extends TestCatalogOperationDispatcher {
+public class TestTableOperationDispatcher extends TestOperationDispatcher {
   private static TableOperationDispatcher tableOperationDispatcher;
   private static SchemaOperationDispatcher schemaOperationDispatcher;
 
