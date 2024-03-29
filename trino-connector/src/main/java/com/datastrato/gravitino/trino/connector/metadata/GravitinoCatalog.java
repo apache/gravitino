@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import io.trino.spi.TrinoException;
+import java.time.Instant;
 import java.util.Map;
 import org.apache.logging.log4j.util.Strings;
 
@@ -53,5 +54,10 @@ public class GravitinoCatalog {
 
   public Map<String, String> getProperties() {
     return catalog.properties();
+  }
+
+  public Instant getLastModifiedTime() {
+    Instant time = catalog.auditInfo().lastModifiedTime();
+    return time == null ? catalog.auditInfo().createTime() : time;
   }
 }

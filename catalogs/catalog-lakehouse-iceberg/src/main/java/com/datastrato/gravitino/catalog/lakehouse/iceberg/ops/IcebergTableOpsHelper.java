@@ -149,9 +149,9 @@ public class IcebergTableOpsHelper {
         "Cannot update missing field: %s",
         fieldName);
 
-    boolean nullable = icebergTableSchema.findField(fieldName).isOptional();
+    icebergTableSchema.findField(fieldName).isOptional();
     org.apache.iceberg.types.Type type =
-        ConvertUtil.toIcebergType(nullable, updateColumnType.getNewDataType());
+        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
     Preconditions.checkArgument(
         type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
@@ -199,7 +199,7 @@ public class IcebergTableOpsHelper {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          ConvertUtil.toIcebergType(addColumn.getDataType()),
           addColumn.getComment());
     } else {
       // TODO: figure out how to enable users to add required columns
@@ -207,7 +207,7 @@ public class IcebergTableOpsHelper {
       icebergUpdateSchema.addRequiredColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          ConvertUtil.toIcebergType(addColumn.getDataType()),
           addColumn.getComment());
     }
 

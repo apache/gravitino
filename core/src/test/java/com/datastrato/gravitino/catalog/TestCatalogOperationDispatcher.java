@@ -27,7 +27,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestColumn;
-import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -47,6 +46,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -82,7 +82,7 @@ public class TestCatalogOperationDispatcher {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
-    entityStore = spy(new TestEntityStore.InMemoryEntityStore());
+    entityStore = spy(new TestMemoryEntityStore.InMemoryEntityStore());
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
@@ -228,7 +228,7 @@ public class TestCatalogOperationDispatcher {
                     .build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
-    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
+    dispatcher.loadSchema(schemaIdent);
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
   }
@@ -310,7 +310,8 @@ public class TestCatalogOperationDispatcher {
   public void testCreateAndDropSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
+
+    dispatcher.createSchema(schemaIdent, "comment", props);
 
     boolean dropped = dispatcher.dropSchema(schemaIdent, false);
     Assertions.assertTrue(dropped);
@@ -527,7 +528,8 @@ public class TestCatalogOperationDispatcher {
           TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
           TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
-    Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
     boolean dropped = dispatcher.dropTable(tableIdent);
     Assertions.assertTrue(dropped);

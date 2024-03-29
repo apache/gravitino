@@ -240,7 +240,7 @@ public abstract class Config {
   }
 
   /** The DeprecatedConfig class represents a configuration entry that has been deprecated. */
-  private class DeprecatedConfig {
+  private static class DeprecatedConfig {
     private final String key;
     private final String version;
     private final String deprecationMessage;

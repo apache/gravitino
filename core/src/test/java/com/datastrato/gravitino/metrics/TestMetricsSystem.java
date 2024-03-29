@@ -13,7 +13,7 @@ public class TestMetricsSystem {
   MetricsSystem metricsSystem = new MetricsSystem();
 
   private long getCounterValue(String metricsSourceName, String name) {
-    return metricsSystem.getMetricRegistry().counter(metricsSourceName + ".a.b").getCount();
+    return metricsSystem.getMetricRegistry().counter(metricsSourceName + "." + name).getCount();
   }
 
   @Test

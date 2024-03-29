@@ -341,7 +341,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     for (int i = 0; i < allFutures.size(); i++) {
       try {
         Future<Integer> completedTask = completionService.take();
-        Integer taskId = completedTask.get();
+        completedTask.get();
       } catch (InterruptedException | ExecutionException e) {
         executor.shutdownNow();
         throw new RuntimeException("Failed to execute test " + e.getMessage(), e);
