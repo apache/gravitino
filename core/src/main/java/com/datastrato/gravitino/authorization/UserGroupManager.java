@@ -9,7 +9,11 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.*;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
+import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
@@ -20,14 +24,14 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * UserGroupManager is used for add, remove and get users or roles from one metalake. UserGroupManager doesn't manage
- * users or groups, just sets up the relationship between the metalake and the user/group. Metalake is like a
- * concept of the organization. `AddUser` or `AddGroup` means that a role or user enters an organization.
+ * UserGroupManager is used for add, remove and get users or roles from one metalake.
+ * UserGroupManager doesn't manage users or groups, just sets up the relationship between the
+ * metalake and the user/group. Metalake is like a concept of the organization. `AddUser` or
+ * `AddGroup` means that a role or user enters an organization.
  */
 public class UserGroupManager {
 
@@ -35,7 +39,7 @@ public class UserGroupManager {
   private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
 
   private static final String GROUP_DOES_NOT_EXIST_MSG =
-          "Group %s does not exist in th metalake %s";
+      "Group %s does not exist in th metalake %s";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -49,38 +53,38 @@ public class UserGroupManager {
    * Adds a new User.
    *
    * @param metalake The Metalake of the User.
-   * @param name     The name of the User.
+   * @param name The name of the User.
    * @return The added User instance.
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException           If adding the User encounters storage issues.
+   * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
     UserEntity userEntity =
-            UserEntity.builder()
-                    .withId(idGenerator.nextId())
-                    .withName(name)
-                    .withNamespace(
-                            Namespace.of(
-                                    metalake,
-                                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                                    UserEntity.USER_SCHEMA_NAME))
-                    .withRoles(Lists.newArrayList())
-                    .withAuditInfo(
-                            AuditInfo.builder()
-                                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                                    .withCreateTime(Instant.now())
-                                    .build())
-                    .build();
+        UserEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(name)
+            .withNamespace(
+                Namespace.of(
+                    metalake,
+                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                    UserEntity.USER_SCHEMA_NAME))
+            .withRoles(Lists.newArrayList())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
     try {
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
       throw new UserAlreadyExistsException(
-              "User %s in the metalake %s already exists", name, metalake);
+          "User %s in the metalake %s already exists", name, metalake);
     } catch (IOException ioe) {
       LOG.error(
-              "Adding user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
+          "Adding user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -89,7 +93,7 @@ public class UserGroupManager {
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
-   * @param user     THe name of the User.
+   * @param user THe name of the User.
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
@@ -99,7 +103,7 @@ public class UserGroupManager {
       return store.delete(ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
-              "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
+          "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -108,10 +112,10 @@ public class UserGroupManager {
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
-   * @param user     The name of the User.
+   * @param user The name of the User.
    * @return The getting User instance.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException    If getting the User encounters storage issues.
+   * @throws RuntimeException If getting the User encounters storage issues.
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
@@ -129,38 +133,38 @@ public class UserGroupManager {
    * Adds a new Group.
    *
    * @param metalake The Metalake of the Group.
-   * @param group    The name of the Group.
+   * @param group The name of the Group.
    * @return The Added Group instance.
    * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException            If adding the Group encounters storage issues.
+   * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     GroupEntity groupEntity =
-            GroupEntity.builder()
-                    .withId(idGenerator.nextId())
-                    .withName(group)
-                    .withNamespace(
-                            Namespace.of(
-                                    metalake,
-                                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                                    GroupEntity.GROUP_SCHEMA_NAME))
-                    .withRoles(Collections.emptyList())
-                    .withAuditInfo(
-                            AuditInfo.builder()
-                                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                                    .withCreateTime(Instant.now())
-                                    .build())
-                    .build();
+        GroupEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(group)
+            .withNamespace(
+                Namespace.of(
+                    metalake,
+                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                    GroupEntity.GROUP_SCHEMA_NAME))
+            .withRoles(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
     try {
       store.put(groupEntity, false /* overwritten */);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Group {} in the metalake {} already exists", group, metalake, e);
       throw new GroupAlreadyExistsException(
-              "Group %s in the metalake %s already exists", group, metalake);
+          "Group %s in the metalake %s already exists", group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-              "Adding group {} failed in the metalake {} due to storage issues", group, metalake, ioe);
+          "Adding group {} failed in the metalake {} due to storage issues", group, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -169,7 +173,7 @@ public class UserGroupManager {
    * Removes a Group.
    *
    * @param metalake The Metalake of the Group.
-   * @param group    THe name of the Group.
+   * @param group THe name of the Group.
    * @return `true` if the Group was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
@@ -178,10 +182,10 @@ public class UserGroupManager {
       return store.delete(ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
-              "Removing group {} in the metalake {} failed due to storage issues",
-              group,
-              metalake,
-              ioe);
+          "Removing group {} in the metalake {} failed due to storage issues",
+          group,
+          metalake,
+          ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -190,10 +194,10 @@ public class UserGroupManager {
    * Gets a Group.
    *
    * @param metalake The Metalake of the Group.
-   * @param group    THe name of the Group.
+   * @param group THe name of the Group.
    * @return The getting Group instance.
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException     If getting the Group encounters storage issues.
+   * @throws RuntimeException If getting the Group encounters storage issues.
    */
   public Group getGroup(String metalake, String group) {
     try {
@@ -214,6 +218,6 @@ public class UserGroupManager {
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-            metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
   }
 }
