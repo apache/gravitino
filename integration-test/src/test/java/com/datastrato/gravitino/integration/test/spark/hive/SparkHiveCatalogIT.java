@@ -86,4 +86,68 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
   }
+
+  @Test
+  public void testInsertHiveFormatPartitionTableAsSelect() {
+    String tableName = "insert_hive_partition_table";
+    String newTableName = "new_" + tableName;
+
+    // create source table
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
+
+    // insert into partition ((name = %s, age = %s) select xx
+    dropTableIfExists(newTableName);
+    String createTableSql =
+        String.format(
+            "CREATE TABLE %s (id INT) PARTITIONED BY (name STRING, age INT)", newTableName);
+    sql(createTableSql);
+    String insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age = %s) SELECT id FROM %s",
+            newTableName,
+            typeConstant.get(DataTypes.StringType),
+            typeConstant.get(DataTypes.IntegerType),
+            tableName);
+    sql(insertPartitionSql);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    String expectedData = getExpectedTableData(newTableInfo);
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name = %s, age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age) SELECT id, age FROM %s",
+            newTableName, typeConstant.get(DataTypes.StringType), tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name,  age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name , age) SELECT * FROM %s",
+            newTableName, tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+  }
 }

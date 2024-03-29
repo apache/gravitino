@@ -268,3 +268,6 @@
    Trino
    ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
    ./trino-connector/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java
+
+   Apache Arrow
+   ./dev/ci/util_free_space.sh

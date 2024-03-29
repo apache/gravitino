@@ -182,8 +182,6 @@ public class CatalogConnectorManager {
   }
 
   private void reloadCatalog(GravitinoMetalake metalake, GravitinoCatalog catalog) {
-    String catalogFullName = catalog.getFullName();
-
     GravitinoCatalog oldCatalog = catalogConnectors.get(catalog.getFullName()).getCatalog();
     if (!catalog.getLastModifiedTime().isAfter(oldCatalog.getLastModifiedTime())) {
       return;

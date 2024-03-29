@@ -78,6 +78,10 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
     ENGINE(String value) {
       this.value = value;
     }
+
+    public String getValue() {
+      return this.value;
+    }
   }
 
   @Override
