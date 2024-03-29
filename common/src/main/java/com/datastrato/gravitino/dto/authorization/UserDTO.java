@@ -9,19 +9,15 @@ import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-
 import java.util.List;
-
-import org.apache.commons.lang3.StringUtils;
-
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a User Data Transfer Object (DTO). */
 public class UserDTO implements User {
 
   @JsonProperty("name")
   private String name;
-
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -36,7 +32,7 @@ public class UserDTO implements User {
   /**
    * Creates a new instance of UserDTO.
    *
-   * @param name  The name of the User DTO.
+   * @param name The name of the User DTO.
    * @param audit The audit information of the User DTO.
    */
   protected UserDTO(String name, AuditDTO audit) {
@@ -90,7 +86,6 @@ public class UserDTO implements User {
 
     /** The audit information of the user. */
     protected AuditDTO audit;
-
 
     /**
      * Sets the name of the user.

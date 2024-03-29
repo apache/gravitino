@@ -84,9 +84,7 @@ public class UserOperations {
                           TreeLockUtils.doWithTreeLock(
                               ident,
                               LockType.WRITE,
-                              () ->
-                                  accessControlManager.addUser(
-                                      metalake, request.getName()))))));
+                              () -> accessControlManager.addUser(metalake, request.getName()))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.CREATE, request.getName(), metalake, e);
@@ -98,7 +96,8 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-user", absolute = true)
-  public Response removeUser(@PathParam("metalake") String metalake, @PathParam("user") String user) {
+  public Response removeUser(
+      @PathParam("metalake") String metalake, @PathParam("user") String user) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -118,6 +117,7 @@ public class UserOperations {
   }
 
   private NameIdentifier ofUser(String metalake, String user) {
-    return NameIdentifier.of(metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
+    return NameIdentifier.of(
+        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
   }
 }

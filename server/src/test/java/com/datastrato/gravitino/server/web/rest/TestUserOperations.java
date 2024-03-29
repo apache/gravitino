@@ -113,9 +113,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals("user1", userDTO.name());
 
     // Test throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .addUser(any(), any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).addUser(any(), any());
     Response resp1 =
         target("/metalakes/metalake1/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -130,9 +128,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw UserAlreadyExistsException
-    doThrow(new UserAlreadyExistsException("mock error"))
-        .when(manager)
-        .addUser(any(), any());
+    doThrow(new UserAlreadyExistsException("mock error")).when(manager).addUser(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
