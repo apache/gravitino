@@ -33,7 +33,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "src/lib/utils/axios/Axios.js"  ],
   "exclude": [
     "node_modules"
   ]
