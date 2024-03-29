@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
@@ -39,11 +39,11 @@ import javax.ws.rs.core.Response;
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions")
 public class PartitionOperations {
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final TableOperationDispatcher dispatcher;
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public PartitionOperations(CatalogOperationDispatcher dispatcher) {
+  public PartitionOperations(TableOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 

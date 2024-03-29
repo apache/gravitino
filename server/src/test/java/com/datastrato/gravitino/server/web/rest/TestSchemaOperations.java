@@ -17,7 +17,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -63,7 +63,7 @@ public class TestSchemaOperations extends JerseyTest {
     }
   }
 
-  private CatalogOperationDispatcher dispatcher = mock(CatalogOperationDispatcher.class);
+  private SchemaOperationDispatcher dispatcher = mock(SchemaOperationDispatcher.class);
 
   private final String metalake = "metalake1";
 
@@ -93,7 +93,7 @@ public class TestSchemaOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(CatalogOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(SchemaOperationDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

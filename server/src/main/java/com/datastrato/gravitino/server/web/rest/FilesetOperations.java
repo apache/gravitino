@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.FilesetCreateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdatesRequest;
@@ -42,12 +42,12 @@ public class FilesetOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(FilesetOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final FilesetOperationDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public FilesetOperations(CatalogOperationDispatcher dispatcher) {
+  public FilesetOperations(FilesetOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
