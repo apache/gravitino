@@ -146,5 +146,5 @@ server distribution package.
     ./gradlew assembleDistribution
     ```
 
-   This creates `gravitino-spark-connector-runtime-{version}.jar` and `gravitino-spark-connector-runtime-{version}.tar.gz.sha256` under the `distribution` directory.
+   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` and `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar.sha256` under the `distribution` directory.
 
