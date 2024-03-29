@@ -215,6 +215,14 @@ public class SchemaMetaService {
     return true;
   }
 
+  public void deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    SessionUtils.doWithCommit(
+        SchemaMetaMapper.class,
+        mapper -> {
+          mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
+
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     Namespace.checkSchema(namespace);
     Long parentEntityId = null;

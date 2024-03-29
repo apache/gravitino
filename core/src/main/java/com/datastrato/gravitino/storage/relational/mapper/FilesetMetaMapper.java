@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
@@ -215,4 +216,11 @@ public interface FilesetMetaMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId);
+
+  @Delete(
+      "DELETE FROM "
+          + META_TABLE_NAME
+          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteFilesetMetasByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }

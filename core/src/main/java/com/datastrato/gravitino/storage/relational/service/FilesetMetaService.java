@@ -213,6 +213,19 @@ public class FilesetMetaService {
     return true;
   }
 
+  public void deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    SessionUtils.doWithCommit(
+        FilesetMetaMapper.class,
+        mapper -> {
+          mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+    SessionUtils.doWithCommit(
+        FilesetVersionMapper.class,
+        mapper -> {
+          mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
+
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     Namespace.checkFileset(namespace);
     Long parentEntityId = null;

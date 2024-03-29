@@ -8,18 +8,19 @@ package com.datastrato.gravitino.storage.relational;
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
+import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
+import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
+import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
+import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.dbcp2.DelegatingConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,8 @@ public final class RelationalGarbageCollector implements Closeable {
     long threadId = Thread.currentThread().getId();
     LOG.info("Thread {} start to collect garbage...", threadId);
     try {
+      LOG.info("Start to collect and delete legacy data by thread {}", threadId);
+      collectAndRemoveLegacyData();
       LOG.info("Start to collect and delete old version data by thread {}", threadId);
       collectAndRemoveOldVersionData();
     } catch (Exception e) {
@@ -68,43 +71,42 @@ public final class RelationalGarbageCollector implements Closeable {
     }
   }
 
-  private void collectAndRemoveOldVersionData() throws SQLException {
+  private void collectAndRemoveLegacyData() throws SQLException {
+    long legacyTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
+    // TODO: put limit to configuration
+    int limit = 20;
+
+    for (AllTables.TABLE_NAMES tableName : AllTables.TABLE_NAMES.values()) {
+      switch (tableName) {
+        case METALAKE_TABLE_NAME:
+          MetalakeMetaService.getInstance()
+              .deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
+        case CATALOG_TABLE_NAME:
+          CatalogMetaService.getInstance()
+              .deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
+        case SCHEMA_TABLE_NAME:
+          SchemaMetaService.getInstance().deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+        case TABLE_TABLE_NAME:
+          TableMetaService.getInstance().deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+        case FILESET_TABLE_NAME:
+          FilesetMetaService.getInstance()
+              .deleteFilesetAndVersionMetasByLegacyTimeLine(legacyTimeLine, limit);
+        case FILESET_VERSION_TABLE_NAME:
+          FilesetMetaService.getInstance()
+              .deleteFilesetAndVersionMetasByLegacyTimeLine(legacyTimeLine, limit);
+        default:
+          throw new IllegalArgumentException("Unsupported table name: " + tableName);
+      }
+    }
+  }
+
+  private void collectAndRemoveOldVersionData() {
     long deleteTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
 
-    for (AllTables.TABLE_NAMES table : AllTables.TABLE_NAMES.values()) {
-      System.out.println(table.getTableName());
+    int version_retention_count = 1;
 
-      /*
-      String sql = "SELECT * FROM " + table + " WHERE deleted_at != 0 AND deleted_at < ?";
-      DelegatingConnection<Connection> connection = null;
-      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-        stmt.setLong(1, deleteTimeLine);
-        try (ResultSet rs = stmt.executeQuery()) {
-          while (rs.next()) {
-            String deleteSql = "DELETE FROM " + table + " WHERE id = ?";
-            try (PreparedStatement deleteStmt = connection.prepareStatement(deleteSql)) {
-              deleteStmt.setLong(1, rs.getLong("id"));
-              deleteStmt.executeUpdate();
-            }
 
-            String checkSql = "SELECT * FROM " + table + " WHERE id > ? LIMIT 1";
-            try (PreparedStatement checkStmt = connection.prepareStatement(checkSql)) {
-              checkStmt.setLong(1, rs.getLong("id"));
-              try (ResultSet checkRs = checkStmt.executeQuery()) {
-                if (checkRs.next()) {
-                  String deleteOldVersionSql = "DELETE FROM " + table + " WHERE id = ?";
-                  try (PreparedStatement deleteOldVersionStmt =
-                      connection.prepareStatement(deleteOldVersionSql)) {
-                    deleteOldVersionStmt.setLong(1, rs.getLong("id"));
-                    deleteOldVersionStmt.executeUpdate();
-                  }
-                }
-              }
-            }
-          }
-        }
-      } */
-    }
+    for (AllTables.TABLE_NAMES table : AllTables.TABLE_NAMES.values()) {}
   }
 
   @Override

@@ -209,4 +209,12 @@ public class CatalogMetaService {
 
     return true;
   }
+
+  public void deleteCatalogMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    SessionUtils.doWithCommit(
+        CatalogMetaMapper.class,
+        mapper -> {
+          mapper.deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
 }

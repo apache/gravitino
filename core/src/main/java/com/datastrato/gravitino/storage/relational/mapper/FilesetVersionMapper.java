@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
@@ -98,4 +99,11 @@ public interface FilesetVersionMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
+
+  @Delete(
+      "DELETE FROM "
+          + VERSION_TABLE_NAME
+          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteFilesetVersionsByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }
