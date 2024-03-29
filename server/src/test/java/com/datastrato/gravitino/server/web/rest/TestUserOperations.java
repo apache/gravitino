@@ -18,9 +18,9 @@ import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
@@ -238,7 +238,7 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropUser() {
+  public void testRemoveUser() {
     when(manager.removeUser(any(), any())).thenReturn(true);
 
     Response resp =
@@ -248,11 +248,11 @@ public class TestUserOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    DropResponse dropResponse = resp.readEntity(DropResponse.class);
-    Assertions.assertEquals(0, dropResponse.getCode());
-    Assertions.assertTrue(dropResponse.dropped());
+    RemoveResponse removeResponse = resp.readEntity(RemoveResponse.class);
+    Assertions.assertEquals(0, removeResponse.getCode());
+    Assertions.assertTrue(removeResponse.removed());
 
-    // Test when failed to drop user
+    // Test when failed to remove user
     when(manager.removeUser(any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/users/user1")
@@ -261,9 +261,9 @@ public class TestUserOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
-    DropResponse dropResponse2 = resp2.readEntity(DropResponse.class);
-    Assertions.assertEquals(0, dropResponse2.getCode());
-    Assertions.assertFalse(dropResponse2.dropped());
+    RemoveResponse removeResponse2 = resp2.readEntity(RemoveResponse.class);
+    Assertions.assertEquals(0, removeResponse2.getCode());
+    Assertions.assertFalse(removeResponse2.removed());
 
     doThrow(new RuntimeException("mock error")).when(manager).removeUser(any(), any());
     Response resp3 =

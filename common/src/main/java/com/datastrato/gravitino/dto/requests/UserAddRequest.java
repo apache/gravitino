@@ -14,7 +14,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
-/** Represents a request to create a user. */
+/** Represents a request to add a user. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -25,13 +25,13 @@ public class UserAddRequest implements RESTRequest {
   @JsonProperty("name")
   private final String name;
 
-  /** Default constructor for MetalakeCreateRequest. (Used for Jackson deserialization.) */
+  /** Default constructor for UserAddRequest. (Used for Jackson deserialization.) */
   public UserAddRequest() {
     this(null);
   }
 
   /**
-   * Creates a new UserCreateRequest.
+   * Creates a new UserAddRequest.
    *
    * @param name The name of the user.
    */

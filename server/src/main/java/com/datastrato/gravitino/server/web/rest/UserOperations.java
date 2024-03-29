@@ -9,7 +9,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
@@ -64,7 +64,7 @@ public class UserOperations {
                               LockType.READ,
                               () -> accessControlManager.getUser(metalake, user))))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.LOAD, user, metalake, e);
+      return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
     }
   }
 
@@ -87,7 +87,7 @@ public class UserOperations {
                               () -> accessControlManager.addUser(metalake, request.getName()))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.ADD, request.getName(), metalake, e);
     }
   }
 
@@ -103,16 +103,16 @@ public class UserOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = ofUser(metalake, user);
-            boolean dropped =
+            boolean removed =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.WRITE, () -> accessControlManager.removeUser(metalake, user));
-            if (!dropped) {
-              LOG.warn("Failed to drop table {} under metalkae {}", user, metalake);
+            if (!removed) {
+              LOG.warn("Failed to remove user {} under metalake {}", user, metalake);
             }
-            return Utils.ok(new DropResponse(dropped));
+            return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.DROP, user, metalake, e);
+      return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, metalake, e);
     }
   }
 
