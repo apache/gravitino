@@ -40,14 +40,14 @@ public class HivePropertiesConverter implements PropertiesConverter {
           HivePropertiesConstants.GRAVITINO_HIVE_SERDE_LIB);
 
   /**
-   * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored.as" = "PARQUET" in property.
+   * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored-as" = "PARQUET" in property.
    *
    * <p>CREATE TABLE xxx USING PARQUET will save "provider" = "PARQUET" in property.
    *
    * <p>CREATE TABLE xxx ROW FORMAT SERDE xx STORED AS INPUTFORMAT xx OUTPUTFORMAT xx will save
    * "hive.input-format", "hive.output-format", "hive.serde" in property.
    *
-   * <p>CREATE TABLE xxx ROW FORMAT DELIMITED FIELDS TERMINATED xx will save "option.xx" in
+   * <p>CREATE TABLE xxx ROW FORMAT DELIMITED FIELDS TERMINATED xx will save "option.field.delim" in
    * property.
    *
    * <p>Please refer to
