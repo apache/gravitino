@@ -267,9 +267,9 @@ subprojects {
     tasks.withType<JavaCompile>().configureEach {
       options.errorprone.isEnabled.set(true)
       options.errorprone.disableAllChecks.set(true)
+      options.errorprone.disableWarningsInGeneratedCode.set(true)
       options.errorprone.enable(
         "AnnotateFormatMethod",
-        "FormatStringAnnotation",
         "AlwaysThrows",
         "ArrayEquals",
         "ArrayToString",
@@ -278,6 +278,7 @@ subprojects {
         "BoxedPrimitiveEquality",
         "ChainingConstructorIgnoresParameter",
         "CheckNotNullMultipleTimes",
+        "ClassCanBeStatic",
         "CollectionIncompatibleType",
         "CollectionToArraySafeParameter",
         "ComparingThisWithNull",
@@ -288,15 +289,18 @@ subprojects {
         "DangerousLiteralNull",
         "DeadException",
         "DeadThread",
+        "DefaultCharset",
         "DoNotCall",
         "DoNotMock",
         "DuplicateMapKeys",
+        "EqualsGetClass",
         "EqualsNaN",
         "EqualsNull",
         "EqualsReference",
         "EqualsWrongThing",
         "ForOverride",
         "FormatString",
+        "FormatStringAnnotation",
         "GetClassOnAnnotation",
         "GetClassOnClass",
         "HashtableContains",
@@ -308,6 +312,7 @@ subprojects {
         "IncompatibleArgumentType",
         "IndexOfChar",
         "InfiniteRecursion",
+        "InlineFormatString",
         "InvalidJavaTimeConstant",
         "InvalidPatternSyntax",
         "IsInstanceIncompatibleType",
@@ -350,12 +355,10 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UnusedVariable",
         "UseCorrectAssertInTests",
         "VarTypeName",
-        "XorPower",
-        "EqualsGetClass",
-        "DefaultCharset",
-        "InlineFormatString"
+        "XorPower"
       )
     }
   }
@@ -427,6 +430,11 @@ subprojects {
   }
 
   configure<SigningExtension> {
+    val taskNames = gradle.getStartParameter().getTaskNames()
+    taskNames.forEach() {
+      if (it.contains("publishToMavenLocal")) setRequired(false)
+    }
+
     val gpgId = System.getenv("GPG_ID")
     val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
@@ -512,7 +520,8 @@ tasks.rat {
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
-    "**/NOTICE.*"
+    "**/NOTICE.*",
+    "clients/client-python/.pytest_cache/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
