@@ -52,7 +52,7 @@ public class GroupManager {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
-    GroupEntity metalakeGroup =
+    GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(idGenerator.nextId())
             .withName(group)
@@ -69,8 +69,8 @@ public class GroupManager {
                     .build())
             .build();
     try {
-      store.put(metalakeGroup, false /* overwritten */);
-      return metalakeGroup;
+      store.put(groupEntity, false /* overwritten */);
+      return groupEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Group {} in the metalake {} already exists", group, metalake, e);
       throw new GroupAlreadyExistsException(
