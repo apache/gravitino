@@ -17,12 +17,10 @@ import com.datastrato.gravitino.storage.IdGenerator;
  */
 public class AccessControlManager {
 
-  private final UserManager userManager;
-  private final GroupManager groupManager;
+  private final UserGroupManager userGroupManager;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator) {
-    this.userManager = new UserManager(store, idGenerator);
-    this.groupManager = new GroupManager(store, idGenerator);
+    this.userGroupManager = new UserGroupManager(store, idGenerator);
   }
 
   /**
@@ -35,7 +33,7 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    return userManager.addUser(metalake, name);
+    return userGroupManager.addUser(metalake, name);
   }
 
   /**
@@ -47,7 +45,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeUser(String metalake, String user) {
-    return userManager.removeUser(metalake, user);
+    return userGroupManager.removeUser(metalake, user);
   }
 
   /**
@@ -60,7 +58,7 @@ public class AccessControlManager {
    * @throws RuntimeException If getting the User encounters storage issues.
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
-    return userManager.getUser(metalake, user);
+    return userGroupManager.getUser(metalake, user);
   }
 
   /**
@@ -73,7 +71,7 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
-    return groupManager.addGroup(metalake, group);
+    return userGroupManager.addGroup(metalake, group);
   }
 
   /**
@@ -85,7 +83,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   public boolean removeGroup(String metalake, String group) {
-    return groupManager.removeGroup(metalake, group);
+    return userGroupManager.removeGroup(metalake, group);
   }
 
   /**
@@ -98,6 +96,6 @@ public class AccessControlManager {
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
-    return groupManager.getGroup(metalake, group);
+    return userGroupManager.getGroup(metalake, group);
   }
 }
