@@ -15,6 +15,7 @@ repositories {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
+val sparkMajorVersion: String = extra["sparkMajorVersion"].toString()
 val icebergVersion: String = libs.versions.iceberg.get()
 val kyuubiVersion: String = libs.versions.kyuubi.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
@@ -42,7 +43,7 @@ dependencies {
 
 tasks.shadowJar {
   isZip64 = true
-  archiveFileName.set("${rootProject.name}-spark-connector-runtime-3.4_$scalaVersion-$version.jar")
+  archiveFileName.set("${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar")
   archiveClassifier.set("")
 
   relocate("com.google", "com.datastrato.gravitino.shaded.com.google")

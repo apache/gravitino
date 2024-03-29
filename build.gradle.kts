@@ -61,6 +61,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Found unsupported Scala version: $scalaVersion")
 }
+val sparkMajorVersion: String = extra["sparkMajorVersion"].toString()
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
@@ -633,7 +634,7 @@ tasks {
     dependsOn("spark-connector:shadowJar")
     group = "gravitino distribution"
     finalizedBy("checksumSparkConnector")
-    from("spark-connector/build/libs/${rootProject.name}-spark-connector-runtime-3.4_$scalaVersion-$version.jar")
+    from("spark-connector/build/libs/${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar")
     into(projectDir.dir("distribution"))
   }
 
@@ -676,7 +677,7 @@ tasks {
   register("checksumSparkConnector") {
     group = "gravitino distribution"
     dependsOn(assembleSparkConnector)
-    val sparkJarName = "${rootProject.name}-spark-connector-runtime-3.4_$scalaVersion-$version.jar"
+    val sparkJarName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar"
     var sparkJarFile = projectDir.dir("distribution").asFile.resolve(sparkJarName)
     var checksumFile = file("$sparkJarFile.sha256")
     inputs.file(sparkJarFile)
