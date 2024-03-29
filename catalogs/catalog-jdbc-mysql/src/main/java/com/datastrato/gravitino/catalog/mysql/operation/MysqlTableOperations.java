@@ -51,7 +51,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   public static final String BACK_QUOTE = "`";
   public static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
-      "Mysql does not support nested column names.";
+      "MySQL does not support nested column names.";
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
