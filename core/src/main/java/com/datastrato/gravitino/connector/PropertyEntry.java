@@ -222,6 +222,28 @@ public final class PropertyEntry<T> {
         .build();
   }
 
+  public static PropertyEntry<Short> shortPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Short defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Short>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Short.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Short::parseShort)
+        .withEncoder(String::valueOf)
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public static PropertyEntry<String> stringReservedPropertyEntry(
       String name, String description, boolean hidden) {
     return stringPropertyEntry(name, description, false, true, null, hidden, true);
@@ -262,6 +284,11 @@ public final class PropertyEntry<T> {
   public static PropertyEntry<String> stringOptionalPropertyEntry(
       String name, String description, boolean immutable, String defaultValue, boolean hidden) {
     return stringPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
+  }
+
+  public static PropertyEntry<Short> shortOptionalPropertyEntry(
+      String name, String description, boolean immutable, Short defaultValue, boolean hidden) {
+    return shortPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
   public static PropertyEntry<Integer> integerOptionalPropertyEntry(

@@ -7,7 +7,9 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
@@ -32,7 +34,11 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
-  private CatalogOperationDispatcher catalogOperationDispatcher;
+  private SchemaOperationDispatcher schemaOperationDispatcher;
+
+  private TableOperationDispatcher tableOperationDispatcher;
+
+  private FilesetOperationDispatcher filesetOperationDispatcher;
 
   private MetalakeManager metalakeManager;
 
@@ -97,8 +103,12 @@ public class GravitinoEnv {
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.catalogOperationDispatcher =
-        new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.tableOperationDispatcher =
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     // Create and initialize access control related modules
     this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
@@ -141,12 +151,30 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogOperationDispatcher instance.
+   * @return The SchemaOperationDispatcher instance.
    */
-  public CatalogOperationDispatcher catalogOperationDispatcher() {
-    return catalogOperationDispatcher;
+  public SchemaOperationDispatcher schemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
+
+  /**
+   * Get the TableOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The TableOperationDispatcher instance.
+   */
+  public TableOperationDispatcher tableOperationDispatcher() {
+    return tableOperationDispatcher;
+  }
+
+  /**
+   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The FilesetOperationDispatcher instance.
+   */
+  public FilesetOperationDispatcher filesetOperationDispatcher() {
+    return filesetOperationDispatcher;
   }
 
   /**

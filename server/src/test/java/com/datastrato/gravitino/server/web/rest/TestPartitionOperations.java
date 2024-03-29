@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
@@ -86,7 +86,7 @@ public class TestPartitionOperations extends JerseyTest {
     }
   }
 
-  private CatalogOperationDispatcher dispatcher = mock(CatalogOperationDispatcher.class);
+  private TableOperationDispatcher dispatcher = mock(TableOperationDispatcher.class);
   private final String metalake = "metalake1";
   private final String catalog = "catalog1";
   private final String schema = "schema1";
@@ -116,7 +116,7 @@ public class TestPartitionOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(CatalogOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(TableOperationDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
