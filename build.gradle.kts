@@ -61,7 +61,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Found unsupported Scala version: $scalaVersion")
 }
-val sparkMajorVersion: String = extra["sparkMajorVersion"].toString()
+val sparkMajorVersion: String = libs.versions.spark.get().substringBeforeLast(".")
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
