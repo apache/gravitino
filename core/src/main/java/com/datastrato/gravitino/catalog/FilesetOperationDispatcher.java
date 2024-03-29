@@ -136,8 +136,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
    * <p>Implementation may reject the change. If any change is rejected, no changes should be
    * applied to the fileset.
    *
-   * <p>The {@link FilesetChange.RenameFileset} change will only update the fileset name, the underlying storage
-   * location for managed fileset will not be renamed.
+   * <p>The {@link FilesetChange.RenameFileset} change will only update the fileset name, the
+   * underlying storage location for managed fileset will not be renamed.
    *
    * @param ident A fileset identifier.
    * @param changes The changes to apply to the fileset.
