@@ -5,8 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 
 import Box from '@mui/material/Box'
 import Tab from '@mui/material/Tab'
