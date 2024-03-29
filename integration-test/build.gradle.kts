@@ -146,6 +146,7 @@ tasks.test {
 
     dependsOn(":trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar", ":catalogs:catalog-jdbc-doris:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
