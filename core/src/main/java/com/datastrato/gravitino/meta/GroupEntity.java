@@ -22,6 +22,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, " The unique id of the group entity.");
+
   public static final Field NAME =
       Field.required("name", String.class, "The name of the group entity.");
 

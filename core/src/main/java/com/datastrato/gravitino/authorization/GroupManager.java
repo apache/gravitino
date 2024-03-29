@@ -49,7 +49,7 @@ public class GroupManager {
    * @param group The name of the Group.
    * @return The Added Group instance.
    * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException If creating the Group encounters storage issues.
+   * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     GroupEntity metalakeGroup =
@@ -87,8 +87,8 @@ public class GroupManager {
    *
    * @param metalake The Metalake of the Group.
    * @param group THe name of the Group.
-   * @return `true` if the Group was successfully deleted, `false` otherwise.
-   * @throws RuntimeException If deleting the Group encounters storage issues.
+   * @return `true` if the Group was successfully removed, `false` otherwise.
+   * @throws RuntimeException If removing the Group encounters storage issues.
    */
   public boolean removeGroup(String metalake, String group) {
     try {
@@ -110,7 +110,7 @@ public class GroupManager {
    * @param group THe name of the Group.
    * @return The getting Group instance.
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException If loading the Group encounters storage issues.
+   * @throws RuntimeException If getting the Group encounters storage issues.
    */
   public Group getGroup(String metalake, String group) {
     try {
