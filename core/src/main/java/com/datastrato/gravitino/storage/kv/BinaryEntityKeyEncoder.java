@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
+import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
@@ -78,6 +79,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           FILESET,
           new String[] {FILESET.getShortName() + "/", "/", "/", "/"},
           USER,
+          new String[] {USER.getShortName() + "/", "/", "/", "/"},
+          GROUP,
           new String[] {USER.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
