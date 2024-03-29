@@ -228,7 +228,7 @@ public class TestResponses {
   @Test
   void testUserResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
     UserResponse response = new UserResponse(user);
     response.validate(); // No exception thrown

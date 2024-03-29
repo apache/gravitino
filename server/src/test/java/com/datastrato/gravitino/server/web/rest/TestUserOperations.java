@@ -31,6 +31,7 @@ import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.rest.RESTUtils;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -111,6 +112,8 @@ public class TestUserOperations extends JerseyTest {
 
     UserDTO userDTO = userResponse.getUser();
     Assertions.assertEquals("user1", userDTO.name());
+    Assertions.assertNotNull(userDTO.roles());
+    Assertions.assertTrue(userDTO.roles().isEmpty());
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).addUser(any(), any());
@@ -177,6 +180,8 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(0, userResponse.getCode());
     UserDTO userDTO = userResponse.getUser();
     Assertions.assertEquals("user1", userDTO.name());
+    Assertions.assertNotNull(userDTO.roles());
+    Assertions.assertTrue(userDTO.roles().isEmpty());
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).getUser(any(), any());
@@ -226,6 +231,7 @@ public class TestUserOperations extends JerseyTest {
     return UserEntity.builder()
         .withId(1L)
         .withName(user)
+        .withRoles(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

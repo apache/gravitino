@@ -9,8 +9,8 @@ import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** Represents a User Data Transfer Object (DTO). */
@@ -22,7 +22,6 @@ public class UserDTO implements User {
   @JsonProperty("audit")
   private AuditDTO audit;
 
-  @Nullable
   @JsonProperty("roles")
   private List<String> roles;
 
@@ -33,11 +32,13 @@ public class UserDTO implements User {
    * Creates a new instance of UserDTO.
    *
    * @param name The name of the User DTO.
+   * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
    */
-  protected UserDTO(String name, AuditDTO audit) {
+  protected UserDTO(String name, List<String> roles, AuditDTO audit) {
     this.name = name;
     this.audit = audit;
+    this.roles = roles;
   }
 
   /** @return The name of the User DTO. */
@@ -82,7 +83,7 @@ public class UserDTO implements User {
     protected String name;
 
     /** The roles of the user. */
-    protected List<String> roles;
+    protected List<String> roles = Collections.emptyList();
 
     /** The audit information of the user. */
     protected AuditDTO audit;
@@ -105,7 +106,10 @@ public class UserDTO implements User {
      * @return The builder instance.
      */
     public S withRoles(List<String> roles) {
-      this.roles = roles;
+      if (roles != null) {
+        this.roles = roles;
+      }
+
       return (S) this;
     }
 
@@ -129,7 +133,7 @@ public class UserDTO implements User {
     public UserDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new UserDTO(name, audit);
+      return new UserDTO(name, roles, audit);
     }
   }
 }
