@@ -100,7 +100,7 @@ public class UserDTO implements User {
     }
 
     /**
-     * Sets the properties of the user.
+     * Sets the roles of the user.
      *
      * @param roles The roles of the user.
      * @return The builder instance.

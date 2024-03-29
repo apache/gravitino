@@ -115,7 +115,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertNotNull(userDTO.roles());
     Assertions.assertTrue(userDTO.roles().isEmpty());
 
-    // Test throw NoSuchMetalakeException
+    // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).addUser(any(), any());
     Response resp1 =
         target("/metalakes/metalake1/users")
@@ -130,7 +130,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test throw UserAlreadyExistsException
+    // Test to throw UserAlreadyExistsException
     doThrow(new UserAlreadyExistsException("mock error")).when(manager).addUser(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/users")
@@ -145,7 +145,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(
         UserAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
-    // Test throw internal RuntimeException
+    // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).addUser(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/users")
@@ -183,7 +183,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertNotNull(userDTO.roles());
     Assertions.assertTrue(userDTO.roles().isEmpty());
 
-    // Test throw NoSuchMetalakeException
+    // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).getUser(any(), any());
     Response resp1 =
         target("/metalakes/metalake1/users/user1")
@@ -197,7 +197,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test throw NoSuchUserException
+    // Test to throw NoSuchUserException
     doThrow(new NoSuchUserException("mock error")).when(manager).getUser(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/users/user1")
@@ -211,7 +211,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse1.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse1.getType());
 
-    // Test throw internal RuntimeException
+    // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).getUser(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/users/user1")
