@@ -249,7 +249,7 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -279,7 +279,7 @@ class TestKvGarbageCollector {
       store.put(metalake2);
       store.put(metalake3);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -310,7 +310,7 @@ class TestKvGarbageCollector {
       store.put(catalog1);
       store.put(catalog2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -343,7 +343,7 @@ class TestKvGarbageCollector {
       store.put(schema1);
       store.put(schema2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
@@ -379,7 +379,7 @@ class TestKvGarbageCollector {
       store.put(table1);
       store.put(table2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
