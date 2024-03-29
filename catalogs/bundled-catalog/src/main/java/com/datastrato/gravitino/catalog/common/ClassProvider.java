@@ -36,6 +36,7 @@ import java.util.Set;
  * Therefore, this module is used to store the required classes for the query engine's
  * functionality.
  */
+@SuppressWarnings("UnusedVariable")
 public class ClassProvider {
 
   private static final Set<Class<?>> BASE_CLASS =

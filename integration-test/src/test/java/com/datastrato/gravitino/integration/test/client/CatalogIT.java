@@ -92,6 +92,50 @@ public class CatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testListCatalogsInfo() {
+    String relCatalogName = GravitinoITUtils.genRandomName("rel_catalog_");
+    NameIdentifier relCatalogIdent = NameIdentifier.of(metalakeName, relCatalogName);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    Catalog relCatalog =
+        metalake.createCatalog(
+            relCatalogIdent,
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "relational catalog comment",
+            properties);
+
+    String fileCatalogName = GravitinoITUtils.genRandomName("file_catalog_");
+    NameIdentifier fileCatalogIdent = NameIdentifier.of(metalakeName, fileCatalogName);
+    Catalog fileCatalog =
+        metalake.createCatalog(
+            fileCatalogIdent,
+            Catalog.Type.FILESET,
+            "hadoop",
+            "file catalog comment",
+            Collections.emptyMap());
+
+    Catalog[] catalogs = metalake.listCatalogsInfo(relCatalogIdent.namespace());
+    for (Catalog catalog : catalogs) {
+      if (catalog.name().equals(relCatalogName)) {
+        assertCatalogEquals(relCatalog, catalog);
+      } else if (catalog.name().equals(fileCatalogName)) {
+        assertCatalogEquals(fileCatalog, catalog);
+      }
+    }
+    // TODO: uncomment this after fixing hidden properties
+    // Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
+    // Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
+  }
+
+  private void assertCatalogEquals(Catalog catalog1, Catalog catalog2) {
+    Assertions.assertEquals(catalog1.name(), catalog2.name());
+    Assertions.assertEquals(catalog1.type(), catalog2.type());
+    Assertions.assertEquals(catalog1.provider(), catalog2.provider());
+    Assertions.assertEquals(catalog1.comment(), catalog2.comment());
+  }
+
+  @Test
   @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
   public void testCreateCatalogWithPackage() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");

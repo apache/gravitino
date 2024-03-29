@@ -8,8 +8,10 @@ package com.datastrato.gravitino.storage.kv;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
+import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.Entity.EntityType.USER;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 
@@ -332,6 +334,20 @@ public class KvEntityStore implements EntityStore {
     return prefixes;
   }
 
+  void deleteUserEntitiesIfNecessary(NameIdentifier ident, EntityType type) throws IOException {
+    if (type != METALAKE) {
+      return;
+    }
+    byte[] encode = entityKeyEncoder.encode(ident, type, true);
+    byte[] prefix = replacePrefixTypeInfo(encode, USER.getShortName());
+    transactionalKvBackend.deleteRange(
+        new KvRange.KvRangeBuilder()
+            .start(prefix)
+            .startInclusive(true)
+            .end(Bytes.increment(Bytes.wrap(prefix)).get())
+            .build());
+  }
+
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
     byte[] result = new byte[encode.length];
     System.arraycopy(encode, 0, result, 0, encode.length);
@@ -390,6 +406,7 @@ public class KvEntityStore implements EntityStore {
                     .build());
           }
 
+          deleteUserEntitiesIfNecessary(ident, entityType);
           return transactionalKvBackend.delete(dataKey);
         });
   }
