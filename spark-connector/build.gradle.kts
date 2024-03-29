@@ -26,10 +26,10 @@ dependencies {
   implementation(libs.guava)
   implementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
   implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
-  implementation("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
 
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
@@ -37,12 +37,13 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  testImplementation("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.shadowJar {
   isZip64 = true
-  archiveFileName.set("${rootProject.name}-spark-connector-runtime-$version.jar")
+  archiveFileName.set("${rootProject.name}-spark-connector-runtime-3.4_$scalaVersion-$version.jar")
   archiveClassifier.set("")
 
   relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
