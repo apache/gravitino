@@ -77,9 +77,6 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
   public WebElement metalakeNameLink;
 
-  @FindBy(xpath = "//div[@data-prev-refer='props-metastore.uris']//input[@name='value']")
-  public WebElement hiveCatalogURIInput;
-
   @FindBy(xpath = "//div[contains(@class, 'MuiDataGrid-columnHeaders')]//div[@role='row']")
   public WebElement columnHeaders;
 
@@ -88,6 +85,12 @@ public class CatalogsPage extends AbstractWebIT {
 
   @FindBy(xpath = "//*[@data-refer='details-props-table']")
   public WebElement detailsPropsTable;
+
+  @FindBy(xpath = "//*[@data-refer='catalog-provider-selector']")
+  public WebElement catalogProviderSelector;
+
+  @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-provider']")
+  public WebElement catalogProviderList;
 
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
@@ -129,9 +132,11 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void setHiveCatalogURI(String value) {
+  public void setCatalogPropInput(String key, String value) {
     try {
-      hiveCatalogURIInput.sendKeys(value);
+      String xpath = "//div[@data-prev-refer='props-" + key + "']//input[@name='value']";
+      WebElement propItem = driver.findElement(By.xpath(xpath));
+      propItem.sendKeys(value);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -267,7 +272,13 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyCreateHiveCatalog(String name) {
+  public void clickSelectProvider(String provider) throws InterruptedException {
+    WebElement providerItem =
+        catalogProviderList.findElement(By.xpath(".//li[@data-value='" + provider + "']"));
+    clickAndWait(providerItem);
+  }
+
+  public boolean verifyCreateCatalog(String name) {
     try {
       String xpath =
           "//div[contains(@class, 'ant-tree-treenode')]//span[@title='"

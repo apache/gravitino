@@ -451,6 +451,7 @@ const CreateCatalogDialog = props => {
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
                       disabled={type === 'update'}
+                      data-refer='catalog-provider-selector'
                     >
                       {providerTypes.map(item => {
                         return (
