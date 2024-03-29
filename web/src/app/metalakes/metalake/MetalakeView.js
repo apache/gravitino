@@ -26,7 +26,6 @@ import {
   getFilesetDetails,
   setSelectedNodes
 } from '@/lib/store/metalakes'
-import { type } from 'os'
 
 const MetalakeView = () => {
   const dispatch = useAppDispatch()
