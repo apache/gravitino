@@ -394,7 +394,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public void close() throws IOException {
-    adminClient.close();
+    if (adminClient != null) {
+      adminClient.close();
+      adminClient = null;
+    }
   }
 
   @Override
