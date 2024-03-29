@@ -229,10 +229,9 @@ public class GravitinoMockServer implements AutoCloseable {
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
 
-                CatalogConnectorMetadataAdapter metadataAdapter =
-                    catalogConnectorManager
-                        .getCatalogConnector(catalogName.toString())
-                        .getMetadataAdapter();
+                catalogConnectorManager
+                    .getCatalogConnector(catalogName.toString())
+                    .getMetadataAdapter();
                 GravitinoSchema schema = new GravitinoSchema(schemaName.name(), properties, "");
                 metadata.createSchema(null, schemaName.name(), emptyMap(), null);
 
@@ -602,7 +601,7 @@ public class GravitinoMockServer implements AutoCloseable {
     }
   }
 
-  class Metalake {
+  static class Metalake {
     GravitinoMetalake metalake;
     Map<String, Catalog> catalogs = new HashMap<>();
 

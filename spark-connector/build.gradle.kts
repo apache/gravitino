@@ -20,6 +20,7 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":common"))
   implementation(libs.bundles.log4j)
