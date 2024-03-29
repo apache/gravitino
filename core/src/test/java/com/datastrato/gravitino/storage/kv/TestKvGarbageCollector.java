@@ -155,14 +155,7 @@ class TestKvGarbageCollector {
 
   @Test
   void testRemoveWithGCCollector1() throws IOException, InterruptedException {
-    Config config = Mockito.mock(Config.class);
-    File baseDir = new File(System.getProperty("java.io.tmpdir"));
-    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-    file.deleteOnExit();
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Config config = getConfig();
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
@@ -240,16 +233,8 @@ class TestKvGarbageCollector {
 
   @Test
   void testRemoveWithGCCollector2() throws IOException, InterruptedException {
-    Config config = Mockito.mock(Config.class);
-    File baseDir = new File(System.getProperty("java.io.tmpdir"));
-    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-    file.deleteOnExit();
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Config config = getConfig();
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
