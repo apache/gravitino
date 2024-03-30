@@ -52,6 +52,10 @@ public class TestEntity {
   private final Long userId = 1L;
   private final String userName = "testUser";
 
+  // Group test data
+  private final Long groupId = 1L;
+  private final String groupName = "testGroup";
+
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
@@ -226,5 +230,26 @@ public class TestEntity {
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(testUserEntityWithoutFields.roles());
+  }
+
+  @Test
+  public void testGroup() {
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    Map<Field, Object> fields = group.fields();
+    Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
+    Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLES));
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+
+    Assertions.assertNull(groupWithoutFields.roles());
   }
 }

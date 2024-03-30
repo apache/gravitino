@@ -6,6 +6,8 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -99,11 +101,59 @@ public class TestAccessControlManager {
     accessControlManager.addUser("metalake", "testRemove");
 
     // Test to remove user
-    boolean dropped = accessControlManager.removeUser("metalake", "testRemove");
-    Assertions.assertTrue(dropped);
+    boolean removed = accessControlManager.removeUser("metalake", "testRemove");
+    Assertions.assertTrue(removed);
 
     // Test to remove non-existed user
-    boolean dropped1 = accessControlManager.removeUser("metalake", "no-exist");
-    Assertions.assertFalse(dropped1);
+    boolean removed1 = accessControlManager.removeUser("metalake", "no-exist");
+    Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testAddGroup() {
+
+    Group group = accessControlManager.addGroup("metalake", "testAdd");
+    Assertions.assertEquals("testAdd", group.name());
+    Assertions.assertTrue(group.roles().isEmpty());
+
+    group = accessControlManager.addGroup("metalake", "testAddWithOptionalField");
+
+    Assertions.assertEquals("testAddWithOptionalField", group.name());
+    Assertions.assertTrue(group.roles().isEmpty());
+
+    // Test with GroupAlreadyExistsException
+    Assertions.assertThrows(
+        GroupAlreadyExistsException.class,
+        () -> accessControlManager.addGroup("metalake", "testAdd"));
+  }
+
+  @Test
+  public void testGetGroup() {
+
+    accessControlManager.addGroup("metalake", "testGet");
+
+    Group group = accessControlManager.getGroup("metalake", "testGet");
+    Assertions.assertEquals("testGet", group.name());
+
+    // Test to get non-existed group
+    Throwable exception =
+        Assertions.assertThrows(
+            NoSuchGroupException.class,
+            () -> accessControlManager.getGroup("metalake", "not-exist"));
+    Assertions.assertTrue(exception.getMessage().contains("Group not-exist does not exist"));
+  }
+
+  @Test
+  public void testRemoveGroup() {
+
+    accessControlManager.addGroup("metalake", "testRemove");
+
+    // Test to remove group
+    boolean removed = accessControlManager.removeGroup("metalake", "testRemove");
+    Assertions.assertTrue(removed);
+
+    // Test to remove non-existed group
+    boolean removed1 = accessControlManager.removeUser("metalake", "no-exist");
+    Assertions.assertFalse(removed1);
   }
 }
