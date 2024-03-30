@@ -15,8 +15,8 @@ import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_US
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Catalog;
@@ -92,7 +92,7 @@ public class TestEntityStorage {
 
       Assertions.assertEquals(KV_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
       Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
       File dir = new File(DB_DIR);
       if (dir.exists() || !dir.isDirectory()) {
