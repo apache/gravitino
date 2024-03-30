@@ -2,33 +2,41 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
+import io.github.piyushroshan.python.VenvTask
 
-tasks.withType(Exec::class) {
-  workingDir = file("${project.projectDir}")
+plugins {
+  id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
+}
+
+pythonPlugin {
+  pythonVersion.set(project.rootProject.extra["pythonVersion"].toString())
 }
 
 tasks {
-  val pythonVersion by registering(Exec::class) {
-    commandLine("python", "--version")
+  register<VenvTask>("condaInfo") {
+    venvExec = "conda"
+    args = listOf("info")
   }
 
-  val installPip by registering(Exec::class) {
-    dependsOn(pythonVersion)
-    commandLine("python", "-m", "pip", "install", "--upgrade", "pip")
+  val pipInstall by registering(VenvTask::class) {
+    venvExec = "pip"
+    args = listOf("install", "--isolated", "-r", "requirements.txt")
   }
 
-  val installDeps by registering(Exec::class) {
-    dependsOn(installPip)
-    commandLine("python", "-m", "pip", "install", "-r", "requirements.txt")
+  val runPyTests by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    venvExec = "pytest"
+    workingDir = projectDir.resolve("tests")
   }
 
-  val pyTest by registering(Exec::class) {
-    dependsOn(installDeps)
-    commandLine("pytest", "${project.projectDir}/tests")
+  compileJava {
+    dependsOn(pipInstall)
   }
 
   test {
-    dependsOn(pyTest)
+    dependsOn(runPyTests)
+    useJUnitPlatform()
+    testLogging.showStandardStreams = true
   }
 
   clean {
