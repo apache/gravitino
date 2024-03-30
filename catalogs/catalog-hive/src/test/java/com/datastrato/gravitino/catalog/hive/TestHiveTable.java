@@ -514,11 +514,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     TableChange tableChange9 = TableChange.updateColumnDefaultValue(new String[] {"col_1"}, Literals.of("0", Types.ByteType.get()));
     exception =
-            Assertions.assertThrows(
-                    IllegalArgumentException.class,
-                    () -> tableCatalog.alterTable(tableIdentifier, tableChange9));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange9));
+
     Assertions.assertEquals(
-            "Hive does not support altering column default value", exception.getMessage());
+        "Hive does not support altering column default value", exception.getMessage());
 
     // test alter
     tableCatalog.alterTable(

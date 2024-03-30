@@ -259,6 +259,8 @@ public class IcebergTableOpsHelper {
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        throw new IllegalArgumentException("Iceberg doesn't support update column default value");
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");

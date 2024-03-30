@@ -598,7 +598,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
               if (c instanceof TableChange.UpdateColumnDefaultValue) {
                 throw new IllegalArgumentException(
-                        "Hive does not support altering column default value");
+                    "Hive does not support altering column default value");
               }
 
               if (c instanceof TableChange.UpdateColumnPosition
@@ -812,7 +812,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
           } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
             throw new IllegalArgumentException(
-                    "Hive does not support altering column default value");
+                "Hive does not support altering column default value");
 
           } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
             throw new IllegalArgumentException(
