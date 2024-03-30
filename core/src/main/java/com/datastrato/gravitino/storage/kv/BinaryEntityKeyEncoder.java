@@ -11,7 +11,6 @@ import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
-import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
 import static com.datastrato.gravitino.Entity.EntityType.USER;
 
 import com.datastrato.gravitino.Entity.EntityType;
