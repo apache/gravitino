@@ -87,20 +87,6 @@ class HTTPClient:
 
     def _make_request(self, opener, request, timeout=None):
         timeout = timeout or self.timeout
-        #         logger.debug(
-        #             """
-        # ==========================[QUERY]===============================
-        # method: {}
-        # url: {}
-        # headers: {}
-        # body: {}
-        # ==========================[QUERY]===============================""".format(  # noqa
-        #                 request.get_method(),
-        #                 request.get_full_url(),
-        #                 self._mask_auth_headers(dict(request.header_items())),
-        #                 request.data,
-        #             )
-        #         )
         try:
             return opener.open(request, timeout=timeout)
         except HTTPError as err:
