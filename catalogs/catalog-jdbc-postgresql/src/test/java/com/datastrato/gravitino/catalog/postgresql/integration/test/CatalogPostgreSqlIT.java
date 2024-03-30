@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -787,26 +786,22 @@ public class CatalogPostgreSqlIT extends AbstractIT {
                 columns,
                 table_comment,
                 createProperties());
-
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
     catalog
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[0].name()},
-                toFunctionArg(Literals.of("1.234", Types.FloatType.get()))),
+                new String[] {columns[0].name()}, Literals.of("1.234", Types.FloatType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[1].name()},
-                toFunctionArg(Literals.of("hello", Types.VarCharType.of(255)))),
+                new String[] {columns[1].name()}, Literals.of("hello", Types.VarCharType.of(255))),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()},
-                toFunctionArg(Literals.of("world", Types.StringType.get()))),
+                new String[] {columns[2].name()}, Literals.of("world", Types.StringType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[3].name()},
-                toFunctionArg(Literals.of(2000, Types.IntegerType.get()))),
+                new String[] {columns[3].name()}, Literals.of(2000, Types.IntegerType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[4].name()},
-                toFunctionArg(FunctionExpression.of("current_timestamp"))));
+                new String[] {columns[4].name()}, FunctionExpression.of("current_timestamp")));
 
     table =
         catalog

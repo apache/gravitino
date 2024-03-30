@@ -241,7 +241,8 @@ class DTOConverters {
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
       return new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
-          change.fieldName(), ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue());
+          change.fieldName(),
+          toFunctionArg(((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue()));
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return new TableUpdateRequest.UpdateTableColumnTypeRequest(
