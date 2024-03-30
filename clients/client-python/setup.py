@@ -3,34 +3,21 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-import io
-import os
 from setuptools import find_packages, setup
-
-
-def read(*paths, **kwargs):
-    content = ""
-    with io.open(
-        os.path.join(os.path.dirname(__file__), *paths),
-        encoding=kwargs.get("encoding", "utf8"),
-    ) as open_file:
-        content = open_file.read().strip()
-    return content
 
 
 setup(
     name="gravitino",
-    version="0.0.1",
     description="project description TBD",
-    url="https://github.com/datastrato/gravitino",
-    long_description=read("README.md"),
+    version="0.0.1",
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
+    url="https://github.com/datastrato/gravitino",
     author="datastrato",
+    python_requires=">=3.8",
     packages=find_packages(include=["gravitino", ".*"]),
-    install_requires=[],
+    install_requires=open("requirements.txt").read(),
     extras_require={
-        "dev": [
-            "pytest~=8.0.1",
-        ]
+        "dev": open("requirements-dev.txt").read(),
     },
 )
