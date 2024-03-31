@@ -230,6 +230,7 @@ Gravitino supports these table alteration operations:
 - `UpdateColumnPosition`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `UpdateColumnDefaultValue`
 - `SetProperty`
 
 :::info
