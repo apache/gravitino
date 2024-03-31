@@ -207,6 +207,25 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testHiveFormatWithExternalTable() {
+    String tableName = "test_hive_format_with_external_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateExternalTableString(tableName);
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
+                    HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
   void testHiveFormatWithUsing() {
     String tableName = "test_hive_format_using_table";
     dropTableIfExists(tableName);

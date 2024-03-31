@@ -731,6 +731,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         tableName);
   }
 
+  protected String getCreateExternalTableString(String tableName) {
+    return String.format(
+        "CREATE EXTERNAL TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
+        tableName);
+  }
+
   protected List<SparkColumnInfo> getSimpleTableColumn() {
     return Arrays.asList(
         SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
