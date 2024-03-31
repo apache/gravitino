@@ -5,13 +5,14 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
 import com.google.common.annotations.VisibleForTesting;
 
 public class IcebergPropertiesConstants {
 
   @VisibleForTesting
   public static final String LAKEHOUSE_ICEBERG_CATALOG_BACKEND =
-      IcebergCatalogPropertiesMetadata.CATALOG_BACKEND;
+      IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 
   @VisibleForTesting
   public static final String LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE =
