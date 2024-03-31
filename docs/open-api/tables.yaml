@@ -392,7 +392,7 @@ components:
           updateColumnComment: "#/components/schemas/UpdateTableColumnCommentRequest"
           updateColumnPosition: "#/components/schemas/UpdateTableColumnPositionRequest"
           updateColumnNullability: "#/components/schemas/UpdateTableColumnNullabilityRequest"
-          updateColumnDefaultValue: "#/components/schemas/UpdateTableColumnDefaultValueyRequest"
+          updateColumnDefaultValue: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
           deleteColumn: "#/components/schemas/DeleteTableColumnRequest"
 
     RenameTableRequest:
@@ -664,7 +664,7 @@ components:
       example: {
         "@type": "updateColumnDefaultValue",
         "fieldName": [ "existing_column" ],
-        "newDefaultValue": :{ "type": "literal", "dataType": "varchar(100)", "value": "new default value" }
+        "newDefaultValue": { "type": "literal", "dataType": "varchar(100)", "value": "new default value" }
       }
 
     DeleteTableColumnRequest:
