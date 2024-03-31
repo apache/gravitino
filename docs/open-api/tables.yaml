@@ -501,13 +501,28 @@ components:
           description: Whether the column to add is nullable
           nullable: true
           default: true
+        autoIncrement:
+          type: boolean
+          description: Whether the column to add should auto increment
+          nullable: true
+          default: false
+        defaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
+          description: The default value of the column to add
+          nullable: true
       example: {
         "@type": "addColumn",
         "fieldName": [ "new_column" ],
         "type": "integer",
         "comment": "new integer column comment",
         "position": "first",
-        "nullable": true
+        "nullable": true,
+        "autoIncrement": false,
+        "defaultValue" : {
+          "type": "literal",
+          "dataType": "integer",
+          "value": "1024"
+        }
       }
 
     RenameTableColumnRequest:
