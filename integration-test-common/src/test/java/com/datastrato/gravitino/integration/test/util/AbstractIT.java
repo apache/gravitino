@@ -6,7 +6,6 @@ package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -273,18 +272,7 @@ public class AbstractIT {
     Assertions.assertEquals(tableComment, table.comment());
     Assertions.assertEquals(columns.size(), table.columns().length);
     for (int i = 0; i < columns.size(); i++) {
-      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
-      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
-      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
-      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
-      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
-      if (columns.get(i).defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
-          && columns.get(i).nullable()) {
-        Assertions.assertEquals(LiteralDTO.NULL, table.columns()[i].defaultValue());
-      } else {
-        Assertions.assertEquals(
-            toFunctionArg(columns.get(i).defaultValue()), table.columns()[i].defaultValue());
-      }
+      assertColumn(columns.get(i), table.columns()[i]);
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
