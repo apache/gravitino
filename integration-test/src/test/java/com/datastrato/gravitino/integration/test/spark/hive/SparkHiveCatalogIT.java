@@ -8,10 +8,13 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -85,5 +88,237 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     String partitionExpression = "age_p1=1/age_p2=b";
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
+  }
+
+  @Test
+  public void testInsertHiveFormatPartitionTableAsSelect() {
+    String tableName = "insert_hive_partition_table";
+    String newTableName = "new_" + tableName;
+
+    // create source table
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableReadWrite(tableInfo);
+
+    // insert into partition ((name = %s, age = %s) select xx
+    dropTableIfExists(newTableName);
+    String createTableSql =
+        String.format(
+            "CREATE TABLE %s (id INT) PARTITIONED BY (name STRING, age INT)", newTableName);
+    sql(createTableSql);
+    String insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age = %s) SELECT id FROM %s",
+            newTableName,
+            typeConstant.get(DataTypes.StringType),
+            typeConstant.get(DataTypes.IntegerType),
+            tableName);
+    sql(insertPartitionSql);
+
+    SparkTableInfo newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    String expectedData = getExpectedTableData(newTableInfo);
+    List<String> tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name = %s, age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name = %s, age) SELECT id, age FROM %s",
+            newTableName, typeConstant.get(DataTypes.StringType), tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+
+    // insert into partition ((name,  age) select xx
+    dropTableIfExists(newTableName);
+    sql(createTableSql);
+    insertPartitionSql =
+        String.format(
+            "INSERT OVERWRITE TABLE %s PARTITION (name , age) SELECT * FROM %s",
+            newTableName, tableName);
+    sql(insertPartitionSql);
+
+    newTableInfo = getTableInfo(newTableName);
+    checkPartitionDirExists(newTableInfo);
+    tableData = getTableData(newTableName);
+    Assertions.assertTrue(tableData.size() == 1);
+    Assertions.assertEquals(expectedData, tableData.get(0));
+  }
+
+  @Test
+  void testHiveDefaultFormat() {
+    String tableName = "hive_default_format_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  void testHiveFormatWithStoredAs() {
+    String tableName = "test_hive_format_stored_as_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "STORED AS PARQUET";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  @Test
+  void testHiveFormatWithUsing() {
+    String tableName = "test_hive_format_using_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "USING PARQUET";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  @Test
+  void testHivePropertiesWithSerdeRowFormat() {
+    String tableName = "test_hive_row_serde_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql =
+        String.format(
+            "%s ROW FORMAT SERDE '%s' WITH SERDEPROPERTIES ('serialization.format'='@', 'field.delim' = ',') STORED AS INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
+            createTableSql,
+            HivePropertiesConstants.PARQUET_SERDE_CLASS,
+            HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+            HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS);
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
+                    "@",
+                    TableCatalog.OPTION_PREFIX + "field.delim",
+                    ",",
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  /*
+  | DELIMITED [ FIELDS TERMINATED BY fields_terminated_char [ ESCAPED BY escaped_char ] ]
+      [ COLLECTION ITEMS TERMINATED BY collection_items_terminated_char ]
+      [ MAP KEYS TERMINATED BY map_key_terminated_char ]
+      [ LINES TERMINATED BY row_terminated_char ]
+      [ NULL DEFINED AS null_char ]
+   */
+  @Test
+  void testHivePropertiesWithDelimitedRowFormat() {
+    String tableName = "test_hive_row_format_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql +=
+        "ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY ';' "
+            + "COLLECTION ITEMS TERMINATED BY '@' "
+            + "MAP KEYS TERMINATED BY ':' "
+            + "NULL DEFINED AS 'n' "
+            + "STORED AS TEXTFILE";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    TableCatalog.OPTION_PREFIX + "field.delim",
+                    ",",
+                    TableCatalog.OPTION_PREFIX + "escape.delim",
+                    ";",
+                    TableCatalog.OPTION_PREFIX + "mapkey.delim",
+                    ":",
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
+                    ",",
+                    TableCatalog.OPTION_PREFIX + "colelction.delim",
+                    "@",
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+
+    // check it's a text file and field.delim take effects
+    List<Object[]> rows =
+        rowsToJava(
+            getSparkSession()
+                .read()
+                .option("delimiter", ",")
+                .csv(tableInfo.getTableLocation())
+                .collectAsList());
+    Assertions.assertTrue(rows.size() == 1);
+    Object[] row = rows.get(0);
+    Assertions.assertEquals(3, row.length);
+    Assertions.assertEquals("2", row[0]);
+    Assertions.assertEquals("gravitino_it_test", (String) row[1]);
+    Assertions.assertEquals("2", row[2]);
   }
 }

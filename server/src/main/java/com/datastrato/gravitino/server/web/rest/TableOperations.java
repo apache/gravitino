@@ -11,7 +11,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
@@ -46,12 +46,12 @@ public class TableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final TableOperationDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TableOperations(CatalogOperationDispatcher dispatcher) {
+  public TableOperations(TableOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
