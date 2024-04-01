@@ -49,7 +49,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
         architecture: [linux/amd64]
@@ -77,6 +77,10 @@ jobs:
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
         uses: csexton/debugger-action@master
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
 
       - name: Integration Test
         id: integrationTest
