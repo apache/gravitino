@@ -59,16 +59,14 @@ public interface Entity extends Serializable {
         case METALAKE:
           return ImmutableList.of();
         case CATALOG:
-        case USER:
-        case GROUP:
           return ImmutableList.of(METALAKE);
         case SCHEMA:
           return ImmutableList.of(METALAKE, CATALOG);
         case TABLE:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case FILESET:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case TOPIC:
+        case USER:
+        case GROUP:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case COLUMN:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);
