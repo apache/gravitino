@@ -5,6 +5,11 @@
 
 export const providers = [
   {
+    label: 'hadoop',
+    value: 'hadoop',
+    defaultProps: []
+  },
+  {
     label: 'hive',
     value: 'hive',
     defaultProps: [

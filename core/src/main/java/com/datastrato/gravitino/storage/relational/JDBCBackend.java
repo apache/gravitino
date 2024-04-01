@@ -88,6 +88,7 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
     } else {
+      // TODO: Add support for TopicEntity
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
     }

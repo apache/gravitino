@@ -13,6 +13,7 @@ import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.annotations.VisibleForTesting;
 import javax.ws.rs.core.Response;
@@ -53,6 +54,11 @@ public class ExceptionHandlers {
   public static Response handleFilesetException(
       OperationType op, String fileset, String schema, Exception e) {
     return FilesetExceptionHandler.INSTANCE.handle(op, fileset, schema, e);
+  }
+
+  public static Response handleUserException(
+      OperationType op, String user, String metalake, Exception e) {
+    return UserExceptionHandler.INSTANCE.handle(op, user, metalake, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -254,12 +260,42 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class UserExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
+
+    private static String getUserErrorMsg(
+        String fileset, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
+          fileset, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String user, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(user) ? "" : " [" + user + "]";
+      String errorMsg = getUserErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UserAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, user, metalake, e);
+      }
+    }
+  }
+
   @VisibleForTesting
   static class BaseExceptionHandler extends ExceptionHandler {
 
     private static final String EXCEPTION_KEYWORD = "Exception: ";
-
-    private static final ExceptionHandler INSTANCE = new BaseExceptionHandler();
 
     private static String getBaseErrorMsg(
         String object, String operation, String parent, String reason) {

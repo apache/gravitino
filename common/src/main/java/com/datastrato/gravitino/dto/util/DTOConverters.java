@@ -9,9 +9,11 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
+import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -328,6 +330,24 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a user implementation to a UserDTO.
+   *
+   * @param user The user implementation.
+   * @return The user DTO.
+   */
+  public static UserDTO toDTO(User user) {
+    if (user instanceof UserDTO) {
+      return (UserDTO) user;
+    }
+
+    return UserDTO.builder()
+        .withName(user.name())
+        .withRoles(user.roles())
+        .withAudit(toDTO(user.auditInfo()))
+        .build();
+  }
+
+  /**
    * Converts a Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
@@ -460,6 +480,19 @@ public class DTOConverters {
       return new PartitionDTO[0];
     }
     return Arrays.stream(partitions).map(DTOConverters::toDTO).toArray(PartitionDTO[]::new);
+  }
+
+  /**
+   * Converts an array of Catalogs to an array of CatalogDTOs.
+   *
+   * @param catalogs The catalogs to be converted.
+   * @return The array of CatalogDTOs.
+   */
+  public static CatalogDTO[] toDTOs(Catalog[] catalogs) {
+    if (ArrayUtils.isEmpty(catalogs)) {
+      return new CatalogDTO[0];
+    }
+    return Arrays.stream(catalogs).map(DTOConverters::toDTO).toArray(CatalogDTO[]::new);
   }
 
   /**

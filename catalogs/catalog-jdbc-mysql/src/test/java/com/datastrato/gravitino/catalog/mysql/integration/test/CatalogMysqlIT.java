@@ -464,6 +464,7 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  date_col_2 date,\n"
             + "  date_col_3 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),\n"
             + "  date_col_4 date DEFAULT (CURRENT_DATE),\n"
+            + "  date_col_5 date DEFAULT '2024-04-01',\n"
             + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
             + "  timestamp_col_2 timestamp default 19830905,\n"
             + "  decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
@@ -517,6 +518,10 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "date_col_4":
           Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
+          break;
+        case "date_col_5":
+          Assertions.assertEquals(
+              Literals.of("2024-04-01", Types.DateType.get()), column.defaultValue());
           break;
         case "timestamp_col_1":
           Assertions.assertEquals(

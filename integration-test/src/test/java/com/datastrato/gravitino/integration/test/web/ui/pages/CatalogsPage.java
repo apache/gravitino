@@ -23,6 +23,9 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='back-home-btn']")
   public WebElement backHomeBtn;
 
+  @FindBy(xpath = "//*[@data-refer='select-metalake']")
+  public WebElement metalakeSelect;
+
   @FindBy(xpath = "//div[@data-refer='table-grid']")
   public WebElement tableGrid;
 
@@ -88,6 +91,17 @@ public class CatalogsPage extends AbstractWebIT {
 
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
+  }
+
+  public void metalakeSelectChange(String metalakeName) {
+    try {
+      clickAndWait(metalakeSelect);
+      String keyPath = "//li[@data-refer='select-option-" + metalakeName + "']";
+      WebElement selectOption = driver.findElement(By.xpath(keyPath));
+      clickAndWait(selectOption);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public void setCatalogNameField(String nameField) {
@@ -174,9 +188,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickCatalogLink(String metalakeName, String catalogName) {
+  public void clickCatalogLink(String metalakeName, String catalogName, String catalogType) {
     try {
-      String xpath = "//a[@href='?metalake=" + metalakeName + "&catalog=" + catalogName + "']";
+      String xpath =
+          "//a[@href='?metalake="
+              + metalakeName
+              + "&catalog="
+              + catalogName
+              + "&type="
+              + catalogType
+              + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -186,13 +207,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickSchemaLink(String metalakeName, String catalogName, String schemaName) {
+  public void clickSchemaLink(
+      String metalakeName, String catalogName, String catalogType, String schemaName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "']";
@@ -206,13 +230,19 @@ public class CatalogsPage extends AbstractWebIT {
   }
 
   public void clickTableLink(
-      String metalakeName, String catalogName, String schemaName, String tableName) {
+      String metalakeName,
+      String catalogName,
+      String catalogType,
+      String schemaName,
+      String tableName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "&table="

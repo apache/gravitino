@@ -25,7 +25,9 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergTableRenameOperations {
 
-  @Context private HttpServletRequest httpRequest;
+  @SuppressWarnings("UnusedVariable")
+  @Context
+  private HttpServletRequest httpRequest;
 
   private IcebergTableOps icebergTableOps;
 
