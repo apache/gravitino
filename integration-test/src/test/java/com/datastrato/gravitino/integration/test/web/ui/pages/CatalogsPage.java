@@ -188,9 +188,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickCatalogLink(String metalakeName, String catalogName) {
+  public void clickCatalogLink(String metalakeName, String catalogName, String catalogType) {
     try {
-      String xpath = "//a[@href='?metalake=" + metalakeName + "&catalog=" + catalogName + "']";
+      String xpath =
+          "//a[@href='?metalake="
+              + metalakeName
+              + "&catalog="
+              + catalogName
+              + "&type="
+              + catalogType
+              + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -200,13 +207,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickSchemaLink(String metalakeName, String catalogName, String schemaName) {
+  public void clickSchemaLink(
+      String metalakeName, String catalogName, String catalogType, String schemaName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "']";
@@ -220,13 +230,19 @@ public class CatalogsPage extends AbstractWebIT {
   }
 
   public void clickTableLink(
-      String metalakeName, String catalogName, String schemaName, String tableName) {
+      String metalakeName,
+      String catalogName,
+      String catalogType,
+      String schemaName,
+      String tableName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "&table="
