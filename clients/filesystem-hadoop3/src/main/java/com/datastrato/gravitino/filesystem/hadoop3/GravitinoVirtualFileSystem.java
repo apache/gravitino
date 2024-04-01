@@ -290,7 +290,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         virtualUri
             .toString()
             .startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme \"%s\".");
+        "Path %s doesn't start with scheme prefix \"%s\".",
+        virtualUri,
+        GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
 
     if (StringUtils.isBlank(virtualUri.toString())) {
       throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
