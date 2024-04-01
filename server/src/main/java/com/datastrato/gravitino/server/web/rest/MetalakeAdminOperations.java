@@ -21,6 +21,7 @@ import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -66,6 +67,7 @@ public class MetalakeAdminOperations {
     }
   }
 
+  @DELETE
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-admin." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)

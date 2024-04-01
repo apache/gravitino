@@ -95,7 +95,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     UserAddRequest req = new UserAddRequest("user1");
     User user = buildUser("user1");
 
-    when(manager.addUser(any(), any())).thenReturn(user);
+    when(manager.addMetalakeAdmin(any())).thenReturn(user);
 
     Response resp =
         target("/admins")
@@ -115,7 +115,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertTrue(userDTO.roles().isEmpty());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).addUser(any(), any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).addMetalakeAdmin(any());
     Response resp1 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -130,7 +130,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw UserAlreadyExistsException
-    doThrow(new UserAlreadyExistsException("mock error")).when(manager).addUser(any(), any());
+    doThrow(new UserAlreadyExistsException("mock error")).when(manager).addMetalakeAdmin(any());
     Response resp2 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -145,7 +145,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
         UserAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addUser(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).addMetalakeAdmin(any());
     Response resp3 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -186,7 +186,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertTrue(removeResponse.removed());
 
     // Test when failed to remove user
-    when(manager.removeUser(any(), any())).thenReturn(false);
+    when(manager.removeMetalakeAdmin(any())).thenReturn(false);
     Response resp2 =
         target("/admins/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -198,7 +198,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertEquals(0, removeResponse2.getCode());
     Assertions.assertFalse(removeResponse2.removed());
 
-    doThrow(new RuntimeException("mock error")).when(manager).removeUser(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).removeMetalakeAdmin(any());
     Response resp3 =
         target("/admins/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
