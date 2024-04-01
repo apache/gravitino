@@ -105,12 +105,12 @@ public class BinaryEntityEncoderUtil {
 
   /**
    * Get key prefix of all sub-entities under a specific entities. For example, as a metalake will
-   * start with `ml_{metalake_id}`, sub-entities under this metalake will have the prefix
+   * start with `ml/{metalake_id}`, sub-entities under this metalake will have the prefix
    *
    * <pre>
-   *   catalog: ca_{metalake_id}
-   *   schema:  sc_{metalake_id}
-   *   table:   ta_{metalake_id}
+   *   catalog: ca/{metalake_id}
+   *   schema:  sc/{metalake_id}
+   *   table:   ta/{metalake_id}
    * </pre>
    *
    * Why the sub-entities under this metalake start with those prefixes, please see {@link
