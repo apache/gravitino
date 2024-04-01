@@ -186,6 +186,17 @@ public class NameIdentifier {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a topic identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The topic {@link NameIdentifier} to check.
+   */
+  public static void checkTopic(NameIdentifier ident) {
+    check(ident != null, "Topic identifier must not be null");
+    Namespace.checkTopic(ident.namespace);
+  }
+
+  /**
    * Create a {@link NameIdentifier} from the given identifier string.
    *
    * @param identifier The identifier string
