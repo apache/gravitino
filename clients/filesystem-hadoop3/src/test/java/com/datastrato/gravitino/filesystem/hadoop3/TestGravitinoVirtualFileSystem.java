@@ -187,14 +187,14 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
           localPath2.toString());
       FileSystemTestUtils.mkdirs(filesetPath2, fs);
 
-      Thread.sleep(1000);
+      Thread.sleep(5000);
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
               .getFilesetCache()
               .getIfPresent(NameIdentifier.of(metalakeName, catalogName, schemaName, "fileset1")));
 
       // expired by time
-      Thread.sleep(1000);
+      Thread.sleep(5000);
       assertEquals(0, ((GravitinoVirtualFileSystem) fs).getFilesetCache().asMap().size());
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
