@@ -63,8 +63,8 @@ public class ExceptionHandlers {
   }
 
   public static Response handleGroupException(
-      OperationType op, String user, String metalake, Exception e) {
-    return GroupExceptionHandler.INSTANCE.handle(op, user, metalake, e);
+      OperationType op, String group, String metalake, Exception e) {
+    return GroupExceptionHandler.INSTANCE.handle(op, group, metalake, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -271,10 +271,10 @@ public class ExceptionHandlers {
     private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
 
     private static String getUserErrorMsg(
-        String fileset, String operation, String metalake, String reason) {
+        String user, String operation, String metalake, String reason) {
       return String.format(
           "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
-          fileset, operation, metalake, reason);
+          user, operation, metalake, reason);
     }
 
     @Override
