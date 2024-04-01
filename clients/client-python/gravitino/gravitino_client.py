@@ -15,7 +15,7 @@ class MetaLake:
         self.name = payload.get("name")
         self.payload = payload
         self.service = service["service"]
-        self.catalogs = self.service.get_catalogs(self.name)
+        self.catalogs = self.service.list_catalogs(self.name)
 
     def __repr__(self):
         return f"MetaLake<{self.name}>"
@@ -34,7 +34,7 @@ class Catalog:
         self.catalog_name = catalog_name
         self.name = catalog_name
         self.service = service["service"]
-        self.schemas = self.service.get_schemas(metalake_name, catalog_name)
+        self.schemas = self.service.list_schemas(metalake_name, catalog_name)
 
     def __repr__(self):
         return f"Catalog<{self.name}>"
@@ -54,7 +54,7 @@ class Schema:
         self.schema_name = schema_name
         self.name = schema_name
         self.service = service["service"]
-        self.tables = self.service.get_tables(metalake_name, catalog_name, schema_name)
+        self.tables = self.service.list_tables(metalake_name, catalog_name, schema_name)
 
     def __repr__(self):
         return f"Schema<{self.name}>"
@@ -141,7 +141,7 @@ class GravitinoClient:
         return self.service.get_version()
 
     def get_metalakes(self) -> [MetaLake]:
-        return [MetaLake(metalake) for metalake in self.service.get_metalakes()]
+        return [MetaLake(metalake) for metalake in self.service.list_metalakes()]
 
     def get_metalake(self, metalake: str) -> MetaLake:
         return MetaLake(self.service.get_metalake(metalake))

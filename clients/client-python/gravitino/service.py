@@ -20,7 +20,7 @@ class _Service:
         return self.http_client.get("/version")
 
     @unpack("metalakes")
-    def get_metalakes(self) -> Response:
+    def list_metalakes(self) -> Response:
         return self.http_client.get("/metalakes")
 
     @unpack("metalake")
@@ -28,7 +28,7 @@ class _Service:
         return self.http_client.get(f"/metalakes/{metalake}")
 
     @unpack("identifiers")
-    def get_catalogs(self, metalake: str) -> Response:
+    def list_catalogs(self, metalake: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/")
 
     @unpack("catalog")
@@ -36,7 +36,7 @@ class _Service:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/{catalog}")
 
     @unpack("identifiers")
-    def get_schemas(self, metalake: str, catalog: str) -> Response:
+    def list_schemas(self, metalake: str, catalog: str) -> Response:
         return self.http_client.get(f"/metalakes/{metalake}/catalogs/{catalog}/schemas")
 
     @unpack("schema")
@@ -46,7 +46,7 @@ class _Service:
         )
 
     @unpack("identifiers")
-    def get_tables(self, metalake: str, catalog: str, schema: str) -> Response:
+    def list_tables(self, metalake: str, catalog: str, schema: str) -> Response:
         return self.http_client.get(
             f"/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables"
         )
@@ -60,7 +60,7 @@ class _Service:
         )
 
     @unpack("names")
-    def get_partitions(
+    def list_partitions(
         self, metalake: str, catalog: str, schema: str, table: str
     ) -> Response:
         return self.http_client.get(

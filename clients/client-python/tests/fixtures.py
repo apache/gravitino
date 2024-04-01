@@ -8,7 +8,7 @@ services_version = {
     "compileDate": "06/02/2024 08:37:11",
     "gitCommit": "ae87dbdef5a749cdbed66d7f0e841cc809ad2510",
 }
-services_get_metalakes = [
+services_list_metalakes = [
     {
         "name": "metalake_demo",
         "comment": "comment",
@@ -20,18 +20,18 @@ services_get_metalake = {
     "comment": "comment",
     "audit": {"creator": "anonymous", "createTime": "2024-03-30T13:49:53.382Z"},
 }
-services_get_catalogs = [
+services_list_catalogs = [
     {"namespace": ["metalake_demo"], "name": "catalog_hive"},
     {"namespace": ["metalake_demo"], "name": "catalog_iceberg"},
     {"namespace": ["metalake_demo"], "name": "catalog_postgres"},
 ]
 services_get_catalog = {"namespace": ["metalake_demo"], "name": "catalog_hive"}
-services_get_schemas = [
+services_list_schemas = [
     {"namespace": ["metalake_demo", "catalog_hive"], "name": "default"},
     {"namespace": ["metalake_demo", "catalog_hive"], "name": "sales"},
 ]
 services_get_schema = {"namespace": ["metalake_demo", "catalog_hive"], "name": "sales"}
-services_get_tables = [
+services_list_tables = [
     {"namespace": ["metalake_demo", "catalog_hive", "sales"], "name": "categories"},
     {"namespace": ["metalake_demo", "catalog_hive", "sales"], "name": "customers"},
     {"namespace": ["metalake_demo", "catalog_hive", "sales"], "name": "products"},
