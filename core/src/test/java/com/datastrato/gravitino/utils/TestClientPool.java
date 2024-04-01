@@ -11,12 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TestClientPool {
-
-  private static final Logger logger = LoggerFactory.getLogger(TestClientPool.class);
 
   private ClientPoolImpl<ClientMock, Exception> clientPool;
 
@@ -86,14 +82,11 @@ public class TestClientPool {
   }
 
   private static class ClientMock {
-    private boolean closed = false;
 
     public String performAction(String input) {
       return input;
     }
 
-    public void close() {
-      closed = true;
-    }
+    public void close() {}
   }
 }

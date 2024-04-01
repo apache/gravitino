@@ -12,6 +12,7 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdatesRequest;
+import com.datastrato.gravitino.dto.responses.CatalogListResponse;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
@@ -23,12 +24,14 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -53,19 +56,27 @@ public class CatalogOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  public Response listCatalogs(@PathParam("metalake") String metalake) {
+  public Response listCatalogs(
+      @PathParam("metalake") String metalake,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             Namespace catalogNS = Namespace.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
-            NameIdentifier[] idents =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake),
-                    LockType.WRITE,
-                    () -> manager.listCatalogs(catalogNS));
-            return Utils.ok(new EntityListResponse(idents));
+            return TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(metalake),
+                LockType.WRITE,
+                () -> {
+                  if (verbose) {
+                    Catalog[] catalogs = manager.listCatalogsInfo(catalogNS);
+                    return Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
+                  } else {
+                    NameIdentifier[] idents = manager.listCatalogs(catalogNS);
+                    return Utils.ok(new EntityListResponse(idents));
+                  }
+                });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
