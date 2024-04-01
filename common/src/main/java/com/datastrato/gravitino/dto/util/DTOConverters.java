@@ -17,6 +17,7 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
+import com.datastrato.gravitino.dto.messaging.TopicDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
@@ -44,6 +45,7 @@ import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -434,6 +436,21 @@ public class DTOConverters {
         .storageLocation(fileset.storageLocation())
         .properties(fileset.properties())
         .audit(toDTO(fileset.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a Topic to a TopicDTO.
+   *
+   * @param topic The topic to be converted.
+   * @return The topic DTO.
+   */
+  public static TopicDTO toDTO(Topic topic) {
+    return TopicDTO.builder()
+        .withName(topic.name())
+        .withComment(topic.comment())
+        .withProperties(topic.properties())
+        .withAudit(toDTO(topic.auditInfo()))
         .build();
   }
 
