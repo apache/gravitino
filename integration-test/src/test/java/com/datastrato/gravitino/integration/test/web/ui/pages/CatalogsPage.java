@@ -93,8 +93,14 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//*[@data-refer='catalog-provider-selector']")
   public WebElement catalogProviderSelector;
 
+  @FindBy(xpath = "//*[@data-refer='catalog-type-selector']")
+  public WebElement catalogTypeSelector;
+
   @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-provider']")
   public WebElement catalogProviderList;
+
+  @FindBy(xpath = "//ui[@aria-labelledby='select-catalog-type']")
+  public WebElement catalogTypeList;
 
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
@@ -329,6 +335,11 @@ public class CatalogsPage extends AbstractWebIT {
     WebElement providerItem =
         catalogProviderList.findElement(By.xpath(".//li[@data-value='" + provider + "']"));
     clickAndWait(providerItem);
+  }
+
+  public void clickSelectType(String type) throws InterruptedException {
+    WebElement typeItem = catalogTypeList.findElement(By.xpath(".//li[@data-value='"+type+"']"));
+    clickAndWait(typeItem);
   }
 
   public boolean verifyCreateCatalog(String name) {

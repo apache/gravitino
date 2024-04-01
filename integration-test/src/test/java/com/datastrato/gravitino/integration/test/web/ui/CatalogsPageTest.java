@@ -39,13 +39,15 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String metalakeName = "test";
   private static final String metalakeSelectName = "metalake_select_name";
   String catalogType = "relational";
-  static String catalogName = "catalog_name";
+  String catalogName = "catalog_name";
   String modifiedCatalogName = catalogName + "_edited";
   String schemaName = "default";
   String tableName = "table";
   String icebergCatalogName = "catalog_iceberg";
   String mysqlCatalogName = "catalog_mysql";
-  static String pgCatalogName = "catalog_pg";
+  String pgCatalogName = "catalog_pg";
+
+  String filesetCatalogName = "catalog_fileset";
 
   @BeforeAll
   public static void before() throws Exception {
@@ -173,6 +175,18 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(5)
+  public void testCreateFilesetCatalog() throws InterruptedException {
+    clickAndWait(catalogsPage.createCatalogBtn);
+    catalogsPage.setCatalogNameField(filesetCatalogName);
+    clickAndWait(catalogsPage.catalogTypeSelector);
+    catalogsPage.clickSelectType("fileset");
+    catalogsPage.setCatalogCommentField("fileset catalog comment");
+    clickAndWait(catalogsPage.handleSubmitCatalogBtn);
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(filesetCatalogName));
+  }
+
+  @Test
+  @Order(6)
   public void testRefreshPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), "Gravitino");
@@ -180,7 +194,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(6)
+  @Order(7)
   public void testViewTabMetalakeDetails() throws InterruptedException {
     clickAndWait(catalogsPage.tabDetailsBtn);
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
@@ -189,7 +203,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.createTable(gravitinoUri, metalakeName, catalogName, schemaName);
     catalogsPage.clickViewCatalogBtn(catalogName);
@@ -197,9 +211,8 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(8)
+  @Order(9)
   public void testEditCatalog() throws InterruptedException {
-
     catalogsPage.clickEditCatalogBtn(catalogName);
     catalogsPage.setCatalogNameField(modifiedCatalogName);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
@@ -207,21 +220,21 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(9)
+  @Order(10)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(metalakeName, modifiedCatalogName, catalogType);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
   }
 
   @Test
-  @Order(10)
+  @Order(11)
   public void testClickSchemaLink() {
     catalogsPage.clickSchemaLink(metalakeName, modifiedCatalogName, catalogType, schemaName);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
   }
 
   @Test
-  @Order(11)
+  @Order(12)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
         metalakeName, modifiedCatalogName, catalogType, schemaName, tableName);
@@ -230,7 +243,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(12)
+  @Order(13)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(metalakeSelectName);
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
@@ -240,7 +253,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(13)
+  @Order(14)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
