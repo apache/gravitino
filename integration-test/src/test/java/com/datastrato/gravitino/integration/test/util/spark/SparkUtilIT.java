@@ -143,7 +143,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     return String.format("SELECT * FROM %s", tableName);
   }
 
-  private List<Object[]> rowsToJava(List<Row> rows) {
+  protected List<Object[]> rowsToJava(List<Row> rows) {
     return rows.stream().map(this::toJava).collect(Collectors.toList());
   }
 

@@ -19,9 +19,9 @@ public class SparkIcebergTable extends SparkBaseTable implements SupportsRowLeve
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,
-      TableCatalog sparkCatalog,
+      TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter) {
-    super(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+    super(identifier, gravitinoTable, sparkIcebergCatalog, propertiesConverter);
   }
 
   @Override

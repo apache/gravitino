@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
@@ -47,12 +47,12 @@ public class SchemaOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final SchemaOperationDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public SchemaOperations(CatalogOperationDispatcher dispatcher) {
+  public SchemaOperations(SchemaOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
