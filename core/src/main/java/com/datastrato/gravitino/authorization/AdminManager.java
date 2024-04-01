@@ -100,7 +100,7 @@ public class AdminManager {
   }
 
   /**
-   * Judge whether the user is the service admin.
+   * Judges whether the user is the service admin.
    *
    * @param user the name of the user
    * @return true, if the user is service admin, otherwise false.
@@ -111,7 +111,7 @@ public class AdminManager {
   }
 
   /**
-   * Judge whether the user is the metalake admin.
+   * Judges whether the user is the metalake admin.
    *
    * @param user the name of the user
    * @return true, if the user is metalake admin, otherwise false.
