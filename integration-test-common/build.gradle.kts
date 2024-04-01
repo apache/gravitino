@@ -36,7 +36,12 @@ dependencies {
 }
 
 tasks.test {
-  useJUnitPlatform()
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    useJUnitPlatform()
+  }
 }
 
 val testJar by tasks.registering(Jar::class) {
