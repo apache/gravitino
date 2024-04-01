@@ -25,6 +25,7 @@ class GravitinoVirtualFileSystemConfiguration {
   /** The configuration key for the URI of the default OAuth server. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY =
       "fs.gravitino.client.oauth2.serverUri";
+
   /** The configuration key for the client credential. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY =
       "fs.gravitino.client.oauth2.credential";

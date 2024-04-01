@@ -12,7 +12,6 @@ import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessing
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import java.security.KeyPair;
 import java.util.Date;
 import org.apache.hc.core5.http.HttpStatus;
 import org.junit.jupiter.api.AfterAll;
@@ -27,18 +26,20 @@ public abstract class Oauth2MockServerBase {
   private static int port;
 
   @SuppressWarnings("JavaUtilDate")
+  private static final String accessToken =
+      Jwts.builder()
+          .setSubject("gravitino")
+          .setExpiration(new Date(System.currentTimeMillis() + 10000))
+          .setAudience("service1")
+          .signWith(
+              Keys.keyPairFor(SignatureAlgorithm.RS256).getPrivate(), SignatureAlgorithm.RS256)
+          .compact();
+
   @BeforeAll
   public static void setup() {
     mockServer = ClientAndServer.startClientAndServer(0);
     port = mockServer.getLocalPort();
-    KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
-    String accessToken =
-        Jwts.builder()
-            .setSubject("gravitino")
-            .setExpiration(new Date(System.currentTimeMillis() + 10000))
-            .setAudience("service1")
-            .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
-            .compact();
+
     OAuth2TokenResponse response =
         new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
     try {
@@ -58,5 +59,9 @@ public abstract class Oauth2MockServerBase {
 
   public static String serverUri() {
     return String.format("%s%d", MOCK_SERVER_HOST, port);
+  }
+
+  public static String accessToken() {
+    return accessToken;
   }
 }
