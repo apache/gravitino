@@ -191,6 +191,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
 
       Awaitility.await()
           .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
           .untilAsserted(
               () ->
                   assertNull(
@@ -203,6 +204,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
       // expired by time
       Awaitility.await()
           .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
           .untilAsserted(
               () ->
                   assertEquals(
