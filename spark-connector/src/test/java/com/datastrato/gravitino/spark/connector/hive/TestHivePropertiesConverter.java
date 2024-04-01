@@ -76,9 +76,11 @@ public class TestHivePropertiesConverter {
                 "b"));
     Assertions.assertEquals(
         ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"), hiveProperties);
+  }
 
-    // external table
-    hiveProperties =
+  @Test
+  void testExternalTable() {
+    Map<String, String> hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"));
     Assertions.assertEquals(
