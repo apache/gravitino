@@ -76,9 +76,6 @@ public class BinaryEntityEncoderUtil {
   public static String generateKeyForMapping(
       NameIdentifier nameIdentifier, EntityType entityType, NameMappingService nameMappingService)
       throws IOException {
-    if (nameIdentifier.namespace().isEmpty()) {
-      return entityType.getShortName() + TYPE_AND_NAME_SEPARATOR + nameIdentifier.name();
-    }
     Namespace namespace = nameIdentifier.namespace();
     String name = nameIdentifier.name();
 

@@ -235,12 +235,14 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // Please review the id-name mapping content in KvNameMappingService.java and
     // method generateMappingKey in this class.
     String[] names = new String[ids.length];
+    List<EntityType> parents = EntityType.getParentEntityTypes(entityType);
     for (int i = 0; i < ids.length; i++) {
       // The format of name is like '{metalake_id}/{catalog_id}/sc_schema_name'
       String name = nameMappingService.getNameById(ids[i]);
       // extract the real name from the name mapping service
       // The name for table is 'table' NOT 'ta_table' to make it backward compatible.
-      if (BinaryEntityEncoderUtil.VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(entityType)) {
+      EntityType currentEntityType = i < parents.size() ? parents.get(i) : entityType;
+      if (BinaryEntityEncoderUtil.VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(currentEntityType)) {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
       } else {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);
