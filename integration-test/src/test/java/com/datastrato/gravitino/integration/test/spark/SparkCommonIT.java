@@ -4,10 +4,12 @@
  */
 package com.datastrato.gravitino.integration.test.spark;
 
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -28,8 +31,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class SparkCommonIT extends SparkEnvIT {
+  private static final Logger LOG = LoggerFactory.getLogger(SparkCommonIT.class);
 
   // To generate test data for write&read table.
   protected static final Map<DataType, String> typeConstant =
@@ -63,14 +69,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsPartition();
 
-  // Use a custom database not the original default database because SparkIT couldn't read&write
-  // data to tables in default database. The main reason is default database location is
+  // Use a custom database not the original default database because SparkCommonIT couldn't
+  // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
   // not real HDFS address. The location of tables created under default database is like
   // hdfs://localhost:9000/xxx which couldn't read write data from SparkCommonIT. Will use default
   // database after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() {
+    // cleanup the metastore_db directory in embedded mode
+    // to avoid the exception about `ERROR XSDB6: Another instance of Derby may have already booted
+    // the database /home/runner/work/gravitino/gravitino/integration-test/metastore_db`
+    File hiveLocalMetaStorePath = new File("metastore_db");
+    try {
+      if (hiveLocalMetaStorePath.exists()) {
+        FileUtils.deleteDirectory(hiveLocalMetaStorePath);
+      }
+    } catch (IOException e) {
+      LOG.error(e.getMessage(), e);
+    }
     sql("USE " + getCatalogName());
     createDatabaseIfNotExists(getDefaultDatabase());
   }
@@ -86,6 +103,18 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql("USE " + getCatalogName());
     getDatabases()
         .forEach(database -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", database)));
+  }
+
+  @Test
+  void testListTables() {
+    String tableName = "t_list";
+    Set<String> tableNames = listTableNames();
+    Assertions.assertFalse(tableNames.contains(tableName));
+    createSimpleTable(tableName);
+    tableNames = listTableNames();
+    Assertions.assertTrue(tableNames.contains(tableName));
+    Assertions.assertThrowsExactly(
+        NoSuchSchemaException.class, () -> sql("SHOW TABLES IN nonexistent_schema"));
   }
 
   @Test
