@@ -186,8 +186,20 @@ class TestKvGarbageCollector {
       kvEntityStore.put(schemaEntity);
       kvEntityStore.put(tableEntity);
       kvEntityStore.put(filesetEntity);
-      kvEntityStore.put(UserEntity.builder().withId(1L).withAuditInfo(auditInfo).withName("the same").withNamespace(Namespace.of("metalake1", "catalog1", "schema1")).build());
-      kvEntityStore.put(GroupEntity.builder().withId(2L).withAuditInfo(auditInfo).withName("the same").withNamespace(Namespace.of("metalake1", "catalog1", "schema1")).build());
+      kvEntityStore.put(
+          UserEntity.builder()
+              .withId(1L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
+      kvEntityStore.put(
+          GroupEntity.builder()
+              .withId(2L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
 
       // now try to scan raw data from kv store
       KvBackend kvBackend = kvEntityStore.backend;
