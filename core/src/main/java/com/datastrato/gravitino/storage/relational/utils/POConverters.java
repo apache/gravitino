@@ -497,6 +497,9 @@ public class POConverters {
     try {
       Map<String, String> oldProperties =
           JsonUtils.anyFieldMapper().readValue(oldFilesetVersionPO.getProperties(), Map.class);
+      if (oldProperties == null) {
+        return newFileset.properties() != null;
+      }
       return !oldProperties.equals(newFileset.properties());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);

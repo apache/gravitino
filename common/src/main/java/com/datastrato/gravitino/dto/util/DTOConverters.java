@@ -9,9 +9,11 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
+import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -64,6 +66,7 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -327,6 +330,24 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a user implementation to a UserDTO.
+   *
+   * @param user The user implementation.
+   * @return The user DTO.
+   */
+  public static UserDTO toDTO(User user) {
+    if (user instanceof UserDTO) {
+      return (UserDTO) user;
+    }
+
+    return UserDTO.builder()
+        .withName(user.name())
+        .withRoles(user.roles())
+        .withAudit(toDTO(user.auditInfo()))
+        .build();
+  }
+
+  /**
    * Converts a Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
@@ -462,6 +483,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Catalogs to an array of CatalogDTOs.
+   *
+   * @param catalogs The catalogs to be converted.
+   * @return The array of CatalogDTOs.
+   */
+  public static CatalogDTO[] toDTOs(Catalog[] catalogs) {
+    if (ArrayUtils.isEmpty(catalogs)) {
+      return new CatalogDTO[0];
+    }
+    return Arrays.stream(catalogs).map(DTOConverters::toDTO).toArray(CatalogDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.
@@ -511,6 +545,8 @@ public class DTOConverters {
         return FunctionExpression.of(
             ((FuncExpressionDTO) arg).functionName(),
             fromFunctionArgs(((FuncExpressionDTO) arg).args()));
+      case UNPARSED:
+        return UnparsedExpression.of(((UnparsedExpressionDTO) arg).unparsedExpression());
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
@@ -641,6 +677,61 @@ public class DTOConverters {
         column.nullable(),
         column.autoIncrement(),
         fromFunctionArg((FunctionArg) column.defaultValue()));
+  }
+
+  /**
+   * Converts a TableDTO to a Table.
+   *
+   * @param tableDTO The table DTO to be converted.
+   * @return The table.
+   */
+  public static Table fromDTO(TableDTO tableDTO) {
+    return new Table() {
+      @Override
+      public String name() {
+        return tableDTO.name();
+      }
+
+      @Override
+      public Column[] columns() {
+        return fromDTOs((ColumnDTO[]) tableDTO.columns());
+      }
+
+      @Override
+      public Transform[] partitioning() {
+        return fromDTOs((Partitioning[]) tableDTO.partitioning());
+      }
+
+      @Override
+      public SortOrder[] sortOrder() {
+        return fromDTOs((SortOrderDTO[]) tableDTO.sortOrder());
+      }
+
+      @Override
+      public Distribution distribution() {
+        return fromDTO((DistributionDTO) tableDTO.distribution());
+      }
+
+      @Override
+      public Index[] index() {
+        return fromDTOs((IndexDTO[]) tableDTO.index());
+      }
+
+      @Override
+      public String comment() {
+        return tableDTO.comment();
+      }
+
+      @Override
+      public Map<String, String> properties() {
+        return tableDTO.properties();
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return tableDTO.auditInfo();
+      }
+    };
   }
 
   /**

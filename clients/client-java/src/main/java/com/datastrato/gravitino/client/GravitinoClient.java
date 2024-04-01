@@ -16,8 +16,6 @@ import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Client for an user to interact with the Gravitino API, allowing the client to list,
@@ -28,8 +26,6 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoClient extends GravitinoClientBase
     implements SupportsCatalogs, SupportsCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoClient.class);
 
   private final GravitinoMetalake metalake;
 
@@ -59,6 +55,11 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     return getMetalake().listCatalogs(namespace);
+  }
+
+  @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    return getMetalake().listCatalogsInfo(namespace);
   }
 
   @Override

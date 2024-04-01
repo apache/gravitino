@@ -17,6 +17,8 @@ import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -113,7 +115,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table createTable(
-      Identifier ident, Column[] columns, Transform[] partitions, Map<String, String> properties)
+      Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
@@ -127,11 +129,23 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
     String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
+    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
+        SparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
+    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
+        SparkTransformConverter.toGravitinoPartitionings(transforms);
+
     try {
       com.datastrato.gravitino.rel.Table table =
           gravitinoCatalogClient
               .asTableCatalog()
-              .createTable(gravitinoIdentifier, gravitinoColumns, comment, gravitinoProperties);
+              .createTable(
+                  gravitinoIdentifier,
+                  gravitinoColumns,
+                  comment,
+                  gravitinoProperties,
+                  partitionings,
+                  distributionAndSortOrdersInfo.getDistribution(),
+                  distributionAndSortOrdersInfo.getSortOrders());
       return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());
@@ -400,6 +414,11 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
           (TableChange.UpdateColumnComment) change;
       return com.datastrato.gravitino.rel.TableChange.updateColumnComment(
           updateColumnComment.fieldNames(), updateColumnComment.newComment());
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      TableChange.UpdateColumnNullability updateColumnNullability =
+          (TableChange.UpdateColumnNullability) change;
+      return com.datastrato.gravitino.rel.TableChange.updateColumnNullability(
+          updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

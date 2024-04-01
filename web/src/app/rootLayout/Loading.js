@@ -7,10 +7,12 @@
 
 import { Box, CircularProgress } from '@mui/material'
 
-const Loading = () => {
+const Loading = ({ height }) => {
+  const heightParams = height ? `twc-h-[${height}]` : 'twc-h-[full]'
+
   return (
-    <Box className={`twc-h-[100vh] twc-flex twc-items-center twc-flex-col twc-justify-center`}>
-      <CircularProgress disableShrink sx={{ mt: 6 }} />
+    <Box className={`${heightParams} twc-grow twc-flex twc-items-center twc-flex-col twc-justify-center`}>
+      <CircularProgress disableShrink sx={{ my: 6 }} />
     </Box>
   )
 }

@@ -190,28 +190,28 @@ public interface FilesetMetaMapper {
   @Update(
       "UPDATE "
           + META_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
           + META_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId);
 
   @Update(
       "UPDATE "
           + META_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId);
 
   @Update(
       "UPDATE "
           + META_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP()"
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId);
 }

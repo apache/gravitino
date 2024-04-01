@@ -5,11 +5,9 @@
 
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -77,15 +75,11 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
                 ImmutableMap.of());
 
     Assertions.assertEquals(
-        toFunctionArg(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
-        createdTable.columns()[0].defaultValue());
-    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[1].defaultValue());
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.NULL, createdTable.columns()[1].defaultValue());
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[2].defaultValue());
     Assertions.assertEquals(
-        LiteralDTO.builder()
-            .withValue("current_timestamp")
-            .withDataType(Types.VarCharType.of(255))
-            .build(),
+        Literals.varcharLiteral(255, "current_timestamp"),
         createdTable.columns()[3].defaultValue());
   }
 }

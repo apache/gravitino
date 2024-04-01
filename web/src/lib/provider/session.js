@@ -8,6 +8,7 @@
 import { createContext, useEffect, useState, useContext } from 'react'
 
 import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { initialVersion } from '@/lib/store/sys'
@@ -31,6 +32,16 @@ const AuthProvider = ({ children }) => {
 
   const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
+  const searchParams = useSearchParams()
+  const paramsSize = [...searchParams.keys()].length
+
+  const goToMetalakeListPage = () => {
+    if (paramsSize) {
+      router.refresh()
+    } else {
+      router.push('/metalakes')
+    }
+  }
 
   const dispatch = useAppDispatch()
 
@@ -41,12 +52,12 @@ const AuthProvider = ({ children }) => {
 
       if (authType === 'simple') {
         dispatch(initialVersion())
-        router.push('/metalakes')
+        goToMetalakeListPage()
       } else if (authType === 'oauth') {
         if (token) {
           dispatch(setAuthToken(token))
           dispatch(initialVersion())
-          router.push('/metalakes')
+          goToMetalakeListPage()
         } else {
           router.push('/login')
         }

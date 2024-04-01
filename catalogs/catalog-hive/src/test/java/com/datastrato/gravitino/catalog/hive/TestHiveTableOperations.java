@@ -36,7 +36,6 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   private static final NameIdentifier tableIdentifier =
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME, genRandomName());
   private static HiveCatalog hiveCatalog;
-  private static HiveSchema hiveSchema;
   private static HiveTable hiveTable;
   private static Column[] columns;
   private static Partition existingPartition;
@@ -44,7 +43,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   @BeforeAll
   public static void setup() {
     hiveCatalog = initHiveCatalog();
-    hiveSchema = initHiveSchema(hiveCatalog);
+    initHiveSchema(hiveCatalog);
     hiveTable = createPartitionedTable();
 
     // add partition: city=0/dt=2020-01-01

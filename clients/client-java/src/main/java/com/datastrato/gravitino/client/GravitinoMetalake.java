@@ -15,6 +15,7 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdatesRequest;
+import com.datastrato.gravitino.dto.responses.CatalogListResponse;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
@@ -24,6 +25,7 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -74,6 +76,32 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.identifiers();
+  }
+
+  /**
+   * List all the catalogs with their information under this metalake with specified namespace.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @return A list of {@link Catalog} under the specified namespace.
+   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   */
+  @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    Namespace.checkCatalog(namespace);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    CatalogListResponse resp =
+        restClient.get(
+            String.format("api/metalakes/%s/catalogs", namespace.level(0)),
+            params,
+            CatalogListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    return Arrays.stream(resp.getCatalogs())
+        .map(c -> DTOConverters.toCatalog(c, restClient))
+        .toArray(Catalog[]::new);
   }
 
   /**

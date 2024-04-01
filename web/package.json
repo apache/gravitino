@@ -27,7 +27,7 @@
     "@mui/x-tree-view": "^6.17.0",
     "@reduxjs/toolkit": "^1.9.7",
     "antd": "^5.13.3",
-    "axios": "^1.6.5",
+    "axios": "^1.6.8",
     "chroma-js": "^2.4.2",
     "clsx": "^2.0.0",
     "dayjs": "^1.11.10",

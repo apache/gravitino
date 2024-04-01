@@ -6,9 +6,12 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
+import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
+import static com.datastrato.gravitino.Entity.EntityType.USER;
 
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
@@ -66,11 +69,22 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   // Key format template. Please the comment of the class for more details.
   public static final Map<EntityType, String[]> ENTITY_TYPE_TO_NAME_IDENTIFIER =
       ImmutableMap.of(
-          METALAKE, new String[] {METALAKE.getShortName() + "/"},
-          CATALOG, new String[] {CATALOG.getShortName() + "/", "/"},
-          SCHEMA, new String[] {SCHEMA.getShortName() + "/", "/", "/"},
-          TABLE, new String[] {TABLE.getShortName() + "/", "/", "/", "/"},
-          FILESET, new String[] {FILESET.getShortName() + "/", "/", "/", "/"});
+          METALAKE,
+          new String[] {METALAKE.getShortName() + "/"},
+          CATALOG,
+          new String[] {CATALOG.getShortName() + "/", "/"},
+          SCHEMA,
+          new String[] {SCHEMA.getShortName() + "/", "/", "/"},
+          TABLE,
+          new String[] {TABLE.getShortName() + "/", "/", "/", "/"},
+          FILESET,
+          new String[] {FILESET.getShortName() + "/", "/", "/", "/"},
+          USER,
+          new String[] {USER.getShortName() + "/", "/", "/", "/"},
+          GROUP,
+          new String[] {GROUP.getShortName() + "/", "/", "/", "/"},
+          TOPIC,
+          new String[] {TOPIC.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 
