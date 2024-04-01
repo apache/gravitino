@@ -249,12 +249,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition addedPartition = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -294,12 +294,12 @@ If the partition name contains special characters, you should use [URL encoding]
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition Partition = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -330,12 +330,12 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 String[] partitionNames = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -367,7 +367,6 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition[] partitions =
         gravitinoClient
-            .loadMetalake(NameIdentifier.of("metalake"))
             .loadCatalog(NameIdentifier.of("metalake", "catalog"))
             .asTableCatalog()
             .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
