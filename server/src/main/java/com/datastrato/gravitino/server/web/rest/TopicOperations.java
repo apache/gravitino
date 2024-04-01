@@ -103,7 +103,10 @@ public class TopicOperations {
                     LockType.WRITE,
                     () ->
                         dispatcher.createTopic(
-                            ident, request.getComment(), null, request.getProperties()));
+                            ident,
+                            request.getComment(),
+                            null /* dataLayout, always null because it's not supported yet.*/,
+                            request.getProperties()));
             return Utils.ok(new TopicResponse(DTOConverters.toDTO(topic)));
           });
     } catch (Exception e) {
