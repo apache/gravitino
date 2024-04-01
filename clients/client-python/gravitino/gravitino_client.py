@@ -27,6 +27,9 @@ class MetaLake:
     def __dir__(self):
         return [catalog["name"] for catalog in self.catalogs]
 
+    def __contains__(self, item):
+        return item in dir(self)
+
 
 class Catalog:
     def __init__(self, metalake_name: str, catalog_name: str):
@@ -45,6 +48,9 @@ class Catalog:
 
     def __dir__(self):
         return [schema["name"] for schema in self.schemas]
+
+    def __contains__(self, item):
+        return item in dir(self)
 
 
 class Schema:
@@ -67,6 +73,9 @@ class Schema:
 
     def __dir__(self):
         return [table["name"] for table in self.tables]
+
+    def __contains__(self, item):
+        return item in dir(self)
 
 
 class Table:

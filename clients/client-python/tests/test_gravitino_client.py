@@ -4,45 +4,12 @@ This software is licensed under the Apache License version 2.
 """
 
 import unittest
-from unittest.mock import patch
 
 from gravitino import GravitinoClient, gravitino_metalake
-from . import fixtures
+from .utils import services_fixtures
 
 
-@patch("gravitino.service._Service.get_version", return_value=fixtures.services_version)
-@patch(
-    "gravitino.service._Service.list_metalakes",
-    return_value=fixtures.services_list_metalakes,
-)
-@patch(
-    "gravitino.service._Service.get_metalake",
-    return_value=fixtures.services_get_metalake,
-)
-@patch(
-    "gravitino.service._Service.list_catalogs",
-    return_value=fixtures.services_list_catalogs,
-)
-@patch(
-    "gravitino.service._Service.get_catalog",
-    return_value=fixtures.services_get_catalog,
-)
-@patch(
-    "gravitino.service._Service.list_schemas",
-    return_value=fixtures.services_list_schemas,
-)
-@patch(
-    "gravitino.service._Service.get_schema",
-    return_value=fixtures.services_get_schema,
-)
-@patch(
-    "gravitino.service._Service.list_tables",
-    return_value=fixtures.services_list_tables,
-)
-@patch(
-    "gravitino.service._Service.get_table",
-    return_value=fixtures.services_get_table,
-)
+@services_fixtures
 class TestGravitinoClient(unittest.TestCase):
     def setUp(self):
         self.client = GravitinoClient("http://localhost:9000")
@@ -58,6 +25,22 @@ class TestGravitinoClient(unittest.TestCase):
     def test_get_metalake(self, *args):
         metalake = self.client.get_metalake("metalake_demo")
         self.assertEqual(metalake.name, "metalake_demo")
+        self.assertIn("catalog_hive", metalake)
+
+    def test_get_catalog(self, *args):
+        catalog = self.client.get_metalake("metalake_demo").catalog_hive
+        self.assertEqual(catalog.name, "catalog_hive")
+        self.assertIn("sales", catalog)
+
+    def test_get_schema(self, *args):
+        schema = self.client.get_metalake("metalake_demo").catalog_hive.sales
+        self.assertEqual(schema.name, "sales")
+        self.assertIn("sales", schema)
+
+    def test_get_table(self, *args):
+        table = self.client.get_metalake("metalake_demo").catalog_hive.sales.sales
+        self.assertEqual(table.name, "sales")
+        self.assertEqual(table.info().get("name"), "sales")
 
     def test_dynamic_properties(self, *args):
         metalake = self.client.get_metalake("metalake_demo")
@@ -66,21 +49,9 @@ class TestGravitinoClient(unittest.TestCase):
         self.assertIn("catalog_postgres", dir(metalake))
         self.assertEqual(metalake.catalog_hive.name, "catalog_hive")
         self.assertEqual(metalake.catalog_hive.sales.name, "sales")
-        self.assertEqual(metalake.catalog_hive.sales.sales.info().get("name"), "sales")
 
 
-@patch(
-    "gravitino.service._Service.get_metalake",
-    return_value=fixtures.services_get_metalake,
-)
-@patch(
-    "gravitino.service._Service.list_catalogs",
-    return_value=fixtures.services_list_catalogs,
-)
-@patch(
-    "gravitino.service._Service.get_catalog",
-    return_value=fixtures.services_get_catalog,
-)
+@services_fixtures
 class TestGravitinoMetalake(unittest.TestCase):
     def test_gravitino_metalake(self, *args):
         metalake = gravitino_metalake("http://localhost:9000", "metalake_demo")
