@@ -92,6 +92,9 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetOperationDispatcher())
                 .to(FilesetOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.topicOperationDispatcher())
+                .to(com.datastrato.gravitino.catalog.TopicOperationDispatcher.class)
+                .ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
