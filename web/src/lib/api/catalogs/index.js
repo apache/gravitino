@@ -6,7 +6,7 @@
 import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
-  GET: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
+  GET: ({ metalake }) => `/api/metalakes/${metalake}/catalogs?details=true`,
   GET_DETAIL: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,
   CREATE: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
   UPDATE: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,

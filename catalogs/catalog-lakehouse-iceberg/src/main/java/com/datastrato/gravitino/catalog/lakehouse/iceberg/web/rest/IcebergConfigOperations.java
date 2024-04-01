@@ -23,7 +23,9 @@ import org.apache.iceberg.rest.responses.ConfigResponse;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergConfigOperations {
 
-  @Context private HttpServletRequest httpRequest;
+  @SuppressWarnings("UnusedVariable")
+  @Context
+  private HttpServletRequest httpRequest;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.storage.kv;
 
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.storage.kv.KvNameMappingService.GENERAL_NAME_MAPPING_PREFIX;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
@@ -44,9 +44,6 @@ public final class KvGarbageCollector implements Closeable {
   private final Config config;
   private final EntityKeyEncoder<byte[]> entityKeyEncoder;
 
-  private static final long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L; // 30 days
-  private static final long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L; // 10 minutes
-
   private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
   @VisibleForTesting
@@ -65,21 +62,10 @@ public final class KvGarbageCollector implements Closeable {
     this.kvBackend = kvBackend;
     this.config = config;
     this.entityKeyEncoder = entityKeyEncoder;
-
-    long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
-    if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The delete time line is too long or too short, "
-                  + "please check it. The delete time line is %s ms,"
-                  + "max delete time allow is %s ms(30 days),"
-                  + "min delete time allow is %s ms(10 minutes)",
-              deleteTimeLine, MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW));
-    }
   }
 
   public void start() {
-    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -133,7 +119,7 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveOldVersionData() throws IOException {
-    long deleteTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
+    long deleteTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
     // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
     // is smaller than transactionIdToDelete)
