@@ -3,18 +3,15 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-import re
-
 from gravitino.constants import TIMEOUT
 from gravitino.service import initialize_service, service
-from gravitino.typing import JSON_ro
 
 
 class MetaLake:
-    def __init__(self, payload: JSON_ro):
-        self.name = payload.get("name")
-        self.payload = payload
+    def __init__(self, metalake_name: str):
+        self.name = metalake_name
         self.service = service["service"]
+        self.metalake = self.service.get_metalake(self.name)
         self.catalogs = self.service.list_catalogs(self.name)
 
     def __repr__(self):
@@ -103,21 +100,11 @@ class GravitinoClient:
         self,
         host: str,
         *,
-        protocol: str = "http",
-        port: int = 8090,
         prefix: str = "/api",
         timeout: int = TIMEOUT,
         debug: bool = False,
     ) -> None:
-        if re.search(r"^https?:\/\/", host):
-            _host = host.rstrip("/")
-        else:
-            _host = f"{protocol}://{host.rstrip('/')}"
-
-        if not re.search(r"[0-9]{2,5}$", _host):
-            _host = f"{_host}:{port}"
-
-        _base_url = f"{_host}/{prefix.strip('/')}"
+        _base_url = f"{host.rstrip('/')}/{prefix.strip('/')}"
         initialize_service(_base_url, timeout)
         self.service = service["service"]
         self.debug = debug
@@ -128,8 +115,6 @@ class GravitinoClient:
         host: str,
         metalake_name: str,
         *,
-        protocol: str = "http",
-        port: int = 8090,
         prefix: str = "/api",
         timeout: int = TIMEOUT,
         debug: bool = False,
@@ -137,8 +122,6 @@ class GravitinoClient:
         # keep in mind, all constructors should include same interface as __init__ function
         client = cls(
             host,
-            protocol=protocol,
-            port=port,
             prefix=prefix,
             timeout=timeout,
             debug=debug,
@@ -150,18 +133,18 @@ class GravitinoClient:
         return self.service.get_version()
 
     def get_metalakes(self) -> [MetaLake]:
-        return [MetaLake(metalake) for metalake in self.service.list_metalakes()]
+        return [
+            MetaLake(metalake.get("name")) for metalake in self.service.list_metalakes()
+        ]
 
     def get_metalake(self, metalake: str) -> MetaLake:
-        return MetaLake(self.service.get_metalake(metalake))
+        return MetaLake(metalake)
 
 
 def gravitino_metalake(
     host: str,
     metalake_name: str,
     *,
-    protocol: str = "http",
-    port: int = 8090,
     prefix: str = "/api",
     timeout: int = TIMEOUT,
     debug: bool = False,
@@ -169,8 +152,6 @@ def gravitino_metalake(
     return GravitinoClient.initialize_metalake(
         host,
         metalake_name,
-        protocol=protocol,
-        port=port,
         prefix=prefix,
         timeout=timeout,
         debug=debug,
