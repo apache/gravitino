@@ -176,6 +176,7 @@ export const fetchCatalogs = createAsyncThunk(
   'appMetalakes/fetchCatalogs',
   async ({ init, update, page, metalake }, { getState, dispatch }) => {
     if (init) {
+      dispatch(resetTree())
       dispatch(resetTableData())
       dispatch(setTableLoading(true))
     }

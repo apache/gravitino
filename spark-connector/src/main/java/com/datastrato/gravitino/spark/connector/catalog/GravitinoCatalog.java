@@ -414,6 +414,11 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
           (TableChange.UpdateColumnComment) change;
       return com.datastrato.gravitino.rel.TableChange.updateColumnComment(
           updateColumnComment.fieldNames(), updateColumnComment.newComment());
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      TableChange.UpdateColumnNullability updateColumnNullability =
+          (TableChange.UpdateColumnNullability) change;
+      return com.datastrato.gravitino.rel.TableChange.updateColumnNullability(
+          updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

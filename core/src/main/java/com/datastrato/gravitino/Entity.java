@@ -23,6 +23,8 @@ public interface Entity extends Serializable {
     COLUMN("co", 4),
     FILESET("fi", 5),
     TOPIC("to", 6),
+    USER("us", 7),
+    GROUP("gr", 8),
 
     AUDIT("au", 65534);
 
@@ -47,7 +49,7 @@ public interface Entity extends Serializable {
     /**
      * Returns the parent entity types of the given entity type. The parent entity types are the
      * entity types that are higher in the hierarchy than the given entity type. For example, the
-     * parent entity types of a table are schema, catalog, and metalake.
+     * parent entity types of a table are metalake, catalog, and schema. (Sequence: root to leaf)
      *
      * @param entityType The entity type for which to get the parent entity types.
      * @return The parent entity types of the given entity type.
@@ -57,6 +59,8 @@ public interface Entity extends Serializable {
         case METALAKE:
           return ImmutableList.of();
         case CATALOG:
+        case USER:
+        case GROUP:
           return ImmutableList.of(METALAKE);
         case SCHEMA:
           return ImmutableList.of(METALAKE, CATALOG);

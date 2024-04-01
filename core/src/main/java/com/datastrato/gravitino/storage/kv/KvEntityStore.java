@@ -6,8 +6,12 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Entity.EntityType.GROUP;
+import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
+import static com.datastrato.gravitino.Entity.EntityType.USER;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.generateKeyForMapping;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.getSubEntitiesPrefix;
+import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.replacePrefixTypeInfo;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
@@ -217,6 +221,25 @@ public class KvEntityStore implements EntityStore {
     return serDe.deserialize(value, e);
   }
 
+  void deleteAuthorizationEntitiesIfNecessary(NameIdentifier ident, EntityType type)
+      throws IOException {
+    if (type != METALAKE) {
+      return;
+    }
+    byte[] encode = entityKeyEncoder.encode(ident, type, true);
+
+    String[] entityShortNames = new String[] {USER.getShortName(), GROUP.getShortName()};
+    for (String name : entityShortNames) {
+      byte[] prefix = replacePrefixTypeInfo(encode, name);
+      transactionalKvBackend.deleteRange(
+          new KvRange.KvRangeBuilder()
+              .start(prefix)
+              .startInclusive(true)
+              .end(Bytes.increment(Bytes.wrap(prefix)).get())
+              .build());
+    }
+  }
+
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
@@ -266,6 +289,7 @@ public class KvEntityStore implements EntityStore {
                     .build());
           }
 
+          deleteAuthorizationEntitiesIfNecessary(ident, entityType);
           return transactionalKvBackend.delete(dataKey);
         });
   }

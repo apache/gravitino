@@ -13,11 +13,24 @@ paths:
     get:
       tags:
         - catalog
-      summary: List catalogs
+      summary: List catalogs (names)
       operationId: listCatalogs
+      parameters:
+        - $ref: "#/components/parameters/details"
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+          description: Returns the list of catalog objects if {details} is true, otherwise returns the list of catalog identifiers
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/CatalogListResponse"
+                  - $ref: "#/components/schemas/CatalogInfoListResponse"
+              examples:
+                CatalogListResponse:
+                  $ref: "#/components/examples/CatalogListResponse"
+                CatalogInfoListResponse:
+                  $ref: "#/components/examples/CatalogInfoListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
@@ -133,6 +146,15 @@ paths:
 
 
 components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the catalogs
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
 
@@ -153,8 +175,8 @@ components:
           description: The type of the catalog
           enum:
             - relational
-            - file
-            - stream
+            - fileset
+            - messaging
         provider:
           type: string
           description: The provider of the catalog
@@ -163,6 +185,7 @@ components:
             - lakehouse-iceberg
             - jdbc-mysql
             - jdbc-postgresql
+            - hadoop
         comment:
           type: string
           description: A comment about the catalog
@@ -175,6 +198,35 @@ components:
           default: { }
           additionalProperties:
             type: string
+
+    CatalogListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        identifiers:
+          type: array
+          items:
+            $ref: "./openapi.yaml#/components/schemas/NameIdentifier"
+
+    CatalogInfoListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        catalogs:
+          type: array
+          description: A list of catalog objects
+          items:
+            $ref: "#/components/schemas/Catalog"
 
     CatalogCreateRequest:
       type: object
@@ -191,7 +243,7 @@ components:
           description: The type of the catalog
           enum:
             - relational
-            - file
+            - fileset
             - stream
         provider:
           type: string
@@ -347,6 +399,41 @@ components:
               "my_metalake"
             ],
             "name": "my_hive_catalog"
+          }
+        ]
+      }
+
+    CatalogInfoListResponse:
+      value: {
+        "code": 0,
+        "catalogs": [
+          {
+            "name": "my_hive_catalog",
+            "type": "relational",
+            "provider": "hive",
+            "comment": "This is my hive catalog",
+            "properties": {
+              "key1": "value1",
+              "gravitino.bypass.hive.metastore.client.capability.check": "false",
+              "metastore.uris": "thrift://127.0.0.1:9083"
+            },
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2023-12-08T03:41:25.595Z"
+            }
+          },
+          {
+            "name": "my_hadoop_catalog",
+            "type": "fileset",
+            "provider": "hadoop",
+            "comment": "This is my hadoop catalog",
+            "properties": {
+              "key2": "value2"
+            },
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2023-12-08T06:41:25.595Z"
+            }
           }
         ]
       }
