@@ -64,7 +64,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testAddUser() {
-
     User user = accessControlManager.addUser("metalake", "testAdd");
     Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
@@ -82,7 +81,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testGetUser() {
-
     accessControlManager.addUser("metalake", "testGet");
 
     User user = accessControlManager.getUser("metalake", "testGet");
@@ -97,7 +95,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testRemoveUser() {
-
     accessControlManager.addUser("metalake", "testRemove");
 
     // Test to remove user
@@ -111,7 +108,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testAddGroup() {
-
     Group group = accessControlManager.addGroup("metalake", "testAdd");
     Assertions.assertEquals("testAdd", group.name());
     Assertions.assertTrue(group.roles().isEmpty());
@@ -129,7 +125,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testGetGroup() {
-
     accessControlManager.addGroup("metalake", "testGet");
 
     Group group = accessControlManager.getGroup("metalake", "testGet");
@@ -145,7 +140,6 @@ public class TestAccessControlManager {
 
   @Test
   public void testRemoveGroup() {
-
     accessControlManager.addGroup("metalake", "testRemove");
 
     // Test to remove group

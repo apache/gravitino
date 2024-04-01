@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.spark;
 
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
@@ -118,7 +117,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     tableNames = listTableNames();
     Assertions.assertTrue(tableNames.contains(tableName));
     Assertions.assertThrowsExactly(
-        NoSuchSchemaException.class, () -> sql("SHOW TABLES IN nonexistent_schema"));
+        NoSuchNamespaceException.class, () -> sql("SHOW TABLES IN nonexistent_schema"));
   }
 
   @Test
