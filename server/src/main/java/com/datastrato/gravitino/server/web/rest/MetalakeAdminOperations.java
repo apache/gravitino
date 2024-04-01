@@ -9,7 +9,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
@@ -62,8 +62,7 @@ public class MetalakeAdminOperations {
                               LockType.WRITE,
                               () -> accessControlManager.addMetalakeAdmin(request.getName()))))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(
-          OperationType.CREATE, request.getName(), null, e);
+      return ExceptionHandlers.handleUserException(OperationType.ADD, request.getName(), null, e);
     }
   }
 
@@ -77,16 +76,16 @@ public class MetalakeAdminOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = ofMetalakeAdmin(user);
-            boolean dropped =
+            boolean removed =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.WRITE, () -> accessControlManager.removeMetalakeAdmin(user));
-            if (!dropped) {
+            if (!removed) {
               LOG.warn("Failed to remove metalake admin user {}", user);
             }
-            return Utils.ok(new DropResponse(dropped));
+            return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.DROP, user, null, e);
+      return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, null, e);
     }
   }
 
