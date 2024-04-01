@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.dto.requests.UserAddRequest;
+import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
@@ -73,7 +73,7 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-group", absolute = true)
-  public Response addGroup(@PathParam("metalake") String metalake, UserAddRequest request) {
+  public Response addGroup(@PathParam("metalake") String metalake, GroupAddRequest request) {
     try {
       NameIdentifier ident = ofGroup(metalake, request.getName());
       return Utils.doAs(
@@ -97,7 +97,7 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-group", absolute = true)
-  public Response removeUser(
+  public Response removeGroup(
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
       return Utils.doAs(
