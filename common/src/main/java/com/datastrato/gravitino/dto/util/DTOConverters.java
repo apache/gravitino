@@ -9,10 +9,12 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
+import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.GroupDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
@@ -344,6 +346,24 @@ public class DTOConverters {
         .withName(user.name())
         .withRoles(user.roles())
         .withAudit(toDTO(user.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a group implementation to a GroupDTO.
+   *
+   * @param group The group implementation.
+   * @return The group DTO.
+   */
+  public static GroupDTO toDTO(Group group) {
+    if (group instanceof GroupDTO) {
+      return (GroupDTO) group;
+    }
+
+    return GroupDTO.builder()
+        .withName(group.name())
+        .withRoles(group.roles())
+        .withAudit(toDTO(group.auditInfo()))
         .build();
   }
 
