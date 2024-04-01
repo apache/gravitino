@@ -221,6 +221,10 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
                 ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
+
+    dropTableIfExists(tableName);
+    Path tableLocation = new Path(tableInfo.getTableLocation());
+    checkDataFileExists(tableLocation);
   }
 
   @Test

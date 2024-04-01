@@ -8,8 +8,12 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
+
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -645,6 +651,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected void checkDirExists(Path dir) {
     try {
       Assertions.assertTrue(hdfs.exists(dir), "HDFS directory not exists," + dir);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected void checkDataFileExists(Path dir) {
+    Boolean isExists = false;
+    try {
+      for (FileStatus fileStatus : hdfs.listStatus(dir)) {
+        if (fileStatus.isFile()) {
+          isExists = true;
+          break;
+        }
+      }
+      Assertions.assertTrue(isExists);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
