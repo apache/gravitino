@@ -28,8 +28,9 @@ import org.slf4j.LoggerFactory;
 /**
  * There are two kinds of admin roles in the system: service admin and metalake admin. The service
  * admin is configured instead of managing by APIs. It is responsible for creating metalake admin.
- * If Gravitino enables authorization, service admin is required. Metalake admin can create a metalake or
- * drops its metalake. The metalake admin will be responsible for managing the access control.
+ * If Gravitino enables authorization, service admin is required. Metalake admin can create a
+ * metalake or drops its metalake. The metalake admin will be responsible for managing the access
+ * control.
  */
 public class AdminManager {
 

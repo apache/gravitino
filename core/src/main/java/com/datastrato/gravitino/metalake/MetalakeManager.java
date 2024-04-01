@@ -105,7 +105,8 @@ public class MetalakeManager implements SupportsMetalakes {
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
     if (BaseMetalake.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a metalake with with reserved name `system`");
+      throw new IllegalArgumentException(
+          "Can't create a metalake with with reserved name `system`");
     }
 
     BaseMetalake metalake =
