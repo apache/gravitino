@@ -874,7 +874,9 @@ public class TestEntityStorage {
         .withId(1L)
         .withNamespace(
             Namespace.of(
-                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.USER_SCHEMA_NAME))
+                metalake,
+                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                SchemaEntity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())

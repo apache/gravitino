@@ -166,15 +166,12 @@ public class TestAccessControlManager {
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
-            UserAlreadyExistsException.class,
-            () -> accessControlManager.addMetalakeAdmin("test"));
-
+        UserAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("test"));
 
     // Test to remove admin
     boolean removed = accessControlManager.removeMetalakeAdmin("test");
     Assertions.assertTrue(removed);
     Assertions.assertFalse(accessControlManager.isMetalakeAdmin("test"));
-
 
     // Test to remove non-existed admin
     boolean removed1 = accessControlManager.removeMetalakeAdmin("no-exist");

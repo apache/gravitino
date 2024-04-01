@@ -14,7 +14,6 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
-import com.datastrato.gravitino.meta.*;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
@@ -215,6 +214,9 @@ public class UserGroupManager {
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.GROUP_SCHEMA_NAME, group);
+        metalake,
+        CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+        SchemaEntity.GROUP_SCHEMA_NAME,
+        group);
   }
 }

@@ -242,15 +242,15 @@ public interface Configs {
 
   ConfigEntry<Boolean> ENABLE_AUTHORIZATION =
       new ConfigBuilder("gravitino.authorization.enable")
-              .doc("Enable the authorization")
-              .version(ConfigConstants.VERSION_0_5_0)
-              .booleanConf()
-              .createWithDefault(false);
+          .doc("Enable the authorization")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   ConfigEntry<String> SERVICE_ADMIN =
       new ConfigBuilder("gravitino.authorization.serviceAdmin")
-              .doc("The admin of Gravitino service")
-              .version(ConfigConstants.VERSION_0_5_0)
-              .stringConf()
-              .create();
+          .doc("The admin of Gravitino service")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .create();
 }

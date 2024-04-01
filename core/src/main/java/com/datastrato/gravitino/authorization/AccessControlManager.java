@@ -101,18 +101,43 @@ public class AccessControlManager {
     return userGroupManager.getGroup(metalake, group);
   }
 
+  /**
+   * Adds a new metalake admin.
+   *
+   * @param user The name of the User.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
   public User addMetalakeAdmin(String user) {
     return adminManager.addMetalakeAdmin(user);
   }
 
+  /**
+   * Removes a metalake admin.
+   *
+   * @param user The name of the User.
+   * @return `true` if the User was successfully removed, `false` otherwise.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
   public boolean removeMetalakeAdmin(String user) {
     return adminManager.removeMetalakeAdmin(user);
   }
 
+  /**
+   * Judge whether the user is the service admin.
+   * @param user the name of the user
+   * @return true, if the user is service admin, otherwise false.
+   */
   public boolean isServiceAdmin(String user) {
     return adminManager.isServiceAdmin(user);
   }
 
+  /**
+   * Judge whether the user is the metalake admin.
+   * @param user the name of the user
+   * @return true, if the user is metalake admin, otherwise false.
+   */
   public boolean isMetalakeAdmin(String user) {
     return adminManager.isMetalakeAdmin(user);
   }
