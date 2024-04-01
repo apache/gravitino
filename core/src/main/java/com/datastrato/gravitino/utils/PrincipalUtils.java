@@ -38,4 +38,8 @@ public class PrincipalUtils {
     }
     return subject.getPrincipals(UserPrincipal.class).iterator().next();
   }
+
+  public static String getCurrentUserName() {
+    return getCurrentPrincipal().getName();
+  }
 }

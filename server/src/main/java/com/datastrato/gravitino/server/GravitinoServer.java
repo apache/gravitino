@@ -9,10 +9,10 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
-import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
+import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
 import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
@@ -82,9 +82,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
                 .ranked(1);
-            bind(gravitinoEnv.tableOperationDispatcher())
-                .to(TableOperationDispatcher.class)
-                .ranked(1);
+            bind(gravitinoEnv.tableOperationDispatcher()).to(TableCatalog.class).ranked(1);
             bind(gravitinoEnv.filesetOperationDispatcher())
                 .to(FilesetOperationDispatcher.class)
                 .ranked(1);
