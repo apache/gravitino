@@ -163,7 +163,6 @@ public class TestGroupOperations extends JerseyTest {
 
   @Test
   public void testGetGroup() {
-
     Group group = buildGroup("group1");
 
     when(manager.getGroup(any(), any())).thenReturn(group);
