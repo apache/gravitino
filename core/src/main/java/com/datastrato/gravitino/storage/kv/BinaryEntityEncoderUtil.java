@@ -89,6 +89,10 @@ public class BinaryEntityEncoderUtil {
    * Concatenate the namespace ids and the name of the entity. Assuming the namespace ids are [1, 2]
    * and the name is 'schema', the result will be '1/2/sc_schema'.
    *
+   * <p>Attention, in order to make this change backward compatible, if the entity type is TABLE, we
+   * will not add a prefix to the name. If the entity type is not TABLE, we will add the prefix to
+   * the name.
+   *
    * @param namespaceIds namespace ids, which are the ids of the parent entities
    * @param name name of the entity
    * @param type type of the entity
@@ -99,7 +103,9 @@ public class BinaryEntityEncoderUtil {
         Joiner.on(NAMESPACE_SEPARATOR)
             .join(
                 Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
-    String mappingName = type.getShortName() + TYPE_AND_NAME_SEPARATOR + name;
+    // We need to make it backward compatible, so we need to check if the name is already prefixed.
+    String mappingName =
+        type == EntityType.TABLE ? name : type.getShortName() + TYPE_AND_NAME_SEPARATOR + name;
     return StringUtils.isBlank(context) ? mappingName : context + NAMESPACE_SEPARATOR + mappingName;
   }
 

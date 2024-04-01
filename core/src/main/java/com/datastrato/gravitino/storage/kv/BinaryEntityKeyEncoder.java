@@ -239,7 +239,12 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
       // The format of name is like '{metalake_id}/{catalog_id}/sc_schema_name'
       String name = nameMappingService.getNameById(ids[i]);
       // extract the real name from the name mapping service
-      names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);
+      // The name for table is 'table' NOT 'ta_table' to make it backward compatible.
+      if (entityType == TABLE && i == 3) {
+        names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
+      } else {
+        names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);
+      }
     }
 
     NameIdentifier nameIdentifier = NameIdentifier.of(names);
