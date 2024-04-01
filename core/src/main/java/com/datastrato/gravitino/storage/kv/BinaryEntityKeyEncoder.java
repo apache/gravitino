@@ -240,7 +240,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
       String name = nameMappingService.getNameById(ids[i]);
       // extract the real name from the name mapping service
       // The name for table is 'table' NOT 'ta_table' to make it backward compatible.
-      if (entityType == TABLE && i == 3) {
+      if (BinaryEntityEncoderUtil.VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(entityType)) {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
       } else {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);

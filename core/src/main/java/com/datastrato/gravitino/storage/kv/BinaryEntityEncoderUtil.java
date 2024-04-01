@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
+import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
@@ -18,17 +19,25 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 public class BinaryEntityEncoderUtil {
+
+  // The entity types in version 0.4.0, entities in this set do not have the prefix in the name-id
+  // mapping. Why do we introduce it? We need to make it backward compatible.
+  public static final Set<EntityType> VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES =
+      ImmutableSet.of(METALAKE, CATALOG, SCHEMA, TABLE);
+
   private BinaryEntityEncoderUtil() {}
 
   /**
@@ -105,7 +114,9 @@ public class BinaryEntityEncoderUtil {
                 Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
     // We need to make it backward compatible, so we need to check if the name is already prefixed.
     String mappingName =
-        type == EntityType.TABLE ? name : type.getShortName() + TYPE_AND_NAME_SEPARATOR + name;
+        VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(type)
+            ? name
+            : type.getShortName() + TYPE_AND_NAME_SEPARATOR + name;
     return StringUtils.isBlank(context) ? mappingName : context + NAMESPACE_SEPARATOR + mappingName;
   }
 
