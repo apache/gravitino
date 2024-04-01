@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -60,6 +61,11 @@ public class ExceptionHandlers {
   public static Response handleUserException(
       OperationType op, String user, String metalake, Exception e) {
     return UserExceptionHandler.INSTANCE.handle(op, user, metalake, e);
+  }
+
+  public static Response handleGroupException(
+      OperationType op, String group, String metalake, Exception e) {
+    return GroupExceptionHandler.INSTANCE.handle(op, group, metalake, e);
   }
 
   public static Response handleTopicException(
@@ -300,6 +306,38 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, user, metalake, e);
+      }
+    }
+  }
+
+  private static class GroupExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new GroupExceptionHandler();
+
+    private static String getGroupErrorMsg(
+        String group, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate group %s operation [%s] under metalake [%s], reason [%s]",
+          group, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String group, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(group) ? "" : " [" + group + "]";
+      String errorMsg = getGroupErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof GroupAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, group, metalake, e);
       }
     }
   }
