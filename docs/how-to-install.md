@@ -43,7 +43,8 @@ The Gravitino binary distribution package contains the following files:
     |   └── log4j2.properties       # log4j configuration for the Gravitino server.
     |── libs/                       # Gravitino server dependencies libraries.
     |── logs/                       # Gravitino server logs. Automatically created after the Gravitino server starts.
-    └── data/                       # Default directory for the Gravitino server to store data.
+    |── data/                       # Default directory for the Gravitino server to store data.
+    └── scripts/                    # Extra scripts for Gravitino.
 ```
 
 #### Configure the Gravitino server
