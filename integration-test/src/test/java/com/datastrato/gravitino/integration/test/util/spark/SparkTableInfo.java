@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
@@ -43,6 +44,10 @@ public class SparkTableInfo {
     return tableName;
   }
 
+  public String getTableLocation() {
+    return tableProperties.get(TableCatalog.PROP_LOCATION);
+  }
+
   // Include database name and table name
   public String getTableIdentifier() {
     if (StringUtils.isNotBlank(database)) {
@@ -50,10 +55,6 @@ public class SparkTableInfo {
     } else {
       return tableName;
     }
-  }
-
-  public String getTableLocation() {
-    return tableProperties.get(ConnectorConstants.LOCATION);
   }
 
   public boolean isPartitionTable() {

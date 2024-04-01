@@ -8,18 +8,18 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.hadoop.fs.Path;
-import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.platform.commons.util.StringUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -35,60 +35,13 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     return "hive";
   }
 
-  @Test
-  void testCreateAndLoadSchema() {
-    String testDatabaseName = "t_create1";
-    dropDatabaseIfExists(testDatabaseName);
-    sql("CREATE DATABASE " + testDatabaseName);
-    Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
-    Assertions.assertFalse(databaseMeta.containsKey("Comment"));
-    Assertions.assertTrue(databaseMeta.containsKey("Location"));
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    String properties = databaseMeta.get("Properties");
-    Assertions.assertTrue(StringUtils.isBlank(properties));
-
-    testDatabaseName = "t_create2";
-    dropDatabaseIfExists(testDatabaseName);
-    String testDatabaseLocation = "/tmp/" + testDatabaseName;
-    sql(
-        String.format(
-            "CREATE DATABASE %s COMMENT 'comment' LOCATION '%s'\n" + " WITH DBPROPERTIES (ID=001);",
-            testDatabaseName, testDatabaseLocation));
-    databaseMeta = getDatabaseMetadata(testDatabaseName);
-    String comment = databaseMeta.get("Comment");
-    Assertions.assertEquals("comment", comment);
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
-    // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
-    Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
-    properties = databaseMeta.get("Properties");
-    Assertions.assertEquals("((ID,001))", properties);
-  }
-
-  @Test
-  void testAlterSchema() {
-    String testDatabaseName = "t_alter";
-    sql("CREATE DATABASE " + testDatabaseName);
-    Assertions.assertTrue(
-        StringUtils.isBlank(getDatabaseMetadata(testDatabaseName).get("Properties")));
-
-    sql(String.format("ALTER DATABASE %s SET DBPROPERTIES ('ID'='001')", testDatabaseName));
-    Assertions.assertEquals("((ID,001))", getDatabaseMetadata(testDatabaseName).get("Properties"));
-
-    // Hive metastore doesn't support alter database location, therefore this test method
-    // doesn't verify ALTER DATABASE database_name SET LOCATION 'new_location'.
-
-    Assertions.assertThrowsExactly(
-        NoSuchNamespaceException.class,
-        () -> sql("ALTER DATABASE notExists SET DBPROPERTIES ('ID'='001')"));
-  }
-
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
     return true;
   }
 
   @Override
-  protected boolean supportPartition() {
+  protected boolean supportsPartition() {
     return true;
   }
 
@@ -204,5 +157,173 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     tableData = getTableData(newTableName);
     Assertions.assertTrue(tableData.size() == 1);
     Assertions.assertEquals(expectedData, tableData.get(0));
+  }
+
+  @Test
+  void testHiveDefaultFormat() {
+    String tableName = "hive_default_format_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  void testHiveFormatWithStoredAs() {
+    String tableName = "test_hive_format_stored_as_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "STORED AS PARQUET";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  @Test
+  void testHiveFormatWithUsing() {
+    String tableName = "test_hive_format_using_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "USING PARQUET";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  @Test
+  void testHivePropertiesWithSerdeRowFormat() {
+    String tableName = "test_hive_row_serde_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql =
+        String.format(
+            "%s ROW FORMAT SERDE '%s' WITH SERDEPROPERTIES ('serialization.format'='@', 'field.delim' = ',') STORED AS INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
+            createTableSql,
+            HivePropertiesConstants.PARQUET_SERDE_CLASS,
+            HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+            HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS);
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
+                    "@",
+                    TableCatalog.OPTION_PREFIX + "field.delim",
+                    ",",
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.PARQUET_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+    checkParquetFile(tableInfo);
+  }
+
+  /*
+  | DELIMITED [ FIELDS TERMINATED BY fields_terminated_char [ ESCAPED BY escaped_char ] ]
+      [ COLLECTION ITEMS TERMINATED BY collection_items_terminated_char ]
+      [ MAP KEYS TERMINATED BY map_key_terminated_char ]
+      [ LINES TERMINATED BY row_terminated_char ]
+      [ NULL DEFINED AS null_char ]
+   */
+  @Test
+  void testHivePropertiesWithDelimitedRowFormat() {
+    String tableName = "test_hive_row_format_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql +=
+        "ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY ';' "
+            + "COLLECTION ITEMS TERMINATED BY '@' "
+            + "MAP KEYS TERMINATED BY ':' "
+            + "NULL DEFINED AS 'n' "
+            + "STORED AS TEXTFILE";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    TableCatalog.OPTION_PREFIX + "field.delim",
+                    ",",
+                    TableCatalog.OPTION_PREFIX + "escape.delim",
+                    ";",
+                    TableCatalog.OPTION_PREFIX + "mapkey.delim",
+                    ":",
+                    TableCatalog.OPTION_PREFIX + "serialization.format",
+                    ",",
+                    TableCatalog.OPTION_PREFIX + "colelction.delim",
+                    "@",
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+
+    // check it's a text file and field.delim take effects
+    List<Object[]> rows =
+        rowsToJava(
+            getSparkSession()
+                .read()
+                .option("delimiter", ",")
+                .csv(tableInfo.getTableLocation())
+                .collectAsList());
+    Assertions.assertTrue(rows.size() == 1);
+    Object[] row = rows.get(0);
+    Assertions.assertEquals(3, row.length);
+    Assertions.assertEquals("2", row[0]);
+    Assertions.assertEquals("gravitino_it_test", (String) row[1]);
+    Assertions.assertEquals("2", row[2]);
   }
 }

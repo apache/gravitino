@@ -12,6 +12,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -85,9 +86,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
         properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
         break;
       case "lakehouse-iceberg":
-        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
-        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
-        properties.put(GravitinoSparkConfig.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
+        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
+        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
         break;
       default:
         throw new IllegalArgumentException("Unsupported provider: " + getProvider());

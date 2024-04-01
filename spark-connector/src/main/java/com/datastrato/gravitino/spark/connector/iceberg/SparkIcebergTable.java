@@ -18,9 +18,9 @@ public class SparkIcebergTable extends SparkBaseTable implements SupportsDelete 
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,
-      TableCatalog sparkCatalog,
+      TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter) {
-    super(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+    super(identifier, gravitinoTable, sparkIcebergCatalog, propertiesConverter);
   }
 
   @Override

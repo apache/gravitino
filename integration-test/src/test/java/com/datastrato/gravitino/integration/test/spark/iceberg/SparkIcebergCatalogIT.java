@@ -33,7 +33,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportPartition() {
+  protected boolean supportsPartition() {
     return false;
   }
 

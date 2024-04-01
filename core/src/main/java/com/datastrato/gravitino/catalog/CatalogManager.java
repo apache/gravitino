@@ -272,6 +272,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
+    if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
+    }
+
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
     Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
@@ -658,6 +662,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     for (CatalogChange change : changes) {
       if (change instanceof CatalogChange.RenameCatalog) {
         CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
+
+        if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(
+            ((CatalogChange.RenameCatalog) change).getNewName())) {
+          throw new IllegalArgumentException(
+              "Can't rename a catalog with with reserved name `system`");
+        }
+
         builder.withName(rename.getNewName());
 
       } else if (change instanceof CatalogChange.UpdateCatalogComment) {
