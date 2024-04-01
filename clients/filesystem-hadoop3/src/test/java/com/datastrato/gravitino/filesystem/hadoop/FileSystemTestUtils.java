@@ -16,7 +16,7 @@ import org.apache.hadoop.util.Progressable;
 
 public class FileSystemTestUtils {
   private static final String LOCAL_FS_PREFIX =
-      "file:/tmp/gravitino_test_fs_" + UUID.randomUUID().toString().replace("-", "") + "/";
+      "file:/tmp/gravitino_test_fs_" + UUID.randomUUID().toString().replace("-", "");
 
   private static final int BUFFER_SIZE = 3;
   private static final short REPLICATION = 1;
@@ -30,15 +30,16 @@ public class FileSystemTestUtils {
     return LOCAL_FS_PREFIX;
   }
 
-  public static Path createFilesetPath(String filesetCatalog, String schema, String fileset) {
-    return new Path(
-        GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
-            + "/"
-            + filesetCatalog
-            + "/"
-            + schema
-            + "/"
-            + fileset);
+  public static Path createFilesetPath(
+      String filesetCatalog, String schema, String fileset, boolean withScheme) {
+    String filesetPath =
+        String.format(
+            "%s/%s/%s/%s",
+            withScheme ? GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX : "",
+            filesetCatalog,
+            schema,
+            fileset);
+    return new Path(filesetPath);
   }
 
   public static Path createLocalRootDir(String filesetCatalog) {
@@ -46,7 +47,7 @@ public class FileSystemTestUtils {
   }
 
   public static Path createLocalDirPrefix(String filesetCatalog, String schema, String fileset) {
-    return new Path(LOCAL_FS_PREFIX + filesetCatalog + "/" + schema + "/" + fileset);
+    return new Path(LOCAL_FS_PREFIX + "/" + filesetCatalog + "/" + schema + "/" + fileset);
   }
 
   public static void create(Path path, FileSystem fileSystem) throws IOException {

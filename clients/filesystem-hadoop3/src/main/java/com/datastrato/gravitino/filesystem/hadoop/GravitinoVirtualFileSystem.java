@@ -84,6 +84,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeCache(maxCapacity, evictionMillsAfterAccess);
 
+    // initialize the Gravitino client
+    String serverUri =
+        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(serverUri),
+        "'%s' is not set in the configuration",
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+
     this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(
@@ -214,39 +222,33 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         authType);
   }
 
-  private String concatVirtualPrefix(NameIdentifier identifier) {
-    return GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
-        + identifier.namespace().level(1)
-        + "/"
-        + identifier.namespace().level(2)
-        + "/"
-        + identifier.name();
+  private String getVirtualLocation(NameIdentifier identifier, boolean withScheme) {
+    return String.format(
+        "%s/%s/%s/%s",
+        withScheme ? GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX : "",
+        identifier.namespace().level(1),
+        identifier.namespace().level(2),
+        identifier.name());
   }
 
   private Path getActualPathByIdentifier(
       NameIdentifier identifier, Pair<Fileset, FileSystem> filesetPair, Path path) {
     String virtualPath = path.toString();
-    if (!virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't start with the scheme \"%s\".",
-              virtualPath, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
-    }
+    boolean withScheme =
+        virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
+    String virtualLocation = getVirtualLocation(identifier, withScheme);
+    String storageLocation = filesetPair.getLeft().storageLocation();
     try {
       if (checkMountsSingleFile(filesetPair)) {
-        String virtualPrefix = concatVirtualPrefix(identifier);
         Preconditions.checkArgument(
-            virtualPath.equals(virtualPrefix),
+            virtualPath.equals(virtualLocation),
             "Path: %s should be same with the virtual prefix: %s, because the fileset only mounts a single file.",
             virtualPath,
-            virtualPrefix);
+            virtualLocation);
 
-        return new Path(filesetPair.getLeft().storageLocation());
+        return new Path(storageLocation);
       } else {
-        return new Path(
-            virtualPath.replaceFirst(
-                concatVirtualPrefix(identifier),
-                new Path(filesetPair.getLeft().storageLocation()).toString()));
+        return new Path(virtualPath.replaceFirst(virtualLocation, storageLocation));
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -286,21 +288,21 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private NameIdentifier extractIdentifier(URI virtualUri) {
-    Preconditions.checkArgument(
-        virtualUri
-            .toString()
-            .startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme prefix \"%s\".",
-        virtualUri,
-        GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
-
     if (StringUtils.isBlank(virtualUri.toString())) {
       throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
     }
 
+    String realUri =
+        virtualUri
+            .toString()
+            .replaceFirst(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX, "");
+
     // remove first '/' symbol with empty string
-    String[] reservedDirs =
-        Arrays.stream(virtualUri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
+    if (realUri.startsWith("/")) {
+      realUri = realUri.replaceFirst("/", "");
+    }
+
+    String[] reservedDirs = realUri.split("/");
     Preconditions.checkArgument(
         reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", virtualUri);
 
@@ -449,7 +451,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return convertFileStatusPathPrefix(
         fileStatus,
         context.getFileset().storageLocation(),
-        concatVirtualPrefix(context.getIdentifier()));
+        getVirtualLocation(context.getIdentifier(), true));
   }
 
   @Override
@@ -462,7 +464,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 convertFileStatusPathPrefix(
                     fileStatus,
                     new Path(context.getFileset().storageLocation()).toString(),
-                    concatVirtualPrefix(context.getIdentifier())))
+                    getVirtualLocation(context.getIdentifier(), true)))
         .toArray(FileStatus[]::new);
   }
 
