@@ -106,6 +106,18 @@ public class Namespace {
   }
 
   /**
+   * Create a namespace for topic.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for topic
+   */
+  public static Namespace ofTopic(String metalake, String catalog, String schema) {
+    return of(metalake, catalog, schema);
+  }
+
+  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
