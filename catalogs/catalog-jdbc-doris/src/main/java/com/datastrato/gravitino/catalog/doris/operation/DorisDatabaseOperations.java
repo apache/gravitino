@@ -53,15 +53,13 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
     try (final Connection connection = this.dataSource.getConnection()) {
       String query = String.format("SHOW TABLES IN `%s`", databaseName);
-      try (Statement statement = connection.createStatement()) {
+      try (Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(query)) {
         // Execute the query and check if there exists any tables in the database
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          if (resultSet.next()) {
-            throw new IllegalStateException(
-                String.format(
-                    "Database %s is not empty, the value of cascade should be true.",
-                    databaseName));
-          }
+        if (resultSet.next()) {
+          throw new IllegalStateException(
+              String.format(
+                  "Database %s is not empty, the value of cascade should be true.", databaseName));
         }
       }
     } catch (SQLException sqlException) {
@@ -73,25 +71,25 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    try (final Connection connection = this.dataSource.getConnection()) {
-      String query = "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?";
-      try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-        preparedStatement.setString(1, databaseName);
+    String query = "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?";
 
-        // Execute the query
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-          if (!resultSet.next()) {
-            throw new NoSuchSchemaException(
-                "Database %s could not be found in information_schema.SCHEMATA", databaseName);
-          }
-          String schemaName = resultSet.getString("SCHEMA_NAME");
-          Map<String, String> properties = getDatabaseProperties(connection, databaseName);
-          return JdbcSchema.builder()
-              .withName(schemaName)
-              .withProperties(properties)
-              .withAuditInfo(AuditInfo.EMPTY)
-              .build();
+    try (final Connection connection = this.dataSource.getConnection();
+        PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+      preparedStatement.setString(1, databaseName);
+
+      // Execute the query
+      try (ResultSet resultSet = preparedStatement.executeQuery()) {
+        if (!resultSet.next()) {
+          throw new NoSuchSchemaException(
+              "Database %s could not be found in information_schema.SCHEMATA", databaseName);
         }
+        String schemaName = resultSet.getString("SCHEMA_NAME");
+        Map<String, String> properties = getDatabaseProperties(connection, databaseName);
+        return JdbcSchema.builder()
+            .withName(schemaName)
+            .withProperties(properties)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
       }
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
