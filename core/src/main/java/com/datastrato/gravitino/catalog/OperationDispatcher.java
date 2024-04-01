@@ -17,6 +17,7 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -143,6 +144,9 @@ public abstract class OperationDispatcher {
       } else if (item instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof TopicChange.SetProperty) {
+        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
       }
     }
 
@@ -160,6 +164,9 @@ public abstract class OperationDispatcher {
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       } else if (item instanceof FilesetChange.RemoveProperty) {
         FilesetChange.RemoveProperty removeProperty = (FilesetChange.RemoveProperty) item;
+        properties.put(removeProperty.getProperty(), removeProperty.getProperty());
+      } else if (item instanceof TopicChange.RemoveProperty) {
+        TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) item;
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       }
     }

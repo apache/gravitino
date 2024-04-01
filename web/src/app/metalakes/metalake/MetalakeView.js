@@ -18,10 +18,12 @@ import {
   fetchCatalogs,
   fetchSchemas,
   fetchTables,
+  fetchFilesets,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
   getTableDetails,
+  getFilesetDetails,
   setSelectedNodes
 } from '@/lib/store/metalakes'
 
@@ -35,29 +37,39 @@ const MetalakeView = () => {
     const routeParams = {
       metalake: searchParams.get('metalake'),
       catalog: searchParams.get('catalog'),
+      type: searchParams.get('type'),
       schema: searchParams.get('schema'),
-      table: searchParams.get('table')
+      table: searchParams.get('table'),
+      fileset: searchParams.get('fileset')
     }
     if ([...searchParams.keys()].length) {
-      const { metalake, catalog, schema, table } = routeParams
+      const { metalake, catalog, type, schema, table, fileset } = routeParams
 
       if (paramsSize === 1 && metalake) {
         dispatch(fetchCatalogs({ init: true, page: 'metalakes', metalake }))
         dispatch(getMetalakeDetails({ metalake }))
       }
 
-      if (paramsSize === 2 && catalog) {
-        dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog }))
-        dispatch(getCatalogDetails({ metalake, catalog }))
+      if (paramsSize === 3 && catalog) {
+        dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, type }))
+        dispatch(getCatalogDetails({ metalake, catalog, type }))
       }
 
-      if (paramsSize === 3 && catalog && schema) {
-        dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+      if (paramsSize === 4 && catalog && type && schema) {
+        if (type === 'fileset') {
+          dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
+        } else {
+          dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+        }
         dispatch(getSchemaDetails({ metalake, catalog, schema }))
       }
 
-      if (paramsSize === 4 && catalog && schema && table) {
+      if (paramsSize === 5 && catalog && schema && table) {
         dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+      }
+
+      if (paramsSize === 5 && catalog && schema && fileset) {
+        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
       }
     }
 
@@ -65,9 +77,11 @@ const MetalakeView = () => {
       setSelectedNodes(
         routeParams.catalog
           ? [
-              `{{${routeParams.metalake}}}{{${routeParams.catalog}}}${
+              `{{${routeParams.metalake}}}{{${routeParams.catalog}}}{{${routeParams.type}}}${
                 routeParams.schema ? `{{${routeParams.schema}}}` : ''
-              }${routeParams.table ? `{{${routeParams.table}}}` : ''}`
+              }${routeParams.table ? `{{${routeParams.table}}}` : ''}${
+                routeParams.fileset ? `{{${routeParams.fileset}}}` : ''
+              }`
             ]
           : []
       )
