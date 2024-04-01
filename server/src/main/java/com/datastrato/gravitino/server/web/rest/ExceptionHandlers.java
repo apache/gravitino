@@ -310,8 +310,8 @@ public class ExceptionHandlers {
     }
 
     @Override
-    public Response handle(OperationType op, String user, String metalake, Exception e) {
-      String formatted = StringUtil.isBlank(user) ? "" : " [" + user + "]";
+    public Response handle(OperationType op, String group, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(group) ? "" : " [" + group + "]";
       String errorMsg = getGroupErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
@@ -325,7 +325,7 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(errorMsg, e);
 
       } else {
-        return super.handle(op, user, metalake, e);
+        return super.handle(op, group, metalake, e);
       }
     }
   }
