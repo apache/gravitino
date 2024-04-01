@@ -4,11 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.PropertyEntry.enumImmutablePropertyEntry;
-import static com.datastrato.gravitino.catalog.PropertyEntry.stringRequiredPropertyEntry;
+import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
-import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

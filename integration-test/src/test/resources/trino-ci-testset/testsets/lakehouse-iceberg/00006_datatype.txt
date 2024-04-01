@@ -6,7 +6,6 @@ CREATE TABLE
 
 "CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
    f1 varchar,
-   f2 varchar,
    f3 varbinary,
    f4 decimal(10, 3),
    f5 real,
@@ -26,14 +25,13 @@ INSERT: 1 row
 
 INSERT: 1 row
 
-"Sample text 1","Text1","65","123.456","7.89","12.34","true","1000","1000","100000","2024-01-01","08:00:00.000","2024-01-01 08:00:00.000"
-"","","","","","","","","","","","",""
+"Sample text 1","65","123.456","7.89","12.34","true","1000","1000","100000","2024-01-01","08:00:00.000","2024-01-01 08:00:00.000"
+"","","","","","","","","","","",""
 
 CREATE TABLE
 
 "CREATE TABLE ""test.gt_iceberg"".gt_db2.tb02 (
    f1 varchar NOT NULL,
-   f2 varchar NOT NULL,
    f3 varbinary NOT NULL,
    f4 decimal(10, 3) NOT NULL,
    f5 real NOT NULL,
@@ -52,7 +50,7 @@ INSERT: 1 row
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f1
 
-<QUERY_FAILED> NULL value not allowed for NOT NULL column: f2
+<QUERY_FAILED> NULL value not allowed for NOT NULL column: f7
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f12
 

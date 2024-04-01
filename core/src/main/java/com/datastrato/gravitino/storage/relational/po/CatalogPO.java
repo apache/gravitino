@@ -104,82 +104,91 @@ public class CatalogPO {
   }
 
   public static class Builder {
-    private final CatalogPO metalakePO;
+    private final CatalogPO catalogPO;
 
-    public Builder() {
-      metalakePO = new CatalogPO();
+    private Builder() {
+      catalogPO = new CatalogPO();
     }
 
     public CatalogPO.Builder withCatalogId(Long catalogId) {
-      metalakePO.catalogId = catalogId;
+      catalogPO.catalogId = catalogId;
       return this;
     }
 
     public CatalogPO.Builder withCatalogName(String name) {
-      metalakePO.catalogName = name;
+      catalogPO.catalogName = name;
       return this;
     }
 
     public CatalogPO.Builder withMetalakeId(Long metalakeId) {
-      metalakePO.metalakeId = metalakeId;
+      catalogPO.metalakeId = metalakeId;
       return this;
     }
 
     public CatalogPO.Builder withType(String type) {
-      metalakePO.type = type;
+      catalogPO.type = type;
       return this;
     }
 
     public CatalogPO.Builder withProvider(String provider) {
-      metalakePO.provider = provider;
+      catalogPO.provider = provider;
       return this;
     }
 
     public CatalogPO.Builder withCatalogComment(String comment) {
-      metalakePO.catalogComment = comment;
+      catalogPO.catalogComment = comment;
       return this;
     }
 
     public CatalogPO.Builder withProperties(String properties) {
-      metalakePO.properties = properties;
+      catalogPO.properties = properties;
       return this;
     }
 
     public CatalogPO.Builder withAuditInfo(String auditInfo) {
-      metalakePO.auditInfo = auditInfo;
+      catalogPO.auditInfo = auditInfo;
       return this;
     }
 
     public CatalogPO.Builder withCurrentVersion(Long currentVersion) {
-      metalakePO.currentVersion = currentVersion;
+      catalogPO.currentVersion = currentVersion;
       return this;
     }
 
     public CatalogPO.Builder withLastVersion(Long lastVersion) {
-      metalakePO.lastVersion = lastVersion;
+      catalogPO.lastVersion = lastVersion;
       return this;
     }
 
     public CatalogPO.Builder withDeletedAt(Long deletedAt) {
-      metalakePO.deletedAt = deletedAt;
+      catalogPO.deletedAt = deletedAt;
       return this;
     }
 
     private void validate() {
-      Preconditions.checkArgument(metalakePO.catalogId != null, "Catalog id is required");
-      Preconditions.checkArgument(metalakePO.catalogName != null, "Catalog name is required");
-      Preconditions.checkArgument(metalakePO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(metalakePO.type != null, "Catalog type is required");
-      Preconditions.checkArgument(metalakePO.provider != null, "Catalog provider is required");
-      Preconditions.checkArgument(metalakePO.auditInfo != null, "Audit info is required");
-      Preconditions.checkArgument(metalakePO.currentVersion != null, "Current version is required");
-      Preconditions.checkArgument(metalakePO.lastVersion != null, "Last version is required");
-      Preconditions.checkArgument(metalakePO.deletedAt != null, "Deleted at is required");
+      Preconditions.checkArgument(catalogPO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(catalogPO.catalogName != null, "Catalog name is required");
+      Preconditions.checkArgument(catalogPO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(catalogPO.type != null, "Catalog type is required");
+      Preconditions.checkArgument(catalogPO.provider != null, "Catalog provider is required");
+      Preconditions.checkArgument(catalogPO.auditInfo != null, "Audit info is required");
+      Preconditions.checkArgument(catalogPO.currentVersion != null, "Current version is required");
+      Preconditions.checkArgument(catalogPO.lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(catalogPO.deletedAt != null, "Deleted at is required");
     }
 
     public CatalogPO build() {
       validate();
-      return metalakePO;
+      return catalogPO;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

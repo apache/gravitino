@@ -32,9 +32,9 @@ public class TestDTOConverters {
     String[] field1 = {"dt"};
     String[] field2 = {"country"};
     LiteralDTO literal1 =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
     LiteralDTO literal2 =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
     String[][] fieldNames = {field1, field2};
     LiteralDTO[] values = {literal1, literal2};
 
@@ -63,9 +63,9 @@ public class TestDTOConverters {
 
     // given
     LiteralDTO lower =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
     LiteralDTO upper =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
     PartitionDTO rangePartitionDTO =
@@ -90,9 +90,9 @@ public class TestDTOConverters {
 
     // given
     LiteralDTO literal1 =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
     LiteralDTO literal2 =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
     LiteralDTO[][] literalDTOS = {new LiteralDTO[] {literal1}, new LiteralDTO[] {literal2}};

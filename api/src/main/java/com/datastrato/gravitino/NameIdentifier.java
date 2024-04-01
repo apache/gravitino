@@ -114,6 +114,21 @@ public class NameIdentifier {
   }
 
   /**
+   * Create the topic {@link NameIdentifier} with the given metalake, catalog, schema and topic
+   * name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param topic The topic name
+   * @return The created topic {@link NameIdentifier}
+   */
+  public static NameIdentifier ofTopic(
+      String metalake, String catalog, String schema, String topic) {
+    return NameIdentifier.of(metalake, catalog, schema, topic);
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *

@@ -74,6 +74,9 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Builds a LiteralDTO instance.
      *
@@ -82,5 +85,10 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
     public LiteralDTO build() {
       return new LiteralDTO(value, dataType);
     }
+  }
+
+  /** @return the builder for creating a new instance of LiteralDTO. */
+  public static Builder builder() {
+    return new Builder();
   }
 }

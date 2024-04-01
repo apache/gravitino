@@ -9,8 +9,8 @@ import static java.lang.Thread.sleep;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
@@ -47,12 +47,12 @@ public class TrinoQueryITBase {
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
-  protected static GravitinoClient gravitinoClient;
+  protected static GravitinoAdminClient gravitinoClient;
   protected static TrinoITContainers trinoITContainers;
   protected static TrinoQueryRunner trinoQueryRunner;
 
   protected static final String metalakeName = "test";
-  protected static GravitinoMetaLake metalake;
+  protected static GravitinoMetalake metalake;
 
   private static void setEnv() throws Exception {
     if (autoStart) {
@@ -75,7 +75,7 @@ public class TrinoQueryITBase {
       gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     } else {
-      gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+      gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     }
   }
 
@@ -118,7 +118,7 @@ public class TrinoQueryITBase {
           return;
         }
 
-        GravitinoMetaLake createdMetalake =
+        GravitinoMetalake createdMetalake =
             gravitinoClient.createMetalake(
                 NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
         Assertions.assertNotNull(createdMetalake);
@@ -190,7 +190,7 @@ public class TrinoQueryITBase {
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     SupportsSchemas schemas = catalog.asSchemas();
     Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
-        .filter(schema -> !schema.name().equals("default") && schema.name().startsWith("gt_"))
+        .filter(schema -> !schema.name().equals("default"))
         .forEach(
             schema -> {
               try {

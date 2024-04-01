@@ -4,11 +4,15 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
-import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -31,9 +35,17 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
-  private CatalogOperationDispatcher catalogOperationDispatcher;
+  private SchemaOperationDispatcher schemaOperationDispatcher;
+
+  private TableOperationDispatcher tableOperationDispatcher;
+
+  private FilesetOperationDispatcher filesetOperationDispatcher;
+
+  private TopicOperationDispatcher topicOperationDispatcher;
 
   private MetalakeManager metalakeManager;
+
+  private AccessControlManager accessControlManager;
 
   private IdGenerator idGenerator;
 
@@ -94,8 +106,17 @@ public class GravitinoEnv {
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.catalogOperationDispatcher =
-        new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.tableOperationDispatcher =
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    // Create and initialize access control related modules
+    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
@@ -135,12 +156,39 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogOperationDispatcher instance.
+   * @return The SchemaOperationDispatcher instance.
    */
-  public CatalogOperationDispatcher catalogOperationDispatcher() {
-    return catalogOperationDispatcher;
+  public SchemaOperationDispatcher schemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
+
+  /**
+   * Get the TableOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The TableOperationDispatcher instance.
+   */
+  public TableOperationDispatcher tableOperationDispatcher() {
+    return tableOperationDispatcher;
+  }
+
+  /**
+   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The FilesetOperationDispatcher instance.
+   */
+  public FilesetOperationDispatcher filesetOperationDispatcher() {
+    return filesetOperationDispatcher;
+  }
+
+  /**
+   * Get the TopicOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The TopicOperationDispatcher instance.
+   */
+  public TopicOperationDispatcher topicOperationDispatcher() {
+    return topicOperationDispatcher;
   }
 
   /**
@@ -172,6 +220,15 @@ public class GravitinoEnv {
 
   public LockManager getLockManager() {
     return lockManager;
+  }
+
+  /**
+   * Get the AccessControlManager associated with the Gravitino environment.
+   *
+   * @return The AccessControlManager instance.
+   */
+  public AccessControlManager accessControlManager() {
+    return accessControlManager;
   }
 
   public void start() {

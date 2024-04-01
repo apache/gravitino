@@ -7,8 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_PARTITIONING_PROPERTY;
 import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_SORTED_BY_PROPERTY;
 
-import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -152,7 +151,7 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
           ICEBERG_PARTITIONING_PROPERTY,
           gravitinoTable.getPartitioning().length > 0
               ? Arrays.stream(gravitinoTable.getPartitioning())
-                  .map(ts -> ((Partitioning.SingleFieldPartitioning) ts).fieldName()[0])
+                  .map(ts -> ((Transform.SingleFieldTransform) ts).fieldName()[0])
                   .collect(Collectors.toList())
               : Collections.EMPTY_LIST);
     }

@@ -5,9 +5,12 @@
 package com.datastrato.gravitino.server;
 
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
-import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
@@ -73,8 +76,18 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
-            bind(gravitinoEnv.catalogOperationDispatcher())
-                .to(CatalogOperationDispatcher.class)
+            bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
+            bind(gravitinoEnv.schemaOperationDispatcher())
+                .to(SchemaOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.tableOperationDispatcher())
+                .to(TableOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.filesetOperationDispatcher())
+                .to(FilesetOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.topicOperationDispatcher())
+                .to(com.datastrato.gravitino.catalog.TopicOperationDispatcher.class)
                 .ranked(1);
           }
         });

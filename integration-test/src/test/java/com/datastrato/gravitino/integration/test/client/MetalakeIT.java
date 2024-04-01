@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -48,7 +48,7 @@ public class MetalakeIT extends AbstractIT {
   @Test
   public void testListMetalake() {
     // no metalakes to start with
-    GravitinoMetaLake[] metaLakes = client.listMetalakes();
+    GravitinoMetalake[] metaLakes = client.listMetalakes();
     assertEquals(0, metaLakes.length);
 
     // one metalakes
@@ -75,7 +75,7 @@ public class MetalakeIT extends AbstractIT {
     // metalake exists
     client.createMetalake(
         NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    GravitinoMetaLake metaLakeA = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    GravitinoMetalake metaLakeA = client.loadMetalake(NameIdentifier.of(metalakeNameA));
     assertEquals(metaLakeA.name(), metalakeNameA);
 
     // metalake does not exist
@@ -106,13 +106,13 @@ public class MetalakeIT extends AbstractIT {
         new MetalakeChange[] {
           MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
         };
-    GravitinoMetaLake metaLake = client.alterMetalake(NameIdentifier.of(metalakeNameA), changes);
+    GravitinoMetalake metaLake = client.alterMetalake(NameIdentifier.of(metalakeNameA), changes);
     assertEquals(newName, metaLake.name());
     assertEquals("new metalake comment", metaLake.comment());
     assertEquals(AuthConstants.ANONYMOUS_USER, metaLake.auditInfo().creator());
 
     // Reload metadata via new name to check if the changes are applied
-    GravitinoMetaLake newMetalake = client.loadMetalake(NameIdentifier.of(newName));
+    GravitinoMetalake newMetalake = client.loadMetalake(NameIdentifier.of(newName));
     assertEquals(newName, newMetalake.name());
     assertEquals("new metalake comment", newMetalake.comment());
 
@@ -122,7 +122,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterNonExistantMetalake() {
+  public void testAlterNonExistentMetalake() {
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
     client.createMetalake(
@@ -140,10 +140,9 @@ public class MetalakeIT extends AbstractIT {
 
   @Test
   public void testCreateMetalake() {
-    GravitinoMetaLake metaLakeA =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    client.createMetalake(
+        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
     assertEquals(metalakeNameA, metalake.name());
     assertEquals("metalake A comment", metalake.comment());
     assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
@@ -160,7 +159,7 @@ public class MetalakeIT extends AbstractIT {
 
   @Test
   public void testDropMetalakes() {
-    GravitinoMetaLake metalakeA =
+    GravitinoMetalake metalakeA =
         client.createMetalake(
             NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
     assertTrue(client.dropMetalake(NameIdentifier.of(metalakeA.name())));
@@ -184,13 +183,13 @@ public class MetalakeIT extends AbstractIT {
   }
 
   public void dropMetalakes() {
-    GravitinoMetaLake[] metaLakes = client.listMetalakes();
-    for (GravitinoMetaLake metalake : metaLakes) {
+    GravitinoMetalake[] metaLakes = client.listMetalakes();
+    for (GravitinoMetalake metalake : metaLakes) {
       assertTrue(client.dropMetalake(NameIdentifier.of(metalake.name())));
     }
 
     // Reload metadata from backend to check if the drop operations are applied
-    for (GravitinoMetaLake metalake : metaLakes) {
+    for (GravitinoMetalake metalake : metaLakes) {
       NameIdentifier id = NameIdentifier.of(metalake.name());
       Assertions.assertThrows(
           NoSuchMetalakeException.class,
@@ -199,7 +198,7 @@ public class MetalakeIT extends AbstractIT {
           });
     }
 
-    for (GravitinoMetaLake metalake : metaLakes) {
+    for (GravitinoMetalake metalake : metaLakes) {
       Assertions.assertFalse(client.dropMetalake(NameIdentifier.of(metalake.name())));
     }
   }

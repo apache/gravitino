@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -13,6 +14,8 @@ import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.annotations.VisibleForTesting;
 import javax.ws.rs.core.Response;
@@ -53,6 +56,21 @@ public class ExceptionHandlers {
   public static Response handleFilesetException(
       OperationType op, String fileset, String schema, Exception e) {
     return FilesetExceptionHandler.INSTANCE.handle(op, fileset, schema, e);
+  }
+
+  public static Response handleUserException(
+      OperationType op, String user, String metalake, Exception e) {
+    return UserExceptionHandler.INSTANCE.handle(op, user, metalake, e);
+  }
+
+  public static Response handleGroupException(
+      OperationType op, String group, String metalake, Exception e) {
+    return GroupExceptionHandler.INSTANCE.handle(op, group, metalake, e);
+  }
+
+  public static Response handleTopicException(
+      OperationType op, String topic, String schema, Exception e) {
+    return TopicExceptionHandler.INSTANCE.handle(op, topic, schema, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -254,12 +272,105 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class UserExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
+
+    private static String getUserErrorMsg(
+        String user, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
+          user, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String user, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(user) ? "" : " [" + user + "]";
+      String errorMsg = getUserErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UserAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, user, metalake, e);
+      }
+    }
+  }
+
+  private static class GroupExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new GroupExceptionHandler();
+
+    private static String getGroupErrorMsg(
+        String group, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate group %s operation [%s] under metalake [%s], reason [%s]",
+          group, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String group, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(group) ? "" : " [" + group + "]";
+      String errorMsg = getGroupErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof GroupAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, group, metalake, e);
+      }
+    }
+  }
+
+  private static class TopicExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new TopicExceptionHandler();
+
+    private static String getTopicErrorMsg(
+        String topic, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate topic(s)%s operation [%s] under schema [%s], reason [%s]",
+          topic, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String topic, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(topic) ? "" : " [" + topic + "]";
+      String errorMsg = getTopicErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof TopicAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, topic, schema, e);
+      }
+    }
+  }
+
   @VisibleForTesting
   static class BaseExceptionHandler extends ExceptionHandler {
 
     private static final String EXCEPTION_KEYWORD = "Exception: ";
-
-    private static final ExceptionHandler INSTANCE = new BaseExceptionHandler();
 
     private static String getBaseErrorMsg(
         String object, String operation, String parent, String reason) {

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -12,9 +12,10 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -27,7 +28,6 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
@@ -68,8 +68,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_METADATA =
       new HadoopFilesetPropertiesMetadata();
 
-  private CatalogEntity entity;
-
   private final EntityStore store;
 
   @VisibleForTesting Configuration hadoopConf;
@@ -86,8 +84,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogEntity entity) throws RuntimeException {
-    this.entity = entity;
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
     // Initialize Hadoop Configuration.
     this.hadoopConf = new Configuration();
     Map<String, String> bypassConfigs =
@@ -130,7 +127,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
 
-      return new HadoopFileset.Builder()
+      return HadoopFileset.builder()
           .withName(ident.name())
           .withType(filesetEntity.filesetType())
           .withComment(filesetEntity.comment())
@@ -218,7 +215,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     Preconditions.checkArgument(stringId != null, "Property String identifier should not be null");
 
     FilesetEntity filesetEntity =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withName(ident.name())
             .withId(stringId.id())
             .withNamespace(ident.namespace())
@@ -242,7 +239,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     }
 
-    return new HadoopFileset.Builder()
+    return HadoopFileset.builder()
         .withName(ident.name())
         .withComment(comment)
         .withType(type)
@@ -271,7 +268,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               Entity.EntityType.FILESET,
               e -> updateFilesetEntity(ident, e, changes));
 
-      return new HadoopFileset.Builder()
+      return HadoopFileset.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
           .withType(updatedFilesetEntity.filesetType())
@@ -370,7 +367,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
 
     SchemaEntity schemaEntity =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withName(ident.name())
             .withId(stringId.id())
             .withNamespace(ident.namespace())
@@ -388,7 +385,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new RuntimeException("Failed to create schema " + ident, ioe);
     }
 
-    return new HadoopSchema.Builder()
+    return HadoopSchema.builder()
         .withName(ident.name())
         .withComment(comment)
         .withProperties(schemaEntity.properties())
@@ -401,7 +398,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
 
-      return new HadoopSchema.Builder()
+      return HadoopSchema.builder()
           .withName(ident.name())
           .withComment(schemaEntity.comment())
           .withProperties(schemaEntity.properties())
@@ -434,7 +431,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               Entity.EntityType.SCHEMA,
               schemaEntity -> updateSchemaEntity(ident, schemaEntity, changes));
 
-      return new HadoopSchema.Builder()
+      return HadoopSchema.builder()
           .withName(ident.name())
           .withComment(entity.comment())
           .withProperties(entity.properties())
@@ -545,7 +542,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       }
     }
 
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withName(schemaEntity.name())
         .withNamespace(ident.namespace())
         .withId(schemaEntity.id())
@@ -587,7 +584,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       }
     }
 
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withName(newName)
         .withNamespace(ident.namespace())
         .withId(filesetEntity.id())

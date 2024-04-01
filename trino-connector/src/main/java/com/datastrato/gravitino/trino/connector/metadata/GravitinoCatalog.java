@@ -7,16 +7,20 @@ package com.datastrato.gravitino.trino.connector.metadata;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
 import io.trino.spi.TrinoException;
+import java.time.Instant;
 import java.util.Map;
 import org.apache.logging.log4j.util.Strings;
 
 /** Help Gravitino connector access CatalogMetadata from gravitino client. */
 public class GravitinoCatalog {
 
+  private final String metalake;
   private final Catalog catalog;
 
-  public GravitinoCatalog(Catalog catalog) {
+  public GravitinoCatalog(String metalake, Catalog catalog) {
+    this.metalake = metalake;
     this.catalog = catalog;
   }
 
@@ -26,6 +30,14 @@ public class GravitinoCatalog {
 
   public String getName() {
     return catalog.name();
+  }
+
+  public String getFullName() {
+    return metalake + "." + catalog.name();
+  }
+
+  public NameIdentifier geNameIdentifier() {
+    return NameIdentifier.ofCatalog(metalake, catalog.name());
   }
 
   public String getProperty(String name, String defaultValue) {
@@ -42,5 +54,10 @@ public class GravitinoCatalog {
 
   public Map<String, String> getProperties() {
     return catalog.properties();
+  }
+
+  public Instant getLastModifiedTime() {
+    Instant time = catalog.auditInfo().lastModifiedTime();
+    return time == null ? catalog.auditInfo().createTime() : time;
   }
 }

@@ -12,10 +12,15 @@ include("api", "common", "core", "meta", "server", "integration-test", "server-c
 include("catalogs:bundled-catalog")
 include("catalogs:catalog-hive")
 include("catalogs:catalog-lakehouse-iceberg")
-include("catalogs:catalog-jdbc-common", "catalogs:catalog-jdbc-mysql", "catalogs:catalog-jdbc-postgresql")
+include(
+  "catalogs:catalog-jdbc-common",
+  "catalogs:catalog-jdbc-doris",
+  "catalogs:catalog-jdbc-mysql",
+  "catalogs:catalog-jdbc-postgresql"
+)
 include("catalogs:catalog-hadoop")
 include("catalogs:catalog-messaging-kafka")
-include("clients:client-java", "clients:client-java-runtime")
+include("clients:client-java", "clients:client-java-runtime", "clients:filesystem-hadoop3", "clients:filesystem-hadoop3-runtime")
 include("trino-connector")
 include("spark-connector")
 include("web")

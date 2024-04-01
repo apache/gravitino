@@ -267,9 +267,9 @@ subprojects {
     tasks.withType<JavaCompile>().configureEach {
       options.errorprone.isEnabled.set(true)
       options.errorprone.disableAllChecks.set(true)
+      options.errorprone.disableWarningsInGeneratedCode.set(true)
       options.errorprone.enable(
         "AnnotateFormatMethod",
-        "FormatStringAnnotation",
         "AlwaysThrows",
         "ArrayEquals",
         "ArrayToString",
@@ -278,6 +278,7 @@ subprojects {
         "BoxedPrimitiveEquality",
         "ChainingConstructorIgnoresParameter",
         "CheckNotNullMultipleTimes",
+        "ClassCanBeStatic",
         "CollectionIncompatibleType",
         "CollectionToArraySafeParameter",
         "ComparingThisWithNull",
@@ -288,15 +289,18 @@ subprojects {
         "DangerousLiteralNull",
         "DeadException",
         "DeadThread",
+        "DefaultCharset",
         "DoNotCall",
         "DoNotMock",
         "DuplicateMapKeys",
+        "EqualsGetClass",
         "EqualsNaN",
         "EqualsNull",
         "EqualsReference",
         "EqualsWrongThing",
         "ForOverride",
         "FormatString",
+        "FormatStringAnnotation",
         "GetClassOnAnnotation",
         "GetClassOnClass",
         "HashtableContains",
@@ -308,6 +312,7 @@ subprojects {
         "IncompatibleArgumentType",
         "IndexOfChar",
         "InfiniteRecursion",
+        "InlineFormatString",
         "InvalidJavaTimeConstant",
         "InvalidPatternSyntax",
         "IsInstanceIncompatibleType",
@@ -338,6 +343,7 @@ subprojects {
         "SelfComparison",
         "SelfEquals",
         "SizeGreaterThanOrEqualsZero",
+        "StaticGuardedByInstance",
         "StreamToString",
         "StringBuilderInitWithChar",
         "SubstringOfZero",
@@ -349,12 +355,10 @@ subprojects {
         "UnnecessaryTypeArgument",
         "UnusedAnonymousClass",
         "UnusedCollectionModifiedInPlace",
+        "UnusedVariable",
         "UseCorrectAssertInTests",
         "VarTypeName",
-        "XorPower",
-        "EqualsGetClass",
-        "DefaultCharset",
-        "InlineFormatString"
+        "XorPower"
       )
     }
   }
@@ -364,7 +368,7 @@ subprojects {
     options.locale = "en_US"
 
     val projectName = project.name
-    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+    if (projectName == "common" || projectName == "api" || projectName == "client-java" || projectName == "filesystem-hadoop3") {
       options {
         (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
         isFailOnError = true
@@ -426,6 +430,11 @@ subprojects {
   }
 
   configure<SigningExtension> {
+    val taskNames = gradle.getStartParameter().getTaskNames()
+    taskNames.forEach() {
+      if (it.contains("publishToMavenLocal")) setRequired(false)
+    }
+
     val gpgId = System.getenv("GPG_ID")
     val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
@@ -504,14 +513,15 @@ tasks.rat {
     "web/next-env.d.ts",
     "web/dist/**/*",
     "web/node_modules/**/*",
-    "web/lib/utils/axios/**/*",
-    "web/lib/enums/httpEnum.ts",
-    "web/types/axios.d.ts",
+    "web/src/lib/utils/axios/**/*",
+    "web/src/lib/enums/httpEnum.ts",
+    "web/src/types/axios.d.ts",
     "web/yarn.lock",
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
-    "**/NOTICE.*"
+    "**/NOTICE.*",
+    "clients/client-python/.pytest_cache/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -640,7 +650,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "spark-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -653,6 +663,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("filesystem") &&
         it.name != "trino-connector" &&
         it.name != "spark-connector" &&
         it.name != "integration-test" &&
@@ -671,6 +682,7 @@ tasks {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
