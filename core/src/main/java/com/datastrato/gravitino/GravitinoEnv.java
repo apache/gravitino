@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
@@ -39,6 +40,8 @@ public class GravitinoEnv {
   private TableOperationDispatcher tableOperationDispatcher;
 
   private FilesetOperationDispatcher filesetOperationDispatcher;
+
+  private TopicOperationDispatcher topicOperationDispatcher;
 
   private MetalakeManager metalakeManager;
 
@@ -109,6 +112,8 @@ public class GravitinoEnv {
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     // Create and initialize access control related modules
     this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
@@ -175,6 +180,15 @@ public class GravitinoEnv {
    */
   public FilesetOperationDispatcher filesetOperationDispatcher() {
     return filesetOperationDispatcher;
+  }
+
+  /**
+   * Get the TopicOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The TopicOperationDispatcher instance.
+   */
+  public TopicOperationDispatcher topicOperationDispatcher() {
+    return topicOperationDispatcher;
   }
 
   /**

@@ -256,6 +256,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertEquals("1", createdTopic.properties().get(REPLICATION_FACTOR));
     Assertions.assertEquals(
         "producer", createdTopic.properties().get(TopicConfig.COMPRESSION_TYPE_CONFIG));
+    Assertions.assertNotNull(createdTopic.properties().get(ID_KEY));
   }
 
   @Test
@@ -315,6 +316,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertEquals(TOPIC_1, topic.name());
     Assertions.assertEquals("1", topic.properties().get(PARTITION_COUNT));
     Assertions.assertEquals("1", topic.properties().get(REPLICATION_FACTOR));
+    Assertions.assertNotNull(topic.properties().get(ID_KEY));
     Assertions.assertTrue(topic.properties().size() > 2);
   }
 
@@ -406,6 +408,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertNull(alteredTopic.comment());
     Assertions.assertEquals("3", alteredTopic.properties().get(PARTITION_COUNT));
     Assertions.assertEquals("1", alteredTopic.properties().get(REPLICATION_FACTOR));
+    Assertions.assertNotNull(alteredTopic.properties().get(ID_KEY));
     Assertions.assertEquals(
         "producer", alteredTopic.properties().get(TopicConfig.COMPRESSION_TYPE_CONFIG));
     // retention.ms overridden was removed, so it should be the default value
