@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  packages: read
+  contents: read
+  pull-requests: write
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   changes:
@@ -72,10 +76,6 @@ jobs:
     timeout-minutes: 30
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    permissions:
-      packages: read
-      contents: read
-      pull-requests: write
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
