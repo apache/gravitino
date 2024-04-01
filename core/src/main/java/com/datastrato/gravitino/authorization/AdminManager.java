@@ -25,6 +25,12 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * There are two kinds of admin roles in the system: service admin and metalake admin. The service
+ * admin is configured instead of managing by APIs. It is responsible for creating metalake admin.
+ * If we enable authorization, service admin is required. Metalake admin can create a metalake or
+ * drops its metalake. The metalake admin will be responsible for managing the access control.
+ */
 public class AdminManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AdminManager.class);
@@ -94,6 +100,7 @@ public class AdminManager {
 
   /**
    * Judge whether the user is the service admin.
+   *
    * @param user the name of the user
    * @return true, if the user is service admin, otherwise false.
    */
@@ -104,6 +111,7 @@ public class AdminManager {
 
   /**
    * Judge whether the user is the metalake admin.
+   *
    * @param user the name of the user
    * @return true, if the user is metalake admin, otherwise false.
    */
@@ -111,7 +119,8 @@ public class AdminManager {
     try {
       return store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER);
     } catch (IOException ioe) {
-      LOG.error("Fail to check whether {} is the metalake admin {} due to storage issues", user, ioe);
+      LOG.error(
+          "Fail to check whether {} is the metalake admin {} due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
     }
   }
