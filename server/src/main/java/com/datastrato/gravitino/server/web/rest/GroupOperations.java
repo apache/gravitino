@@ -15,7 +15,7 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
@@ -119,6 +119,9 @@ public class GroupOperations {
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake,
+        CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+        SchemaEntity.GROUP_SCHEMA_NAME,
+        group);
   }
 }
