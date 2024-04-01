@@ -19,6 +19,8 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
+  private static final String pageTitleName = "Metalakes";
+
   @FindBy(
       xpath =
           "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
@@ -331,7 +333,7 @@ public class MetalakePage extends AbstractWebIT {
                   .executeScript("return document.readyState")
                   .equals("complete"));
       String pageTitle = metalakePageTitle.getText();
-      boolean isPageTitle = pageTitle.equals("Metalakes");
+      boolean isPageTitle = pageTitle.equals(pageTitleName);
       if (!isPageTitle) {
         LOG.error("No match with title, get {}", pageTitle);
         return false;
@@ -348,7 +350,8 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyLinkInNewWindow(String originalWindowHandle, String expectedUrl, boolean contains) {
+  public boolean verifyLinkInNewWindow(
+      String originalWindowHandle, String expectedUrl, boolean contains) {
     try {
       Set<String> allWindowHandles = driver.getWindowHandles();
       for (String windowHandle : allWindowHandles) {

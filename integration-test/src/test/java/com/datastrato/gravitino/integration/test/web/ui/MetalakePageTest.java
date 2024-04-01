@@ -14,10 +14,16 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
+  private static final String appTitle = "Gravitino";
+  private static final String metalakeName = "metalake_name";
+  private static final String editedMetalakeName = metalakeName + "_edited";
+  private static final String FOOTER_LINK_DATASTRATO = "https://datastrato.ai/";
+  private static final String FOOTER_LINK_DOCS = "https://datastrato.ai/docs/";
+  private static final String FOOTER_LINK_LICENSE =
+      "https://github.com/datastrato/gravitino/blob/main/LICENSE";
+  private static final String FOOTER_LINK_SUPPORT =
+      "https://github.com/datastrato/gravitino/issues";
   MetalakePage metalakePage = new MetalakePage();
-
-  String metalakeName = "metalake_name";
-  String editedMetalakeName = metalakeName + "_edited";
 
   // Create a metalake by name, set the default comment and properties.
   public void createMetalakeAction(String name) throws InterruptedException {
@@ -35,7 +41,7 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(0)
   public void homePage() {
     String title = driver.getTitle();
-    Assertions.assertEquals("Gravitino", title);
+    Assertions.assertEquals(appTitle, title);
   }
 
   @Test
@@ -119,7 +125,7 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testRefreshPage() {
     driver.navigate().refresh();
 
-    Assertions.assertEquals(driver.getTitle(), "Gravitino");
+    Assertions.assertEquals(driver.getTitle(), appTitle);
     Assertions.assertTrue(metalakePage.verifyRefreshPage());
   }
 
@@ -128,8 +134,8 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testCheckLinkDatastrato() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkDatastrato.click();
-    String expectedUrl = "https://datastrato.ai/";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_DATASTRATO, false));
   }
 
   @Test
@@ -137,8 +143,8 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testCheckLinkLicense() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkLicense.click();
-    String expectedUrl = "https://github.com/datastrato/gravitino/blob/main/LICENSE";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_LICENSE, false));
   }
 
   @Test
@@ -146,8 +152,8 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testCheckLinkDocs() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkDocs.click();
-    String expectedUrl = "https://datastrato.ai/docs/";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, true));
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_DOCS, true));
   }
 
   @Test
@@ -155,7 +161,7 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testCheckLinkSupport() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkSupport.click();
-    String expectedUrl = "https://github.com/datastrato/gravitino/issues";
-    Assertions.assertTrue(metalakePage.verifyLinkInNewWindow(originalWindowHandle, expectedUrl, false));
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_SUPPORT, false));
   }
 }
