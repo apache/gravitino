@@ -53,7 +53,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo table = getTableInfo(tableName);
 
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos = getSimpleTableColumn();
+    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
@@ -71,7 +72,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo table = getTableInfo(tableName);
 
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos = getSimpleTableColumn();
+    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
@@ -89,7 +91,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo table = getTableInfo(tableName);
 
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos = getSimpleTableColumn();
+    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
@@ -107,7 +110,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo table = getTableInfo(tableName);
 
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos = getSimpleTableColumn();
+    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
