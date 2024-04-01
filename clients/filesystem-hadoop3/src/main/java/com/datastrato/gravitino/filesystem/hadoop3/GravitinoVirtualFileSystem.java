@@ -143,27 +143,25 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         .build();
   }
 
-  private String concatVirtualPrefix(NameIdentifier identifier) {
-    return GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
-        + identifier.namespace().level(1)
-        + "/"
-        + identifier.namespace().level(2)
-        + "/"
-        + identifier.name();
+  private String concatVirtualPrefix(NameIdentifier identifier, boolean withScheme) {
+    String filesetPath =
+            String.format(
+                    "%s/%s/%s/%s",
+                    withScheme ? GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX : "",
+                    filesetCatalog,
+                    schema,
+                    fileset);
+    return new Path(filesetPath);
   }
 
   private Path getActualPathByIdentifier(
       NameIdentifier identifier, Pair<Fileset, FileSystem> filesetPair, Path path) {
     String virtualPath = path.toString();
-    if (!virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't start with the scheme \"%s\".",
-              virtualPath, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
-    }
+    boolean withScheme =
+        virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
     try {
       if (checkMountsSingleFile(filesetPair)) {
-        String virtualPrefix = concatVirtualPrefix(identifier);
+        String virtualPrefix = concatVirtualPrefix(identifier, withScheme);
         Preconditions.checkArgument(
             virtualPath.equals(virtualPrefix),
             "Path: %s should be same with the virtual prefix: %s, because the fileset only mounts a single file.",
@@ -174,7 +172,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       } else {
         return new Path(
             virtualPath.replaceFirst(
-                concatVirtualPrefix(identifier),
+                concatVirtualPrefix(identifier, withScheme),
                 new Path(filesetPair.getLeft().storageLocation()).toString()));
       }
     } catch (Exception e) {
@@ -215,19 +213,21 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private NameIdentifier extractIdentifier(URI virtualUri) {
-    Preconditions.checkArgument(
-        virtualUri
-            .toString()
-            .startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme \"%s\".");
-
     if (StringUtils.isBlank(virtualUri.toString())) {
       throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
     }
 
+    String realUri =
+        virtualUri
+            .toString()
+            .replaceFirst(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX, "");
+
     // remove first '/' symbol with empty string
-    String[] reservedDirs =
-        Arrays.stream(virtualUri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
+    if (realUri.startsWith("/")) {
+      realUri = realUri.replaceFirst("/", "");
+    }
+
+    String[] reservedDirs = realUri.split("/");
     Preconditions.checkArgument(
         reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", virtualUri);
 
@@ -376,7 +376,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return convertFileStatusPathPrefix(
         fileStatus,
         context.getFileset().storageLocation(),
-        concatVirtualPrefix(context.getIdentifier()));
+        concatVirtualPrefix(context.getIdentifier(), true));
   }
 
   @Override
@@ -389,7 +389,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 convertFileStatusPathPrefix(
                     fileStatus,
                     new Path(context.getFileset().storageLocation()).toString(),
-                    concatVirtualPrefix(context.getIdentifier())))
+                    concatVirtualPrefix(context.getIdentifier(), true)))
         .toArray(FileStatus[]::new);
   }
 

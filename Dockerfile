@@ -1,3 +1,7 @@
+/*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
 FROM micr.cloud.mioffice.cn/devops-public/maven-mi-repo:3-jdk-8-slim as builder
 ARG BUILD_CLUSTER
 RUN echo "Build cluster is: $BUILD_CLUSTER"
