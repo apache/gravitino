@@ -36,7 +36,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
-import { providers } from '@/lib/utils/initial'
+import { types, providers } from '@/lib/utils/initial'
 import { nameRegex, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 
@@ -58,7 +58,7 @@ const schema = yup.object().shape({
       nameRegex,
       'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
     ),
-  type: yup.mixed().oneOf(['relational', 'fileset']).required(),
+  type: yup.mixed().oneOf(types).required(),
   provider: yup.mixed().oneOf(providerTypeValues).required(),
   propItems: yup.array().of(
     yup.object().shape({
@@ -287,6 +287,9 @@ const CreateCatalogDialog = props => {
     if (typeSelect === 'fileset') {
       setProviderTypes(providers.filter(p => p.value === 'hadoop'))
       setValue('provider', 'hadoop')
+    } else if (typeSelect === 'messaging') {
+      setProviderTypes(providers.filter(p => p.value === 'kafka'))
+      setValue('provider', 'kafka')
     } else {
       setProviderTypes(providers.filter(p => p.value !== 'hadoop'))
       setValue('provider', 'hive')
@@ -424,8 +427,13 @@ const CreateCatalogDialog = props => {
                       labelId='select-catalog-type'
                       disabled={type === 'update'}
                     >
-                      <MenuItem value={'relational'}>relational</MenuItem>
-                      <MenuItem value={'fileset'}>fileset</MenuItem>
+                      {types.map((item, index) => {
+                        return (
+                          <MenuItem key={item} value={item}>
+                            {item}
+                          </MenuItem>
+                        )
+                      })}
                     </Select>
                   )}
                 />

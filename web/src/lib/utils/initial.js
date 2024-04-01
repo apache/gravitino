@@ -3,7 +3,21 @@
  * This software is licensed under the Apache License version 2.
  */
 
+export const types = ['relational', 'fileset', 'messaging']
+
 export const providers = [
+  {
+    label: 'kafka',
+    value: 'kafka',
+    defaultProps: [
+      {
+        key: 'boostrap.servers',
+        value: '',
+        required: true,
+        description: 'The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them'
+      }
+    ]
+  },
   {
     label: 'hadoop',
     value: 'hadoop',
