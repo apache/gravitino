@@ -73,7 +73,6 @@ public class TestGravitinoMetalake extends TestBase {
 
     NameIdentifier ident1 = NameIdentifier.of(metalakeName, "mock");
     NameIdentifier ident2 = NameIdentifier.of(metalakeName, "mock2");
-    Namespace namespace = Namespace.of(metalakeName);
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {ident1, ident2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
