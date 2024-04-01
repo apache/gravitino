@@ -6,8 +6,11 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -274,5 +277,48 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
     Assertions.assertNull(topicEntityFromBytes1.comment());
     Assertions.assertNull(topicEntityFromBytes1.properties());
+
+    // Test UserEntity
+    Long userId = 1L;
+    String userName = "user";
+    UserEntity userEntity =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
+    UserEntity userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntity, userEntityFromBytes);
+
+    UserEntity userEntityWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
+    userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
+    Assertions.assertNull(userEntityWithoutFields.roles());
+
+    // Test GroupEntity
+    Long groupId = 1L;
+    String groupName = "group";
+
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    byte[] groupBytes = protoEntitySerDe.serialize(group);
+    GroupEntity groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(group, groupFromBytes);
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(groupId).withName(groupName).withAuditInfo(auditInfo).build();
+    groupBytes = protoEntitySerDe.serialize(groupWithoutFields);
+    groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(groupWithoutFields, groupFromBytes);
+    Assertions.assertNull(groupWithoutFields.roles());
   }
 }
