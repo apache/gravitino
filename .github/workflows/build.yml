@@ -102,7 +102,7 @@ jobs:
           min-coverage-overall: 40
           min-coverage-changed-files: 60
           title: 'Code Coverage Report'
-          debug-mode: false
+          debug-mode: true
           update-comment: true
           pass-emoji: ':green_circle:'
           fail-emoji: ':red_circle:'
