@@ -100,7 +100,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
             ErrorHandlers.catalogErrorHandler());
 
     return Arrays.stream(resp.getCatalogs())
-        .map(c -> DTOConverters.toCatalog(c, restClient))
+        .map(c -> DTOConverters.toCatalog(namespace.level(0), c, restClient))
         .toArray(Catalog[]::new);
   }
 
