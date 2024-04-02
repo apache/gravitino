@@ -107,6 +107,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   void testListTables() {
     String tableName = "t_list";
+    dropTableIfExists(tableName);
     Set<String> tableNames = listTableNames();
     Assertions.assertFalse(tableNames.contains(tableName));
     createSimpleTable(tableName);
