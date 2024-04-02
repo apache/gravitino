@@ -248,9 +248,9 @@ public interface Configs {
           .booleanConf()
           .createWithDefault(false);
 
-  ConfigEntry<List<String>> SERVICE_ADMIN =
-      new ConfigBuilder("gravitino.authorization.serviceAdmin")
-          .doc("The admin of Gravitino service")
+  ConfigEntry<List<String>> SERVICE_ADMINS =
+      new ConfigBuilder("gravitino.authorization.serviceAdmins")
+          .doc("The admins of Gravitino service")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .toSequence()

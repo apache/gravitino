@@ -43,7 +43,7 @@ public class AdminManager {
   public AdminManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
-    this.admins = config.get(Configs.SERVICE_ADMIN);
+    this.admins = config.get(Configs.SERVICE_ADMINS);
   }
 
   /**

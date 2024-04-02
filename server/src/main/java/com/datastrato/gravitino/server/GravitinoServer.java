@@ -60,10 +60,10 @@ public class GravitinoServer extends ResourceConfig {
     gravitinoEnv.initialize(serverConfig);
 
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
-    if (enableAuthorization && serverConfig.get(Configs.SERVICE_ADMIN) == null) {
+    if (enableAuthorization && serverConfig.get(Configs.SERVICE_ADMINS) == null) {
       throw new IllegalArgumentException(
           String.format(
-              "The '%s' can't be null, you should configure it", Configs.SERVICE_ADMIN.getKey()));
+              "The '%s' can't be null, you should configure it", Configs.SERVICE_ADMINS.getKey()));
     }
 
     JettyServerConfig jettyServerConfig =
