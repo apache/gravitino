@@ -31,6 +31,8 @@ public interface Entity extends Serializable {
 
   /** The group schema name in the system catalog. */
   String GROUP_SCHEMA_NAME = "group";
+  /** The role schema name in the system catalog. */
+  String ROLE_SCHEMA_NAME = "role";
 
   /** The admin schema name in the authorization catalog of the system metalake. */
   String ADMIN_SCHEMA_NAME = "admin";
@@ -47,6 +49,7 @@ public interface Entity extends Serializable {
     TOPIC("to", 6),
     USER("us", 7),
     GROUP("gr", 8),
+    ROLE("ro", 9),
 
     AUDIT("au", 65534);
 
@@ -89,6 +92,7 @@ public interface Entity extends Serializable {
         case TOPIC:
         case USER:
         case GROUP:
+        case ROLE:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case COLUMN:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);

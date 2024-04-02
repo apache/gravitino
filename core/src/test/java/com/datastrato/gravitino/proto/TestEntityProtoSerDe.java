@@ -4,9 +4,13 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.google.common.collect.ImmutableMap;
@@ -320,5 +324,35 @@ public class TestEntityProtoSerDe {
     groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
     Assertions.assertEquals(groupWithoutFields, groupFromBytes);
     Assertions.assertNull(groupWithoutFields.roles());
+
+    // Test RoleEntity
+    Long roleId = 1L;
+    String roleName = "testRole";
+    RoleEntity roleEntity =
+        RoleEntity.builder()
+            .withId(roleId)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
+            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .withProperties(props)
+            .build();
+    byte[] roleBytes = protoEntitySerDe.serialize(roleEntity);
+    RoleEntity roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class);
+    Assertions.assertEquals(roleEntity, roleFromBytes);
+
+    RoleEntity roleWithoutFields =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
+            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .build();
+    roleBytes = protoEntitySerDe.serialize(roleWithoutFields);
+    roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class);
+    Assertions.assertEquals(roleWithoutFields, roleFromBytes);
   }
 }

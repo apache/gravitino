@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * metalake or drops its metalake. The metalake admin will be responsible for managing the access
  * control. AdminManager operates underlying store using the lock because kv storage needs the lock.
  */
-public class AdminManager {
+class AdminManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AdminManager.class);
 

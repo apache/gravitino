@@ -5,12 +5,18 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
+import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -20,10 +26,12 @@ public class AccessControlManager {
 
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
+  private final RoleManager roleManager;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
+    this.roleManager = new RoleManager(store, idGenerator);
   }
 
   /**
@@ -43,7 +51,7 @@ public class AccessControlManager {
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
-   * @param user THe name of the User.
+   * @param user The name of the User.
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
@@ -143,5 +151,55 @@ public class AccessControlManager {
    */
   public boolean isMetalakeAdmin(String user) {
     return adminManager.isMetalakeAdmin(user);
+  }
+
+  /**
+   * Creates a new Role.
+   *
+   * @param metalake The Metalake of the Role.
+   * @param role The name of the Role.
+   * @param properties The properties of the Role.
+   * @param privilegeEntityIdentifier The privilege entity identifier of the Role.
+   * @param privilegeEntityType The privilege entity type of the Role.
+   * @param privileges The privileges of the Role.
+   * @return The created Role instance.
+   * @throws RoleAlreadyExistsException If a Role with the same identifier already exists.
+   * @throws RuntimeException If creating the Role encounters storage issues.
+   */
+  public Role createRole(
+      String metalake,
+      String role,
+      Map<String, String> properties,
+      NameIdentifier privilegeEntityIdentifier,
+      Entity.EntityType privilegeEntityType,
+      List<Privilege> privileges)
+      throws RoleAlreadyExistsException {
+    return roleManager.createRole(
+        metalake, role, properties, privilegeEntityIdentifier, privilegeEntityType, privileges);
+  }
+
+  /**
+   * Loads a Role.
+   *
+   * @param metalake The Metalake of the Role.
+   * @param role The name of the Role.
+   * @return The loading Role instance.
+   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
+   * @throws RuntimeException If loading the Role encounters storage issues.
+   */
+  public Role loadRole(String metalake, String role) throws NoSuchRoleException {
+    return roleManager.loadRole(metalake, role);
+  }
+
+  /**
+   * Drops a Role.
+   *
+   * @param metalake The Metalake of the Role.
+   * @param role The name of the Role.
+   * @return `true` if the Role was successfully dropped, `false` otherwise.
+   * @throws RuntimeException If dropping the User encounters storage issues.
+   */
+  public boolean dropRole(String metalake, String role) {
+    return roleManager.dropRole(metalake, role);
   }
 }

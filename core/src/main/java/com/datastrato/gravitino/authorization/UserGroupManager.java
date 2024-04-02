@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * metalake and the user or group. Metalake is like a concept of the organization. `AddUser` or
  * `AddGroup` means that a role or user enters an organization.
  */
-public class UserGroupManager {
+class UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
   private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";

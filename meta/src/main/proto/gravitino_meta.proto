@@ -115,3 +115,13 @@ message Group {
   repeated string roles = 3;
   AuditInfo audit_info = 4;
 }
+
+message Role {
+  uint64 id = 1;
+  string name = 2;
+  repeated string privileges = 3;
+  string privilege_entity_identifier = 4;
+  string privilege_entity_type = 5;
+  map<string, string> properties = 6;
+  AuditInfo audit_info = 7;
+}

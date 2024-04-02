@@ -7,19 +7,26 @@ package com.datastrato.gravitino.authorization;
 import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
+import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -181,5 +188,86 @@ public class TestAccessControlManager {
     Assertions.assertTrue(accessControlManager.isServiceAdmin("admin1"));
     Assertions.assertTrue(accessControlManager.isServiceAdmin("admin2"));
     Assertions.assertFalse(accessControlManager.isServiceAdmin("admin3"));
+  }
+
+  @Test
+  public void testCreateRole() {
+    Map<String, String> props = ImmutableMap.of("key1", "value1");
+
+    Role role =
+        accessControlManager.createRole(
+            "metalake",
+            "create",
+            props,
+            NameIdentifier.of("test"),
+            Entity.EntityType.METALAKE,
+            Lists.newArrayList());
+    Assertions.assertEquals("create", role.name());
+    testProperties(props, role.properties());
+
+    // Test with RoleAlreadyExistsException
+    Assertions.assertThrows(
+        RoleAlreadyExistsException.class,
+        () ->
+            accessControlManager.createRole(
+                "metalake",
+                "create",
+                props,
+                NameIdentifier.of("test"),
+                Entity.EntityType.METALAKE,
+                Lists.newArrayList()));
+  }
+
+  @Test
+  public void testLoadRole() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+    accessControlManager.createRole(
+        "metalake",
+        "loadRole",
+        props,
+        NameIdentifier.of("test"),
+        Entity.EntityType.METALAKE,
+        Lists.newArrayList());
+    Role role = accessControlManager.loadRole("metalake", "loadRole");
+    Assertions.assertEquals("loadRole", role.name());
+    testProperties(props, role.properties());
+
+    // Test load non-existed group
+    Throwable exception =
+        Assertions.assertThrows(
+            NoSuchRoleException.class,
+            () -> accessControlManager.loadRole("metalake", "not-exist"));
+    Assertions.assertTrue(exception.getMessage().contains("Role not-exist does not exist"));
+  }
+
+  @Test
+  public void testDropRole() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+    accessControlManager.createRole(
+        "metalake",
+        "testDrop",
+        props,
+        NameIdentifier.of("test"),
+        Entity.EntityType.METALAKE,
+        Lists.newArrayList());
+
+    // Test drop role
+    boolean dropped = accessControlManager.dropRole("metalake", "testDrop");
+    Assertions.assertTrue(dropped);
+
+    // Test drop non-existed role
+    boolean dropped1 = accessControlManager.dropRole("metalake", "no-exist");
+    Assertions.assertFalse(dropped1);
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
   }
 }
