@@ -93,17 +93,17 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
-      Map<String, String> sparkTableProperties = toOptionProperties(properties);
-      String externalValue =
-              Optional.ofNullable(
-                              sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE))
-                      .orElse("false");
+    Map<String, String> sparkTableProperties = toOptionProperties(properties);
+    String externalValue =
+        Optional.ofNullable(
+                sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE))
+            .orElse("false");
 
-      if (externalValue.equalsIgnoreCase(HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE)) {
-          sparkTableProperties.remove(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
-          sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true");
-      }
-      return sparkTableProperties;
+    if (externalValue.equalsIgnoreCase(HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE)) {
+      sparkTableProperties.remove(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
+      sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true");
+    }
+    return sparkTableProperties;
   }
 
   @VisibleForTesting
