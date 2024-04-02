@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
-      "The gravitino id attribute does not exist in properties";
+      "The gravitino id attribute does not exist in properties, changed";
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcCatalogOperations.class);
 
