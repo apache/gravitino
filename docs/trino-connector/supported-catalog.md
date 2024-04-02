@@ -120,7 +120,7 @@ call gravitino.system.alter_catalog(
 ```
 
 if you need more information about catalog, please refer to:
-[Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
+[Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Data type mapping between Trino and Gravitino
 
@@ -147,4 +147,4 @@ Hive does not support `TIME` data type.
 | MapType        | MAP        |
 | StructType     | ROW        |
 
-For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-metadata-using-gravitino.md#gravitino-table-column-type).
+For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-relational-metadata-using-gravitino.md#gravitino-table-column-type).
