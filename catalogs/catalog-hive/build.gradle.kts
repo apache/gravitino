@@ -92,7 +92,6 @@ dependencies {
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.mysql.driver)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
@@ -107,7 +106,6 @@ dependencies {
   }
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

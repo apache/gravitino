@@ -158,9 +158,6 @@ allprojects {
 
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
-      if (project.hasProperty("jdbcBackend")) {
-        param.environment("jdbcBackend", "true")
-      }
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
