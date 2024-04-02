@@ -71,7 +71,6 @@ KerberosTokenProvider provider = KerberosTokenProvider.builder()
 
 // Use ticketCache to create KerberosTokenProvider
 KerberosTokenProvider provider = KerberosTokenProvider.builder()
-        .withMetalake("metalake")
         .withClientPrincipal(clientPrincipal)
         .build();        
 

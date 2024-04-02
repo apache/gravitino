@@ -111,11 +111,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-// Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 // ...
 ```
@@ -152,11 +148,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-// Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 Catalog catalog = gravitinoClient.alterCatalog(NameIdentifier.of("metalake", "catalog"),
     CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
 // ...
@@ -192,11 +184,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 
 ```java
 // ...
-// Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 gravitinoClient.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 // ...
 
@@ -229,11 +217,6 @@ http://localhost:8090/api/metalakes/metalake/catalogs
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
-
 NameIdentifier[] catalogsIdents = gravitinoClient.listCatalogs(Namespace.ofCatalog("metalake"));
 // ...
 ```
@@ -260,11 +243,6 @@ http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
-
 Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
 // ...
 ```
@@ -301,21 +279,15 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-// Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
-
-// Assuming you have just created a Hive catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .build();
 Schema schema = supportsSchemas.createSchema(
-    NameIdentifier.of("metalake", "catalog", "schema"),
+    NameIdentifier.of("metalake", "hive_catalog", "schema"),
     "This is a schema",
     schemaProperties
 );
@@ -353,9 +325,9 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 SupportsSchemas supportsSchemas = catalog.asSchemas();
-Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalog", "schema"));
+Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"));
 // ...
 ```
 
@@ -430,11 +402,11 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cas
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 // cascade can be true or false
-supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), true);
+supportsSchemas.dropSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"), true);
 ```
 
 </TabItem>
@@ -463,10 +435,10 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
-NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "catalog"));
+NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "hive_catalog"));
 ```
 
 </TabItem>
@@ -614,14 +586,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-// Assuming you have just created a metalake named `metalake`
-GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .withMetalake("metalake")
-        .build();
-
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -633,7 +599,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "catalog", "schema", "example_table"),
+  NameIdentifier.of("metalake", "hive_catalog", "schema", "example_table"),
   new Column[] {
     Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
@@ -797,8 +763,8 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 
 ```java
 // ...
-// Assuming you have just created a Hive catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
@@ -841,12 +807,12 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-// Assuming you have just created a Hive catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
-Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "schema", "table"),
+Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
     TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
 // ...
 ```
@@ -891,15 +857,15 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
 // Drop a table
-tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+tableCatalog.dropTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
 
 // Purge a table
-tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+tableCatalog.purgeTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
 // ...
 ```
 
@@ -932,11 +898,11 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 NameIdentifier[] identifiers =
-    tableCatalog.listTables(Namespace.ofTable("metalake", "catalog", "schema"));
+    tableCatalog.listTables(Namespace.ofTable("metalake", "hive_catalog", "schema"));
 // ...
 ```
 

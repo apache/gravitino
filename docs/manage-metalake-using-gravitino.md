@@ -22,7 +22,7 @@ Assuming Gravitino has just started, and the host and port is [http://localhost:
 
 ### Create a metalake
 
-You can create a metalake by sending a `POST` request to the `/api/metalakes` endpoint or just use the Gravitino Java client.
+You can create a metalake by sending a `POST` request to the `/api/metalakes` endpoint or just use the Gravitino Admin Java client.
 The following is an example of creating a metalake:
 
 <Tabs>
@@ -41,6 +41,7 @@ http://localhost:8090/api/metalakes
 GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .builder("http://127.0.0.1:8090")
     .build();
+
 GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
     NameIdentifier.of("metalake"),
     "This is a new metalake",
