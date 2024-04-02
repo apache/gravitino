@@ -133,6 +133,16 @@ public class CatalogsPageTest extends AbstractWebIT {
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
     catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
+    // create table
+    Map<String, String> properties = Maps.newHashMap();
+    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            new Column[] {col1},
+            "comment",
+            properties);
 
     Assertions.assertTrue(catalogsPage.verifyCreateCatalog(HIVE_CATALOG_NAME));
   }
@@ -226,15 +236,6 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
-    Map<String, String> properties = Maps.newHashMap();
-    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
-            new Column[] {col1},
-            "comment",
-            properties);
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
     Assertions.assertTrue(
         catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, hiveMetastoreUri));
