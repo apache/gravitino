@@ -38,10 +38,10 @@ http://localhost:8090/api/metalakes
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient gravitinoClient = GravitinoClient
+GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .builder("http://127.0.0.1:8090")
     .build();
-GravitinoMetaLake newMetalake = gravitinoClient.createMetalake(
+GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
     NameIdentifier.of("metalake"),
     "This is a new metalake",
     new HashMap<>());
@@ -68,7 +68,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
+GravitinoMetaLake loaded = gravitinoAdminClient.loadMetalake(
     NameIdentifier.of("metalake"));
 // ...
 ```
@@ -105,7 +105,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
+GravitinoMetaLake renamed = gravitinoAdminClient.alterMetalake(
     NameIdentifier.of("new_metalake"),
     MetalakeChange.rename("new_metalake_renamed")
 );
@@ -143,7 +143,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-boolean success = gravitinoClient.dropMetalake(
+boolean success = gravitinoAdminClient.dropMetalake(
     NameIdentifier.of("metalake")
 );
 // ...
@@ -174,7 +174,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
+GravitinoMetaLake[] allMetalakes = gravitinoAdminClient.listMetalakes();
 // ...
 ```
 
