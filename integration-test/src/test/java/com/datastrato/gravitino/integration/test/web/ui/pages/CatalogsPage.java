@@ -291,7 +291,14 @@ public class CatalogsPage extends AbstractWebIT {
     clickAndWait(typeItem);
   }
 
-  public boolean verifyCreateCatalog(String name) {
+  public void clickTreeNode(String node) throws InterruptedException {
+    WebElement treeNode =
+        treeView.findElement(
+            By.xpath(".//div[contains(@class, 'ant-tree-treenode')]//span[@title='" + node + "']"));
+    clickAndWait(treeNode);
+  }
+
+  public boolean verifyGetCatalog(String name) {
     try {
       String xpath =
           "//div[contains(@class, 'ant-tree-treenode')]//span[@title='"

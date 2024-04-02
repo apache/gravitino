@@ -135,7 +135,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     // load catalog
     catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
 
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(HIVE_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(HIVE_CATALOG_NAME));
   }
 
   @Test
@@ -152,7 +152,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     // set iceberg warehouse
     catalogsPage.setCatalogFixedProp("warehouse", hdfsUri);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(ICEBERG_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
   }
 
   @Test
@@ -171,7 +171,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogFixedProp("jdbc-user", COMMON_JDBC_USER);
     catalogsPage.setCatalogFixedProp("jdbc-password", COMMON_JDBC_PWD);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(MYSQL_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
   }
 
   @Test
@@ -192,7 +192,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogFixedProp("jdbc-database", PG_JDBC_DB);
 
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(PG_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
   }
 
   @Test
@@ -204,7 +204,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickSelectType("fileset");
     catalogsPage.setCatalogCommentField("fileset catalog comment");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(FILESET_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(FILESET_CATALOG_NAME));
   }
 
   @Test
@@ -287,11 +287,34 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
 
     catalogsPage.metalakeSelectChange(METALAKE_NAME);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(MODIFIED_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
   }
 
   @Test
   @Order(14)
+  public void testTreeList() throws InterruptedException {
+    catalogsPage.clickTreeNode(ICEBERG_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
+    catalogsPage.clickTreeNode(MYSQL_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
+    catalogsPage.clickTreeNode(PG_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
+    catalogsPage.clickTreeNode(FILESET_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(FILESET_CATALOG_NAME));
+    catalogsPage.clickTreeNode(MODIFIED_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
+    catalogsPage.clickTreeNode(SCHEMA_NAME);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    catalogsPage.clickTreeNode(TABLE_NAME);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifyTableColumns());
+  }
+
+  @Test
+  @Order(15)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
