@@ -37,9 +37,9 @@ The Hadoop catalog supports creating, updating, and deleting schema.
 
 ### Schema properties
 
-| Property name | Description                                   | Default value | Required | Since Version |
-|---------------|-----------------------------------------------|---------------|----------|---------------|
-| `location`    | The storage location managed by Hadoop schema | (none)        | No       | 0.5.0         |
+| Property name | Description                                    | Default value | Required | Since Version |
+|---------------|------------------------------------------------|---------------|----------|---------------|
+| `location`    | The storage location managed by Hadoop schema. | (none)        | No       | 0.5.0         |
 
 ### Schema operations
 

@@ -14,11 +14,11 @@ out in Gravitino, which is a collection of files and directories. Users can leve
 fileset to manage non-tabular data like training datasets, raw data.
 
 Typically, a fileset is mapping to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
-With fileset managed by Gravitino, the non-tabular data can also be managed as assets in
+With fileset managed by Gravitino, the non-tabular data can be managed as assets in
 Gravitino with an unified way.
 
 After fileset is created, users can easily access, manage the files/directories through
-Fileset's identifier, without needing the physical path of the managed datasets. Also, with
+Fileset's identifier, without needing to know the physical path of the managed datasets. Also, with
 unified access control mechanism, filesets can also be managed via the same role based access
 control mechanism without needing to set access controls to different storages.
 
@@ -67,10 +67,10 @@ GravitinoMetaLake gravitinoMetaLake =
     gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
-        .put("location", "file:/tmp/root")
-        // Property "location" is optional, if specified all the managed fileset without
-        // specifying storage location will be stored under this location.
-        .build();
+    .put("location", "file:/tmp/root")
+    // Property "location" is optional, if specified all the managed fileset without
+    // specifying storage location will be stored under this location.
+    .build();
 
 Catalog catalog = gravitinoMetaLake.createCatalog(
     NameIdentifier.of("metalake", "catalog"),
@@ -131,7 +131,8 @@ Users should create a metalake and a catalog before creating a schema.
 
 ### Create a schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
+endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs>
 <TabItem value="shell" label="Shell">
