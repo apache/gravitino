@@ -19,6 +19,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -104,7 +105,7 @@ public class MetalakeManager implements SupportsMetalakes {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
-    if (BaseMetalake.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
+    if (EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException(
           "Can't create a metalake with with reserved name `system`");
     }

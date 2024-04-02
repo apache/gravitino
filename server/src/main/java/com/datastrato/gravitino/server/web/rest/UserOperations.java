@@ -14,10 +14,9 @@ import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -118,6 +117,9 @@ public class UserOperations {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.USER_SCHEMA_NAME, user);
+        metalake,
+        EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+        EntitySpecificConstants.USER_SCHEMA_NAME,
+        user);
   }
 }

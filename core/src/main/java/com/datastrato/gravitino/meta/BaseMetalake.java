@@ -24,8 +24,6 @@ import lombok.ToString;
 @ToString
 public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier {
 
-  public static final String SYSTEM_METALAKE_RESERVED_NAME = "system";
-
   public static final Field ID =
       Field.required("id", Long.class, "The metalake's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The metalake's name");

@@ -35,6 +35,7 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
@@ -287,7 +288,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
-    if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
+    if (EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
@@ -678,7 +679,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       if (change instanceof CatalogChange.RenameCatalog) {
         CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
 
-        if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(
+        if (EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME.equals(
             ((CatalogChange.RenameCatalog) change).getNewName())) {
           throw new IllegalArgumentException(
               "Can't rename a catalog with with reserved name `system`");

@@ -61,7 +61,9 @@ public class GravitinoServer extends ResourceConfig {
 
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization && serverConfig.get(Configs.SERVICE_ADMIN) == null) {
-      throw new IllegalArgumentException("The service admin can't be null");
+      throw new IllegalArgumentException(
+          String.format(
+              "The '%s' can't be null, you should configure it", Configs.SERVICE_ADMIN.getKey()));
     }
 
     JettyServerConfig jettyServerConfig =

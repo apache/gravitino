@@ -4,24 +4,24 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,10 +38,12 @@ public class AdminManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
+  private final List<String> admins;
 
-  public AdminManager(EntityStore store, IdGenerator idGenerator) {
+  public AdminManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.admins = config.get(Configs.SERVICE_ADMIN);
   }
 
   /**
@@ -60,9 +62,9 @@ public class AdminManager {
             .withName(user)
             .withNamespace(
                 Namespace.of(
-                    BaseMetalake.SYSTEM_METALAKE_RESERVED_NAME,
+                    EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME,
                     CatalogEntity.AUTHORIZATION_CATALOG_NAME,
-                    SchemaEntity.ADMIN_SCHEMA_NAME))
+                    EntitySpecificConstants.ADMIN_SCHEMA_NAME))
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -106,8 +108,7 @@ public class AdminManager {
    * @return true, if the user is service admin, otherwise false.
    */
   public boolean isServiceAdmin(String user) {
-    String admin = GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMIN);
-    return admin.equals(user);
+    return admins.contains(user);
   }
 
   /**
@@ -128,9 +129,9 @@ public class AdminManager {
 
   private NameIdentifier ofMetalakeAdmin(String user) {
     return NameIdentifier.of(
-        BaseMetalake.SYSTEM_METALAKE_RESERVED_NAME,
+        EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME,
         CatalogEntity.AUTHORIZATION_CATALOG_NAME,
-        SchemaEntity.ADMIN_SCHEMA_NAME,
+        EntitySpecificConstants.ADMIN_SCHEMA_NAME,
         user);
   }
 }

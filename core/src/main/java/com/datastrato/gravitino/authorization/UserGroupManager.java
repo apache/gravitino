@@ -15,11 +15,10 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -67,8 +66,8 @@ public class UserGroupManager {
             .withNamespace(
                 Namespace.of(
                     metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    SchemaEntity.USER_SCHEMA_NAME))
+                    EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+                    EntitySpecificConstants.USER_SCHEMA_NAME))
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -147,8 +146,8 @@ public class UserGroupManager {
             .withNamespace(
                 Namespace.of(
                     metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    SchemaEntity.GROUP_SCHEMA_NAME))
+                    EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+                    EntitySpecificConstants.GROUP_SCHEMA_NAME))
             .withRoles(Collections.emptyList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -214,14 +213,17 @@ public class UserGroupManager {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.USER_SCHEMA_NAME, user);
+        metalake,
+        EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+        EntitySpecificConstants.USER_SCHEMA_NAME,
+        user);
   }
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
         metalake,
-        CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-        SchemaEntity.GROUP_SCHEMA_NAME,
+        EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+        EntitySpecificConstants.GROUP_SCHEMA_NAME,
         group);
   }
 }

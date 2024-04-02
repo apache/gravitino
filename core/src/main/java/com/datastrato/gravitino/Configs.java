@@ -9,6 +9,7 @@ import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
@@ -247,10 +248,11 @@ public interface Configs {
           .booleanConf()
           .createWithDefault(false);
 
-  ConfigEntry<String> SERVICE_ADMIN =
+  ConfigEntry<List<String>> SERVICE_ADMIN =
       new ConfigBuilder("gravitino.authorization.serviceAdmin")
           .doc("The admin of Gravitino service")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
+          .toSequence()
           .create();
 }

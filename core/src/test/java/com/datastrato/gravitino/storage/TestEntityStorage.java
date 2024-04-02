@@ -42,6 +42,7 @@ import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -875,8 +876,8 @@ public class TestEntityStorage {
         .withNamespace(
             Namespace.of(
                 metalake,
-                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                SchemaEntity.USER_SCHEMA_NAME))
+                EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+                EntitySpecificConstants.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
@@ -889,8 +890,8 @@ public class TestEntityStorage {
         .withNamespace(
             Namespace.of(
                 metalake,
-                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                SchemaEntity.GROUP_SCHEMA_NAME))
+                EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
+                EntitySpecificConstants.GROUP_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())

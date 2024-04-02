@@ -24,7 +24,6 @@ import lombok.ToString;
 @ToString
 public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
-  public static final String SYSTEM_CATALOG_RESERVED_NAME = "system";
   public static final String AUTHORIZATION_CATALOG_NAME = "authorization";
 
   public static final Field ID =

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -20,9 +21,9 @@ public class AccessControlManager {
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
 
-  public AccessControlManager(EntityStore store, IdGenerator idGenerator) {
+  public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
-    this.adminManager = new AdminManager(store, idGenerator);
+    this.adminManager = new AdminManager(store, idGenerator, config);
   }
 
   /**
