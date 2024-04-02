@@ -182,6 +182,19 @@ public class Namespace {
         namespace);
   }
 
+  /**
+   * Check if the given topic namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The topic namespace
+   */
+  public static void checkTopic(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Topic namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
   private Namespace(String[] levels) {
     this.levels = levels;
   }
