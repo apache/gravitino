@@ -16,13 +16,9 @@ import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider;
 import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
-import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -30,7 +26,6 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
 import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -39,7 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
@@ -47,7 +41,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -317,7 +310,7 @@ public class TestOauth2Client extends TestGvfsBase {
     Configuration config1 = new Configuration(configuration);
     config1.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, testMetalake);
-    // UnauthorizedException will be caught by the client, and the RESTException will be thrown 
+    // UnauthorizedException will be caught by the client, and the RESTException will be thrown
     assertThrows(RESTException.class, () -> newPath.getFileSystem(config1));
   }
 
@@ -337,7 +330,8 @@ public class TestOauth2Client extends TestGvfsBase {
 
     Configuration configuration = new Configuration(conf);
     configuration.set(
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY, invalid_path + "/bad");
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY,
+        invalid_path + "/bad");
     // should throw BadRequestException
     assertThrows(BadRequestException.class, () -> managedFilesetPath.getFileSystem(configuration));
   }
