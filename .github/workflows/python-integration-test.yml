@@ -86,9 +86,9 @@ jobs:
       - name: Python Client Integration Test
         id: integrationTest
         run: |
-          for version in "3.8" "3.9" "3.10" "3.11"
+          for pythonVersion in "3.8" "3.9" "3.10" "3.11"
           do
-            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${version} :client:client-python:test
+            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :client:client-python:test
           done
 
       - name: Upload integrate tests reports
