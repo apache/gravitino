@@ -14,7 +14,7 @@ export default function StyledToast() {
         reverseOrder={false}
         position='top-right'
         toastOptions={{
-          duration: Infinity,
+          duration: 4000,
           style: {
             borderRadius: '8px',
             maxWidth: 500
