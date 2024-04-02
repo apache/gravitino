@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server;
 
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
@@ -75,6 +76,7 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
+            bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
                 .ranked(1);
@@ -83,6 +85,9 @@ public class GravitinoServer extends ResourceConfig {
                 .ranked(1);
             bind(gravitinoEnv.filesetOperationDispatcher())
                 .to(FilesetOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.topicOperationDispatcher())
+                .to(com.datastrato.gravitino.catalog.TopicOperationDispatcher.class)
                 .ranked(1);
           }
         });

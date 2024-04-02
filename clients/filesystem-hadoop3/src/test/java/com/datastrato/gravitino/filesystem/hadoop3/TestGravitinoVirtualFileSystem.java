@@ -20,10 +20,12 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +153,7 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
   }
 
   @Test
-  public void testInternalCache() throws IOException, InterruptedException {
+  public void testInternalCache() throws IOException {
     Configuration configuration = new Configuration(conf);
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY, "1");
@@ -187,15 +189,27 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
           localPath2.toString());
       FileSystemTestUtils.mkdirs(filesetPath2, fs);
 
-      Thread.sleep(1000);
-      assertNull(
-          ((GravitinoVirtualFileSystem) fs)
-              .getFilesetCache()
-              .getIfPresent(NameIdentifier.of(metalakeName, catalogName, schemaName, "fileset1")));
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  assertNull(
+                      ((GravitinoVirtualFileSystem) fs)
+                          .getFilesetCache()
+                          .getIfPresent(
+                              NameIdentifier.of(
+                                  metalakeName, catalogName, schemaName, "fileset1"))));
 
       // expired by time
-      Thread.sleep(1000);
-      assertEquals(0, ((GravitinoVirtualFileSystem) fs).getFilesetCache().asMap().size());
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  assertEquals(
+                      0, ((GravitinoVirtualFileSystem) fs).getFilesetCache().asMap().size()));
+
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
               .getFilesetCache()

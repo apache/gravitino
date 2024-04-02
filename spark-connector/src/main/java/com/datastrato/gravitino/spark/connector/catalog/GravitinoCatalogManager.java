@@ -58,6 +58,7 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
     gravitinoClient.close();
+    gravitinoCatalogManager = null;
   }
 
   public Catalog getGravitinoCatalogInfo(String name) {
