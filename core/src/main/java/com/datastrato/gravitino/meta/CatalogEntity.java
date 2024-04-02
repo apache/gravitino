@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.proto.CatalogEntitySerDe;
 import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.HashMap;
@@ -121,6 +122,18 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   /** Convert the catalog entity to a {@link CatalogInfo} instance. */
   public CatalogInfo toCatalogInfo() {
     return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
+  }
+
+  /**
+   * Sets the namespace of the catalog entity. because the {@link CatalogEntitySerDe} serializes the
+   * namespace field
+   *
+   * @param namespace the namespace of the catalog entity.
+   * @return the instance of the source catalog entity.
+   */
+  public CatalogEntity withNamespace(Namespace namespace) {
+    this.namespace = namespace;
+    return this;
   }
 
   /** Builder class for creating instances of {@link CatalogEntity}. */
