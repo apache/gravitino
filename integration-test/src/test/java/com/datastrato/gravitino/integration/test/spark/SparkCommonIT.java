@@ -93,7 +93,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         FileUtils.deleteDirectory(hiveLocalMetaStorePath);
       }
     } catch (IOException e) {
-      LOG.error(e.getMessage(), e);
+      LOG.error(String.format("delete director %s failed.", hiveLocalMetaStorePath), e);
       throw e;
     }
     sql("USE " + getCatalogName());
