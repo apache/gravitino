@@ -210,6 +210,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .withNullable(false)
             .build();
 
+    // todo: move this to integration test
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
