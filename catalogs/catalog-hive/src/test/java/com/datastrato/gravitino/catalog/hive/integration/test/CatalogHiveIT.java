@@ -485,6 +485,28 @@ public class CatalogHiveIT extends AbstractIT {
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
+
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
   }
 
   @Test

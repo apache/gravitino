@@ -22,6 +22,7 @@ import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.ProxyPlugin;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -97,6 +98,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
+  private HiveCatalogCapability capability;
+
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
@@ -124,6 +127,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
     this.schemaPropertiesMetadata = new HiveSchemaPropertiesMetadata();
+    this.capability = new HiveCatalogCapability();
 
     // Key format like gravitino.bypass.a.b
     Map<String, String> byPassConfig = Maps.newHashMap();
@@ -690,7 +694,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Arrays.stream(columns)
         .forEach(
             c -> {
-              validateNullable(c.name(), c.nullable());
               validateColumnDefaultValue(c.name(), c.defaultValue());
             });
 
@@ -791,7 +794,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           if (change instanceof TableChange.AddColumn) {
             TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
             String fieldName = String.join(".", addColumn.fieldName());
-            validateNullable(fieldName, addColumn.isNullable());
             validateColumnDefaultValue(fieldName, addColumn.getDefaultValue());
             doAddColumn(cols, addColumn);
 
@@ -867,17 +869,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
       throw new IllegalArgumentException(
           "The DEFAULT constraint for column is only supported since Hive 3.0, "
-              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + fieldName);
-    }
-  }
-
-  private void validateNullable(String fieldName, boolean nullable) {
-    // The NOT NULL constraint for column is supported since Hive3.0, see
-    // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!nullable) {
-      throw new IllegalArgumentException(
-          "The NOT NULL constraint for column is only supported since Hive 3.0, "
               + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
               + fieldName);
     }
@@ -1069,6 +1060,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public Capability columnNotNull() {
+    return capability.columnNotNull();
   }
 
   @Override

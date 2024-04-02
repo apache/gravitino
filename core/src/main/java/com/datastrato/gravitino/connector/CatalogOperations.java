@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.connector.capability.HasCapabilities;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.Closeable;
@@ -16,7 +17,7 @@ import java.util.Map;
  * operation, {@link TableCatalog} to support table operations, etc.
  */
 @Evolving
-public interface CatalogOperations extends Closeable, HasPropertyMetadata {
+public interface CatalogOperations extends Closeable, HasPropertyMetadata, HasCapabilities {
 
   /**
    * Initialize the CatalogOperation with specified configuration. This method is called after
