@@ -75,10 +75,18 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // hdfs://localhost:9000/xxx which couldn't read write data from SparkCommonIT. Will use default
   // database after spark connector support Alter database xx set location command.
   @BeforeAll
-  void initDefaultDatabase() {
-    // cleanup the metastore_db directory in embedded mode
-    // to avoid the exception about `ERROR XSDB6: Another instance of Derby may have already booted
-    // the database /home/runner/work/gravitino/gravitino/integration-test/metastore_db`
+  void initDefaultDatabase() throws IOException {
+    // In embedded mode, derby acts as the backend database for the hive metastore
+    // and creates a directory named metastore_db to store metadata,
+    // supporting only one connection at a time.
+    // Previously, only SparkHiveCatalogIT accessed derby without any exceptions.
+    // Now, SparkIcebergCatalogIT exists at the same time.
+    // This exception about `ERROR XSDB6: Another instance of Derby may have already
+    // booted  the database {GRAVITINO_HOME}/integration-test/metastore_db` will occur when
+    // SparkIcebergCatalogIT is initialized after the Sparkhivecatalogit is executed.
+    // The main reason is that the lock file in the metastore_db directory is not cleaned so that a
+    // new connection cannot be created,
+    // so a clean operation is done here to ensure that a new connection can be created.
     File hiveLocalMetaStorePath = new File("metastore_db");
     try {
       if (hiveLocalMetaStorePath.exists()) {
@@ -86,6 +94,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
       }
     } catch (IOException e) {
       LOG.error(e.getMessage(), e);
+      throw e;
     }
     sql("USE " + getCatalogName());
     createDatabaseIfNotExists(getDefaultDatabase());

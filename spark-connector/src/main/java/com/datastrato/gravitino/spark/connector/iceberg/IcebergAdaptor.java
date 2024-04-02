@@ -66,26 +66,25 @@ public class IcebergAdaptor implements GravitinoCatalogAdaptor {
         "Couldn't get "
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE
             + " from Iceberg Catalog properties");
-    String jdbcUser =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_USER);
+    String jdbcUser = gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_USER);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jdbcUser),
         "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_USER
+            + IcebergPropertiesConstants.GRAVITINO_JDBC_USER
             + " from Iceberg Catalog properties");
     String jdbcPassword =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_PASSWORD);
+        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jdbcPassword),
         "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_PASSWORD
+            + IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD
             + " from Iceberg Catalog properties");
     String jdbcDriver =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_DRIVER);
+        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jdbcDriver),
         "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_DRIVER
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER
             + " from Iceberg Catalog properties");
     icebergProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_TYPE,
@@ -93,11 +92,9 @@ public class IcebergAdaptor implements GravitinoCatalogAdaptor {
     icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, jdbcUri);
     icebergProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, jdbcWarehouse);
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_USER, jdbcUser);
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD, jdbcPassword);
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_DRIVER, jdbcDriver);
+    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_USER, jdbcUser);
+    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_PASSWORD, jdbcPassword);
+    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER, jdbcDriver);
   }
 
   @Override
