@@ -85,8 +85,7 @@ public interface TopicCatalog {
    * Drop a topic from the catalog.
    *
    * @param ident A topic identifier.
-   * @return true If the topic is dropped, false otherwise.
-   * @throws NoSuchTopicException If the topic does not exist.
+   * @return true If the topic is dropped, false if the topic does not exist.
    */
-  boolean dropTopic(NameIdentifier ident) throws NoSuchTopicException;
+  boolean dropTopic(NameIdentifier ident);
 }

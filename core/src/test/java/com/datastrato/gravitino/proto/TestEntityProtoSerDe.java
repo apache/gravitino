@@ -6,6 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.google.common.collect.ImmutableMap;
@@ -296,5 +297,28 @@ public class TestEntityProtoSerDe {
     userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
     userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
     Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
+    Assertions.assertNull(userEntityWithoutFields.roles());
+
+    // Test GroupEntity
+    Long groupId = 1L;
+    String groupName = "group";
+
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    byte[] groupBytes = protoEntitySerDe.serialize(group);
+    GroupEntity groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(group, groupFromBytes);
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(groupId).withName(groupName).withAuditInfo(auditInfo).build();
+    groupBytes = protoEntitySerDe.serialize(groupWithoutFields);
+    groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(groupWithoutFields, groupFromBytes);
+    Assertions.assertNull(groupWithoutFields.roles());
   }
 }
