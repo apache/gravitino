@@ -5,7 +5,6 @@
 import io.github.piyushroshan.python.VenvTask
 
 plugins {
-  java
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
 }
 
@@ -30,42 +29,36 @@ tasks {
 
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
-    args = listOf("install", "--isolated", "-r", "requirements.txt")
+    args = listOf("install", "-e", ".")
   }
 
   val runPyTests by registering(VenvTask::class) {
     dependsOn(pipInstall)
-    venvExec = "pytest"
-    workingDir = projectDir.resolve("tests")
+    venvExec = "python"
+    args = listOf("-m", "unittest")
+    workingDir = projectDir.resolve(".")
+  }
+
+  // https://github.com/datastrato/gravitino/issues/2770
+  // Improved Gradle Build Scripts for Python Module
+  compileTestJava {
+    dependsOn(runPyTests)
   }
 
   compileJava {
-    dependsOn(pipInstall)
-  }
-
-  spotlessJava {
-    dependsOn(pipInstall)
-  }
-
-  spotlessKotlinGradleCheck {
-    dependsOn(pipInstall)
-  }
-
-  spotlessKotlinGradle {
-    dependsOn(pipInstall)
+    dependsOn(runPyTests)
   }
 
   test {
     val skipPythonITs = project.hasProperty("skipPythonITs")
     if (!skipPythonITs) {
       dependsOn(runPyTests)
-      useJUnitPlatform()
-      testLogging.showStandardStreams = true
     }
   }
 
   clean {
     delete("build")
+    delete("gravitino.egg-info")
 
     doLast {
       deleteCacheDir(".pytest_cache")
