@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
@@ -158,7 +159,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 t ->
                     t.createTable(
                         ident,
-                        columns,
+                        applyCapabilities(columns, c.capabilities()),
                         comment,
                         updatedProperties,
                         partitions == null ? EMPTY_TRANSFORM : partitions,
@@ -222,7 +223,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     Table tempAlteredTable =
         doWithCatalog(
             catalogIdent,
-            c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),
+            c ->
+                c.doWithTableOps(
+                    t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
             NoSuchTableException.class,
             IllegalArgumentException.class);
 
