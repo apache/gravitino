@@ -103,6 +103,11 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
+  // Gravitino Python client project didn't need to apply the Spotless plugin
+  if (project.name == "client-python") {
+    return@allprojects
+  }
+
   apply(plugin = "com.diffplug.spotless")
   repositories {
     mavenCentral()
@@ -218,6 +223,11 @@ dependencies {
 }
 
 subprojects {
+  // Gravitino Python client project didn't need to apply the java plugin
+  if (project.name == "client-python") {
+    return@subprojects
+  }
+
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")

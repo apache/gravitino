@@ -22,41 +22,22 @@ fun deleteCacheDir(targetDir: String) {
 }
 
 tasks {
-  register<VenvTask>("condaInfo") {
-    venvExec = "conda"
-    args = listOf("info")
-  }
-
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
     args = listOf("install", "-e", ".")
   }
 
-  val runPyTests by registering(VenvTask::class) {
+  val test by registering(VenvTask::class) {
     dependsOn(pipInstall)
     venvExec = "python"
     args = listOf("-m", "unittest")
     workingDir = projectDir.resolve(".")
   }
 
-  // https://github.com/datastrato/gravitino/issues/2770
-  // Improved Gradle Build Scripts for Python Module
-  compileTestJava {
-    dependsOn(runPyTests)
+  val build by registering(VenvTask::class) {
   }
 
-  compileJava {
-    dependsOn(runPyTests)
-  }
-
-  test {
-    val skipPythonITs = project.hasProperty("skipPythonITs")
-    if (!skipPythonITs) {
-      dependsOn(runPyTests)
-    }
-  }
-
-  clean {
+  val clean by registering(Delete::class) {
     delete("build")
     delete("gravitino.egg-info")
 
