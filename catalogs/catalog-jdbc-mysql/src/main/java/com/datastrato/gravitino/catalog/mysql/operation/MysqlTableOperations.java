@@ -535,7 +535,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     // Append default value if available
-    if (!TableChange.AddColumn.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
           .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))

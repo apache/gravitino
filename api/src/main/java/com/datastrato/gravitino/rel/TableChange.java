@@ -33,9 +33,6 @@ import java.util.Objects;
  */
 @Evolving
 public interface TableChange {
-  /** A default value that indicates the default value is not set. */
-  Expression DEFAULT_VALUE_NOT_SET = Column.DEFAULT_VALUE_NOT_SET;
-
   /**
    * Create a TableChange for renaming a table.
    *
@@ -93,7 +90,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType) {
-    return new AddColumn(fieldName, dataType, null, null, true, false, DEFAULT_VALUE_NOT_SET);
+    return new AddColumn(
+        fieldName, dataType, null, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -109,7 +107,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, String comment) {
-    return new AddColumn(fieldName, dataType, comment, null, true, false, DEFAULT_VALUE_NOT_SET);
+    return new AddColumn(
+        fieldName, dataType, comment, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -125,7 +124,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, null, position, true, false, DEFAULT_VALUE_NOT_SET);
+    return new AddColumn(
+        fieldName, dataType, null, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -144,7 +144,7 @@ public interface TableChange {
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, ColumnPosition position) {
     return new AddColumn(
-        fieldName, dataType, comment, position, true, false, DEFAULT_VALUE_NOT_SET);
+        fieldName, dataType, comment, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -160,7 +160,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, boolean nullable) {
-    return new AddColumn(fieldName, dataType, null, null, nullable, false, DEFAULT_VALUE_NOT_SET);
+    return new AddColumn(
+        fieldName, dataType, null, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -175,7 +176,7 @@ public interface TableChange {
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, boolean nullable) {
     return new AddColumn(
-        fieldName, dataType, comment, null, nullable, false, DEFAULT_VALUE_NOT_SET);
+        fieldName, dataType, comment, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -258,7 +259,7 @@ public interface TableChange {
       ColumnPosition position,
       boolean nullable) {
     return new AddColumn(
-        fieldName, dataType, comment, position, nullable, false, DEFAULT_VALUE_NOT_SET);
+        fieldName, dataType, comment, position, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -284,7 +285,13 @@ public interface TableChange {
       boolean nullable,
       boolean autoIncrement) {
     return new AddColumn(
-        fieldName, dataType, comment, position, nullable, autoIncrement, DEFAULT_VALUE_NOT_SET);
+        fieldName,
+        dataType,
+        comment,
+        position,
+        nullable,
+        autoIncrement,
+        Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**

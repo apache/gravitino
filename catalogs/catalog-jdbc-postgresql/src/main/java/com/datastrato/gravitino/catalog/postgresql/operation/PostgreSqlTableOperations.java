@@ -15,6 +15,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -550,7 +551,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
 
     // Append default value if available
-    if (!TableChange.AddColumn.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
           .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))

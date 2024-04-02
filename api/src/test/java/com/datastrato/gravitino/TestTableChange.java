@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.AddColumn;
 import com.datastrato.gravitino.rel.TableChange.ColumnPosition;
@@ -76,7 +77,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
-    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
@@ -91,7 +92,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(position, addColumn.getPosition());
-    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
@@ -105,7 +106,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertNull(addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
-    assertEquals(TableChange.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
