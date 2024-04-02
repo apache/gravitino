@@ -15,7 +15,5 @@ public class ConnectorConstants {
 
   public static final String DOT = ".";
 
-  public static final String SPARK_SESSION_EXTENSIONS = "spark.sql.extensions";
-
   private ConnectorConstants() {}
 }
