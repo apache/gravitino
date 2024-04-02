@@ -38,6 +38,8 @@ export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', as
 
   const { metalakes } = res
 
+  metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
+
   return { metalakes }
 })
 

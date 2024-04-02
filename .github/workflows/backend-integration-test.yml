@@ -58,6 +58,7 @@ jobs:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
         test-mode: [ embedded, deploy ]
+        backend: [ jdbcBackend, kvBackend]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -87,7 +88,7 @@ jobs:
       - name: Backend Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs -P${{ matrix.backend }}
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
