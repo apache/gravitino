@@ -6,10 +6,6 @@
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +19,6 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class CatalogsPage extends AbstractWebIT {
-
   @FindBy(xpath = "//*[@data-refer='back-home-btn']")
   public WebElement backHomeBtn;
 
@@ -99,7 +94,7 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-provider']")
   public WebElement catalogProviderList;
 
-  @FindBy(xpath = "//ui[@aria-labelledby='select-catalog-type']")
+  @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-type']")
   public WebElement catalogTypeList;
 
   public CatalogsPage() {
@@ -142,7 +137,8 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void setCatalogPropInput(String key, String value) {
+  // set the required fixed catalog properties
+  public void setCatalogFixedProp(String key, String value) {
     try {
       String xpath = "//div[@data-prev-refer='props-" + key + "']//input[@name='value']";
       WebElement propItem = driver.findElement(By.xpath(xpath));
@@ -152,7 +148,8 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void setCatalogProps(int index, String key, String value) {
+  // set the indexed catalog properties
+  public void setCatalogPropsAt(int index, String key, String value) {
     try {
       // Set the indexed props key
       String keyPath = "//div[@data-refer='props-key-" + index + "']//input[@name='key']";
@@ -177,55 +174,6 @@ public class CatalogsPage extends AbstractWebIT {
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
-  }
-
-  public void sendPostJsonRequest(String targetURL, String jsonInputString) {
-    HttpURLConnection connection = null;
-    try {
-      URL url = new URL(targetURL);
-      connection = (HttpURLConnection) url.openConnection();
-      connection.setRequestMethod("POST");
-      connection.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
-      connection.setRequestProperty("Accept", "application/vnd.gravitino.v1+json");
-
-      connection.setUseCaches(false);
-      connection.setDoOutput(true);
-
-      try (OutputStream os = connection.getOutputStream()) {
-        byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
-        os.write(input, 0, input.length);
-      }
-      int responseCode = connection.getResponseCode();
-      LOG.info("POST Response Code :: " + responseCode);
-      if (responseCode == HttpURLConnection.HTTP_OK) {
-        LOG.info("POST request success.");
-      } else {
-        LOG.info("POST request failed.");
-      }
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    } finally {
-      if (connection != null) {
-        connection.disconnect();
-      }
-    }
-  }
-
-  public void createTable(
-      String baseURL, String metalakeName, String catalogName, String schemaName) {
-    String url =
-        baseURL
-            + "/api/metalakes/"
-            + metalakeName
-            + "/catalogs/"
-            + catalogName
-            + "/schemas/"
-            + schemaName
-            + "/tables";
-    String jsonInputString =
-        "{\"name\":\"table\",\"comment\":\"This is my table\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"comment\":\"id column comment\",\"nullable\":true},{\"name\":\"name\",\"type\":\"string\",\"comment\":\"name column comment\",\"nullable\":true},{\"name\":\"age\",\"type\":\"integer\",\"comment\":\"age column comment\",\"nullable\":true},{\"name\":\"dt\",\"type\":\"date\",\"comment\":\"dt column comment\",\"nullable\":true}]}";
-    LOG.info(url);
-    sendPostJsonRequest(url, jsonInputString);
   }
 
   public void clickEditCatalogBtn(String name) {
@@ -338,7 +286,8 @@ public class CatalogsPage extends AbstractWebIT {
   }
 
   public void clickSelectType(String type) throws InterruptedException {
-    WebElement typeItem = catalogTypeList.findElement(By.xpath(".//li[@data-value='"+type+"']"));
+    WebElement typeItem =
+        catalogTypeList.findElement(By.xpath(".//li[@data-value='" + type + "']"));
     clickAndWait(typeItem);
   }
 

@@ -5,14 +5,20 @@
 
 package com.datastrato.gravitino.integration.test.web.ui;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.collect.Maps;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -25,44 +31,55 @@ import org.junit.jupiter.api.TestMethodOrder;
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogsPageTest extends AbstractWebIT {
-  protected static String gravitinoUri = "http://127.0.0.1:8090";
-  protected static String trinoUri = "http://127.0.0.1:8080";
-  protected static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
-  protected static String hdfsUri = "hdfs://127.0.0.1:9000";
-  protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
-  protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
-  protected static TrinoITContainers trinoITContainers;
-  protected static GravitinoAdminClient gravitinoClient;
-  static MetalakePage metalakePage = new MetalakePage();
+  MetalakePage metalakePage = new MetalakePage();
   CatalogsPage catalogsPage = new CatalogsPage();
 
-  private static final String metalakeName = "test";
-  private static final String metalakeSelectName = "metalake_select_name";
-  String catalogType = "relational";
-  String catalogName = "catalog_name";
-  String modifiedCatalogName = catalogName + "_edited";
-  String schemaName = "default";
-  String tableName = "table";
-  String icebergCatalogName = "catalog_iceberg";
-  String mysqlCatalogName = "catalog_mysql";
-  String pgCatalogName = "catalog_pg";
+  protected static TrinoITContainers trinoITContainers;
+  protected static GravitinoAdminClient gravitinoClient;
+  private static GravitinoMetalake metalake;
+  private static Catalog catalog;
 
-  String filesetCatalogName = "catalog_fileset";
+  protected static String GRAVITINO_URI = "http://127.0.0.1:8090";
+  protected static String TRINO_URI = "http://127.0.0.1:8080";
+  protected static String HIVE_METASTORE_URI = "thrift://127.0.0.1:9083";
+  protected static String HDFS_URI = "hdfs://127.0.0.1:9000";
+  protected static String MYSQL_URI = "jdbc:mysql://127.0.0.1";
+  protected static String PG_URI = "jdbc:postgresql://127.0.0.1";
+
+  private static final String WEB_TITLE = "Gravitino";
+  private static final String METALAKE_NAME = "test";
+  private static final String METALAKE_SELECT_NAME = "metalake_select_name";
+  private static final String CATALOG_TYPE = "relational";
+  private static final String DEFAULT_CATALOG_NAME = "default_catalog";
+  private static final String HIVE_CATALOG_NAME = "catalog_hive";
+  private static final String MODIFIED_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
+  private static final String SCHEMA_NAME = "default";
+  private static final String TABLE_NAME = "table";
+  private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
+  private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
+  private static final String PG_CATALOG_NAME = "catalog_pg";
+  private static final String FILESET_CATALOG_NAME = "catalog_fileset";
+
+  private static final String MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+  private static final String PG_JDBC_DRIVER = "org.postgresql.Driver";
+  private static final String JDBC_USER = "trino";
+  private static final String JDBC_PWD = "ds123";
+  private static final String JDBC_DB = "gt_db";
 
   @BeforeAll
   public static void before() throws Exception {
     gravitinoClient = AbstractIT.getGravitinoClient();
 
-    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+    GRAVITINO_URI = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     trinoITContainers = ContainerSuite.getTrinoITContainers();
     trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
 
-    trinoUri = trinoITContainers.getTrinoUri();
-    hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
-    hdfsUri = trinoITContainers.getHdfsUri();
-    mysqlUri = trinoITContainers.getMysqlUri();
-    postgresqlUri = trinoITContainers.getPostgresqlUri();
+    TRINO_URI = trinoITContainers.getTrinoUri();
+    HIVE_METASTORE_URI = trinoITContainers.getHiveMetastoreUri();
+    HDFS_URI = trinoITContainers.getHdfsUri();
+    MYSQL_URI = trinoITContainers.getMysqlUri();
+    PG_URI = trinoITContainers.getPostgresqlUri();
   }
 
   @AfterAll
@@ -79,23 +96,22 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testDeleteCatalog() throws InterruptedException {
     // create metalake
     clickAndWait(metalakePage.createMetalakeBtn);
-    metalakePage.setMetalakeNameField(metalakeName);
+    metalakePage.setMetalakeNameField(METALAKE_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // Create another metalake for select option
     clickAndWait(metalakePage.createMetalakeBtn);
-    metalakePage.setMetalakeNameField(metalakeSelectName);
+    metalakePage.setMetalakeNameField(METALAKE_SELECT_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
-
-    gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
-    metalakePage.clickMetalakeLink(metalakeName);
+    // load metalake
+    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create catalog
-    String defaultCatalogName = "default_catalog";
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(defaultCatalogName);
-    catalogsPage.setCatalogPropInput("metastore.uris", hiveMetastoreUri);
+    catalogsPage.setCatalogNameField(DEFAULT_CATALOG_NAME);
+    catalogsPage.setCatalogFixedProp("metastore.uris", HIVE_METASTORE_URI);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // delete catalog
-    catalogsPage.clickDeleteCatalogBtn(defaultCatalogName);
+    catalogsPage.clickDeleteCatalogBtn(DEFAULT_CATALOG_NAME);
     clickAndWait(catalogsPage.confirmDeleteBtn);
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
   }
@@ -105,32 +121,35 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testCreateHiveCatalog() throws InterruptedException {
     // Create catalog
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(catalogName);
+    catalogsPage.setCatalogNameField(HIVE_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("catalog comment");
-    catalogsPage.setCatalogPropInput("metastore.uris", hiveMetastoreUri);
+    catalogsPage.setCatalogFixedProp("metastore.uris", HIVE_METASTORE_URI);
     catalogsPage.addCatalogPropsBtn.click();
-    catalogsPage.setCatalogProps(1, "key1", "value1");
+    catalogsPage.setCatalogPropsAt(1, "key1", "value1");
     catalogsPage.addCatalogPropsBtn.click();
-    catalogsPage.setCatalogProps(2, "key2", "value2");
+    catalogsPage.setCatalogPropsAt(2, "key2", "value2");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(catalogName));
+    // load catalog
+    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
+
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(HIVE_CATALOG_NAME));
   }
 
   @Test
   @Order(2)
   public void testCreateIcebergCatalog() throws InterruptedException {
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(icebergCatalogName);
+    catalogsPage.setCatalogNameField(ICEBERG_CATALOG_NAME);
     // select provider as iceberg
     clickAndWait(catalogsPage.catalogProviderSelector);
     catalogsPage.clickSelectProvider("lakehouse-iceberg");
     catalogsPage.setCatalogCommentField("iceberg catalog comment");
     // set iceberg uri
-    catalogsPage.setCatalogPropInput("uri", hiveMetastoreUri);
+    catalogsPage.setCatalogFixedProp("uri", HIVE_METASTORE_URI);
     // set iceberg warehouse
-    catalogsPage.setCatalogPropInput("warehouse", hdfsUri);
+    catalogsPage.setCatalogFixedProp("warehouse", HDFS_URI);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(icebergCatalogName));
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(ICEBERG_CATALOG_NAME));
   }
 
   @Test
@@ -138,18 +157,18 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testCreateMysqlCatalog() throws InterruptedException {
     // create mysql catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(mysqlCatalogName);
+    catalogsPage.setCatalogNameField(MYSQL_CATALOG_NAME);
     // select provider as mysql
     clickAndWait(catalogsPage.catalogProviderSelector);
     catalogsPage.clickSelectProvider("jdbc-mysql");
     catalogsPage.setCatalogCommentField("mysql catalog comment");
     // set mysql catalog props
-    catalogsPage.setCatalogPropInput("jdbc-driver", "com.mysql.cj.jdbc.Driver");
-    catalogsPage.setCatalogPropInput("jdbc-url", mysqlUri);
-    catalogsPage.setCatalogPropInput("jdbc-user", "trino");
-    catalogsPage.setCatalogPropInput("jdbc-password", "ds123");
+    catalogsPage.setCatalogFixedProp("jdbc-driver", MYSQL_JDBC_DRIVER);
+    catalogsPage.setCatalogFixedProp("jdbc-url", MYSQL_URI);
+    catalogsPage.setCatalogFixedProp("jdbc-user", JDBC_USER);
+    catalogsPage.setCatalogFixedProp("jdbc-password", JDBC_PWD);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(mysqlCatalogName));
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(MYSQL_CATALOG_NAME));
   }
 
   @Test
@@ -157,39 +176,39 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testCreatePgCatalog() throws InterruptedException {
     // create postgresql catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(pgCatalogName);
+    catalogsPage.setCatalogNameField(PG_CATALOG_NAME);
     // select provider as mysql
     clickAndWait(catalogsPage.catalogProviderSelector);
     catalogsPage.clickSelectProvider("jdbc-postgresql");
     catalogsPage.setCatalogCommentField("postgresql catalog comment");
     // set mysql catalog props
-    catalogsPage.setCatalogPropInput("jdbc-driver", "org.postgresql.Driver");
-    catalogsPage.setCatalogPropInput("jdbc-url", postgresqlUri + ":5432/gt_db");
-    catalogsPage.setCatalogPropInput("jdbc-user", "trino");
-    catalogsPage.setCatalogPropInput("jdbc-password", "ds123");
-    catalogsPage.setCatalogPropInput("jdbc-database", "gt_db");
+    catalogsPage.setCatalogFixedProp("jdbc-driver", PG_JDBC_DRIVER);
+    catalogsPage.setCatalogFixedProp("jdbc-url", PG_URI + ":5432/" + JDBC_DB);
+    catalogsPage.setCatalogFixedProp("jdbc-user", JDBC_USER);
+    catalogsPage.setCatalogFixedProp("jdbc-password", JDBC_PWD);
+    catalogsPage.setCatalogFixedProp("jdbc-database", JDBC_DB);
 
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(pgCatalogName));
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(PG_CATALOG_NAME));
   }
 
   @Test
   @Order(5)
   public void testCreateFilesetCatalog() throws InterruptedException {
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(filesetCatalogName);
+    catalogsPage.setCatalogNameField(FILESET_CATALOG_NAME);
     clickAndWait(catalogsPage.catalogTypeSelector);
     catalogsPage.clickSelectType("fileset");
     catalogsPage.setCatalogCommentField("fileset catalog comment");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(filesetCatalogName));
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(FILESET_CATALOG_NAME));
   }
 
   @Test
   @Order(6)
   public void testRefreshPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), "Gravitino");
+    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
   }
 
@@ -205,31 +224,40 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
-    catalogsPage.createTable(gravitinoUri, metalakeName, catalogName, schemaName);
-    catalogsPage.clickViewCatalogBtn(catalogName);
-    Assertions.assertTrue(catalogsPage.verifyShowCatalogDetails(catalogName, hiveMetastoreUri));
+    Map<String, String> properties = Maps.newHashMap();
+    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            new Column[] {col1},
+            "comment",
+            properties);
+    catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
+    Assertions.assertTrue(
+        catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, HIVE_METASTORE_URI));
   }
 
   @Test
   @Order(9)
   public void testEditCatalog() throws InterruptedException {
-    catalogsPage.clickEditCatalogBtn(catalogName);
-    catalogsPage.setCatalogNameField(modifiedCatalogName);
+    catalogsPage.clickEditCatalogBtn(HIVE_CATALOG_NAME);
+    catalogsPage.setCatalogNameField(MODIFIED_CATALOG_NAME);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyEditedCatalog(modifiedCatalogName));
+    Assertions.assertTrue(catalogsPage.verifyEditedCatalog(MODIFIED_CATALOG_NAME));
   }
 
   @Test
   @Order(10)
   public void testClickCatalogLink() {
-    catalogsPage.clickCatalogLink(metalakeName, modifiedCatalogName, catalogType);
+    catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
   }
 
   @Test
   @Order(11)
   public void testClickSchemaLink() {
-    catalogsPage.clickSchemaLink(metalakeName, modifiedCatalogName, catalogType, schemaName);
+    catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
   }
 
@@ -237,7 +265,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(12)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
-        metalakeName, modifiedCatalogName, catalogType, schemaName, tableName);
+        METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }
@@ -245,11 +273,11 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(13)
   public void testSelectMetalake() throws InterruptedException {
-    catalogsPage.metalakeSelectChange(metalakeSelectName);
+    catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
 
-    catalogsPage.metalakeSelectChange(metalakeName);
-    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(modifiedCatalogName));
+    catalogsPage.metalakeSelectChange(METALAKE_NAME);
+    Assertions.assertTrue(catalogsPage.verifyCreateCatalog(MODIFIED_CATALOG_NAME));
   }
 
   @Test
