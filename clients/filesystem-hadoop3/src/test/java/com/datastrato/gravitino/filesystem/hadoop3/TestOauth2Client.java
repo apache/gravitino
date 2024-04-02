@@ -17,12 +17,15 @@ import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.json.JsonUtils;
+import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -158,6 +161,33 @@ public class TestOauth2Client extends TestGvfsBase {
     // should throw UnauthorizedException
     assertThrows(
         UnauthorizedException.class, () -> managedFilesetPath.getFileSystem(configuration));
+
+    // test wrong client secret
+    mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    OAuth2ErrorResponse response =
+        new OAuth2ErrorResponse("invalid_client", "invalid client secret");
+    try {
+      String respJson = JsonUtils.objectMapper().writeValueAsString(response);
+      mockResponse = mockResponse.withBody(respJson);
+      Map<String, String> bodyMap = new HashMap<>();
+      bodyMap.put("grant_type", "client_credentials");
+      bodyMap.put("client_id", "xx");
+      bodyMap.put("client_secret", "xx");
+      bodyMap.put("scope", scope);
+      Oauth2MockServerBase.mockServer()
+          .when(
+              request()
+                  .withPath("/" + invalid_path)
+                  // mock the fetch token request body
+                  .withBody(
+                      new StringEntity(RESTUtils.encodeFormData(bodyMap)).getContentEncoding()),
+              Times.exactly(1))
+          .respond(mockResponse);
+      assertThrows(
+          UnauthorizedException.class, () -> managedFilesetPath.getFileSystem(configuration));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test
