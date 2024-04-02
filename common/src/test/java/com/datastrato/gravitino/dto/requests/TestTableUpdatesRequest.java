@@ -16,6 +16,8 @@ import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 public class TestTableUpdatesRequest {
   @Test
   public void testTableUpdatesRequest() throws JsonProcessingException {
@@ -130,6 +132,14 @@ public class TestTableUpdatesRequest {
 
     setTablePropertyRequest = new TableUpdateRequest.SetTablePropertyRequest("key", "");
     Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
+
+    // test validate DEFAULT_VALUE_NOT_SET property value
+    TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
+            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[]{"key"}, DEFAULT_VALUE_NOT_SET);
+    Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
+
+    updateTableColumnDefaultValueRequest = new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[]{"key"}, DEFAULT_VALUE_NOT_SET);
+    Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
   }
 
   @Test
