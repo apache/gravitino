@@ -851,7 +851,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         String.format(
             "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
 
-    sql(getRowLevelUpdateTableSql(name, sourceTableName, selectClause, onClause));
+    sql(getRowLevelUpdateTableSql(name, selectClause, sourceTableName, onClause));
 
     // do something to match the query result:
     // 1. remove "'" from values, such as 'a' is trans to a
