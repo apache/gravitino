@@ -74,12 +74,14 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   private void registerSqlExtensions(SparkConf conf) {
-    String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
     String gravitinoDriverExtensions = String.join(",", GRAVITINO_DRIVER_EXTENSIONS);
-    if (StringUtils.isNotBlank(sparkSessionExtensions)) {
+    if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
       conf.set(
           StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
-          String.join(",", sparkSessionExtensions, gravitinoDriverExtensions));
+          String.join(
+              ",",
+              conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()),
+              gravitinoDriverExtensions));
     } else {
       conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
     }
