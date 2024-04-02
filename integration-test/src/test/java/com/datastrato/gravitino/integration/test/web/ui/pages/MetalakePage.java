@@ -19,7 +19,7 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
-  private static final String pageTitleName = "Metalakes";
+  private static final String PAGE_TITLE = "Metalakes";
 
   @FindBy(
       xpath =
@@ -333,7 +333,7 @@ public class MetalakePage extends AbstractWebIT {
                   .executeScript("return document.readyState")
                   .equals("complete"));
       String pageTitle = metalakePageTitle.getText();
-      boolean isPageTitle = pageTitle.equals(pageTitleName);
+      boolean isPageTitle = pageTitle.equals(PAGE_TITLE);
       if (!isPageTitle) {
         LOG.error("No match with title, get {}", pageTitle);
         return false;
