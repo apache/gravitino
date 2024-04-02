@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.spark.connector;
 
 import com.datastrato.gravitino.spark.connector.hive.HiveAdaptor;
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergAdaptor;
 import java.util.Locale;
 
 /**
@@ -17,6 +18,8 @@ public class GravitinoCatalogAdaptorFactory {
     switch (provider.toLowerCase(Locale.ROOT)) {
       case "hive":
         return new HiveAdaptor();
+      case "lakehouse-iceberg":
+        return new IcebergAdaptor();
       default:
         throw new RuntimeException(String.format("Provider:%s is not supported yet", provider));
     }

@@ -29,6 +29,7 @@ import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -117,6 +118,16 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asTopics() == null) {
+              throw new UnsupportedOperationException("Catalog does not support topic operations");
+            }
+            return fn.apply(asTopics());
+          });
+    }
+
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
@@ -149,6 +160,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
+    }
+
+    private TopicCatalog asTopics() {
+      return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
     }
   }
 

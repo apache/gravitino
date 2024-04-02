@@ -48,7 +48,11 @@ To get started with Gravitino, see [Getting started](./getting-started.md) for t
 
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way: the
 REST API and the Java SDK. You can use either to manage metadata. See
-[Manage metadata using Gravitino](./manage-metadata-using-gravitino.md) for details.
+
+* [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
+  metalakes.
+* [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
+  to learn how to manage relational metadata.
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api), and the
@@ -57,6 +61,8 @@ Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.4.0/api/java/index
 Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
 
 Gravitino currently supports the following catalogs:
+
+**Relational catalogs:**
 
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)

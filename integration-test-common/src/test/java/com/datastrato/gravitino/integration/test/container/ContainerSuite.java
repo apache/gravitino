@@ -111,6 +111,7 @@ public class ContainerSuite implements Closeable {
             .withExtraHosts(
                 ImmutableMap.<String, String>builder()
                     .put("host.docker.internal", "host-gateway")
+                    .put(HiveContainer.HOST_NAME, hiveContainerIp)
                     .build())
             .withFilesToMount(
                 ImmutableMap.<String, String>builder()
