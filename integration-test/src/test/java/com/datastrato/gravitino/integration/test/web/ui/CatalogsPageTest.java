@@ -57,6 +57,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String FILESET_CATALOG_NAME = "catalog_fileset";
   private static final String SCHEMA_NAME = "default";
   private static final String TABLE_NAME = "table";
+  private static final String COLUMN_NAME = "column_1";
 
   private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
   private static final String MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
@@ -133,16 +134,6 @@ public class CatalogsPageTest extends AbstractWebIT {
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
     catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
-    // create table
-    Map<String, String> properties = Maps.newHashMap();
-    Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
-            new Column[] {col1},
-            "comment",
-            properties);
 
     Assertions.assertTrue(catalogsPage.verifyCreateCatalog(HIVE_CATALOG_NAME));
   }
@@ -250,20 +241,35 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyEditedCatalog(MODIFIED_CATALOG_NAME));
   }
 
+  // test catalog show schema list
   @Test
   @Order(10)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
   }
 
+  // test schema show table list
   @Test
   @Order(11)
   public void testClickSchemaLink() {
+    // create table
+    Map<String, String> properties = Maps.newHashMap();
+    Column column = Column.of(COLUMN_NAME, Types.IntegerType.get(), "column comment");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            new Column[] {column},
+            "comment",
+            properties);
     catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
   }
 
+  // test table show column list
   @Test
   @Order(12)
   public void testClickTableLink() {
@@ -271,6 +277,7 @@ public class CatalogsPageTest extends AbstractWebIT {
         METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
   }
 
   @Test

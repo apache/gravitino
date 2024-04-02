@@ -403,6 +403,26 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
+  public boolean verifyShowDataItemInList(String itemName) {
+    try {
+      List<WebElement> list =
+          tableGrid.findElements(
+              By.xpath(
+                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']"));
+      String rowItemColName =
+          list.get(0).findElement(By.xpath(".//div[@data-field='name']")).getText();
+      if (!rowItemColName.equals(itemName)) {
+        LOG.error(
+            "the rowItemColName: {} does not match with itemName: {}", rowItemColName, itemName);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
   public boolean verifyTableColumns() {
     try {
       List<String> columns = Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Comment");
