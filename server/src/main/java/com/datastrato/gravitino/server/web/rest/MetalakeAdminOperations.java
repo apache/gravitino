@@ -6,18 +6,13 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
-import com.datastrato.gravitino.lock.LockType;
-import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
-import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -50,17 +45,13 @@ public class MetalakeAdminOperations {
   public Response addAdmin(UserAddRequest request) {
 
     try {
-      NameIdentifier ident = ofMetalakeAdmin(request.getName());
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new UserResponse(
                       DTOConverters.toDTO(
-                          TreeLockUtils.doWithTreeLock(
-                              ident,
-                              LockType.WRITE,
-                              () -> accessControlManager.addMetalakeAdmin(request.getName()))))));
+                          accessControlManager.addMetalakeAdmin(request.getName())))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.ADD, request.getName(), null, e);
     }
@@ -76,10 +67,7 @@ public class MetalakeAdminOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = ofMetalakeAdmin(user);
-            boolean removed =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> accessControlManager.removeMetalakeAdmin(user));
+            boolean removed = accessControlManager.removeMetalakeAdmin(user);
             if (!removed) {
               LOG.warn("Failed to remove metalake admin user {}", user);
             }
@@ -88,13 +76,5 @@ public class MetalakeAdminOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, null, e);
     }
-  }
-
-  private NameIdentifier ofMetalakeAdmin(String user) {
-    return NameIdentifier.of(
-        EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME,
-        CatalogEntity.AUTHORIZATION_CATALOG_NAME,
-        EntitySpecificConstants.ADMIN_SCHEMA_NAME,
-        user);
   }
 }

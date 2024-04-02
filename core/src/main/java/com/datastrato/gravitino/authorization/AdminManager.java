@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * admin is configured instead of managing by APIs. It is responsible for creating metalake admin.
  * If Gravitino enables authorization, service admin is required. Metalake admin can create a
  * metalake or drops its metalake. The metalake admin will be responsible for managing the access
- * control.
+ * control. AdminManager operates underlying store using the lock because kv storage needs the lock.
  */
 public class AdminManager {
 
@@ -54,7 +54,7 @@ public class AdminManager {
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user) {
+  public synchronized User addMetalakeAdmin(String user) {
 
     UserEntity userEntity =
         UserEntity.builder()
@@ -91,7 +91,7 @@ public class AdminManager {
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  public boolean removeMetalakeAdmin(String user) {
+  public synchronized boolean removeMetalakeAdmin(String user) {
     try {
       return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);
     } catch (IOException ioe) {
@@ -117,7 +117,7 @@ public class AdminManager {
    * @param user the name of the user
    * @return true, if the user is metalake admin, otherwise false.
    */
-  public boolean isMetalakeAdmin(String user) {
+  public synchronized boolean isMetalakeAdmin(String user) {
     try {
       return store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER);
     } catch (IOException ioe) {
