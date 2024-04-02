@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.filesystem.hadoop3;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockserver.model.HttpRequest.request;
 
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -40,13 +40,14 @@ public abstract class Oauth2MockServerBase {
     mockServer = ClientAndServer.startClientAndServer(0);
     port = mockServer.getLocalPort();
 
+    // mock authentication normally
     OAuth2TokenResponse response =
         new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
     try {
       String respJson = JsonUtils.objectMapper().writeValueAsString(response);
       HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
       mockResponse = mockResponse.withBody(respJson);
-      mockServer.when(any(), Times.unlimited()).respond(mockResponse);
+      mockServer.when(request().withPath("/token/test"), Times.unlimited()).respond(mockResponse);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
@@ -63,5 +64,9 @@ public abstract class Oauth2MockServerBase {
 
   public static String accessToken() {
     return accessToken;
+  }
+
+  public static ClientAndServer mockServer() {
+    return mockServer;
   }
 }

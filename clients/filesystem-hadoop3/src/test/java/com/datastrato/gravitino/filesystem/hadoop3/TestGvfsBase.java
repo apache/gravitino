@@ -34,8 +34,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
-  private static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
-  private static final String GVFS_ABSTRACT_IMPL_CLASS = Gvfs.class.getName();
+  protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
+  protected static final String GVFS_ABSTRACT_IMPL_CLASS = Gvfs.class.getName();
   protected static Configuration conf = new Configuration();
   protected Path localDirPath = null;
   protected Path localFilePath = null;
