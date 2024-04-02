@@ -39,12 +39,12 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
 
-  protected static String GRAVITINO_URI = "http://127.0.0.1:8090";
-  protected static String TRINO_URI = "http://127.0.0.1:8080";
-  protected static String HIVE_METASTORE_URI = "thrift://127.0.0.1:9083";
-  protected static String HDFS_URI = "hdfs://127.0.0.1:9000";
-  protected static String MYSQL_URI = "jdbc:mysql://127.0.0.1";
-  protected static String PG_URI = "jdbc:postgresql://127.0.0.1";
+  protected static String gravitinoUri = "http://127.0.0.1:8090";
+  protected static String trinoUri = "http://127.0.0.1:8080";
+  protected static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  protected static String hdfsUri = "hdfs://127.0.0.1:9000";
+  protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
+  protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
   private static final String WEB_TITLE = "Gravitino";
   private static final String METALAKE_NAME = "test";
@@ -53,33 +53,35 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String DEFAULT_CATALOG_NAME = "default_catalog";
   private static final String HIVE_CATALOG_NAME = "catalog_hive";
   private static final String MODIFIED_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
+  private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
+  private static final String FILESET_CATALOG_NAME = "catalog_fileset";
   private static final String SCHEMA_NAME = "default";
   private static final String TABLE_NAME = "table";
-  private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
-  private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
-  private static final String PG_CATALOG_NAME = "catalog_pg";
-  private static final String FILESET_CATALOG_NAME = "catalog_fileset";
 
+  private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
   private static final String MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+
+  private static final String PG_CATALOG_NAME = "catalog_pg";
   private static final String PG_JDBC_DRIVER = "org.postgresql.Driver";
-  private static final String JDBC_USER = "trino";
-  private static final String JDBC_PWD = "ds123";
-  private static final String JDBC_DB = "gt_db";
+  private static final String PG_JDBC_DB = "gt_db";
+
+  private static final String COMMON_JDBC_USER = "trino";
+  private static final String COMMON_JDBC_PWD = "ds123";
 
   @BeforeAll
   public static void before() throws Exception {
     gravitinoClient = AbstractIT.getGravitinoClient();
 
-    GRAVITINO_URI = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     trinoITContainers = ContainerSuite.getTrinoITContainers();
     trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
 
-    TRINO_URI = trinoITContainers.getTrinoUri();
-    HIVE_METASTORE_URI = trinoITContainers.getHiveMetastoreUri();
-    HDFS_URI = trinoITContainers.getHdfsUri();
-    MYSQL_URI = trinoITContainers.getMysqlUri();
-    PG_URI = trinoITContainers.getPostgresqlUri();
+    trinoUri = trinoITContainers.getTrinoUri();
+    hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
+    hdfsUri = trinoITContainers.getHdfsUri();
+    mysqlUri = trinoITContainers.getMysqlUri();
+    postgresqlUri = trinoITContainers.getPostgresqlUri();
   }
 
   @AfterAll
@@ -108,7 +110,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     // create catalog
     clickAndWait(catalogsPage.createCatalogBtn);
     catalogsPage.setCatalogNameField(DEFAULT_CATALOG_NAME);
-    catalogsPage.setCatalogFixedProp("metastore.uris", HIVE_METASTORE_URI);
+    catalogsPage.setCatalogFixedProp("metastore.uris", hiveMetastoreUri);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // delete catalog
     catalogsPage.clickDeleteCatalogBtn(DEFAULT_CATALOG_NAME);
@@ -123,7 +125,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     clickAndWait(catalogsPage.createCatalogBtn);
     catalogsPage.setCatalogNameField(HIVE_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("catalog comment");
-    catalogsPage.setCatalogFixedProp("metastore.uris", HIVE_METASTORE_URI);
+    catalogsPage.setCatalogFixedProp("metastore.uris", hiveMetastoreUri);
     catalogsPage.addCatalogPropsBtn.click();
     catalogsPage.setCatalogPropsAt(1, "key1", "value1");
     catalogsPage.addCatalogPropsBtn.click();
@@ -145,9 +147,9 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickSelectProvider("lakehouse-iceberg");
     catalogsPage.setCatalogCommentField("iceberg catalog comment");
     // set iceberg uri
-    catalogsPage.setCatalogFixedProp("uri", HIVE_METASTORE_URI);
+    catalogsPage.setCatalogFixedProp("uri", hiveMetastoreUri);
     // set iceberg warehouse
-    catalogsPage.setCatalogFixedProp("warehouse", HDFS_URI);
+    catalogsPage.setCatalogFixedProp("warehouse", hdfsUri);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     Assertions.assertTrue(catalogsPage.verifyCreateCatalog(ICEBERG_CATALOG_NAME));
   }
@@ -164,9 +166,9 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogCommentField("mysql catalog comment");
     // set mysql catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", MYSQL_JDBC_DRIVER);
-    catalogsPage.setCatalogFixedProp("jdbc-url", MYSQL_URI);
-    catalogsPage.setCatalogFixedProp("jdbc-user", JDBC_USER);
-    catalogsPage.setCatalogFixedProp("jdbc-password", JDBC_PWD);
+    catalogsPage.setCatalogFixedProp("jdbc-url", mysqlUri);
+    catalogsPage.setCatalogFixedProp("jdbc-user", COMMON_JDBC_USER);
+    catalogsPage.setCatalogFixedProp("jdbc-password", COMMON_JDBC_PWD);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     Assertions.assertTrue(catalogsPage.verifyCreateCatalog(MYSQL_CATALOG_NAME));
   }
@@ -183,10 +185,10 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogCommentField("postgresql catalog comment");
     // set mysql catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", PG_JDBC_DRIVER);
-    catalogsPage.setCatalogFixedProp("jdbc-url", PG_URI + ":5432/" + JDBC_DB);
-    catalogsPage.setCatalogFixedProp("jdbc-user", JDBC_USER);
-    catalogsPage.setCatalogFixedProp("jdbc-password", JDBC_PWD);
-    catalogsPage.setCatalogFixedProp("jdbc-database", JDBC_DB);
+    catalogsPage.setCatalogFixedProp("jdbc-url", postgresqlUri + ":5432/" + PG_JDBC_DB);
+    catalogsPage.setCatalogFixedProp("jdbc-user", COMMON_JDBC_USER);
+    catalogsPage.setCatalogFixedProp("jdbc-password", COMMON_JDBC_PWD);
+    catalogsPage.setCatalogFixedProp("jdbc-database", PG_JDBC_DB);
 
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     Assertions.assertTrue(catalogsPage.verifyCreateCatalog(PG_CATALOG_NAME));
@@ -235,7 +237,7 @@ public class CatalogsPageTest extends AbstractWebIT {
             properties);
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
     Assertions.assertTrue(
-        catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, HIVE_METASTORE_URI));
+        catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, hiveMetastoreUri));
   }
 
   @Test
