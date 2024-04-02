@@ -75,7 +75,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
       }
     }
 
-    if (isExternal.equals("true")) {
+    if (isExternal.equalsIgnoreCase("true")) {
       gravitinoTableProperties.put(
           HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
           HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE.name());
