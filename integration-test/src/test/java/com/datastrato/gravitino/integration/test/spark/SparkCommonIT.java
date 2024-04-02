@@ -72,6 +72,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsPartition();
 
+  protected abstract boolean supportsDelete();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -669,6 +671,29 @@ public abstract class SparkCommonIT extends SparkEnvIT {
             .withTableProperties(ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "b"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  @EnabledIf("supportsDelete")
+  void testIcebergDeleteOperation() {
+    String tableName = "test_delete_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableDelete(table);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(String.format("DELETE FROM %s WHERE id <= 4", tableName));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult2.size());
+    Assertions.assertEquals("5,5,5", queryResult2.get(0));
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
