@@ -171,4 +171,8 @@ public abstract class GravitinoMockServerBase {
       throw new RuntimeException(e);
     }
   }
+
+  public static ClientAndServer mockServer() {
+    return mockServer;
+  }
 }
