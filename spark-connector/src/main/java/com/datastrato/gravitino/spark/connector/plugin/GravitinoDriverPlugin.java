@@ -13,10 +13,12 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +30,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
+  private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
+      new String[] {IcebergSparkSessionExtensions.class.getName()};
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -46,7 +50,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     Set<String> catalogs = catalogManager.listCatalogs();
     registerGravitinoCatalogs(conf, catalogs);
-    registerSqlExtensions();
+    registerSqlExtensions(pluginContext.conf());
     return Collections.emptyMap();
   }
 
@@ -69,6 +73,17 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         });
   }
 
-  // Todo inject Iceberg extensions
-  private void registerSqlExtensions() {}
+  private void registerSqlExtensions(SparkConf conf) {
+    String gravitinoDriverExtensions = String.join(",", GRAVITINO_DRIVER_EXTENSIONS);
+    if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
+      conf.set(
+          StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
+          String.join(
+              ",",
+              conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()),
+              gravitinoDriverExtensions));
+    } else {
+      conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
+    }
+  }
 }
