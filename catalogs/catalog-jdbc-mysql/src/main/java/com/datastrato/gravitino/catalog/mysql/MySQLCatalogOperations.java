@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,9 +46,22 @@ public class MySQLCatalogOperations extends JdbcCatalogOperations {
       // Close thread AbandonedConnectionCleanupThread
       Class.forName(CONNECTION_CLEAN_UP_THREAD).getMethod("uncheckedShutdown").invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
-      // Deregister the MySQL driver
-      DriverManager.deregisterDriver(DriverManager.getDriver("jdbc:mysql://127.0.0.1:3306"));
-      LOG.info("MySQL driver has been deregistered...");
+
+      // Deregister the MySQL driver, only deregister the driver if it is loaded by
+      // IsolatedClassLoader.
+      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://127.0.0.1:3306");
+      LOG.info(
+          "MySQL driver class loader: {}",
+          mysqlDriver.getClass().getClassLoader().getClass().getName());
+      if (mysqlDriver
+          .getClass()
+          .getClassLoader()
+          .getClass()
+          .getName()
+          .equals("com.datastrato.gravitino.utils.IsolatedClassLoader$1")) {
+        DriverManager.deregisterDriver(mysqlDriver);
+        LOG.info("MySQL driver has been deregistered...");
+      }
     } catch (Exception e) {
       // Ignore
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or Deregister MySQL driver", e);
