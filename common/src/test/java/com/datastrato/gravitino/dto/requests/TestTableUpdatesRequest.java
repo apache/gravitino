@@ -137,12 +137,14 @@ public class TestTableUpdatesRequest {
     TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
         new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
             new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
-    Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
 
     updateTableColumnDefaultValueRequest =
         new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
             new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
-    Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
   }
 
   @Test

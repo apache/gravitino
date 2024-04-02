@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
@@ -484,7 +486,8 @@ public interface TableUpdateRequest extends RESTRequest {
               && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
           "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          newDefaultValue != null, "\"newDefaultValue\" field is required and cannot be empty");
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"newDefaultValue\" field is required and cannot be empty");
     }
 
     /** @return An instance of TableChange. */
