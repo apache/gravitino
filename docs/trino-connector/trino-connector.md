@@ -22,7 +22,7 @@ The loading of Gravitino's catalogs into Trino follows the naming convention:
 ```
 
 Regarding `metalake` and `catalog`, 
-you can refer to [Create a Metalake](../manage-metadata-using-gravitino.md#create-a-metalake), [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
+you can refer to [Create a Metalake](../manage-relational-metadata-using-gravitino.md#create-a-metalake), [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 Usage in queries is as follows:
 
