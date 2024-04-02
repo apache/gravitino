@@ -114,7 +114,7 @@ public class TestEntityStorage {
 
   private void prepareJdbcTable() {
     // Read the ddl sql to create table
-    String scriptPath = "relational-entity-store/jdbc/h2/schema-h2.sql";
+    String scriptPath = "h2/schema-h2.sql";
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
