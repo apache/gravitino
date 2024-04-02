@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
@@ -15,8 +17,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 public class TestTableUpdatesRequest {
   @Test
@@ -135,10 +135,13 @@ public class TestTableUpdatesRequest {
 
     // test validate DEFAULT_VALUE_NOT_SET property value
     TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
-            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[]{"key"}, DEFAULT_VALUE_NOT_SET);
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
     Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
 
-    updateTableColumnDefaultValueRequest = new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[]{"key"}, DEFAULT_VALUE_NOT_SET);
+    updateTableColumnDefaultValueRequest =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
     Assertions.assertDoesNotThrow(updateTableColumnDefaultValueRequest::validate);
   }
 
