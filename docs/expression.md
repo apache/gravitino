@@ -9,7 +9,7 @@ license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces the expression system of Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing), and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
+This page introduces the expression system of Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing), and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts: field reference, literal, and function. Function expressions can contain field references, literals, and other function expressions.
 
 ## Field reference

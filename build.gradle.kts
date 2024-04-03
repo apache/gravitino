@@ -158,6 +158,9 @@ allprojects {
 
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+      if (project.hasProperty("jdbcBackend")) {
+        param.environment("jdbcBackend", "true")
+      }
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
@@ -521,6 +524,7 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "ROADMAP",
     "clients/client-python/.pytest_cache/*"
   )
 
@@ -565,6 +569,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
