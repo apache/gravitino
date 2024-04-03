@@ -170,7 +170,7 @@ const TableView = () => {
             title='Delete'
             size='small'
             sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDelete({ name: row.name, type: 'catalog' })}
+            onClick={() => handleDelete({ name: row.name, type: 'catalog', catalogType: row.type })}
             data-refer={`delete-catalog-${row.name}`}
           >
             <DeleteIcon />
@@ -345,9 +345,9 @@ const TableView = () => {
     }
   }
 
-  const handleDelete = ({ name, type }) => {
+  const handleDelete = ({ name, type, catalogType }) => {
     setOpenConfirmDelete(true)
-    setConfirmCacheData({ name, type })
+    setConfirmCacheData({ name, type, catalogType })
   }
 
   const handleCloseConfirm = () => {
@@ -358,7 +358,7 @@ const TableView = () => {
   const handleConfirmDeleteSubmit = () => {
     if (confirmCacheData) {
       if (confirmCacheData.type === 'catalog') {
-        dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name }))
+        dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name, type: confirmCacheData.catalogType }))
       }
 
       setOpenConfirmDelete(false)
@@ -368,7 +368,7 @@ const TableView = () => {
   const checkColumns = () => {
     if (paramsSize == 1 && searchParams.has('metalake')) {
       return catalogsColumns
-    } else if (paramsSize == 4 && searchParams.has('table')) {
+    } else if (paramsSize == 5 && searchParams.has('table')) {
       return tableColumns
     } else {
       return columns

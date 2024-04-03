@@ -22,7 +22,8 @@ import {
   removeExpandedNode,
   setSelectedNodes,
   setLoadedNodes,
-  getTableDetails
+  getTableDetails,
+  getFilesetDetails
 } from '@/lib/store/metalakes'
 
 import { extractPlaceholder } from '@/lib/utils'
@@ -46,6 +47,12 @@ const MetalakeTree = props => {
         const pathArr = extractPlaceholder(nodeProps.data.key)
         const [metalake, catalog, schema, table] = pathArr
         dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+      }
+    } else if (nodeProps.data.node === 'fileset') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        const pathArr = extractPlaceholder(nodeProps.data.key)
+        const [metalake, catalog, schema, fileset] = pathArr
+        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
       }
     } else {
       dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
@@ -141,6 +148,19 @@ const MetalakeTree = props => {
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:table' : 'mdi:reload'} fontSize='inherit' />
+          </IconButton>
+        )
+      case 'fileset':
+        return (
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:file' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
 

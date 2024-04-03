@@ -314,6 +314,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+    if (!schemaExists(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
+    }
+
     try {
       ListTablesResponse listTablesResponse =
           icebergTableOps.listTable(IcebergTableOpsHelper.getIcebergNamespace(namespace));

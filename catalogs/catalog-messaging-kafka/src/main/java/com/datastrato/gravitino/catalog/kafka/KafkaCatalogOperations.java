@@ -5,10 +5,12 @@
 package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.StringIdentifier.newPropertiesWithId;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.storage.RandomIdGenerator.MAX_ID;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -65,6 +67,7 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
@@ -159,13 +162,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, ident.name());
     DescribeConfigsResult configsResult =
         adminClient.describeConfigs(Collections.singleton(configResource));
+
     int partitions;
     int replicationFactor;
+    Uuid topicId;
     Map<String, String> properties = Maps.newHashMap();
     try {
       TopicDescription topicDescription = result.topicNameValues().get(ident.name()).get();
       partitions = topicDescription.partitions().size();
       replicationFactor = topicDescription.partitions().get(0).replicas().size();
+      topicId = topicDescription.topicId();
 
       Config topicConfigs = configsResult.all().get().get(configResource);
       topicConfigs.entries().forEach(e -> properties.put(e.name(), e.value()));
@@ -185,7 +191,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
     return KafkaTopic.builder()
         .withName(ident.name())
-        .withProperties(properties)
+        // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic ID
+        // as the Gravitino ID
+        .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), properties))
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -204,11 +212,26 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     try {
       CreateTopicsResult createTopicsResult =
           adminClient.createTopics(Collections.singleton(buildNewTopic(ident, properties)));
+      Uuid topicId = createTopicsResult.topicId(ident.name()).get();
       LOG.info(
-          "Created topic {} with {} partitions and replication factor {}",
+          "Created topic {}[id: {}] with {} partitions and replication factor {}",
           ident,
+          topicId.toString(),
           createTopicsResult.numPartitions(ident.name()).get(),
           createTopicsResult.replicationFactor(ident.name()).get());
+
+      return KafkaTopic.builder()
+          .withName(ident.name())
+          .withComment(comment)
+          // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic
+          // ID as the Gravitino ID
+          .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), properties))
+          .withAuditInfo(
+              AuditInfo.builder()
+                  .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                  .withCreateTime(Instant.now())
+                  .build())
+          .build();
     } catch (ExecutionException e) {
       if (e.getCause() instanceof TopicExistsException) {
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
@@ -227,17 +250,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (InterruptedException e) {
       throw new RuntimeException("Failed to create topic in Kafka" + ident, e);
     }
-
-    return KafkaTopic.builder()
-        .withName(ident.name())
-        .withComment(comment)
-        .withProperties(properties)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                .withCreateTime(Instant.now())
-                .build())
-        .build();
   }
 
   @Override
@@ -297,7 +309,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public boolean dropTopic(NameIdentifier ident) throws NoSuchTopicException {
+  public boolean dropTopic(NameIdentifier ident) {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     checkSchemaExists(schemaIdent);
 
@@ -500,6 +512,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (Exception e) {
       throw new RuntimeException("Failed to alter topic properties for topic " + topicName, e);
     }
+  }
+
+  private StringIdentifier convertToGravitinoId(Uuid topicId) {
+    return StringIdentifier.fromId(topicId.getLeastSignificantBits() & MAX_ID);
   }
 
   private NewTopic buildNewTopic(NameIdentifier ident, Map<String, String> properties) {
