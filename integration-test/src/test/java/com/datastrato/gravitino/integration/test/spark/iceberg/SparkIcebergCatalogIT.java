@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
-import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
@@ -51,6 +50,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertTrue(conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
     String extensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
     Assertions.assertTrue(StringUtils.isNotBlank(extensions));
-    Assertions.assertEquals(IcebergSparkSessionExtensions.class.getName(), extensions);
+    Assertions.assertEquals(
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions", extensions);
   }
 }
