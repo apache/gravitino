@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
@@ -139,7 +140,11 @@ public class AbstractIT {
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
           FileUtils.readFileToString(
-              new File(gravitinoHome + "/core/src/main/resources/mysql/mysql_init.sql"), "UTF-8");
+              new File(
+                  gravitinoHome
+                      + String.format(
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
+              "UTF-8");
       String[] initMySQLBackendSqls = mysqlContent.split(";");
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
