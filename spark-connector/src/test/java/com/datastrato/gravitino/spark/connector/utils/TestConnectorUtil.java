@@ -22,10 +22,10 @@ public class TestConnectorUtil {
     elements = new String[] {"a", "a", "b", "c"};
     otherElements = "";
     result = ConnectorUtil.removeDuplicates(elements, otherElements);
-      Assertions.assertEquals(result, "a,b,c");
+    Assertions.assertEquals(result, "a,b,c");
 
     elements = new String[] {"a", "a", "b", "c"};
     result = ConnectorUtil.removeDuplicates(elements, null);
-      Assertions.assertEquals(result, "a,b,c");
+    Assertions.assertEquals(result, "a,b,c");
   }
 }
