@@ -74,13 +74,16 @@ public class GravitinoServer extends ResourceConfig {
 
   private void initializeRestApi() {
     packages("com.datastrato.gravitino.server.web.rest");
+    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {
           @Override
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
-            bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
+            if (enableAuthorization) {
+              bind(gravitinoEnv.accessControlManager()).to(AccessControlManager.class).ranked(1);
+            }
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
                 .ranked(1);
@@ -110,10 +113,9 @@ public class GravitinoServer extends ResourceConfig {
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
 
-    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
-    if (enableAuthorization) {
+    if (!enableAuthorization) {
       List<String> accessControlPaths =
-          Lists.newArrayList("/api/users", "/api/groups", "/api/admins");
+          Lists.newArrayList("/api/users/*", "/api/groups/*", "/api/admins/*");
       for (String path : accessControlPaths) {
         server.addFilter(new AccessControlNotAllowedFilter(), path);
       }
