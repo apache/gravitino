@@ -332,6 +332,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+  }
+
+  @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {

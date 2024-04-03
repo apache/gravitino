@@ -218,6 +218,11 @@ public class TestCatalogOperations
   }
 
   @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    return schemas.keySet().toArray(new NameIdentifier[0]);
+  }
+
+  @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     AuditInfo auditInfo =

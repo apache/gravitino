@@ -136,6 +136,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     }
   }
 
+  @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+  }
+
   /**
    * Creates a new schema with the provided identifier, comment, and metadata.
    *

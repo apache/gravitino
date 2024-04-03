@@ -146,16 +146,16 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
    */
   @Override
-  public String[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    return databaseOperation.listDatabases().toArray(new String[0]);
+  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    List<String> schemaNames = databaseOperation.listDatabases();
+    return schemaNames.stream()
+        .map(db -> NameIdentifier.of(namespace, db))
+        .toArray(NameIdentifier[]::new);
   }
 
   @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    List<String> schemaNames = databaseOperation.listDatabases();
-    return schemaNames.stream()
-            .map(db -> NameIdentifier.of(namespace, db))
-            .toArray(NameIdentifier[]::new);
+    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
   }
 
   /**

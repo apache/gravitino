@@ -47,7 +47,7 @@ public interface SupportsSchemas {
    * @return An array of schema identifier under the namespace.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  String[] listSchemas(Namespace namespace) throws NoSuchCatalogException;
+  NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException;
 
   /**
    * List schemas.

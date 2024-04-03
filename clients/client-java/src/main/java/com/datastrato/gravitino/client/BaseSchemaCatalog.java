@@ -21,6 +21,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rel.types.Type;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,8 +41,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
+  /** The namespace of current catalog, which is the metalake name. */
+  protected final Namespace namespace;
 
   BaseSchemaCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -51,6 +55,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
+    Namespace.checkCatalog(namespace);
+    this.namespace = namespace;
   }
 
   @Override
@@ -82,7 +88,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
 
   @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    return listSchemas(Namespace.ofSchema());
+    return listSchemas(Namespace.ofSchema(namespace.level(0), name()));
   }
 
   /**

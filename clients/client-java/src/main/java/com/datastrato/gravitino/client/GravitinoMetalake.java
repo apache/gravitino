@@ -99,7 +99,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
 
     return Arrays.stream(resp.getCatalogs())
-        .map(c -> DTOConverters.toCatalog(c, restClient))
+        .map(c -> DTOConverters.toCatalog(this.name(), c, restClient))
         .toArray(Catalog[]::new);
   }
 
@@ -122,7 +122,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -160,7 +160,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -193,7 +193,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**

@@ -292,6 +292,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+  }
   /**
    * Creates a new schema with the provided identifier, comment, and metadata.
    *
