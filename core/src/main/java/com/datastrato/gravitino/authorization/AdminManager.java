@@ -13,9 +13,9 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
-import com.datastrato.gravitino.utils.EntitySpecificConstants;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -37,12 +37,12 @@ public class AdminManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final List<String> admins;
+  private final List<String> serviceAdmins;
 
   public AdminManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
-    this.admins = config.get(Configs.SERVICE_ADMINS);
+    this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
 
   /**
@@ -107,7 +107,7 @@ public class AdminManager {
    * @return true, if the user is service admin, otherwise false.
    */
   public boolean isServiceAdmin(String user) {
-    return admins.contains(user);
+    return serviceAdmins.contains(user);
   }
 
   /**
