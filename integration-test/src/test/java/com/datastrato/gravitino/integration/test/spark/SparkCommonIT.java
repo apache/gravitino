@@ -682,7 +682,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
-    checkTableDelete(table);
     sql(
         String.format(
             "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
@@ -690,7 +689,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     List<String> queryResult1 = getTableData(tableName);
     Assertions.assertEquals(5, queryResult1.size());
     Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
-    sql(String.format("DELETE FROM %s WHERE id <= 4", tableName));
+    sql(getDeleteSql(tableName, "id <= 4"));
     List<String> queryResult2 = getTableData(tableName);
     Assertions.assertEquals(1, queryResult2.size());
     Assertions.assertEquals("5,5,5", queryResult2.get(0));
@@ -752,14 +751,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
               return tmp;
             })
         .collect(Collectors.joining(","));
-  }
-
-  protected void checkTableDelete(SparkTableInfo table) {
-    String name = table.getTableIdentifier();
-    checkTableReadWrite(table);
-    sql(getDeleteSql(name, "1=1"));
-    List<Object[]> queryResult = sql(getSelectAllSql(name));
-    Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
   }
 
   protected String getCreateSimpleTableString(String tableName) {

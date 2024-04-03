@@ -139,7 +139,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
   }
 
-  protected static String getSelectAllSql(String tableName) {
+  private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
 
