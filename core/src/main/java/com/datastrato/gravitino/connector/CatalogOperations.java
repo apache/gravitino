@@ -18,6 +18,9 @@ import java.util.Map;
 @Evolving
 public interface CatalogOperations extends Closeable, HasPropertyMetadata {
 
+  String MYSQL_CATALOG_CONNECTION_CLEAN_UP_THREAD =
+      "com.mysql.cj.jdbc.AbandonedConnectionCleanupThread";
+
   /**
    * Initialize the CatalogOperation with specified configuration. This method is called after
    * CatalogOperation object is created, but before any other method is called. The method is used

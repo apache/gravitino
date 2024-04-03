@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
@@ -990,5 +991,16 @@ public class CatalogIcebergIT extends AbstractIT {
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
     }
+  }
+
+  @Test
+  void testAlterCatalog() {
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            NameIdentifier.of(metalakeName, catalogName),
+            CatalogChange.setProperty("key1", "val1"),
+            CatalogChange.removeProperty("key2"));
+    Assertions.assertEquals("val1", alteredCatalog.properties().get("key1"));
+    Assertions.assertNull(alteredCatalog.properties().get("key2"));
   }
 }

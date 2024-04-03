@@ -41,6 +41,9 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -509,5 +512,17 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Jdbc catalog doesn't support topic related operations");
+  }
+
+  public static void deregisterDriver(Driver driver) throws SQLException {
+    if (driver
+        .getClass()
+        .getClassLoader()
+        .getClass()
+        .getName()
+        .equals("com.datastrato.gravitino.utils.IsolatedClassLoader$1")) {
+      DriverManager.deregisterDriver(driver);
+      LOG.info("Driver {} has been deregistered...", driver);
+    }
   }
 }
