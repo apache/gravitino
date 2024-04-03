@@ -746,15 +746,13 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected String getCreateSimpleTableString(String tableName, boolean isExternal) {
+    String external = "";
     if (isExternal) {
-      return String.format(
-          "CREATE EXTERNAL TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
-          tableName);
-    } else {
-      return String.format(
-          "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
-          tableName);
+      external = "EXTERNAL";
     }
+    return String.format(
+        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
+        external, tableName);
   }
 
   protected List<SparkColumnInfo> getSimpleTableColumn() {
