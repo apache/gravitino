@@ -72,7 +72,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
 Catalog catalog = gravitinoClient.createCatalog(
     NameIdentifier.of("metalake", "catalog"),
     Type.FILESET,
-    "hadoop", // provider, We support only support "hadoop".
+    "hadoop", // provider, Gravitino support only "hadoop" for now.
     "This is a hadoop fileset catalog",
     properties);
 // ...
@@ -103,8 +103,8 @@ Please refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md
 from relational catalog for more details. For fileset catalog, the drop operation is the same.
 
 :::note
-Currently, Gravitino doesn't support dropping a catalog with schema and files under it. You have
-to drop all the schemas and files under the catalog before dropping the catalog.
+Currently, Gravitino doesn't support dropping a catalog with schema and filesets under it. You have
+to drop all the schemas and filesets under the catalog before dropping the catalog.
 :::
 
 ### List all catalogs in a metalake
@@ -269,9 +269,9 @@ Currently, Gravitino supports two **types** of the fileset:
 
  - `MANAGED`: The storage location of the fileset is managed by Gravitino, when specified as
    `MANAGED`, the physical location of the fileset will be deleted when this fileset is dropped.
- - `EXTERNAL`: The storage location of the fileset is managed by users, when specified as
-   `EXTERNAL`, the physical location of the fileset will **not** be deleted when this fileset is
-   dropped.
+ - `EXTERNAL`: The storage location of the fileset is **not** managed by Gravitino, when
+   specified as `EXTERNAL`, the physical location of the fileset will **not** be deleted when
+   this fileset is dropped.
 
 **storageLocation**
 
