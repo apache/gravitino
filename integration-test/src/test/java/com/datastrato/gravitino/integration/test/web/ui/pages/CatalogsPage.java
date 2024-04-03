@@ -294,8 +294,21 @@ public class CatalogsPage extends AbstractWebIT {
   public void clickTreeNode(String node) throws InterruptedException {
     WebElement treeNode =
         treeView.findElement(
-            By.xpath(".//div[contains(@class, 'ant-tree-treenode')]//span[@title='" + node + "']"));
+            By.xpath(
+                ".//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
+                    + node
+                    + "']/span[contains(@class, 'ant-tree-title')]"));
     clickAndWait(treeNode);
+  }
+
+  public void clickTreeNodeRefresh(String node) throws InterruptedException {
+    WebElement treeNodeRefreshBtn =
+        treeView.findElement(
+            By.xpath(
+                ".//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
+                    + node
+                    + "']/span[contains(@class, 'ant-tree-iconEle')]/button"));
+    clickAndWait(treeNodeRefreshBtn);
   }
 
   public boolean verifyGetCatalog(String name) {

@@ -56,8 +56,10 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
   private static final String FILESET_CATALOG_NAME = "catalog_fileset";
   private static final String SCHEMA_NAME = "default";
-  private static final String TABLE_NAME = "table";
-  private static final String COLUMN_NAME = "column_1";
+  private static final String TABLE_NAME = "table1";
+  private static final String TABLE_NAME_2 = "table2";
+  private static final String COLUMN_NAME = "column";
+  private static final String COLUMN_NAME_2 = "column_2";
 
   private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
   private static final String MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
@@ -83,6 +85,23 @@ public class CatalogsPageTest extends AbstractWebIT {
     hdfsUri = trinoITContainers.getHdfsUri();
     mysqlUri = trinoITContainers.getMysqlUri();
     postgresqlUri = trinoITContainers.getPostgresqlUri();
+  }
+
+  void createTableAndColumn(
+      String metalakeName,
+      String catalogName,
+      String schemaName,
+      String tableName,
+      String colName) {
+    Map<String, String> properties = Maps.newHashMap();
+    Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            new Column[] {column},
+            "comment",
+            properties);
   }
 
   @AfterAll
@@ -255,15 +274,8 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(11)
   public void testClickSchemaLink() {
     // create table
-    Map<String, String> properties = Maps.newHashMap();
-    Column column = Column.of(COLUMN_NAME, Types.IntegerType.get(), "column comment");
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
-            new Column[] {column},
-            "comment",
-            properties);
+    createTableAndColumn(
+        METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
     catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
@@ -292,7 +304,7 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(14)
-  public void testTreeList() throws InterruptedException {
+  public void testClickTreeList() throws InterruptedException {
     catalogsPage.clickTreeNode(ICEBERG_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
     catalogsPage.clickTreeNode(MYSQL_CATALOG_NAME);
@@ -315,6 +327,19 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(15)
+  public void testTreeNodeRefresh() throws InterruptedException {
+    createTableAndColumn(
+        METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
+    catalogsPage.clickTreeNode(MODIFIED_CATALOG_NAME);
+    catalogsPage.clickTreeNodeRefresh(SCHEMA_NAME);
+    catalogsPage.clickTreeNode(TABLE_NAME_2);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2));
+    Assertions.assertTrue(catalogsPage.verifyTableColumns());
+  }
+
+  @Test
+  @Order(16)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
