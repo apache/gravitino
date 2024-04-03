@@ -24,30 +24,13 @@ jobs:
             source_changes:
               - .github/**
               - api/**
-              - bin/**
-              - catalogs/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
               - clients/client-python/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
-              - dev/**
-              - gradle/**
-              - integration-test/**
               - meta/**
               - server/**
               - server-common/**
-              - spark-connector/**
-              - trino-connector/**
-              - web/**
-              - docs/open-api/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
@@ -73,11 +56,6 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
-
-      - name: Package Gravitino
-        run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Free up disk space
         run: |
