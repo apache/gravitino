@@ -305,21 +305,39 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(14)
   public void testClickTreeList() throws InterruptedException {
-    catalogsPage.clickTreeNode(ICEBERG_CATALOG_NAME);
+    String icebergNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickTreeNode(icebergNode);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
-    catalogsPage.clickTreeNode(MYSQL_CATALOG_NAME);
+    String mysqlNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MYSQL_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickTreeNode(mysqlNode);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
-    catalogsPage.clickTreeNode(PG_CATALOG_NAME);
+    String pgNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, PG_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickTreeNode(pgNode);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
-    catalogsPage.clickTreeNode(FILESET_CATALOG_NAME);
+    String filesetNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, FILESET_CATALOG_NAME, "fileset");
+    catalogsPage.clickTreeNode(filesetNode);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(FILESET_CATALOG_NAME));
-    catalogsPage.clickTreeNode(MODIFIED_CATALOG_NAME);
+    String hiveNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickTreeNode(hiveNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
-    catalogsPage.clickTreeNode(SCHEMA_NAME);
+    String schemaNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
+    catalogsPage.clickTreeNode(schemaNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
-    catalogsPage.clickTreeNode(TABLE_NAME);
+    String tableNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
+    catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
@@ -330,9 +348,19 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testTreeNodeRefresh() throws InterruptedException {
     createTableAndColumn(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
-    catalogsPage.clickTreeNode(MODIFIED_CATALOG_NAME);
-    catalogsPage.clickTreeNodeRefresh(SCHEMA_NAME);
-    catalogsPage.clickTreeNode(TABLE_NAME_2);
+    String hiveNode =
+        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickTreeNode(hiveNode);
+    String schemaNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
+    catalogsPage.clickTreeNodeRefresh(schemaNode);
+    String tableNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME_2);
+    catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());

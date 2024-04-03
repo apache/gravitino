@@ -291,20 +291,14 @@ public class CatalogsPage extends AbstractWebIT {
     clickAndWait(typeItem);
   }
 
-  public void clickTreeNode(String node) throws InterruptedException {
-    WebElement treeNode =
-        treeView.findElement(
-            By.xpath(".//div[contains(@class, 'ant-tree-treenode')]//span[@title='" + node + "']"));
+  public void clickTreeNode(String nodeKey) throws InterruptedException {
+    WebElement treeNode = driver.findElement(By.xpath("//p[@data-refer-node='" + nodeKey + "']"));
     clickAndWait(treeNode);
   }
 
-  public void clickTreeNodeRefresh(String node) throws InterruptedException {
+  public void clickTreeNodeRefresh(String nodeKey) throws InterruptedException {
     WebElement treeNodeRefreshBtn =
-        treeView.findElement(
-            By.xpath(
-                ".//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
-                    + node
-                    + "']//span[contains(@class, 'ant-tree-iconEle')]//button"));
+        driver.findElement(By.xpath("//button[@data-refer='tree-node-refresh-" + nodeKey + "']"));
     try {
       int reTry = 3;
       for (int i = 0; i < reTry; i++) {
