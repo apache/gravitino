@@ -253,6 +253,7 @@ public interface Configs {
           .doc("The admins of Gravitino service")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .toSequence()
           .create();
 }

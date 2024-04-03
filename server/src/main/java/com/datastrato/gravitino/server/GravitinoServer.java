@@ -15,6 +15,7 @@ import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
+import com.datastrato.gravitino.server.web.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
@@ -22,7 +23,9 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -58,13 +61,6 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initialize(serverConfig);
-
-    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
-    if (enableAuthorization && serverConfig.get(Configs.SERVICE_ADMINS) == null) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The '%s' can't be null, you should configure it", Configs.SERVICE_ADMINS.getKey()));
-    }
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -113,6 +109,16 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
+
+    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      List<String> accessControlPaths =
+          Lists.newArrayList("/api/users", "/api/groups", "/api/admins");
+      for (String path : accessControlPaths) {
+        server.addFilter(new AccessControlNotAllowedFilter(), path);
+      }
+    }
+
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }
