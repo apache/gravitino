@@ -115,7 +115,7 @@ public class GravitinoServer extends ResourceConfig {
 
     if (!enableAuthorization) {
       List<String> accessControlPaths =
-          Lists.newArrayList("/api/users/*", "/api/groups/*", "/api/admins/*");
+          Lists.newArrayList("/api/metalakes/*/users/*", "/api/metalakes/*/groups/*", "/api/admins/*");
       for (String path : accessControlPaths) {
         server.addFilter(new AccessControlNotAllowedFilter(), path);
       }
