@@ -15,7 +15,9 @@ import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
+import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
 
@@ -82,6 +84,15 @@ class DTOConverters {
             .build();
 
       case MESSAGING:
+        return MessagingCatalog.builder()
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
@@ -177,6 +188,23 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.RemoveProperty) {
       return new FilesetUpdateRequest.RemoveFilesetPropertiesRequest(
           ((FilesetChange.RemoveProperty) change).getProperty());
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static TopicUpdateRequest toTopicUpdateRequest(TopicChange change) {
+    if (change instanceof TopicChange.UpdateTopicComment) {
+      return new TopicUpdateRequest.UpdateTopicCommentRequest(
+          ((TopicChange.UpdateTopicComment) change).getNewComment());
+    } else if (change instanceof TopicChange.SetProperty) {
+      return new TopicUpdateRequest.SetTopicPropertyRequest(
+          ((TopicChange.SetProperty) change).getProperty(),
+          ((TopicChange.SetProperty) change).getValue());
+    } else if (change instanceof TopicChange.RemoveProperty) {
+      return new TopicUpdateRequest.RemoveTopicPropertyRequest(
+          ((TopicChange.RemoveProperty) change).getProperty());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());

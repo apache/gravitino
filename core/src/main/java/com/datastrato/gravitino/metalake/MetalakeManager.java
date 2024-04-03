@@ -12,6 +12,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
+import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -127,7 +128,7 @@ public class MetalakeManager implements SupportsMetalakes {
     try {
       store.put(metalake, false /* overwritten */);
       return metalake;
-    } catch (EntityAlreadyExistsException e) {
+    } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
       throw new MetalakeAlreadyExistsException("Metalake %s already exists", ident);
     } catch (IOException ioe) {
