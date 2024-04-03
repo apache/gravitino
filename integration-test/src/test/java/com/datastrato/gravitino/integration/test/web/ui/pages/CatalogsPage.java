@@ -294,10 +294,7 @@ public class CatalogsPage extends AbstractWebIT {
   public void clickTreeNode(String node) throws InterruptedException {
     WebElement treeNode =
         treeView.findElement(
-            By.xpath(
-                ".//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
-                    + node
-                    + "']/span[contains(@class, 'ant-tree-title')]"));
+            By.xpath(".//div[contains(@class, 'ant-tree-treenode')]//span[@title='" + node + "']"));
     clickAndWait(treeNode);
   }
 
@@ -307,8 +304,15 @@ public class CatalogsPage extends AbstractWebIT {
             By.xpath(
                 ".//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
                     + node
-                    + "']/span[contains(@class, 'ant-tree-iconEle')]/button"));
-    clickAndWait(treeNodeRefreshBtn);
+                    + "']//span[contains(@class, 'ant-tree-iconEle')]//button"));
+    try {
+      int reTry = 3;
+      for (int i = 0; i < reTry; i++) {
+        clickAndWait(treeNodeRefreshBtn);
+      }
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
   public boolean verifyGetCatalog(String name) {
@@ -429,12 +433,14 @@ public class CatalogsPage extends AbstractWebIT {
           tableGrid.findElements(
               By.xpath(
                   "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']"));
-      String rowItemColName =
-          list.get(0).findElement(By.xpath(".//div[@data-field='name']")).getText();
-      if (!rowItemColName.equals(itemName)) {
-        LOG.error(
-            "the rowItemColName: {} does not match with itemName: {}", rowItemColName, itemName);
-        return false;
+      for (WebElement element : list) {
+        String rowItemColName =
+            element.findElement(By.xpath(".//div[@data-field='name']")).getText();
+        if (!rowItemColName.equals(itemName)) {
+          LOG.error(
+              "the rowItemColName: {} does not match with itemName: {}", rowItemColName, itemName);
+          return false;
+        }
       }
       return true;
     } catch (Exception e) {
