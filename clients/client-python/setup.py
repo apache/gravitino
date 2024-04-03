@@ -8,8 +8,8 @@ from setuptools import find_packages, setup
 
 setup(
     name="gravitino",
-    description="project description TBD",
-    version="0.0.1",
+    description="Python lib/client for Gravitino",
+    version="0.5.0",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/datastrato/gravitino",
