@@ -4,3 +4,6 @@
 **/.pytest_cache/**
 **/__pycache__/**
 gravitino.egg-info
+vevn
+.vevn
+.idea
