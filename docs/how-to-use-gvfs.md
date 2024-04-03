@@ -73,7 +73,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 Please get the `Gravitino Virtual File System runtime jar` firstly, you can get it in two ways:
 1. [Maven repository](https://mvnrepository.com/):  
-It will be published into the maven central repository, which names like `gravitino-filesystem-hadoop3-runtime-{version}.jar`.
+You can find the runtime jar in the maven central repository, which names like `gravitino-filesystem-hadoop3-runtime-{version}.jar`.
 2. Compiles the source code:  
 You can also download the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it locally using the following command:
 ```shell
@@ -81,14 +81,14 @@ You can also download the [Gravitino source code](https://github.com/datastrato/
 ```
 
 ### 1. Hadoop shell
-You can use the hadoop shell command to operate the fileset storage. For example:
+You can use the Hadoop shell command to operate the fileset storage. For example:
 ```shell
 # 1. Configure the hadoop `core-site.xml` configuration
 # you should put the properties above into this file
 vi ${HADOOP_HOME}/etc/hadoop/core-site.xml
 
 # 2. Place the gvfs runtime jar into your Hadoop environment
-cp gravitino-filesystem-hadoop3-runtime-{version}-SNAPSHOT.jar ${HADOOP_HOME}/share/hadoop/common/lib/
+cp gravitino-filesystem-hadoop3-runtime-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/
 
 # 3. Complete the Kerberos authentication of the Hadoop environment.
 # You need to ensure that the Kerberos has permission to operate the HDFS directory.
