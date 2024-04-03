@@ -73,7 +73,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 Please get the `Gravitino Virtual File System runtime jar` firstly, you can get it in two ways:
 1. [Maven repository](https://mvnrepository.com/):  
-We will publish it into the maven central repository, which names like `gravitino-filesystem-hadoop3-runtime-{version}-SNAPSHOT.jar`.
+It will be published into the maven central repository, which names like `gravitino-filesystem-hadoop3-runtime-{version}.jar`.
 2. Compiles the source code:  
 You can also download the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it locally using the following command:
 ```shell
@@ -99,8 +99,8 @@ kinit -kt your_kerbers.keytab your_kerberos@xxx.com
 ```
 
 ### 2. Java code
-You can alse operate the fileset storage through the java code.  
-You need to ensure that your code is running in the correct Hadoop environment, and the environment has the `gravitino-filesystem-hadoop3-runtime-{version}-SNAPSHOT.jar`.  
+You can also operate the fileset storage through the java code.  
+You need to ensure that your code is running in the correct Hadoop environment, and the environment has the `gravitino-filesystem-hadoop3-runtime-{version}.jar`.  
 For example:
 ```text
 Configuration conf = new Configuration();
@@ -132,7 +132,7 @@ Then, you can configure the Hadoop configuration in the submit shell command lik
 
 #### 3.3 Operate the fileset storage in your code
 Finally, you can operate the fileset storage in your Spark program:
-```text
+```scala
 // Scala
 val spark = SparkSession.builder()
       .appName("Gvfs Example")
