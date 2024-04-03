@@ -524,6 +524,7 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "ROADMAP",
     "clients/client-python/.pytest_cache/*"
   )
 
