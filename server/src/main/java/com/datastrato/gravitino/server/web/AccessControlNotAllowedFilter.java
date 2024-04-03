@@ -14,6 +14,7 @@ import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
@@ -25,6 +26,9 @@ import javax.servlet.http.HttpServletResponse;
 public class AccessControlNotAllowedFilter implements Filter {
 
   public static final String ALLOW = "Allow";
+  public static final String API_METALAKES = "/api/metalakes";
+  public static final String USERS = "users";
+  public static final String GROUPS = "groups";
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {}
@@ -32,12 +36,33 @@ public class AccessControlNotAllowedFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
-    HttpServletResponse resp = (HttpServletResponse) response;
-    resp.setHeader(ALLOW, "");
-    resp.sendError(
-        SC_METHOD_NOT_ALLOWED,
-        String.format(
-            "You should set '%s' to true in the server side", Configs.ENABLE_AUTHORIZATION));
+    HttpServletRequest req = (HttpServletRequest) request;
+    String path = req.getRequestURI();
+    if (isAccessControlPath(path)) {
+      HttpServletResponse resp = (HttpServletResponse) response;
+      resp.setHeader(ALLOW, "");
+      resp.sendError(
+          SC_METHOD_NOT_ALLOWED,
+          String.format(
+              "You should set '%s' to true in the server side",
+              Configs.ENABLE_AUTHORIZATION.getKey()));
+    } else {
+      chain.doFilter(request, response);
+    }
+  }
+
+  boolean isAccessControlPath(String path) {
+    if (path.startsWith(API_METALAKES)) {
+      String[] segments = path.substring(API_METALAKES.length()).split("/");
+
+      if (segments.length > 2) {
+        return USERS.equalsIgnoreCase(segments[2]) || GROUPS.equalsIgnoreCase(segments[2]);
+      } else {
+        return false;
+      }
+    } else {
+      return true;
+    }
   }
 
   @Override
