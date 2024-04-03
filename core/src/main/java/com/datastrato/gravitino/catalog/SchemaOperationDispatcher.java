@@ -20,7 +20,6 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.time.Instant;
@@ -28,7 +27,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SchemaOperationDispatcher extends OperationDispatcher implements SupportsSchemas {
+public class SchemaOperationDispatcher extends OperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
@@ -52,7 +51,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
    *     namespace.
    * @throws NoSuchCatalogException If the catalog namespace does not exist.
    */
-  @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     return doWithCatalog(
         getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
@@ -71,7 +69,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
    *     exist.
    * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
    */
-  @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -155,7 +152,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
    * @return The loaded Schema object.
    * @throws NoSuchSchemaException If the schema does not exist.
    */
-  @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     Schema schema =
@@ -209,7 +205,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
    * @throws NoSuchSchemaException If the schema corresponding to the provided identifier does not
    *     exist.
    */
-  @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
@@ -294,7 +289,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
    * @return True if the schema was successfully dropped, false otherwise.
    * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
    */
-  @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     boolean dropped =
         doWithCatalog(

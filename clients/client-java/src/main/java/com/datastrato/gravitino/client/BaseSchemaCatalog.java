@@ -80,6 +80,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
     return resp.identifiers();
   }
 
+  @Override
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+    return listSchemas(Namespace.ofSchema());
+  }
+
   /**
    * Create a new schema with specified identifier, comment and metadata.
    *
