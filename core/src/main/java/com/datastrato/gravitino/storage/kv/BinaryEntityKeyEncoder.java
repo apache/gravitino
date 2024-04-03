@@ -242,8 +242,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
       // extract the real name from the name mapping service
       // The name for table is 'table' NOT 'ta_table' to make it backward compatible.
       EntityType currentEntityType = i < parents.size() ? parents.get(i) : entityType;
-      if (BinaryEntityEncoderUtil.VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(
-          currentEntityType)) {
+      if (BinaryEntityEncoderUtil.VERSION_0_4_COMPATIBLE_ENTITY_TYPES.contains(currentEntityType)) {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i];
       } else {
         names[i] = name.split(NAMESPACE_SEPARATOR, i + 1)[i].substring(3);

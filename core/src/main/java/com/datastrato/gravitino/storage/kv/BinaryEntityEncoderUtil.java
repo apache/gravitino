@@ -33,9 +33,9 @@ import org.apache.commons.lang3.StringUtils;
 
 public class BinaryEntityEncoderUtil {
 
-  // The entity types in version 0.4.0, entities in this set do not have the prefix in the name-id
+  // The entity types in version 0.4.x, entities in this set do not have the prefix in the name-id
   // mapping. Why do we introduce it? We need to make it backward compatible.
-  public static final Set<EntityType> VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES =
+  public static final Set<EntityType> VERSION_0_4_COMPATIBLE_ENTITY_TYPES =
       ImmutableSet.of(METALAKE, CATALOG, SCHEMA, TABLE);
 
   private BinaryEntityEncoderUtil() {}
@@ -111,7 +111,7 @@ public class BinaryEntityEncoderUtil {
                 Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
     // We need to make it backward compatible, so we need to check if the name is already prefixed.
     String mappingName =
-        VERSION_0_4_0_COMPATIBLE_ENTITY_TYPES.contains(type)
+        VERSION_0_4_COMPATIBLE_ENTITY_TYPES.contains(type)
             ? name
             : type.getShortName() + TYPE_AND_NAME_SEPARATOR + name;
     return StringUtils.isBlank(context) ? mappingName : context + NAMESPACE_SEPARATOR + mappingName;
