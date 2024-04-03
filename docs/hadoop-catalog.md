@@ -11,11 +11,14 @@ This software is licensed under the Apache License version 2."
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
 the storage location of the fileset. Currently, it supports local filesystem and HDFS. For
-object stores like S3, ADLS, and GCS, we haven't yet tested.
+object storage like S3, GCS, and Azure Blob Storage, you can put the hadoop object store jar like
+hadoop-aws into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory to enable the support.
+Gravitino itself haven't yest tested the object storage support, so if you have any issue,
+please create an [issue](https://github.com/datastrato/gravitino/issues).
 
 Note that the Hadoop catalog is built against Hadoop 3, it should be compatible with both Hadoop
 2.x and 3.x, since we don't leverage any new features in Hadoop 3. If there's any compatibility
-issue, please let us know.
+issue, please create an [issue](https://github.com/datastrato/gravitino/issues).
 
 ## Catalog
 
@@ -33,7 +36,7 @@ Refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catal
 
 ### Schema capabilities
 
-The Hadoop catalog supports creating, updating, and deleting schema.
+The Hadoop catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema properties
 
@@ -49,8 +52,12 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 
 ### Fileset capabilities
 
-- The Hadoop catalog supports creating, updating, and deleting filesets.
+- The Hadoop catalog supports creating, updating, deleting, and listing filesets.
 
 ### Fileset properties
 
 No.
+
+### Fileset operations
+
+Refer to [Fileset operations](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.

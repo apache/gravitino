@@ -14,8 +14,8 @@ out in Gravitino, which is a collection of files and directories. Users can leve
 fileset to manage non-tabular data like training datasets, raw data.
 
 Typically, a fileset is mapping to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
-With fileset managed by Gravitino, the non-tabular data can be managed as assets in
-Gravitino with an unified way.
+With fileset managed by Gravitino, the non-tabular data can be managed as assets together with
+tabular data and others in Gravitino with a unified way.
 
 After fileset is created, users can easily access, manage the files/directories through
 Fileset's identifier, without needing to know the physical path of the managed datasets. Also, with
@@ -24,7 +24,7 @@ control mechanism without needing to set access controls to different storages.
 
 To use fileset, we assume that:
 
- - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
+ - Gravitino server is launched, and the host and port is [http://localhost:8090](http://localhost:8090).
  - Metalake has been created.
 
 ## Catalog operations
