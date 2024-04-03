@@ -88,12 +88,12 @@ public interface SupportsPartitions {
    * If the table supports purging, drop a partition with specified name and completely remove
    * partition data by skipping a trash.
    *
-   * @param partitionName The name of the partition.
+   * @param partitionNames The name of the partition.
    * @return true if a partition was deleted, false if the partition did not exist.
    * @throws NoSuchPartitionException If the partition does not exist.
    * @throws UnsupportedOperationException If partition purging is not supported.
    */
-  default boolean purgePartition(String partitionName)
+  default boolean purgePartition(String partitionNames)
       throws NoSuchPartitionException, UnsupportedOperationException {
     throw new UnsupportedOperationException("Partition purging is not supported");
   }
