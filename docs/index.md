@@ -71,12 +71,12 @@ Gravitino currently supports the following catalogs:
 * [**MySQL catalog**](./jdbc-mysql-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 
-Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
-[Iceberg REST catalog service](./iceberg-rest-service.md) for details.
-
 **Fileset catalogs:**
 
 * [**Hadoop catalog**](./hadoop-catalog.md)
+
+Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
+[Iceberg REST catalog service](./iceberg-rest-service.md) for details.
 
 ## Gravitino playground
 

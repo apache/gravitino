@@ -22,7 +22,7 @@ Fileset's identifier, without needing to know the physical path of the managed d
 unified access control mechanism, filesets can also be managed via the same role based access
 control mechanism without needing to set access controls to different storages.
 
-To use fileset, we assume that:
+To use fileset, please make sure that:
 
  - Gravitino server is launched, and the host and port is [http://localhost:8090](http://localhost:8090).
  - Metalake has been created.
