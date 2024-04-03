@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -650,6 +651,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
+  protected void checkDataFileExists(Path dir) {
+    Boolean isExists = false;
+    try {
+      for (FileStatus fileStatus : hdfs.listStatus(dir)) {
+        if (fileStatus.isFile()) {
+          isExists = true;
+          break;
+        }
+      }
+      Assertions.assertTrue(isExists);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   void testTableOptions() {
     String tableName = "options_table";
@@ -726,9 +742,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected String getCreateSimpleTableString(String tableName) {
+    return getCreateSimpleTableString(tableName, false);
+  }
+
+  protected String getCreateSimpleTableString(String tableName, boolean isExternal) {
+    String external = "";
+    if (isExternal) {
+      external = "EXTERNAL";
+    }
     return String.format(
-        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
-        tableName);
+        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
+        external, tableName);
   }
 
   protected List<SparkColumnInfo> getSimpleTableColumn() {
