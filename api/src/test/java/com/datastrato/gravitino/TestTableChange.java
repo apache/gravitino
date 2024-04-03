@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.AddColumn;
 import com.datastrato.gravitino.rel.TableChange.ColumnPosition;
@@ -76,6 +77,7 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
@@ -90,18 +92,21 @@ public class TestTableChange {
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(position, addColumn.getPosition());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test
   public void testAddColumnWithNullCommentAndPosition() {
     String[] fieldName = {"Middle Name"};
     Type dataType = Types.StringType.get();
-    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldName, dataType, null, null);
+    AddColumn addColumn =
+        (AddColumn) TableChange.addColumn(fieldName, dataType, null, (ColumnPosition) null);
 
     assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertNull(addColumn.getComment());
     assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, addColumn.getDefaultValue());
   }
 
   @Test

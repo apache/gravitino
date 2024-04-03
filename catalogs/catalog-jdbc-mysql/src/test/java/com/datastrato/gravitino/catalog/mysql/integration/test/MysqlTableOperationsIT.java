@@ -110,7 +110,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .withType(VARCHAR)
             .withComment("new_add")
             .withNullable(true)
-            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(Literals.of("hello test", VARCHAR))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -119,7 +119,8 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             new String[] {newColumn.name()},
             newColumn.dataType(),
             newColumn.comment(),
-            TableChange.ColumnPosition.after("col_1")),
+            TableChange.ColumnPosition.after("col_1"),
+            newColumn.defaultValue()),
         TableChange.setProperty(MYSQL_ENGINE_KEY, "InnoDB"));
     properties.put(MYSQL_ENGINE_KEY, "InnoDB");
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
@@ -329,6 +330,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     //  `new_col_1` int NOT NULL COMMENT 'id' ,
     //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
     //  `col_4` varchar(255) NOT NULL COMMENT 'txt4' ,
+    //  `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
@@ -336,7 +338,9 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             new String[] {newColName_1}, TableChange.ColumnPosition.after(newColName_2)),
         TableChange.updateComment(newComment),
         TableChange.addColumn(new String[] {"col_4"}, VARCHAR, "txt4", false),
-        TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment));
+        TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment),
+        TableChange.addColumn(
+            new String[] {"col_5"}, VARCHAR, "txt5", Literals.of("hello world", VARCHAR)));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
@@ -360,11 +364,20 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .withNullable(false)
             .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_5")
+            .withType(VARCHAR)
+            .withComment("txt5")
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
+            .withNullable(true)
+            .build());
     assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
 
     //  `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
     //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
-    //  `col_4` varchar(255) NOT NULL COMMENT 'txt4' ,
+    //  `col_4` varchar(255) NULL COMMENT 'txt4' ,
+    //  `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
     //  `new_col_1` int NOT NULL COMMENT 'id' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -377,6 +390,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     col_1 = columns.remove(1);
     JdbcColumn col3 = columns.remove(1);
     JdbcColumn col_4 = columns.remove(1);
+    JdbcColumn col_5 = columns.remove(1);
     columns.clear();
 
     columns.add(
@@ -396,6 +410,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .withComment(col_4.comment())
             .withDefaultValue(col_4.defaultValue())
             .build());
+    columns.add(col_5);
     columns.add(col_1);
 
     assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);

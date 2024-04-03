@@ -1277,4 +1277,52 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Indexes.EMPTY_INDEXES,
         table);
   }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.DateType.get(), "comment", true, false, null);
+    Column[] newColumns = new Column[] {col1, col2};
+    String tableName = "default_value_table";
+
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, newColumns[0].defaultValue());
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col3 =
+        Column.of("col_3", Types.LongType.get(), "id", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col3.name()},
+            col3.dataType(),
+            col3.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col3.nullable(),
+            col3.autoIncrement(),
+            col3.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    newColumns = new Column[] {col1, col2, col3};
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+  }
 }

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -123,7 +124,8 @@ public class TestTableUpdatesRequest {
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
             false,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
     String expected =
         "{\n"
@@ -137,7 +139,12 @@ public class TestTableUpdatesRequest {
             + "    \"after\": \"afterColumn\"\n"
             + "  },\n"
             + "  \"nullable\": false,\n"
-            + "  \"autoIncrement\": false\n"
+            + "  \"autoIncrement\": false,\n"
+            + "  \"defaultValue\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"string\",\n"
+            + "    \"value\": \"hello\"\n"
+            + "  }\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));

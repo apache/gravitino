@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
@@ -18,8 +20,10 @@ import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.messaging.TopicChange;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 
 class DTOConverters {
   private DTOConverters() {}
@@ -214,13 +218,21 @@ class DTOConverters {
   private static TableUpdateRequest toColumnUpdateRequest(TableChange.ColumnChange change) {
     if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      Expression defaultValue;
+      if (addColumn.getDefaultValue() == null
+          || addColumn.getDefaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+        defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+      } else {
+        defaultValue = toFunctionArg(addColumn.getDefaultValue());
+      }
       return new TableUpdateRequest.AddTableColumnRequest(
           addColumn.fieldName(),
           addColumn.getDataType(),
           addColumn.getComment(),
           addColumn.getPosition(),
           addColumn.isNullable(),
-          addColumn.isAutoIncrement());
+          addColumn.isAutoIncrement(),
+          defaultValue);
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
