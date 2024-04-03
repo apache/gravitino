@@ -29,8 +29,10 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.storage.kv.KvGarbageCollector.LogHelper;
 import java.io.File;
@@ -184,6 +186,20 @@ class TestKvGarbageCollector {
       kvEntityStore.put(schemaEntity);
       kvEntityStore.put(tableEntity);
       kvEntityStore.put(filesetEntity);
+      kvEntityStore.put(
+          UserEntity.builder()
+              .withId(1L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
+      kvEntityStore.put(
+          GroupEntity.builder()
+              .withId(2L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
 
       // now try to scan raw data from kv store
       KvBackend kvBackend = kvEntityStore.backend;
@@ -196,7 +212,7 @@ class TestKvGarbageCollector {
                   .endInclusive(false)
                   .build());
 
-      Assertions.assertEquals(5, data.size());
+      Assertions.assertEquals(7, data.size());
 
       KvGarbageCollector kvGarbageCollector = kvEntityStore.kvGarbageCollector;
       for (Pair<byte[], byte[]> pair : data) {
@@ -222,6 +238,17 @@ class TestKvGarbageCollector {
           case FILESET:
             Assertions.assertEquals(
                 NameIdentifier.of("metalake1", "catalog1", "schema1", "fileset1"),
+                helper.identifier);
+            break;
+          case USER:
+            Assertions.assertEquals(
+                NameIdentifier.of("metalake1", "catalog1", "schema1", "the same"),
+                helper.identifier);
+            break;
+
+          case GROUP:
+            Assertions.assertEquals(
+                NameIdentifier.of("metalake1", "catalog1", "schema1", "the same"),
                 helper.identifier);
             break;
           default:

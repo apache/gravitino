@@ -570,6 +570,102 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testSameNameUnderANameSpace(String type) throws IOException {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      if (store instanceof RelationalEntityStore) {
+        prepareJdbcTable();
+      }
+
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+      BaseMetalake metalake1 =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake1", auditInfo);
+      CatalogEntity catalog1 =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake1"),
+              "catalog1",
+              auditInfo);
+      SchemaEntity schema1 =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake1", "catalog1"),
+              "schema1",
+              auditInfo);
+
+      Namespace namespace = Namespace.of("metalake1", "catalog1", "schema1");
+      TableEntity table1 =
+          createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
+
+      FilesetEntity filesetEntity1 =
+          createFilesetEntity(
+              RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
+
+      store.put(metalake1);
+      store.put(catalog1);
+      store.put(schema1);
+      store.put(table1);
+      store.put(filesetEntity1);
+
+      NameIdentifier identifier = NameIdentifier.of("metalake1", "catalog1", "schema1", "sameName");
+
+      TableEntity loadedTableEntity =
+          store.get(identifier, Entity.EntityType.TABLE, TableEntity.class);
+      Assertions.assertEquals(table1.id(), loadedTableEntity.id());
+      FilesetEntity loadedFilesetEntity =
+          store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
+      Assertions.assertEquals(filesetEntity1.id(), loadedFilesetEntity.id());
+
+      // Remove anyone will not affect another
+      store.delete(identifier, Entity.EntityType.TABLE);
+      store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
+
+      // JDBC use id as the primary key, so we need to change the id of table1 if we want to store
+      // it again
+      table1 =
+          createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
+      store.put(table1);
+      store.delete(identifier, Entity.EntityType.FILESET);
+      store.get(identifier, Entity.EntityType.TABLE, TableEntity.class);
+
+      // Rename anyone will not affect another
+      filesetEntity1 =
+          createFilesetEntity(
+              RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
+      store.put(filesetEntity1);
+      long table1Id = table1.id();
+      store.update(
+          identifier,
+          TableEntity.class,
+          Entity.EntityType.TABLE,
+          e -> createTableEntity(table1Id, namespace, "sameNameChanged", e.auditInfo()));
+
+      NameIdentifier changedNameIdentifier =
+          NameIdentifier.of("metalake1", "catalog1", "schema1", "sameNameChanged");
+      store.get(changedNameIdentifier, Entity.EntityType.TABLE, TableEntity.class);
+      store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
+
+      table1 =
+          createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
+      store.put(table1);
+      long filesetId = filesetEntity1.id();
+      store.update(
+          identifier,
+          FilesetEntity.class,
+          Entity.EntityType.FILESET,
+          e -> createFilesetEntity(filesetId, namespace, "sameNameChanged", e.auditInfo()));
+
+      store.get(identifier, Entity.EntityType.TABLE, TableEntity.class);
+      store.get(changedNameIdentifier, Entity.EntityType.FILESET, FilesetEntity.class);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testDeleteAndRename(String type) throws IOException {
     Config config = Mockito.mock(Config.class);
     init(type, config);
