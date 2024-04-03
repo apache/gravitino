@@ -97,7 +97,7 @@ jobs:
           name: integrate test reports
           path: |
             build/reports
-            integration-test/build/integration-test.log
+            integration-test/build/integration-test-integration-test.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
