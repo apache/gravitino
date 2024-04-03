@@ -34,6 +34,15 @@ tasks {
     workingDir = projectDir.resolve(".")
   }
 
+  val integrationTest by registering(VenvTask::class) {
+    dependsOn(pipInstall, project.rootProject.tasks.findByPath("compileDistribution"))
+    venvExec = "python"
+    args = listOf("-m", "unittest", "tests/test_integration_gravitino_client.py")
+    workingDir = projectDir.resolve(".")
+    environment = mapOf("PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package")
+  }
+
   val build by registering(VenvTask::class) {
   }
 
