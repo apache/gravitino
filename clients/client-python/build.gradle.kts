@@ -24,7 +24,7 @@ fun deleteCacheDir(targetDir: String) {
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
-    args = listOf("install", "-e", ".")
+    args = listOf("install", "-e", ".[dev]")
   }
 
   val test by registering(VenvTask::class) {
