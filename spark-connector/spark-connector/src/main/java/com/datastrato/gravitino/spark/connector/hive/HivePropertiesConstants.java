@@ -31,12 +31,14 @@ public class HivePropertiesConstants {
   public static final String GRAVITINO_HIVE_FORMAT_CSV = StorageFormat.CSV.toString();
   public static final String GRAVITINO_HIVE_EXTERNAL_TABLE = EXTERNAL_TABLE.name();
   public static final String GRAVITINO_HIVE_TABLE_TYPE = "table-type";
+  public static final String GRAVITINO_HIVE_LOCATION = "location";
 
   public static final String SPARK_HIVE_STORED_AS = "hive.stored-as";
   public static final String SPARK_HIVE_INPUT_FORMAT = "input-format";
   public static final String SPARK_HIVE_OUTPUT_FORMAT = "output-format";
   public static final String SPARK_HIVE_SERDE_LIB = "serde-lib";
   public static final String SPARK_HIVE_EXTERNAL = "external";
+  public static final String SPARK_HIVE_LOCATION = "location";
 
   @VisibleForTesting
   public static final String TEXT_INPUT_FORMAT_CLASS =
