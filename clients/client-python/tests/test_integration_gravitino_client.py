@@ -20,6 +20,4 @@ class IntegrationTestGravitinoClient(IntegrationTestEnv):
         projectVersion = os.environ.get('PROJECT_VERSION', '')
 
         if projectVersion != '':
-            print(versionDTO['version'])
-            print(projectVersion)
             assert versionDTO['version'] == projectVersion

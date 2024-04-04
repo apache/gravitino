@@ -26,5 +26,6 @@
 3. Run integration tests
     ```bash
     cd gravitino
+    ./gradlew compileDistribution -x test
     ./gradlew :clients:client-python:integrationTest
     ```

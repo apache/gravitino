@@ -35,7 +35,7 @@ tasks {
   }
 
   val integrationTest by registering(VenvTask::class) {
-    dependsOn(pipInstall, project.rootProject.tasks.findByPath("compileDistribution"))
+    dependsOn(pipInstall)
     venvExec = "python"
     args = listOf("-m", "unittest", "tests/test_integration_gravitino_client.py")
     workingDir = projectDir.resolve(".")
