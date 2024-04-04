@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 public abstract class SparkCommonIT extends SparkEnvIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkCommonIT.class);
 
+  private static String LOCATION = "/user/hive/external_db";
+
   // To generate test data for write&read table.
   protected static final Map<DataType, String> typeConstant =
       ImmutableMap.of(
@@ -670,6 +672,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
+  protected void checkTableLocation(Path dir) {
+    Assertions.assertTrue(dir.toString().equals(hdfs.getUri() + LOCATION));
+  }
+
+  protected void deleteDirIfExists() {
+    try {
+      Path location = new Path(LOCATION);
+      if (hdfs.exists(location)) {
+        hdfs.delete(new Path(LOCATION), true);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   void testTableOptions() {
     String tableName = "options_table";
@@ -746,17 +763,22 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected String getCreateSimpleTableString(String tableName) {
-    return getCreateSimpleTableString(tableName, false);
+    return getCreateSimpleTableString(tableName, false, false);
   }
 
-  protected String getCreateSimpleTableString(String tableName, boolean isExternal) {
+  protected String getCreateSimpleTableString(
+      String tableName, boolean isExternal, boolean hasLocation) {
     String external = "";
+    String location = "";
     if (isExternal) {
       external = "EXTERNAL";
     }
+    if (hasLocation) {
+      location = "LOCATION '" + LOCATION + "'";
+    }
     return String.format(
-        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
-        external, tableName);
+        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s",
+        external, tableName, location);
   }
 
   protected List<SparkColumnInfo> getSimpleTableColumn() {

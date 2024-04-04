@@ -210,7 +210,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   void testHiveFormatWithExternalTable() {
     String tableName = "test_hive_format_with_external_table";
     dropTableIfExists(tableName);
-    String createTableSql = getCreateSimpleTableString(tableName, true);
+    String createTableSql = getCreateSimpleTableString(tableName, true, false);
     sql(createTableSql);
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
@@ -225,6 +225,27 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     dropTableIfExists(tableName);
     Path tableLocation = new Path(tableInfo.getTableLocation());
     checkDataFileExists(tableLocation);
+  }
+
+  @Test
+  void testHiveFormatWithLocationTable() {
+    String tableName = "test_hive_format_with_location_table";
+    Boolean[] isExternals = {Boolean.TRUE, Boolean.FALSE};
+
+    Arrays.stream(isExternals)
+        .forEach(
+            isExternal -> {
+              dropTableIfExists(tableName);
+              deleteDirIfExists();
+              String createTableSql = getCreateSimpleTableString(tableName, isExternal, true);
+              sql(createTableSql);
+
+              SparkTableInfo tableInfo = getTableInfo(tableName);
+              Path tableLocation = new Path(tableInfo.getTableLocation());
+              checkTableReadWrite(tableInfo);
+              checkTableLocation(tableLocation);
+              checkDataFileExists(tableLocation);
+            });
   }
 
   @Test
