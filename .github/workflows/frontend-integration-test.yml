@@ -75,8 +75,8 @@ jobs:
         uses: docker/setup-qemu-action@v2
 
       - name: Package Gravitino
+        if: ${{ matrix.test-mode == 'deploy' }}
         run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
