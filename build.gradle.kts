@@ -291,6 +291,7 @@ subprojects {
         "ArrayToString",
         "ArraysAsListPrimitiveArray",
         "ArrayFillIncompatibleType",
+        "BadImport",
         "BoxedPrimitiveEquality",
         "ChainingConstructorIgnoresParameter",
         "CheckNotNullMultipleTimes",

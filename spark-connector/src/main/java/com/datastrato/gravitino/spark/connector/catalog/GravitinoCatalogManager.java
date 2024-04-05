@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.spark.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -88,7 +87,7 @@ public class GravitinoCatalogManager {
   private Catalog loadCatalog(String catalogName) {
     Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
     Preconditions.checkArgument(
-        Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
+        Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
     LOG.info("Load catalog {} from Gravitino successfully.", catalogName);
     return catalog;
   }
