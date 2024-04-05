@@ -17,6 +17,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
+import com.datastrato.gravitino.storage.LogHelper;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
@@ -320,28 +321,6 @@ public final class KvGarbageCollector implements Closeable {
             timestamp,
             Bytes.wrap(kv.getKey()));
       }
-    }
-  }
-
-  static class LogHelper {
-
-    @VisibleForTesting final NameIdentifier identifier;
-    @VisibleForTesting final EntityType type;
-    @VisibleForTesting final long createTimeInMs;
-    // Formatted createTime
-    @VisibleForTesting final String createTimeAsString;
-
-    public static final LogHelper NONE = new LogHelper(null, null, 0L, null);
-
-    public LogHelper(
-        NameIdentifier identifier,
-        EntityType type,
-        long createTimeInMs,
-        String createTimeAsString) {
-      this.identifier = identifier;
-      this.type = type;
-      this.createTimeInMs = createTimeInMs;
-      this.createTimeAsString = createTimeAsString;
     }
   }
 
