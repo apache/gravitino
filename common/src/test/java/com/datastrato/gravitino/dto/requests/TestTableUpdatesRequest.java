@@ -133,18 +133,23 @@ public class TestTableUpdatesRequest {
     setTablePropertyRequest = new TableUpdateRequest.SetTablePropertyRequest("key", "");
     Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
 
-    // test validate DEFAULT_VALUE_NOT_SET property value
+    // test validate DEFAULT_VALUE_NOT_SET or null property value
     TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
         new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
             new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Throwable exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception1.getMessage().contains("field is required and cannot be empty"));
 
     updateTableColumnDefaultValueRequest =
-        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
-            new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[] {"key"}, null);
+    Throwable exception2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception2.getMessage().contains("field is required and cannot be empty"));
   }
 
   @Test
