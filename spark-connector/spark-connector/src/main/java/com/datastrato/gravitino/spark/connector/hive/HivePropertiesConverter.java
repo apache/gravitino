@@ -64,6 +64,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
     String isExternal =
         Optional.ofNullable(gravitinoTableProperties.get(TableCatalog.PROP_EXTERNAL))
             .orElse("false");
+    String location = gravitinoTableProperties.get(TableCatalog.PROP_LOCATION);
 
     if (fileFormat != null) {
       String gravitinoFormat = fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
@@ -80,6 +81,11 @@ public class HivePropertiesConverter implements PropertiesConverter {
           HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
           HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE.name());
     }
+
+    if (location != null) {
+      gravitinoTableProperties.put(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION, location);
+    }
+
     sparkToGravitinoPropertyMap.forEach(
         (sparkProperty, gravitinoProperty) -> {
           if (gravitinoTableProperties.containsKey(sparkProperty)) {
@@ -96,9 +102,16 @@ public class HivePropertiesConverter implements PropertiesConverter {
     Map<String, String> sparkTableProperties = toOptionProperties(properties);
     String hiveTableType =
         sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
+    String location =
+        sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION);
+
     if (HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE.equalsIgnoreCase(hiveTableType)) {
       sparkTableProperties.remove(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
       sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true");
+    }
+
+    if (location != null) {
+      sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_LOCATION, location);
     }
 
     return sparkTableProperties;

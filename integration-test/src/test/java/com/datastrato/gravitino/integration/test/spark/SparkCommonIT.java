@@ -37,8 +37,6 @@ import org.slf4j.LoggerFactory;
 public abstract class SparkCommonIT extends SparkEnvIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkCommonIT.class);
 
-  private static String LOCATION = "/user/hive/external_db";
-
   // To generate test data for write&read table.
   protected static final Map<DataType, String> typeConstant =
       ImmutableMap.of(
@@ -673,14 +671,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected void checkTableLocation(Path dir) {
-    Assertions.assertTrue(dir.toString().equals(hdfs.getUri() + LOCATION));
+    Assertions.assertTrue(dir.toString().equals(hdfs.getUri() + "/user/hive/external_db"));
   }
 
-  protected void deleteDirIfExists() {
+  protected void deleteDirIfExists(String path) {
     try {
-      Path location = new Path(LOCATION);
-      if (hdfs.exists(location)) {
-        hdfs.delete(new Path(LOCATION), true);
+      Path dir = new Path(path);
+      if (hdfs.exists(dir)) {
+        hdfs.delete(dir, true);
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -763,22 +761,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   protected String getCreateSimpleTableString(String tableName) {
-    return getCreateSimpleTableString(tableName, false, false);
+    return getCreateSimpleTableString(tableName, false);
   }
 
-  protected String getCreateSimpleTableString(
-      String tableName, boolean isExternal, boolean hasLocation) {
+  protected String getCreateSimpleTableString(String tableName, boolean isExternal) {
     String external = "";
-    String location = "";
     if (isExternal) {
       external = "EXTERNAL";
     }
-    if (hasLocation) {
-      location = "LOCATION '" + LOCATION + "'";
-    }
     return String.format(
-        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s",
-        external, tableName, location);
+        "CREATE %s TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
+        external, tableName);
   }
 
   protected List<SparkColumnInfo> getSimpleTableColumn() {

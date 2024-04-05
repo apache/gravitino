@@ -118,10 +118,6 @@ public abstract class SparkUtilIT extends AbstractIT {
     sql("DROP TABLE IF EXISTS " + tableName);
   }
 
-  protected void dropTable(String tableName) {
-    sql("DROP TABLE " + tableName);
-  }
-
   protected boolean tableExists(String tableName) {
     try {
       SparkTableInfo tableInfo = getTableInfo(tableName);
