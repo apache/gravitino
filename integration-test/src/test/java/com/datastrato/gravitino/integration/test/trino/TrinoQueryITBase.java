@@ -189,7 +189,7 @@ public class TrinoQueryITBase {
     }
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     SupportsSchemas schemas = catalog.asSchemas();
-    Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
+    Arrays.stream(schemas.listSchemas())
         .filter(schema -> !schema.name().equals("default"))
         .forEach(
             schema -> {

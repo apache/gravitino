@@ -137,7 +137,7 @@ public class TestRelationalCatalog extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {schema1, schema2});
     buildMockResource(Method.GET, schemaPath, null, resp, SC_OK);
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas(schemaNs);
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
 
     Assertions.assertEquals(2, schemas.length);
     Assertions.assertEquals(schema1, schemas[0]);
@@ -146,7 +146,7 @@ public class TestRelationalCatalog extends TestBase {
     // Test return empty schema list
     EntityListResponse emptyResp = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, schemaPath, null, emptyResp, SC_OK);
-    NameIdentifier[] emptySchemas = catalog.asSchemas().listSchemas(schemaNs);
+    NameIdentifier[] emptySchemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, emptySchemas.length);
 
     // Test throw NoSuchCatalogException
@@ -155,21 +155,20 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.GET, schemaPath, null, errorResp, SC_NOT_FOUND);
     SupportsSchemas supportSchemas = catalog.asSchemas();
     Throwable ex =
-        Assertions.assertThrows(
-            NoSuchCatalogException.class, () -> supportSchemas.listSchemas(schemaNs));
+        Assertions.assertThrows(NoSuchCatalogException.class, () -> supportSchemas.listSchemas());
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw RuntimeException
     ErrorResponse errorResp1 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, schemaPath, null, errorResp1, SC_INTERNAL_SERVER_ERROR);
     Throwable ex1 =
-        Assertions.assertThrows(RuntimeException.class, () -> supportSchemas.listSchemas(schemaNs));
+        Assertions.assertThrows(RuntimeException.class, () -> supportSchemas.listSchemas());
     Assertions.assertTrue(ex1.getMessage().contains("internal error"));
 
     // Test throw unparsed system error
     buildMockResource(Method.GET, schemaPath, null, "unparsed error", SC_BAD_REQUEST);
     Throwable ex2 =
-        Assertions.assertThrows(RESTException.class, () -> supportSchemas.listSchemas(schemaNs));
+        Assertions.assertThrows(RESTException.class, () -> supportSchemas.listSchemas());
     Assertions.assertTrue(ex2.getMessage().contains("unparsed error"));
   }
 
