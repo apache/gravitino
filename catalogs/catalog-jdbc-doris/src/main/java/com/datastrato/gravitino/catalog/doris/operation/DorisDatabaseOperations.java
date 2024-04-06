@@ -34,9 +34,7 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
     // Doris does not support setting schema comment, put comment in properties
     Map<String, String> newProperties = new HashMap<>(properties);
-    if (StringUtils.isNotEmpty(comment)) {
-      newProperties.put(COMMENT_KEY, comment);
-    }
+    newProperties.put(COMMENT_KEY, comment);
 
     // Append properties
     sqlBuilder.append(DorisUtils.generatePropertiesSql(newProperties));
