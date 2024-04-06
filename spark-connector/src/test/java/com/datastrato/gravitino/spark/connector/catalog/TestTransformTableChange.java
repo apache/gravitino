@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.expressions.LiteralValue;
@@ -243,7 +244,9 @@ public class TestTransformTableChange {
         sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
     Assertions.assertEquals(
         sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
+  }
 
+  @Test
   void testUpdateColumnDefaultValue() {
     String[] fieldNames = new String[] {"col"};
     String newDedauleValue = "col_default_value";
@@ -263,7 +266,8 @@ public class TestTransformTableChange {
 
     Assertions.assertArrayEquals(
         sparkUpdateColumnDefaultValue.fieldNames(), gravitinoUpdateColumnDefaultValue.fieldName());
-    Assertions.assertTrue(
-        newDedauleValue.equalsIgnoreCase(gravitinoUpdateColumnDefaultValue.newDefaultValue()));
+    Assertions.assertEquals(
+        Literals.stringLiteral(newDedauleValue),
+        gravitinoUpdateColumnDefaultValue.getNewDefaultValue());
   }
 }
