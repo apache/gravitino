@@ -13,6 +13,8 @@ import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
@@ -26,30 +28,28 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
 public class AuditCatalogMysqlIT extends AbstractIT {
-
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
   private static final String expectUser = System.getProperty("user.name");
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  public static final String mysqlImageName = "mysql:8.0";
-  protected static final String TEST_DB_NAME = new Random().nextInt(1000) + "_test_db";
+  protected static String TEST_DB_NAME;
   private static final String provider = "jdbc-mysql";
 
   private static MysqlService mysqlService;
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private static MySQLContainer MYSQL_CONTAINER;
   private static GravitinoMetalake metalake;
 
   @BeforeAll
@@ -65,13 +65,12 @@ public class AuditCatalogMysqlIT extends AbstractIT {
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
 
-    MYSQL_CONTAINER =
-        new MySQLContainer<>(mysqlImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    MYSQL_CONTAINER.start();
-    mysqlService = new MysqlService(MYSQL_CONTAINER);
+    // FIXME: startMySQLContainer should create db name by test class name
+    containerSuite.startMySQLContainer(AuditCatalogMysqlIT.class);
+    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+    TEST_DB_NAME = MYSQL_CONTAINER.getDatabaseNameByClass(AuditCatalogMysqlIT.class);
+
+    mysqlService = new MysqlService(containerSuite.getMySQLContainer(), TEST_DB_NAME);
     createMetalake();
   }
 
@@ -80,13 +79,13 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     AbstractIT.stopIntegrationTest();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     mysqlService.close();
-    MYSQL_CONTAINER.stop();
   }
 
   @Test
   public void testAuditCatalog() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_catalog");
     Catalog catalog = createCatalog(catalogName);
+
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(catalog.auditInfo().creator(), catalog.auditInfo().lastModifier());
     Assertions.assertEquals(
@@ -144,13 +143,15 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(expectUser, table.auditInfo().lastModifier());
   }
 
-  private static Catalog createCatalog(String catalogName) {
+  private static Catalog createCatalog(String catalogName) throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(), 0, MYSQL_CONTAINER.getJdbcUrl().lastIndexOf("/")));
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
     catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName());
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());

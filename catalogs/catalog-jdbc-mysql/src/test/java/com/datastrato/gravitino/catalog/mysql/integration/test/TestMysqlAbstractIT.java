@@ -4,37 +4,60 @@
  */
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
+import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
+import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
+import com.google.common.collect.Maps;
+import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Map;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.containers.MySQLContainer;
 
 public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
-
   public static final String defaultMysqlImageName = "mysql:8.0";
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static String TEST_DB_NAME;
 
   @BeforeAll
-  public static void startup() {
-    CONTAINER =
-        new MySQLContainer<>(defaultMysqlImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
+  public static void startup() throws Exception {
+    ContainerSuite containerSuite = ContainerSuite.getInstance();
+    containerSuite.startMySQLContainer(TestMysqlAbstractIT.class);
+    TEST_DB_NAME =
+        containerSuite.getMySQLContainer().getDatabaseNameByClass(TestMysqlAbstractIT.class);
+    DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
+
     DATABASE_OPERATIONS = new MysqlDatabaseOperations();
     TABLE_OPERATIONS = new MysqlTableOperations();
     JDBC_EXCEPTION_CONVERTER = new MysqlExceptionConverter();
-    TestJdbcAbstractIT.startup();
-    DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
+    DATABASE_OPERATIONS.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
     TABLE_OPERATIONS.initialize(
-        DATA_SOURCE,
+        dataSource,
         JDBC_EXCEPTION_CONVERTER,
         new MysqlTypeConverter(),
         new MysqlColumnDefaultValueConverter(),
         Collections.emptyMap());
+  }
+
+  private static Map<String, String> getMySQLCatalogProperties() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
+
+    String jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
+
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
+
+    return catalogProperties;
   }
 }

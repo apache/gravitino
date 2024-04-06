@@ -37,7 +37,6 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-it")
 public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
-
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
 
@@ -202,9 +201,9 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .withComment("name")
             .withDefaultValue(Literals.NULL)
             .build();
-    //  `col_1` int NOT NULL COMMENT 'id' ,
-    //  `col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'name' ,
-    //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
+    // `col_1` int NOT NULL COMMENT 'id' ,
+    // `col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'name' ,
+    // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
     columns.add(col_3);
     Map<String, String> properties = new HashMap<>();
 
@@ -233,7 +232,8 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
-    // After modifying the type, some attributes of the corresponding column are not supported.
+    // After modifying the type, some attributes of the corresponding column are not
+    // supported.
     columns.clear();
     col_1 =
         JdbcColumn.builder()
@@ -250,9 +250,9 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
 
     String newComment = "new_comment";
     // update table comment and column comment
-    //  `col_1` int NOT NULL COMMENT 'id' ,
-    //  `col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'new_comment' ,
-    //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
+    // `col_1` int NOT NULL COMMENT 'id' ,
+    // `col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'new_comment' ,
+    // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
@@ -288,9 +288,10 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     String newColName_2 = "new_col_2";
     // rename column
     // update table comment and column comment
-    //  `new_col_1` int NOT NULL COMMENT 'id' ,
-    //  `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'new_comment' ,
-    //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
+    // `new_col_1` int NOT NULL COMMENT 'id' ,
+    // `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'new_comment'
+    // ,
+    // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
@@ -326,11 +327,11 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
     newComment = "txt3";
     String newCol2Comment = "xxx";
     // update column position 、comment and add column、set table properties
-    //  `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
-    //  `new_col_1` int NOT NULL COMMENT 'id' ,
-    //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
-    //  `col_4` varchar(255) NOT NULL COMMENT 'txt4' ,
-    //  `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
+    // `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
+    // `new_col_1` int NOT NULL COMMENT 'id' ,
+    // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
+    // `col_4` varchar(255) NOT NULL COMMENT 'txt4' ,
+    // `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
@@ -374,11 +375,11 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             .build());
     assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
 
-    //  `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
-    //  `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
-    //  `col_4` varchar(255) NULL COMMENT 'txt4' ,
-    //  `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
-    //  `new_col_1` int NOT NULL COMMENT 'id' ,
+    // `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
+    // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
+    // `col_4` varchar(255) NULL COMMENT 'txt4' ,
+    // `col_5` varchar(255) COMMENT 'hello world' DEFAULT 'hello world' ,
+    // `new_col_1` int NOT NULL COMMENT 'id' ,
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,

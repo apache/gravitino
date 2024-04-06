@@ -8,6 +8,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -19,13 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.testcontainers.containers.MySQLContainer;
 
 public class MysqlService {
 
   private Connection connection;
 
-  public MysqlService(MySQLContainer<?> mysqlContainer) {
+  public MysqlService(MySQLContainer mysqlContainer, String testDBName) {
     String username = mysqlContainer.getUsername();
     String password = mysqlContainer.getPassword();
 
@@ -33,7 +33,9 @@ public class MysqlService {
       connection =
           DriverManager.getConnection(
               StringUtils.substring(
-                  mysqlContainer.getJdbcUrl(), 0, mysqlContainer.getJdbcUrl().lastIndexOf("/")),
+                  mysqlContainer.getJdbcUrl(testDBName),
+                  0,
+                  mysqlContainer.getJdbcUrl(testDBName).lastIndexOf("/")),
               username,
               password);
     } catch (Exception e) {

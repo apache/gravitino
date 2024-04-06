@@ -25,7 +25,8 @@ public class ContainerSuite implements Closeable {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
 
-  // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
+  // The subnet must match the configuration in
+  // `dev/docker/tools/mac-docker-connector.conf`
   public static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/28";
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
   private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.0/28";
@@ -37,6 +38,9 @@ public class ContainerSuite implements Closeable {
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
+
+  private static volatile MySQLContainer mySQLContainer;
+  private static volatile MySQLContainer mySQLVersion5Container;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -150,6 +154,59 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startMySQLContainer(Class<?> clz) {
+    if (mySQLContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (mySQLContainer == null) {
+          // Start MySQL container
+          MySQLContainer.Builder mysqlBuilder =
+              MySQLContainer.builder()
+                  .withHostName("gravitino-ci-mysql")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .build())
+                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
+                  .withNetwork(network);
+
+          MySQLContainer container = closer.register(mysqlBuilder.build());
+          container.start();
+          mySQLContainer = container;
+        }
+      }
+    }
+    synchronized (MySQLContainer.class) {
+      mySQLContainer.createDatabase(mySQLContainer.getDatabaseNameByClass(clz));
+    }
+  }
+
+  public void startMySQLVersion5Container(Class<?> clz) {
+    if (mySQLVersion5Container == null) {
+      synchronized (ContainerSuite.class) {
+        if (mySQLVersion5Container == null) {
+          // Start MySQL container
+          MySQLContainer.Builder mysqlBuilder =
+              MySQLContainer.builder()
+                  .withImage("mysql:5.7")
+                  .withHostName("gravitino-ci-mysql-v5")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .build())
+                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
+                  .withNetwork(network);
+
+          MySQLContainer container = closer.register(mysqlBuilder.build());
+          container.start();
+          mySQLVersion5Container = container;
+        }
+      }
+    }
+    synchronized (MySQLContainer.class) {
+      mySQLVersion5Container.createDatabase(mySQLVersion5Container.getDatabaseNameByClass(clz));
+    }
+  }
+
   public void startKafkaContainer() {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
@@ -191,7 +248,16 @@ public class ContainerSuite implements Closeable {
     return dorisContainer;
   }
 
-  // Let containers assign addresses in a fixed subnet to avoid `mac-docker-connector` needing to
+  public MySQLContainer getMySQLContainer() {
+    return mySQLContainer;
+  }
+
+  public MySQLContainer getMySQLVersion5Container() {
+    return mySQLVersion5Container;
+  }
+
+  // Let containers assign addresses in a fixed subnet to avoid
+  // `mac-docker-connector` needing to
   // refresh the configuration
   private static Network createDockerNetwork() {
     DockerClient dockerClient = DockerClientFactory.instance().client();

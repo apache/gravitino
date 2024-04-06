@@ -14,6 +14,8 @@ import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -33,12 +35,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.MySQLContainer;
 
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   protected static GravitinoAdminClient client;
 
@@ -56,12 +61,11 @@ public class AbstractIT {
 
   protected static boolean ignoreIcebergRestService = true;
 
-  private static final String MYSQL_DOCKER_IMAGE_VERSION = "mysql:8.0";
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
-  private static final String META_DATA = "metadata";
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private static String META_DATA;
+  private static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
 
@@ -110,7 +114,7 @@ public class AbstractIT {
   }
 
   private static void setMySQLBackend() {
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl();
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
     customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
@@ -146,6 +150,13 @@ public class AbstractIT {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "embedded, jdbcBackend",
+    "embedded, kvBackend",
+    "deploy, jdbcBackend",
+    "deploy, kvBackend"
+  })
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
@@ -157,12 +168,9 @@ public class AbstractIT {
 
     if ("true".equals(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      MYSQL_CONTAINER =
-          new MySQLContainer<>(MYSQL_DOCKER_IMAGE_VERSION)
-              .withDatabaseName(META_DATA)
-              .withUsername("root")
-              .withPassword("root");
-      MYSQL_CONTAINER.start();
+      containerSuite.startMySQLContainer(AbstractIT.class);
+      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+      META_DATA = MYSQL_CONTAINER.getDatabaseNameByClass(AbstractIT.class);
 
       setMySQLBackend();
     }
@@ -229,10 +237,6 @@ public class AbstractIT {
     }
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
-
-    if (MYSQL_CONTAINER != null) {
-      MYSQL_CONTAINER.stop();
-    }
   }
 
   public static GravitinoAdminClient getGravitinoClient() {

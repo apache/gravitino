@@ -47,7 +47,7 @@ public abstract class TestJdbcAbstractIT {
 
   protected static final String TEST_DB_NAME = RandomNameUtils.genRandomName("test_db_");
 
-  public static void startup() {
+  public static void startup() throws Exception {
     CONTAINER.start();
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
