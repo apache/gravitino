@@ -15,28 +15,31 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for Doris. */
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
+  public static final String COMMENT_KEY = "comment";
 
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    if (StringUtils.isNotEmpty(comment)) {
-      throw new UnsupportedOperationException(
-          "Doris doesn't support set database comment: " + comment);
-    }
     StringBuilder sqlBuilder = new StringBuilder();
 
     // Append database name
     sqlBuilder.append(String.format("CREATE DATABASE `%s`", databaseName));
 
+    // Doris does not support setting schema comment, put comment in properties
+    Map<String, String> newProperties = new HashMap<>(properties);
+    if (StringUtils.isNotEmpty(comment)) {
+      newProperties.put(COMMENT_KEY, comment);
+    }
+
     // Append properties
-    sqlBuilder.append(DorisUtils.generatePropertiesSql(properties));
+    sqlBuilder.append(DorisUtils.generatePropertiesSql(newProperties));
 
     String result = sqlBuilder.toString();
     LOG.info("Generated create database:{} sql: {}", databaseName, result);
@@ -82,8 +85,12 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
 
     Map<String, String> properties = getDatabaseProperties(databaseName);
 
+    // extract comment from properties
+    String comment = properties.remove(COMMENT_KEY);
+
     return JdbcSchema.builder()
         .withName(dbName)
+        .withComment(comment)
         .withProperties(properties)
         .withAuditInfo(AuditInfo.EMPTY)
         .build();
@@ -109,6 +116,6 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
       throw new NoSuchTableException("Database %s does not exist.", databaseName);
     }
 
-    return Collections.unmodifiableMap(DorisUtils.extractPropertiesFromSql(createDatabaseSql));
+    return DorisUtils.extractPropertiesFromSql(createDatabaseSql);
   }
 }

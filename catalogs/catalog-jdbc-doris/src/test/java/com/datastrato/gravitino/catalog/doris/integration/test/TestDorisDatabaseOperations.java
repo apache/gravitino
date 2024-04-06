@@ -18,10 +18,12 @@ public class TestDorisDatabaseOperations extends TestDorisAbstractIT {
   @Test
   public void testBaseOperationDatabase() {
     String databaseName = RandomNameUtils.genRandomName("it_db");
+    String comment = "comment";
+
     Map<String, String> properties = new HashMap<>();
     properties.put("property1", "value1");
 
-    testBaseOperation(databaseName, properties, null);
+    testBaseOperation(databaseName, properties, comment);
 
     // recreate database, get exception.
     Assertions.assertThrowsExactly(
