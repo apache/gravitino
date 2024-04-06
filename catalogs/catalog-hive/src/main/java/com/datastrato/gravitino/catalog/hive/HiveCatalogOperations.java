@@ -596,6 +596,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     "Hive does not support altering column nullability");
               }
 
+              if (c instanceof TableChange.UpdateColumnDefaultValue) {
+                throw new IllegalArgumentException(
+                    "Hive does not support altering column default value");
+              }
+
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
                       partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
@@ -804,6 +809,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
           } else if (change instanceof TableChange.UpdateColumnType) {
             doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
+
+          } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+            throw new IllegalArgumentException(
+                "Hive does not support altering column default value");
 
           } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
             throw new IllegalArgumentException(

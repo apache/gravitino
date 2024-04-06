@@ -630,6 +630,18 @@ public class CatalogIcebergIT extends AbstractIT {
             IllegalArgumentException.class, () -> tableCatalog.alterTable(tableIdentifier, change));
     Assertions.assertTrue(illegalArgumentException.getMessage().contains("no_column"));
 
+    TableChange change2 =
+        TableChange.updateColumnDefaultValue(
+            new String[] {col1.name()}, Literals.of("hello", Types.StringType.get()));
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, change2));
+    Assertions.assertTrue(
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg doesn't support update column default value"));
+
     catalog
         .asTableCatalog()
         .alterTable(

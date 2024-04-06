@@ -426,6 +426,90 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
+  public void testAlterTableUpdateColumnDefaultValue() {
+    String tableName = RandomNameUtils.genRandomName("properties_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.DecimalType.of(10, 2))
+            .withComment("test_decimal")
+            .withNullable(false)
+            .withDefaultValue(Literals.decimalLiteral(Decimal.of("0.00", 10, 2)))
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .withDefaultValue(Literals.longLiteral(0L))
+            .withComment("long type")
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_3")
+            .withType(Types.TimestampType.withoutTimeZone())
+            // MySQL 5.7 doesn't support nullable timestamp
+            .withNullable(false)
+            .withComment("timestamp")
+            .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_4")
+            .withType(Types.VarCharType.of(255))
+            .withNullable(false)
+            .withComment("varchar")
+            .withDefaultValue(Literals.of("hello", Types.VarCharType.of(255)))
+            .build());
+    Map<String, String> properties = new HashMap<>();
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
+        };
+    // create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null,
+        Distributions.NONE,
+        indexes);
+
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, loaded);
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        tableName,
+        TableChange.updateColumnDefaultValue(
+            new String[] {columns.get(0).name()},
+            Literals.decimalLiteral(Decimal.of("1.23", 10, 2))),
+        TableChange.updateColumnDefaultValue(
+            new String[] {columns.get(1).name()}, Literals.longLiteral(1L)),
+        TableChange.updateColumnDefaultValue(
+            new String[] {columns.get(2).name()},
+            Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00"))),
+        TableChange.updateColumnDefaultValue(
+            new String[] {columns.get(3).name()}, Literals.of("world", Types.VarCharType.of(255))));
+
+    loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    Assertions.assertEquals(
+        Literals.decimalLiteral(Decimal.of("1.234", 10, 2)), loaded.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.longLiteral(1L), loaded.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00")),
+        loaded.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("world", Types.VarCharType.of(255)), loaded.columns()[3].defaultValue());
+  }
+
+  @Test
   public void testCreateAndLoadTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_cl_table";
     String tableComment = "test_comment";

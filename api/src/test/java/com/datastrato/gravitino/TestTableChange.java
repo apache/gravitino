@@ -21,9 +21,12 @@ import com.datastrato.gravitino.rel.TableChange.RenameColumn;
 import com.datastrato.gravitino.rel.TableChange.RenameTable;
 import com.datastrato.gravitino.rel.TableChange.SetProperty;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnComment;
+import com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnType;
 import com.datastrato.gravitino.rel.TableChange.UpdateComment;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
@@ -204,6 +207,28 @@ public class TestTableChange {
   }
 
   @Test
+  public void testUpdateColumnDefaultValue() {
+    String[] fieldName = {"existing_column"};
+    Expression newDefaultValue = Literals.of("Default Value", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue updateColumnDefaultValue =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+
+    assertArrayEquals(fieldName, updateColumnDefaultValue.fieldName());
+    assertEquals(newDefaultValue, updateColumnDefaultValue.getNewDefaultValue());
+  }
+
+  @Test
+  public void testUpdateNestedColumnDefaultValue() {
+    String[] fieldName = {"nested", "existing_column"};
+    Expression newDefaultValue = Literals.of("Default Value", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue updateColumnType =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+
+    assertArrayEquals(fieldName, updateColumnType.fieldName());
+    assertEquals(newDefaultValue, updateColumnType.getNewDefaultValue());
+  }
+
+  @Test
   public void testUpdateColumnType() {
     String[] fieldName = {"existing_column"};
     Type dataType = Types.StringType.get();
@@ -352,6 +377,39 @@ public class TestTableChange {
     RenameColumn columnA = (RenameColumn) TableChange.renameColumn(nameA, newName);
     String[] nameB = {"Family Name"};
     RenameColumn columnB = (RenameColumn) TableChange.renameColumn(nameB, newName);
+
+    assertFalse(columnA.equals(null));
+    assertFalse(columnA.equals(columnB));
+    assertFalse(columnB.equals(columnA));
+    assertNotEquals(columnA.hashCode(), columnB.hashCode());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValueEqualsAndHashCode() {
+    String[] nameA = {"Column Name"};
+    Expression newDefaultValueA = Literals.of("Default Value", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue columnA =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameA, newDefaultValueA);
+    String[] nameB = {"Column Name"};
+    Expression newDefaultValueB = Literals.of("Default Value", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue columnB =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameB, newDefaultValueB);
+
+    assertTrue(columnA.equals(columnB));
+    assertTrue(columnB.equals(columnA));
+    assertEquals(columnA.hashCode(), columnB.hashCode());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValueNotEqualsAndHashCode() {
+    String[] nameA = {"Column Name A"};
+    Expression newDefaultValueA = Literals.of("New Default Value A", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue columnA =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameA, newDefaultValueA);
+    String[] nameB = {"Column Name B"};
+    Expression newDefaultValueB = Literals.of("New Default Value B", Types.VarCharType.of(255));
+    UpdateColumnDefaultValue columnB =
+        (UpdateColumnDefaultValue) TableChange.updateColumnDefaultValue(nameB, newDefaultValueB);
 
     assertFalse(columnA.equals(null));
     assertFalse(columnA.equals(columnB));
