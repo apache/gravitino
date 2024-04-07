@@ -104,3 +104,6 @@ jobs:
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
+      - name: Print ryuk digest
+        run: |
+          docker image inspect --format '{{.Architecture}}' testcontainers/ryuk:0.5.1
