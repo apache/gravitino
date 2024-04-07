@@ -22,7 +22,7 @@ def check_gravitino_server_status():
         response.close()
         return True
     except requests.exceptions.RequestException as e:
-        logger.error("Failed to access the server: {}".format(e))
+        logger.error("Failed to access the server: {}", e)
         return False
 
 
