@@ -298,16 +298,21 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    return dropSchema(ident.name(), cascade);
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
     Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
-      icebergTableOps.dropNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
-      LOG.info("Dropped Iceberg schema (database) {}", ident.name());
+      icebergTableOps.dropNamespace(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+      LOG.info("Dropped Iceberg schema (database) {}", schemaName);
       return true;
     } catch (NamespaceNotEmptyException e) {
       throw new NonEmptySchemaException(
-          e, "Iceberg schema (database) %s is not empty. One or more tables exist.", ident.name());
+          e, "Iceberg schema (database) %s is not empty. One or more tables exist.", schemaName);
     } catch (NoSuchNamespaceException e) {
-      LOG.warn("Iceberg schema (database) {} does not exist", ident.name());
+      LOG.warn("Iceberg schema (database) {} does not exist", schemaName);
       return false;
     } catch (Exception e) {
       throw new RuntimeException(e);

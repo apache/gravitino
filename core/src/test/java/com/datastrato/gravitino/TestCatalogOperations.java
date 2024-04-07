@@ -44,6 +44,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TestCatalogOperations
     implements CatalogOperations, TableCatalog, FilesetCatalog, TopicCatalog, SupportsSchemas {
@@ -307,6 +309,26 @@ public class TestCatalogOperations
     if (cascade) {
       tables.keySet().stream()
           .filter(table -> table.namespace().toString().equals(ident.toString()))
+          .forEach(tables::remove);
+    }
+
+    return true;
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    Set<String> allSchemas =
+        schemas.keySet().stream().map(NameIdentifier::name).collect(Collectors.toSet());
+
+    if (!allSchemas.contains(schemaName)) {
+      return false;
+    }
+
+    schemas.keySet().stream().filter(key -> key.name().equals(schemaName)).forEach(schemas::remove);
+
+    if (cascade) {
+      tables.keySet().stream()
+          .filter(table -> table.namespace().level(2).equals(schemaName))
           .forEach(tables::remove);
     }
 

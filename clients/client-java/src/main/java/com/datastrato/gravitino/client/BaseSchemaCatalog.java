@@ -186,11 +186,16 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier.checkSchema(ident);
+    return dropSchema(ident.name(), cascade);
+  }
 
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    Namespace ns = Namespace.ofSchema(namespace.level(0), name());
     try {
       DropResponse resp =
           restClient.delete(
-              formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
+              formatSchemaRequestPath(ns) + "/" + schemaName,
               Collections.singletonMap("cascade", String.valueOf(cascade)),
               DropResponse.class,
               Collections.emptyMap(),
@@ -201,7 +206,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
     } catch (NonEmptySchemaException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", ident, e);
+      LOG.warn("Failed to drop schema {}", schemaName, e);
       return false;
     }
   }

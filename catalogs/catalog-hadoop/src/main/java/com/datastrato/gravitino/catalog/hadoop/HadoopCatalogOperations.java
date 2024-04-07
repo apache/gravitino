@@ -494,6 +494,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    NameIdentifier nameIdentifier =
+        NameIdentifier.ofSchema(info.namespace().level(0), info.name(), schemaName);
+    return dropSchema(nameIdentifier, cascade);
+  }
+
+  @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Hadoop fileset catalog doesn't support table related operations");

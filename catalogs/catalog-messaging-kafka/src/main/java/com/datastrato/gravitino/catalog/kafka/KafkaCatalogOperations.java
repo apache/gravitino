@@ -388,7 +388,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    if (ident.equals(defaultSchemaIdent)) {
+    return dropSchema(ident.name(), cascade);
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    if (schemaName.equals(defaultSchemaIdent.name())) {
       throw new IllegalArgumentException("Cannot drop the default schema");
     }
     // TODO: Implement dropping schema after adding support for schema creation

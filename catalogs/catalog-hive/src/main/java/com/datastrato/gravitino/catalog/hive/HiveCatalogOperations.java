@@ -447,26 +447,31 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    return dropSchema(ident.name(), cascade);
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
     try {
       clientPool.run(
           client -> {
-            client.dropDatabase(ident.name(), false, false, cascade);
+            client.dropDatabase(schemaName, false, false, cascade);
             return null;
           });
-      LOG.info("Dropped Hive schema (database) {}", ident.name());
+      LOG.info("Dropped Hive schema (database) {}", schemaName);
       return true;
 
     } catch (InvalidOperationException e) {
       throw new NonEmptySchemaException(
-          e, "Hive schema (database) %s is not empty. One or more tables exist.", ident.name());
+          e, "Hive schema (database) %s is not empty. One or more tables exist.", schemaName);
 
     } catch (NoSuchObjectException e) {
-      LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
+      LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", schemaName);
       return false;
 
     } catch (TException e) {
       throw new RuntimeException(
-          "Failed to drop Hive schema (database) " + ident.name() + " in Hive Metastore", e);
+          "Failed to drop Hive schema (database) " + schemaName + " in Hive Metastore", e);
 
     } catch (Exception e) {
       throw new RuntimeException(e);

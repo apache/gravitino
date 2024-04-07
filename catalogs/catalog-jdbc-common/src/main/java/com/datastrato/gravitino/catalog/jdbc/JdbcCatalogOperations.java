@@ -249,7 +249,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    databaseOperation.delete(ident.name(), cascade);
+    return dropSchema(ident.name(), cascade);
+  }
+
+  @Override
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    databaseOperation.delete(schemaName, cascade);
     return true;
   }
 
