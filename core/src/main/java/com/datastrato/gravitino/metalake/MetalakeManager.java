@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.metalake;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
@@ -104,6 +105,11 @@ public class MetalakeManager implements SupportsMetalakes {
       throws MetalakeAlreadyExistsException {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
+
+    if (Entity.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException(
+          "Can't create a metalake with with reserved name `system`");
+    }
 
     BaseMetalake metalake =
         BaseMetalake.builder()
