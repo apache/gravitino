@@ -135,10 +135,10 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    val skipWebITs = project.hasProperty("skipWebITs")
     if (skipWebITs) {
       exclude("**/integration/test/web/ui/**")
     }
