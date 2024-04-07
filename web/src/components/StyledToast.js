@@ -6,15 +6,18 @@
 'use client'
 
 import { toast, ToastBar, Toaster } from 'react-hot-toast'
+import themeConfig from '../configs/themeConfig'
 
 export default function StyledToast() {
+  const { toastPosition, toastDuration } = themeConfig
+
   return (
     <div>
       <Toaster
         reverseOrder={false}
-        position='top-right'
+        position={toastPosition}
         toastOptions={{
-          duration: Infinity,
+          duration: toastDuration,
           style: {
             borderRadius: '8px',
             maxWidth: 500
