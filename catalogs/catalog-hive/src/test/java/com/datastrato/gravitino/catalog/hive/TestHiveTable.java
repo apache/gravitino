@@ -512,6 +512,17 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"),
         "The exception message is: " + exception.getMessage());
 
+    TableChange tableChange9 =
+        TableChange.updateColumnDefaultValue(
+            new String[] {"col_1"}, Literals.of("0", Types.ByteType.get()));
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange9));
+
+    Assertions.assertEquals(
+        "Hive does not support altering column default value", exception.getMessage());
+
     // test alter
     tableCatalog.alterTable(
         tableIdentifier,

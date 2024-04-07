@@ -255,6 +255,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, tableName));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -447,6 +453,36 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + deleteColumn.fieldName()[0]
         + PG_QUOTE
         + ";";
+  }
+
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column =
+        (JdbcColumn)
+            Arrays.stream(jdbcTable.columns())
+                .filter(c -> c.name().equals(col))
+                .findFirst()
+                .orElse(null);
+    if (null == column) {
+      throw new NoSuchColumnException("Column %s does not exist.", col);
+    }
+
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    sqlBuilder
+        .append("\n")
+        .append(ALTER_COLUMN)
+        .append(PG_QUOTE)
+        .append(col)
+        .append(PG_QUOTE)
+        .append(" SET DEFAULT ")
+        .append(
+            columnDefaultValueConverter.fromGravitino(
+                updateColumnDefaultValue.getNewDefaultValue()));
+    return sqlBuilder.append(";").toString();
   }
 
   private String updateColumnTypeFieldDefinition(

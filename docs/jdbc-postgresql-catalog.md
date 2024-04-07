@@ -172,6 +172,7 @@ Supports operations:
 - `UpdateColumnType`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `UpdateColumnDefaultValue`
 
 :::info
 You can't submit the `RenameTable` operation at the same time as other operations.
