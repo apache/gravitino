@@ -36,8 +36,15 @@ for ((i = 0; i < max_attempts; i++)); do
         echo "All docker compose service is now available."
         exit 0
     }
+
+    num_container=$(docker ps --format '{{.Names}}' | grep trino-ci | wc -l)
+    if [ "$num_container" -lt 4 ]; then
+        echo "ERROR: Trino-ci containers start failed."
+        exit 0
+    fi
+
     sleep 1
 done
 
-echo "Trino service did not start within the specified time."
+echo "ERROR: Trino service did not start within the specified time."
 exit 1

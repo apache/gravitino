@@ -15,6 +15,8 @@ services:
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive
+      - ../build/trino-ci-container-log/hive:/tmp/root
+      - ../build/trino-ci-container-log/hdfs:/usr/local/hadoop/logs
     healthcheck:
       test: ["CMD", "/tmp/check-status.sh"]
       interval: 10s
