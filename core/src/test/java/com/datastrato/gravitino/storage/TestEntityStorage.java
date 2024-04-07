@@ -34,7 +34,6 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
@@ -970,10 +969,7 @@ public class TestEntityStorage {
     return UserEntity.builder()
         .withId(1L)
         .withNamespace(
-            Namespace.of(
-                metalake,
-                EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
-                EntitySpecificConstants.USER_SCHEMA_NAME))
+            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
@@ -984,10 +980,7 @@ public class TestEntityStorage {
     return GroupEntity.builder()
         .withId(1L)
         .withNamespace(
-            Namespace.of(
-                metalake,
-                EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
-                EntitySpecificConstants.GROUP_SCHEMA_NAME))
+            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())

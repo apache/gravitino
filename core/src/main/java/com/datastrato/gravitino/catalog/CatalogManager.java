@@ -8,20 +8,9 @@ import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.CatalogChange.RemoveProperty;
 import com.datastrato.gravitino.CatalogChange.SetProperty;
-import com.datastrato.gravitino.CatalogProvider;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
-import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -32,7 +21,6 @@ import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -288,7 +276,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
-    if (EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
@@ -679,7 +667,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       if (change instanceof CatalogChange.RenameCatalog) {
         CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
 
-        if (EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME.equals(
+        if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(
             ((CatalogChange.RenameCatalog) change).getNewName())) {
           throw new IllegalArgumentException(
               "Can't rename a catalog with with reserved name `system`");

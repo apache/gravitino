@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
@@ -14,7 +15,6 @@ import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
@@ -117,9 +117,6 @@ public class UserOperations {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake,
-        EntitySpecificConstants.SYSTEM_CATALOG_RESERVED_NAME,
-        EntitySpecificConstants.USER_SCHEMA_NAME,
-        user);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 }

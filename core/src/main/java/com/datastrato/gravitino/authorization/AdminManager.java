@@ -13,7 +13,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -61,9 +60,9 @@ public class AdminManager {
             .withName(user)
             .withNamespace(
                 Namespace.of(
-                    EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME,
-                    EntitySpecificConstants.AUTHORIZATION_CATALOG_NAME,
-                    EntitySpecificConstants.ADMIN_SCHEMA_NAME))
+                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
+                    Entity.AUTHORIZATION_CATALOG_NAME,
+                    Entity.ADMIN_SCHEMA_NAME))
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -128,9 +127,9 @@ public class AdminManager {
 
   private NameIdentifier ofMetalakeAdmin(String user) {
     return NameIdentifier.of(
-        EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME,
-        EntitySpecificConstants.AUTHORIZATION_CATALOG_NAME,
-        EntitySpecificConstants.ADMIN_SCHEMA_NAME,
+        Entity.SYSTEM_METALAKE_RESERVED_NAME,
+        Entity.AUTHORIZATION_CATALOG_NAME,
+        Entity.ADMIN_SCHEMA_NAME,
         user);
   }
 }

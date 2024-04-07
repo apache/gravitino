@@ -5,20 +5,12 @@
 package com.datastrato.gravitino.metalake;
 
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
-import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.EntitySpecificConstants;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -106,7 +98,7 @@ public class MetalakeManager implements SupportsMetalakes {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
-    if (EntitySpecificConstants.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException(
           "Can't create a metalake with with reserved name `system`");
     }
