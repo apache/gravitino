@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.plugin;
 
+import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicates;
+
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalog;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
@@ -50,7 +52,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     Set<String> catalogs = catalogManager.listCatalogs();
     registerGravitinoCatalogs(conf, catalogs);
-    registerSqlExtensions(pluginContext.conf());
+    registerSqlExtensions(conf);
     return Collections.emptyMap();
   }
 
@@ -76,12 +78,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private void registerSqlExtensions(SparkConf conf) {
     String gravitinoDriverExtensions = String.join(",", GRAVITINO_DRIVER_EXTENSIONS);
     if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
+      String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
       conf.set(
           StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
-          String.join(
-              ",",
-              conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()),
-              gravitinoDriverExtensions));
+          removeDuplicates(GRAVITINO_DRIVER_EXTENSIONS, sparkSessionExtensions));
     } else {
       conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
     }

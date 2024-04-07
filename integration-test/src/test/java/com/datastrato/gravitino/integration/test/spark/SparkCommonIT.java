@@ -81,36 +81,42 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
   }
 
+  private static String getDeleteSql(String tableName, String condition) {
+    return String.format("DELETE FROM %s where %s", tableName, condition);
+  }
+
   private static String getUpdateTableSql(String tableName, String setClause, String whereClause) {
     return String.format("UPDATE %s SET %s WHERE %s", tableName, setClause, whereClause);
   }
 
   private static String getRowLevelUpdateTableSql(
-      String targetTableName, String selectClause, String sourceTableName, String onClause) {
+          String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-        "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
-            + "ON %s "
-            + "WHEN MATCHED THEN UPDATE SET * "
-            + "WHEN NOT MATCHED THEN INSERT *",
-        targetTableName, selectClause, sourceTableName, onClause);
+            "MERGE INTO %s "
+                    + "USING (SELECT %s) %s "
+                    + "ON %s "
+                    + "WHEN MATCHED THEN UPDATE SET * "
+                    + "WHEN NOT MATCHED THEN INSERT *",
+            targetTableName, selectClause, sourceTableName, onClause);
   }
 
   private static String getRowLevelDeleteTableSql(
-      String targetTableName, String selectClause, String sourceTableName, String onClause) {
+          String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-        "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
-            + "ON %s "
-            + "WHEN MATCHED THEN DELETE "
-            + "WHEN NOT MATCHED THEN INSERT *",
-        targetTableName, selectClause, sourceTableName, onClause);
+            "MERGE INTO %s "
+                    + "USING (SELECT %s) %s "
+                    + "ON %s "
+                    + "WHEN MATCHED THEN DELETE "
+                    + "WHEN NOT MATCHED THEN INSERT *",
+            targetTableName, selectClause, sourceTableName, onClause);
   }
 
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
   protected abstract boolean supportsPartition();
+
+  protected abstract boolean supportsDelete();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -709,6 +715,28 @@ public abstract class SparkCommonIT extends SparkEnvIT {
             .withTableProperties(ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "b"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  @EnabledIf("supportsDelete")
+  void testIcebergDeleteOperation() {
+    String tableName = "test_delete_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(getDeleteSql(tableName, "id <= 4"));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult2.size());
+    Assertions.assertEquals("5,5,5", queryResult2.get(0));
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
