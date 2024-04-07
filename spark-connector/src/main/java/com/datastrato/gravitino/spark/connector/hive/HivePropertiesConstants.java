@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
+
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat;
 import com.google.common.annotations.VisibleForTesting;
@@ -27,11 +29,14 @@ public class HivePropertiesConstants {
   public static final String GRAVITINO_HIVE_FORMAT_AVRO = StorageFormat.AVRO.toString();
   public static final String GRAVITINO_HIVE_FORMAT_JSON = StorageFormat.JSON.toString();
   public static final String GRAVITINO_HIVE_FORMAT_CSV = StorageFormat.CSV.toString();
+  public static final String GRAVITINO_HIVE_EXTERNAL_TABLE = EXTERNAL_TABLE.name();
+  public static final String GRAVITINO_HIVE_TABLE_TYPE = "table-type";
 
   public static final String SPARK_HIVE_STORED_AS = "hive.stored-as";
   public static final String SPARK_HIVE_INPUT_FORMAT = "input-format";
   public static final String SPARK_HIVE_OUTPUT_FORMAT = "output-format";
   public static final String SPARK_HIVE_SERDE_LIB = "serde-lib";
+  public static final String SPARK_HIVE_EXTERNAL = "external";
 
   @VisibleForTesting
   public static final String TEXT_INPUT_FORMAT_CLASS =

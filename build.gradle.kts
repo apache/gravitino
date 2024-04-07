@@ -93,6 +93,9 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   )
 }
 
+val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
+project.extra["pythonVersion"] = pythonVersion
+
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -100,6 +103,11 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
+  // Gravitino Python client project didn't need to apply the Spotless plugin
+  if (project.name == "client-python") {
+    return@allprojects
+  }
+
   apply(plugin = "com.diffplug.spotless")
   repositories {
     mavenCentral()
@@ -215,6 +223,11 @@ dependencies {
 }
 
 subprojects {
+  // Gravitino Python client project didn't need to apply the java plugin
+  if (project.name == "client-python") {
+    return@subprojects
+  }
+
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
@@ -524,6 +537,7 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "ROADMAP",
     "clients/client-python/.pytest_cache/*"
   )
 
@@ -568,6 +582,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
