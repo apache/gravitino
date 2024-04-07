@@ -24,7 +24,7 @@ fun deleteCacheDir(targetDir: String) {
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
-    args = listOf("install", "-e", ".")
+    args = listOf("install", "-e", ".[dev]")
   }
 
   val test by registering(VenvTask::class) {
@@ -32,6 +32,15 @@ tasks {
     venvExec = "python"
     args = listOf("-m", "unittest")
     workingDir = projectDir.resolve(".")
+  }
+
+  val integrationTest by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    venvExec = "python"
+    args = listOf("-m", "unittest", "tests/test_integration_gravitino_client.py")
+    workingDir = projectDir.resolve(".")
+    environment = mapOf("PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package")
   }
 
   val build by registering(VenvTask::class) {
