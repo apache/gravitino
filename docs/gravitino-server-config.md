@@ -67,11 +67,11 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 
 Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
 
-| Configuration item                   | Description                                                   | Default value | Since Version |
-|--------------------------------------|---------------------------------------------------------------|---------------|---------------|
-| `gravitino.lock.maxNodes`            | The maximum number of tree lock nodes to keep in memory       | 100000        | 0.5.0         |
-| `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | 0.5.0         |
-| `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | 0.5.0         |
+| Configuration item                   | Description                                                   | Default value | Required | Since Version |
+|--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.lock.maxNodes`            | The maximum number of tree lock nodes to keep in memory       | 100000        | No       | 0.5.0         |
+| `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
+| `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
 
 ### Catalog configuration
 
