@@ -185,7 +185,7 @@ fs.getFileStatus(filesetPath);
     ```
 
 
-### Use Gvfs with Tensorflow.
+### Use GVFS with Tensorflow.
 
 In order for tensorflow to support gvfs, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
 
