@@ -149,7 +149,7 @@ public class TopicMetaService {
     }
   }
 
-  public Object getTopicByIdentifier(NameIdentifier identifier) {
+  public TopicEntity getTopicByIdentifier(NameIdentifier identifier) {
     NameIdentifier.checkTopic(identifier);
 
     Long schemaId =

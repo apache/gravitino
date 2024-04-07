@@ -38,8 +38,8 @@ public interface TopicMetaMapper {
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
-          + "(topic_id, topic_name, metalake_id,  catalog_id, schema_id,"
-          + " comment, properties, audit_info,  current_version, last_version,"
+          + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+          + " comment, properties, audit_info, current_version, last_version,"
           + " deleted_at)"
           + " VALUES("
           + " #{topicMeta.topicId},"

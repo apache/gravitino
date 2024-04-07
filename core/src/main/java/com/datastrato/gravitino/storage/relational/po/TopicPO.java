@@ -40,6 +40,8 @@ public class TopicPO {
         && Objects.equals(metalakeId, topicPO.metalakeId)
         && Objects.equals(catalogId, topicPO.catalogId)
         && Objects.equals(schemaId, topicPO.schemaId)
+        && Objects.equals(comment, topicPO.comment)
+        && Objects.equals(properties, topicPO.properties)
         && Objects.equals(auditInfo, topicPO.auditInfo)
         && Objects.equals(currentVersion, topicPO.currentVersion)
         && Objects.equals(lastVersion, topicPO.lastVersion)
@@ -54,6 +56,8 @@ public class TopicPO {
         metalakeId,
         catalogId,
         schemaId,
+        comment,
+        properties,
         auditInfo,
         currentVersion,
         lastVersion,
