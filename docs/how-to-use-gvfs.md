@@ -94,15 +94,15 @@ You can configure these properties in two ways:
 Please make sure to have the Gravitino Virtual File System runtime jar firstly, you can get it in
 two ways:
 
-1. [Maven repository](https://mvnrepository.com/): to download the runtime jar in the Maven central
-   repository, which names like `gravitino-filesystem-hadoop3-runtime-{version}.jar`.
+1. Download from the maven central repository: You can download the runtime jar which names like
+   `gravitino-filesystem-hadoop3-runtime-{version}.jar` from [Maven repository](https://mvnrepository.com/).
 2. Compile from the source code:
 
    Download the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
-   locally using the following command:
+   locally using the following command in the Gravitino source code directory:
 
     ```shell
-       ./${GRAVITINO_SOURCE_CODE_HOME}/gradlew :clients:filesystem-hadoop3-runtime:build -x test
+       ./gradlew :clients:filesystem-hadoop3-runtime:build -x test
     ```
 
 ### Use GVFS via Hadoop shell command
@@ -119,7 +119,7 @@ cp gravitino-filesystem-hadoop3-runtime-{version}.jar ${HADOOP_HOME}/share/hadoo
 
 # 3. Complete the Kerberos authentication of the Hadoop environment (if necessary).
 # You need to ensure that the Kerberos has permission to operate the HDFS directory.
-kinit -kt your_kerbers.keytab your_kerberos@xxx.com
+kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 # 4. Try to list the fileset
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
@@ -128,7 +128,7 @@ kinit -kt your_kerbers.keytab your_kerberos@xxx.com
 ### Use GVFS via Java code
 
 You can also operate the files or directories managed by fileset through Java code.
-Please be sure that your code is running in the correct Hadoop environment, and the environment
+Please make sure that your code is running in the correct Hadoop environment, and the environment
 has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 
 For example:
@@ -158,9 +158,9 @@ fs.getFileStatus(filesetPath);
     If you want to include Gravitino Virtual File System runtime jar in your Spark installation,
     make sure to add it to the `${SPARK_HOME}/jars/` folder.
 
-2. Configure the Hadoop configuration when submit the job
+2. Configure the Hadoop configuration when submitting the job
 
-    Then, you can configure the Hadoop configuration in the submit shell command like this:
+    Then, you can configure the Hadoop configuration in the shell command like this:
 
     ```shell
     --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop3.Gvfs
