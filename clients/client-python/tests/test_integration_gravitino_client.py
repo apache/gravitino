@@ -8,7 +8,7 @@ import unittest
 from tests.integration_test_env import IntegrationTestEnv
 
 
-@unittest.skipIf(IntegrationTestEnv.notInITE(),
+@unittest.skipIf(IntegrationTestEnv.not_in_ITE(),
                  "Currently, Python Client integration test only runs in the Gradle build environment")
 class IntegrationTestGravitinoClient(IntegrationTestEnv):
     def test_version(self):
