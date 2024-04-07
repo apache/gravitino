@@ -15,7 +15,6 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -65,9 +64,7 @@ public class UserGroupManager {
             .withName(name)
             .withNamespace(
                 Namespace.of(
-                    metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    UserEntity.USER_SCHEMA_NAME))
+                    metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
             .withRoles(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -145,9 +142,7 @@ public class UserGroupManager {
             .withName(group)
             .withNamespace(
                 Namespace.of(
-                    metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    GroupEntity.GROUP_SCHEMA_NAME))
+                    metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
             .withRoles(Collections.emptyList())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -213,11 +208,11 @@ public class UserGroupManager {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 }

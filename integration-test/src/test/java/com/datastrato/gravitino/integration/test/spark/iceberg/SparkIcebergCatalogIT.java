@@ -6,14 +6,14 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import java.util.List;
+import org.junit.jupiter.api.Assertions;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -237,5 +237,25 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String partitionExpression = "name_trunc=a";
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
+  }
+
+  @Test
+  void testIcebergFileLevelDeleteOperation() {
+    String tableName = "test_delete_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(getDeleteSql(tableName, "id < 10"));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(0, queryResult2.size());
   }
 }
