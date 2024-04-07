@@ -969,8 +969,7 @@ public class TestEntityStorage {
     return UserEntity.builder()
         .withId(1L)
         .withNamespace(
-            Namespace.of(
-                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME))
+            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
@@ -981,10 +980,7 @@ public class TestEntityStorage {
     return GroupEntity.builder()
         .withId(1L)
         .withNamespace(
-            Namespace.of(
-                metalake,
-                CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                GroupEntity.GROUP_SCHEMA_NAME))
+            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
