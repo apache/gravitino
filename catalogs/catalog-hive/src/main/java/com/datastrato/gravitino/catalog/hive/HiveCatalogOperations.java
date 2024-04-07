@@ -145,7 +145,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         });
 
     Map<String, String> mergeConfig = Maps.newHashMap(byPassConfig);
-    // `gravitinoConfig` overwrite byPassConfig if possible
+    // `gravitinoConfig` overwrite byPassConfig if possibles
     mergeConfig.putAll(gravitinoConfig);
 
     Configuration hadoopConf = new Configuration();
