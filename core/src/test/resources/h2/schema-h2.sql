@@ -106,3 +106,22 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     KEY idx_fvmid (metalake_id),
     KEY idx_fvcid (catalog_id)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `topic_meta` (
+    `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
+    `topic_name` VARCHAR(128) NOT NULL COMMENT 'topic name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `comment` VARCHAR(256) DEFAULT '' COMMENT 'topic comment',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'topic properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'topic audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'topic deleted at',
+    PRIMARY KEY (topic_id),
+    CONSTRAINT uk_cid_tn_del UNIQUE (schema_id, topic_name, deleted_at),
+    -- Aliases are used here, and indexes with the same name in H2 can only be created once.
+    KEY idx_tvmid (metalake_id),
+    KEY idx_tvcid (catalog_id)
+) ENGINE=InnoDB;
