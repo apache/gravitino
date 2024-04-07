@@ -63,7 +63,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
   }
 
-  private static String getDeleteSql(String tableName, String condition) {
+  protected static String getDeleteSql(String tableName, String condition) {
     return String.format("DELETE FROM %s where %s", tableName, condition);
   }
 
@@ -71,8 +71,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected abstract boolean supportsSparkSQLClusteredBy();
 
   protected abstract boolean supportsPartition();
-
-  protected abstract boolean supportsDelete();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -671,27 +669,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
             .withTableProperties(ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "b"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
-  }
-
-  @Test
-  @EnabledIf("supportsDelete")
-  void testIcebergFileLevelDeleteOperation() {
-    String tableName = "test_delete_table";
-    dropTableIfExists(tableName);
-    createSimpleTable(tableName);
-
-    SparkTableInfo table = getTableInfo(tableName);
-    checkTableColumns(tableName, getSimpleTableColumn(), table);
-    sql(
-        String.format(
-            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
-            tableName));
-    List<String> queryResult1 = getTableData(tableName);
-    Assertions.assertEquals(5, queryResult1.size());
-    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
-    sql(getDeleteSql(tableName, "1 = 1"));
-    List<String> queryResult2 = getTableData(tableName);
-    Assertions.assertEquals(0, queryResult2.size());
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
