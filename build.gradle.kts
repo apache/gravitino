@@ -631,10 +631,10 @@ tasks {
   }
 
   val assembleSparkConnector by register("assembleSparkConnector", Copy::class) {
-    dependsOn("spark-connector:shadowJar")
+    dependsOn("spark-connector:spark-connector-runtime:shadowJar")
     group = "gravitino distribution"
     finalizedBy("checksumSparkConnector")
-    from("spark-connector/build/libs/${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar")
+    from("spark-connector/spark-connector-runtime/build/libs/${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar")
     into(projectDir.dir("distribution"))
   }
 
