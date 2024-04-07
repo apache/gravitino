@@ -675,7 +675,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @Test
   @EnabledIf("supportsDelete")
-  void testIcebergDeleteOperation() {
+  void testIcebergFileLevelDeleteOperation() {
     String tableName = "test_delete_table";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
@@ -689,10 +689,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     List<String> queryResult1 = getTableData(tableName);
     Assertions.assertEquals(5, queryResult1.size());
     Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
-    sql(getDeleteSql(tableName, "id <= 4"));
+    sql(getDeleteSql(tableName, "1 = 1"));
     List<String> queryResult2 = getTableData(tableName);
-    Assertions.assertEquals(1, queryResult2.size());
-    Assertions.assertEquals("5,5,5", queryResult2.get(0));
+    Assertions.assertEquals(0, queryResult2.size());
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
