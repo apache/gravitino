@@ -55,7 +55,6 @@ const MetalakeTree = props => {
             return 'bx:book'
         }
       case 'fileset':
-        return 'bx:book'
       default:
         return 'bx:book'
     }
