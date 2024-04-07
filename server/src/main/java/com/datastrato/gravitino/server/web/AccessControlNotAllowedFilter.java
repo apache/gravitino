@@ -44,7 +44,8 @@ public class AccessControlNotAllowedFilter implements Filter {
       resp.sendError(
           SC_METHOD_NOT_ALLOWED,
           String.format(
-              "You should set '%s' to true in the server side",
+              "You should set '%s' to true in the server side `gravitino.conf`"
+                  + " to enable the authorization of the system, otherwise this interfaces can't work.",
               Configs.ENABLE_AUTHORIZATION.getKey()));
     } else {
       chain.doFilter(request, response);
