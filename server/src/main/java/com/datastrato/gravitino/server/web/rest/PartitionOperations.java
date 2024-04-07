@@ -169,19 +169,24 @@ public class PartitionOperations {
           httpRequest,
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
-            Table loadTable = dispatcher.loadTable(tableIdent);
-            boolean dropped =
-                purge
-                    ? loadTable.supportPartitions().purgePartition(partition)
-                    : loadTable.supportPartitions().dropPartition(partition);
-            if (!dropped) {
-              LOG.warn(
-                  "Failed to drop partition {} under table {} under schema {}",
-                  partition,
-                  table,
-                  schema);
-            }
-            return Utils.ok(new DropResponse(dropped));
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
+                LockType.WRITE,
+                () -> {
+                  Table loadTable = dispatcher.loadTable(tableIdent);
+                  boolean dropped =
+                      purge
+                          ? loadTable.supportPartitions().purgePartition(partition)
+                          : loadTable.supportPartitions().dropPartition(partition);
+                  if (!dropped) {
+                    LOG.warn(
+                        "Failed to drop partition {} under table {} under schema {}",
+                        partition,
+                        table,
+                        schema);
+                  }
+                  return Utils.ok(new DropResponse(dropped));
+                });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);
