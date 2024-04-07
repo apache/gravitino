@@ -90,25 +90,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   private static String getRowLevelUpdateTableSql(
-          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-            "MERGE INTO %s "
-                    + "USING (SELECT %s) %s "
-                    + "ON %s "
-                    + "WHEN MATCHED THEN UPDATE SET * "
-                    + "WHEN NOT MATCHED THEN INSERT *",
-            targetTableName, selectClause, sourceTableName, onClause);
+        "MERGE INTO %s "
+            + "USING (SELECT %s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN UPDATE SET * "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
   }
 
   private static String getRowLevelDeleteTableSql(
-          String targetTableName, String selectClause, String sourceTableName, String onClause) {
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
-            "MERGE INTO %s "
-                    + "USING (SELECT %s) %s "
-                    + "ON %s "
-                    + "WHEN MATCHED THEN DELETE "
-                    + "WHEN NOT MATCHED THEN INSERT *",
-            targetTableName, selectClause, sourceTableName, onClause);
+        "MERGE INTO %s "
+            + "USING (SELECT %s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN DELETE "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
   }
 
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
