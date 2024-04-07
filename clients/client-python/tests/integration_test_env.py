@@ -56,7 +56,7 @@ class IntegrationTestEnv(unittest.TestCase):
 
         gravitinoServerRunning = False
         for i in range(5):
-            logger.info("Monitoring Gravitino server status. Attempt", i + 1)
+            logger.info("Monitoring Gravitino server status. Attempt {}", i + 1)
             if check_gravitino_server_status():
                 logger.debug("Gravitino Server is running")
                 gravitinoServerRunning = True
@@ -82,7 +82,7 @@ class IntegrationTestEnv(unittest.TestCase):
 
         gravitinoServerRunning = True
         for i in range(5):
-            logger.debug("Monitoring Gravitino server status. Attempt", i + 1)
+            logger.debug("Monitoring Gravitino server status. Attempt {}", i + 1)
             if check_gravitino_server_status():
                 logger.debug("Gravitino server still running")
                 time.sleep(1)
