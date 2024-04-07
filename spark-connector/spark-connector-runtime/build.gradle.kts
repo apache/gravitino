@@ -31,6 +31,6 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
 
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
-  archiveBaseName.set("$baseName")
+  // archiveBaseName.set("$baseName")
   archiveClassifier.set("empty")
 }
