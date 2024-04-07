@@ -183,3 +183,43 @@ fs.getFileStatus(filesetPath);
 
     rdd.foreach(println)
     ```
+
+
+### Use Gvfs with Tensorflow.
+
+In order for tensorflow to support gvfs, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
+
+1. Add a patch and recompile tensorflow-io.
+
+    You need to add a [patch](https://github.com/tensorflow/io/pull/1970) to support gvfs on tensorflow-io. 
+    Then you can follow the [tutorial](https://github.com/tensorflow/io/blob/master/docs/development.md) to recompile your code and release the tensorflow-io module.
+
+2. Configure the Hadoop configuration.
+
+   You need to configure the hadoop configuration and `gravitino-filesystem-hadoop3-runtime-{version}.jar` 
+   and kerberos environment according to the [Use GVFS via Hadoop shell command](#use-gvfs-via-hadoop-shell-command) sections. 
+
+   Then you need to set your environment as follows:
+
+    ``` shell
+   export HADOOP_HOME=${your_hadoop_home}
+   export HADOOP_CONF_DIR=${your_hadoop_conf_home}
+   export PATH=$PATH:$HADOOP_HOME/libexec/hadoop-config.sh
+   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_HOME/jre/lib/amd64/server
+   export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+   export CLASSPATH="$(hadoop classpath --glob)"
+    ```
+   
+3. Import tensorflow-io and have a test.
+
+   ```python
+   import tensorflow as tf
+   import tensorflow_io as tfio
+ 
+   ## read a file
+   print(tf.io.read_file('gvfs://fileset/test_catalog/test_schema/test_fileset_1/test.txt'))
+   
+   ## list directory
+   print(tf.io.gfile.listdir('gvfs://fileset/test_catalog/test_schema/test_fileset_1/'))
+   ```
+    
