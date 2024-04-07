@@ -43,8 +43,8 @@ the path mapping and converting automatically.
 
 | Configuration item                                    | Description                                                                                                                                                                                       | Default value | Required | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop3.Gvfs`.                                                                      | (none)        | Yes      | 0.5.0         |
-| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem`.                                          | (none)        | Yes      | 0.5.0         |
+| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop.Gvfs`.                                                                      | (none)        | Yes      | 0.5.0         |
+| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                          | (none)        | Yes      | 0.5.0         |
 | `fs.gvfs.impl.disable.cache`                          | Close the Gravitino Virtual File System cache in Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No       | 0.5.0         |
 | `fs.gravitino.server.uri`                             | The Gravitino server uri which gvfs needs to load the fileset meta.                                                                                                                               | (none)        | Yes      | 0.5.0         |
 | `fs.gravitino.client.metalake`                        | The metalake which fileset belongs.                                                                                                                                                               | (none)        | Yes      | 0.5.0         |
@@ -57,8 +57,8 @@ You can configure these properties in two ways:
 
     ```java
     Configuration conf = new Configuration();
-    conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop3.Gvfs");
-    conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem");
+    conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.Gvfs");
+    conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
     Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
@@ -70,12 +70,12 @@ You can configure these properties in two ways:
     ```xml
       <property>
         <name>fs.AbstractFileSystem.gvfs.impl</name>
-        <value>com.datastrato.gravitino.filesystem.hadoop3.Gvfs</value>
+        <value>com.datastrato.gravitino.filesystem.hadoop.Gvfs</value>
       </property>
 
       <property>
         <name>fs.gvfs.impl</name>
-        <value>com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem</value>
+        <value>com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
       </property>
 
       <property>
@@ -94,7 +94,7 @@ You can configure these properties in two ways:
 Please make sure to have the Gravitino Virtual File System runtime jar firstly, you can get it in
 two ways:
 
-1. Download from the maven central repository: You can download the runtime jar which names like
+1. Download from the maven central repository: You can download the runtime jar which name is like
    `gravitino-filesystem-hadoop3-runtime-{version}.jar` from [Maven repository](https://mvnrepository.com/).
 2. Compile from the source code:
 
@@ -135,8 +135,8 @@ For example:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop3.Gvfs");
-conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem");
+conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
@@ -163,8 +163,8 @@ fs.getFileStatus(filesetPath);
     Then, you can configure the Hadoop configuration in the shell command like this:
 
     ```shell
-    --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop3.Gvfs
-    --conf spark.hadoop.fs.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem
+    --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop.Gvfs
+    --conf spark.hadoop.fs.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
     --conf spark.hadoop.fs.gravitino.server.uri=${your_gravitino_server_uri}
     --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
     ```
