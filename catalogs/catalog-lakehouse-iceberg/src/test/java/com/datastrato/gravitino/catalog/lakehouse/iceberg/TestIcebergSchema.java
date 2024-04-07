@@ -49,7 +49,7 @@ public class TestIcebergSchema {
     Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
 
     Set<String> names =
-        Arrays.stream(icebergCatalog.asSchemas().listSchemas(ident.namespace()))
+        Arrays.stream(icebergCatalog.asSchemas().listSchemas())
             .map(NameIdentifier::name)
             .collect(Collectors.toSet());
     Assertions.assertTrue(names.contains(ident.name()));

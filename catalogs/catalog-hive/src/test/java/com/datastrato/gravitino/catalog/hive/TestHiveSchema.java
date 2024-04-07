@@ -80,6 +80,9 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     NameIdentifier[] idents = schemas.listSchemas(ident.namespace());
     Assertions.assertTrue(Arrays.asList(idents).contains(ident));
 
+    NameIdentifier[] idents2 = schemas.listSchemas();
+    Assertions.assertArrayEquals(idents, idents2);
+
     Schema loadedSchema = schemas.loadSchema(ident);
     Assertions.assertEquals(schema.auditInfo().creator(), loadedSchema.auditInfo().creator());
     Assertions.assertNull(loadedSchema.auditInfo().createTime());

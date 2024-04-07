@@ -74,6 +74,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private IcebergTableOpsHelper icebergTableOpsHelper;
 
+  private CatalogInfo info;
+
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
@@ -83,6 +85,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -138,7 +141,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+    Namespace ns = Namespace.ofSchema(info.namespace().level(0), info.name());
+    return listSchemas(ns);
   }
 
   /**

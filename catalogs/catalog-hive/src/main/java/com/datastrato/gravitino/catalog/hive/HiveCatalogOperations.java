@@ -294,7 +294,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+    Namespace ns = Namespace.ofSchema(info.namespace().level(0), info.name());
+    return listSchemas(ns);
   }
   /**
    * Creates a new schema with the provided identifier, comment, and metadata.

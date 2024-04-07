@@ -70,6 +70,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private final EntityStore store;
 
+  private CatalogInfo info;
+
   @VisibleForTesting Configuration hadoopConf;
 
   @VisibleForTesting Optional<Path> catalogStorageLocation;
@@ -85,6 +87,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Initialize Hadoop Configuration.
     this.hadoopConf = new Configuration();
     Map<String, String> bypassConfigs =
@@ -331,9 +334,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
   }
 
-  @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+    Namespace ns = Namespace.ofSchema(info.namespace().level(0), info.name());
+    return listSchemas(ns);
   }
 
   @Override

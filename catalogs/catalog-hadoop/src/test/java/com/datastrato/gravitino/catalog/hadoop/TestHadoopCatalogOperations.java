@@ -27,6 +27,8 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -35,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
@@ -199,7 +202,7 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(name, schema.name());
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
@@ -227,12 +230,15 @@ public class TestHadoopCatalogOperations {
     createSchema(name1, comment1, null, null);
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
       Assertions.assertTrue(idents.size() >= 2);
       Assertions.assertTrue(idents.contains(NameIdentifier.ofSchema("m1", "c1", name)));
       Assertions.assertTrue(idents.contains(NameIdentifier.ofSchema("m1", "c1", name1)));
+
+      Set<NameIdentifier> idents2 = Arrays.stream(ops.listSchemas()).collect(Collectors.toSet());
+      Assertions.assertEquals(idents, idents2);
     }
   }
 
@@ -245,7 +251,7 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(name, schema.name());
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
@@ -401,7 +407,7 @@ public class TestHadoopCatalogOperations {
             + "location are not set",
         exception.getMessage());
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -417,7 +423,7 @@ public class TestHadoopCatalogOperations {
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -437,7 +443,7 @@ public class TestHadoopCatalogOperations {
     }
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
               .collect(Collectors.toSet());
@@ -514,7 +520,7 @@ public class TestHadoopCatalogOperations {
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -579,7 +585,7 @@ public class TestHadoopCatalogOperations {
 
     FilesetChange change1 = FilesetChange.updateComment("comment26_new");
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null);
+      ops.initialize(Maps.newHashMap(), getMockCatalogEntity("m1", "c1").toCatalogInfo());
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -831,7 +837,7 @@ public class TestHadoopCatalogOperations {
     }
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(props, null);
+      ops.initialize(props, getMockCatalogEntity("m1", "c1").toCatalogInfo());
 
       NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
@@ -860,7 +866,7 @@ public class TestHadoopCatalogOperations {
     }
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(props, null);
+      ops.initialize(props, getMockCatalogEntity("m1", "c1").toCatalogInfo());
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
       Map<String, String> filesetProps = Maps.newHashMap();
@@ -869,5 +875,20 @@ public class TestHadoopCatalogOperations {
 
       return ops.createFileset(filesetIdent, comment, type, storageLocation, filesetProps);
     }
+  }
+
+  private CatalogEntity getMockCatalogEntity(String metalake, String catalogName) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withNamespace(Namespace.of(metalake))
+            .withType(HadoopCatalog.Type.RELATIONAL)
+            .withProvider("hadoop")
+            .withAuditInfo(auditInfo)
+            .build();
+    return entity;
   }
 }

@@ -81,6 +81,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
+  private CatalogInfo info;
+
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
@@ -114,6 +116,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -155,7 +158,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
-    throw new UnsupportedOperationException("Does not support listSchemas() yet.");
+    Namespace ns = Namespace.ofSchema(info.namespace().level(0), info.name());
+    return listSchemas(ns);
   }
 
   /**
