@@ -8,9 +8,6 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
@@ -47,20 +44,20 @@ import org.mockito.Mockito;
 
 public class TestMetalakeAdminOperations extends JerseyTest {
 
-  private final AccessControlManager manager = mock(AccessControlManager.class);
+  private final AccessControlManager manager = Mockito.mock(AccessControlManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
     public HttpServletRequest get() {
-      HttpServletRequest request = mock(HttpServletRequest.class);
-      when(request.getRemoteUser()).thenReturn(null);
+      HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+      Mockito.when(request.getRemoteUser()).thenReturn(null);
       return request;
     }
   }
 
   @BeforeAll
   public static void setup() {
-    Config config = mock(Config.class);
+    Config config = Mockito.mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
@@ -95,7 +92,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     UserAddRequest req = new UserAddRequest("user1");
     User user = buildUser("user1");
 
-    when(manager.addMetalakeAdmin(any())).thenReturn(user);
+    Mockito.when(manager.addMetalakeAdmin(any())).thenReturn(user);
 
     Response resp =
         target("/admins")
@@ -115,7 +112,9 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertTrue(userDTO.roles().isEmpty());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).addMetalakeAdmin(any());
+    Mockito.doThrow(new NoSuchMetalakeException("mock error"))
+        .when(manager)
+        .addMetalakeAdmin(any());
     Response resp1 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -130,7 +129,9 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw UserAlreadyExistsException
-    doThrow(new UserAlreadyExistsException("mock error")).when(manager).addMetalakeAdmin(any());
+    Mockito.doThrow(new UserAlreadyExistsException("mock error"))
+        .when(manager)
+        .addMetalakeAdmin(any());
     Response resp2 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -145,7 +146,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
         UserAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addMetalakeAdmin(any());
+    Mockito.doThrow(new RuntimeException("mock error")).when(manager).addMetalakeAdmin(any());
     Response resp3 =
         target("/admins")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -172,7 +173,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
 
   @Test
   public void testRemoveMetalakeAdmin() {
-    when(manager.removeMetalakeAdmin(any())).thenReturn(true);
+    Mockito.when(manager.removeMetalakeAdmin(any())).thenReturn(true);
 
     Response resp =
         target("/admins/user1")
@@ -186,7 +187,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertTrue(removeResponse.removed());
 
     // Test when failed to remove user
-    when(manager.removeMetalakeAdmin(any())).thenReturn(false);
+    Mockito.when(manager.removeMetalakeAdmin(any())).thenReturn(false);
     Response resp2 =
         target("/admins/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -198,7 +199,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertEquals(0, removeResponse2.getCode());
     Assertions.assertFalse(removeResponse2.removed());
 
-    doThrow(new RuntimeException("mock error")).when(manager).removeMetalakeAdmin(any());
+    Mockito.doThrow(new RuntimeException("mock error")).when(manager).removeMetalakeAdmin(any());
     Response resp3 =
         target("/admins/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
