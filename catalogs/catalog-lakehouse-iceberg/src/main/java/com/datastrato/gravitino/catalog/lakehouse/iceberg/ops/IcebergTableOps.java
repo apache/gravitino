@@ -10,15 +10,10 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.CacheUtils;
 import com.google.common.base.Preconditions;
-import java.lang.reflect.Field;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.Transaction;
@@ -26,9 +21,6 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.hive.CachedClientPool;
-import org.apache.iceberg.hive.HiveCatalog;
-import org.apache.iceberg.hive.HiveClientPool;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -160,13 +152,7 @@ public class IcebergTableOps implements AutoCloseable {
       closeMySQLCatalogResource();
     }
 
-    // Only Close it in production environment as CachedClientPool in HiveCatalog is static.
-    if (catalog instanceof HiveCatalog && System.getenv("GRAVITINO_TEST") == null) {
-      // HiveCatalog need close.
-      HiveCatalog hiveCatalog = (HiveCatalog) catalog;
-      // Use reflection to get clients
-      closeHiveCatalogResource(hiveCatalog);
-    }
+    // TODO(yuqi) add close for other catalog types such Hive catalog
   }
 
   private void closeMySQLCatalogResource() {
@@ -195,48 +181,6 @@ public class IcebergTableOps implements AutoCloseable {
     } catch (Exception e) {
       // Ignore
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or Deregister MySQL driver", e);
-    }
-  }
-
-  private void closeHiveCatalogResource(HiveCatalog hiveCatalog) {
-    try {
-      LOG.info("Start to close HiveCatalog clients.");
-      Field field = hiveCatalog.getClass().getDeclaredField("clients");
-      field.setAccessible(true);
-      CachedClientPool clients = (CachedClientPool) field.get(hiveCatalog);
-
-      Field clientPoolCacheField = clients.getClass().getDeclaredField("clientPoolCache");
-      clientPoolCacheField.setAccessible(true);
-      Cache cache = (Cache) clientPoolCacheField.get(null);
-      cache.asMap().forEach((key, value) -> ((HiveClientPool) value).close());
-
-      // Close the scheduler thread pool in the Caffeine cache
-      CacheUtils.closeScheduler(cache);
-
-      // Remove shutdown hooks that guard the Caffeine cache thread pool.
-      removeShutdownHook();
-
-      LOG.info("HiveCatalog clients closed.");
-    } catch (Exception e) {
-      // Log the exception
-      LOG.warn("Failed to close HiveCatalog clients.", e);
-    }
-  }
-
-  private void removeShutdownHook()
-      throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
-    // Remove shutdown hooks
-    Class<?> clazz = Class.forName("java.lang.ApplicationShutdownHooks");
-    Field field = clazz.getDeclaredField("hooks");
-    field.setAccessible(true);
-    Map<Thread, Thread> hooks = (Map<Thread, Thread>) field.get(null);
-    Iterator<Thread> iterator = hooks.keySet().iterator();
-    while (iterator.hasNext()) {
-      Thread thread = iterator.next();
-      if (thread.getName().startsWith("DelayedShutdownHook-for")) {
-        thread.interrupt();
-        iterator.remove();
-      }
     }
   }
 }
