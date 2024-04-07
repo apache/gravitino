@@ -350,6 +350,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertTrue(oldProperties.containsKey("key1") && oldProperties.containsKey("key2"));
 
     sql(String.format("ALTER TABLE %s UNSET TBLPROPERTIES('key1')", tableName));
+    sql("desc extended " + tableName).forEach(System.out::println);
     Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
     Assertions.assertFalse(newProperties.containsKey("key1"));
     Assertions.assertTrue(newProperties.containsKey("key2"));

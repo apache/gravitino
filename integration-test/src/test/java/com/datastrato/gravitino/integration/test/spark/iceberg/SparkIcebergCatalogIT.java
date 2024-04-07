@@ -56,6 +56,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testCreateIcebergSimpleTable() {
+    String tableName = "iceberg_simple_table";
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateIcebergSimpleTableString(tableName);
+    sql(createTableSQL);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    Assertions.assertEquals(tableInfo.getTableProperties(), Collections.emptyMap());
+  }
+
+  @Test
   void testCreateIcebergBucketPartitionTable() {
     String tableName = "iceberg_bucket_partition_table";
     dropTableIfExists(tableName);
