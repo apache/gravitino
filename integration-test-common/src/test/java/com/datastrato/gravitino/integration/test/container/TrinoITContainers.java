@@ -35,6 +35,15 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
+    Object error =
+        CommandExecutor.executeCommandLocalHost(
+            "docker compose version", false, ProcessData.TypesOfData.ERROR);
+    if (Strings.isNotEmpty(error.toString())) {
+      String message = "Check docker compose failed:" + error;
+      LOG.error(message);
+      throw new ContainerLaunchException(message);
+    }
+
     shutdown();
 
     Map<String, String> env = new HashMap<>();
@@ -67,7 +76,8 @@ public class TrinoITContainers implements AutoCloseable {
 
     String containerIpMapping = output.toString();
     if (containerIpMapping.isEmpty()) {
-      throw new ContainerLaunchException("Missing to get container status");
+      throw new ContainerLaunchException(
+          "Failed to get the container status; the containers have not started");
     }
 
     try {
