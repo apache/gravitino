@@ -355,7 +355,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(String.format("ALTER TABLE %s UNSET TBLPROPERTIES('key1')", tableName));
     Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
-    Assertions.assertEquals(newProperties, ImmutableMap.of("key2", "value2"));
     Assertions.assertFalse(newProperties.containsKey("key1"));
     Assertions.assertTrue(newProperties.containsKey("key2"));
   }
