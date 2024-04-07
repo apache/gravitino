@@ -190,7 +190,7 @@ public class TestGravitinoMetalake extends TestBase {
         CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.MESSAGING)
+            .withType(Catalog.Type.UNSUPPORTED)
             .withProvider("test")
             .withAudit(
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
@@ -250,7 +250,7 @@ public class TestGravitinoMetalake extends TestBase {
         CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.MESSAGING)
+            .withType(Catalog.Type.UNSUPPORTED)
             .withProvider("test")
             .withAudit(
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())

@@ -26,7 +26,10 @@ jobs:
               - api/**
               - bin/**
               - catalogs/**
-              - clients/**
+              - clients/client-java/**
+              - clients/client-java-runtime/**
+              - clients/filesystem-hadoop3/**
+              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
@@ -58,6 +61,7 @@ jobs:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
         test-mode: [ embedded, deploy ]
+        backend: [ jdbcBackend, kvBackend]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -87,7 +91,7 @@ jobs:
       - name: Backend Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs -P${{ matrix.backend }} -PskipPythonITs
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -96,7 +100,7 @@ jobs:
           name: integrate test reports
           path: |
             build/reports
-            integration-test/build/integration-test.log
+            integration-test/build/integration-test-integration-test.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log

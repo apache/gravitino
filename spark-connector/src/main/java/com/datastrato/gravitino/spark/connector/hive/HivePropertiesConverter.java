@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -60,6 +61,10 @@ public class HivePropertiesConverter implements PropertiesConverter {
     String provider = gravitinoTableProperties.get(TableCatalog.PROP_PROVIDER);
     String storeAs = gravitinoTableProperties.get(HivePropertiesConstants.SPARK_HIVE_STORED_AS);
     String fileFormat = Optional.ofNullable(storeAs).orElse(provider);
+    String isExternal =
+        Optional.ofNullable(gravitinoTableProperties.get(TableCatalog.PROP_EXTERNAL))
+            .orElse("false");
+
     if (fileFormat != null) {
       String gravitinoFormat = fileFormatMap.get(fileFormat.toLowerCase(Locale.ROOT));
       if (gravitinoFormat != null) {
@@ -70,6 +75,11 @@ public class HivePropertiesConverter implements PropertiesConverter {
       }
     }
 
+    if (isExternal.equalsIgnoreCase("true")) {
+      gravitinoTableProperties.put(
+          HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
+          HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE.name());
+    }
     sparkToGravitinoPropertyMap.forEach(
         (sparkProperty, gravitinoProperty) -> {
           if (gravitinoTableProperties.containsKey(sparkProperty)) {
@@ -83,7 +93,15 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
-    return toOptionProperties(properties);
+    Map<String, String> sparkTableProperties = toOptionProperties(properties);
+    String hiveTableType =
+        sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
+    if (HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE.equalsIgnoreCase(hiveTableType)) {
+      sparkTableProperties.remove(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
+      sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true");
+    }
+
+    return sparkTableProperties;
   }
 
   @VisibleForTesting

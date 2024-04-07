@@ -971,6 +971,21 @@ public class CatalogHiveIT extends AbstractIT {
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");

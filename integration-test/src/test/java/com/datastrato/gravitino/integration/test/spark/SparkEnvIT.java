@@ -86,9 +86,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
         properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
         break;
       case "lakehouse-iceberg":
-        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_BACKEND, "hive");
-        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_WAREHOUSE, warehouse);
-        properties.put(IcebergPropertiesConstants.LAKEHOUSE_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND, "hive");
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, hiveMetastoreUri);
         break;
       default:
         throw new IllegalArgumentException("Unsupported provider: " + getProvider());
