@@ -1,4 +1,4 @@
-package com.datastrato.gravitino.integration.test.client.filesystem.hadoop3;
+package com.datastrato.gravitino.integration.test.client.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -65,8 +65,8 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     Assertions.assertTrue(catalog.asSchemas().schemaExists(schemaIdent));
 
     conf.set(
-        "fs.gvfs.impl", "com.datastrato.gravitino.filesystem.hadoop3.GravitinoVirtualFileSystem");
-    conf.set("fs.AbstractFileSystem.gvfs.impl", "com.datastrato.gravitino.filesystem.hadoop3.Gvfs");
+        "fs.gvfs.impl", "com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+    conf.set("fs.AbstractFileSystem.gvfs.impl", "com.datastrato.gravitino.filesystem.hadoop.Gvfs");
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
