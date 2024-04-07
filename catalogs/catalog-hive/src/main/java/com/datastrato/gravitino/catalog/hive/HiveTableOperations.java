@@ -220,8 +220,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   }
 
   @Override
-  public boolean dropPartition(String partitionName, boolean ifExists)
-      throws NoSuchPartitionException {
+  public boolean dropPartition(String partitionName) {
     try {
       Table hiveTable = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
       // Get partitions that need to drop
@@ -253,11 +252,8 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                         partition.getValues(),
                         false));
       }
-    } catch (NoSuchPartitionException | IllegalArgumentException e) {
-      if (ifExists) {
-        return true;
-      }
-      throw e;
+    } catch (NoSuchPartitionException e) {
+      return false;
 
     } catch (UnknownTableException e) {
       throw new NoSuchTableException(

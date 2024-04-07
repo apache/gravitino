@@ -214,7 +214,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     hiveTable.supportPartitions().addPartition(partition5);
 
     // test drop one partition: city=2/dt=2020-01-01
-    hiveTable.supportPartitions().dropPartition(partitionName1, false);
+    hiveTable.supportPartitions().dropPartition(partitionName1);
     NoSuchPartitionException exception1 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -226,7 +226,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
         exception1.getMessage());
 
     // test drop cascade partitions: city=3
-    hiveTable.supportPartitions().dropPartition("city=3", false);
+    hiveTable.supportPartitions().dropPartition("city=3");
     NoSuchPartitionException exception2 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -248,7 +248,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
 
     // test drop one partition: city=4/dt=2020-01-01
     // check city=4/dt=2020-01-02 is still exist
-    hiveTable.supportPartitions().dropPartition(partitionName4, false);
+    hiveTable.supportPartitions().dropPartition(partitionName4);
     NoSuchPartitionException exception4 =
         Assertions.assertThrows(
             NoSuchPartitionException.class,
@@ -261,26 +261,16 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveTable.supportPartitions().partitionExists(partitionName5));
 
     // test not exist partition
-    Assertions.assertTrue(
-        hiveTable.supportPartitions().dropPartition("does_not_exist_partition", true));
     IllegalArgumentException exception5 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              hiveTable.supportPartitions().dropPartition("does_not_exist_partition", false);
+              hiveTable.supportPartitions().dropPartition("does_not_exist_partition");
             });
     Assertions.assertEquals(
         "Error partition format: does_not_exist_partition", exception5.getMessage());
 
-    Assertions.assertTrue(hiveTable.supportPartitions().dropPartition("city=not_exist", true));
-    NoSuchPartitionException exception6 =
-        Assertions.assertThrows(
-            NoSuchPartitionException.class,
-            () -> {
-              hiveTable.supportPartitions().dropPartition("city=not_exist", false);
-            });
-    Assertions.assertEquals(
-        "Hive partition city=not_exist does not exist in Hive Metastore", exception6.getMessage());
+    Assertions.assertFalse(hiveTable.supportPartitions().dropPartition("city=not_exist"));
   }
 
   @Test
@@ -288,7 +278,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
-          hiveTable.supportPartitions().purgePartition("city=1", false);
+          hiveTable.supportPartitions().purgePartition("city=1");
         });
   }
 }

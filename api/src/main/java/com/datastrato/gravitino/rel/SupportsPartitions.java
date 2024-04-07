@@ -80,10 +80,9 @@ public interface SupportsPartitions {
    * Drop a partition with specified name.
    *
    * @param partitionName the name of the partition
-   * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists
    * @return true if a partition was deleted.
    */
-  boolean dropPartition(String partitionName, boolean ifExists) throws NoSuchPartitionException;
+  boolean dropPartition(String partitionName);
 
   /**
    * If the table supports purging, drop a partition with specified name and completely remove
@@ -91,12 +90,11 @@ public interface SupportsPartitions {
    * purging partitions, {@link UnsupportedOperationException} is thrown.
    *
    * @param partitionName The name of the partition.
-   * @param ifExists If true, will not throw NoSuchPartitionException if the partition not exists
    * @return true if a partition was deleted, false if the partition did not exist.
    * @throws NoSuchPartitionException If the partition does not exist.
    * @throws UnsupportedOperationException If partition purging is not supported.
    */
-  default boolean purgePartition(String partitionName, boolean ifExists)
+  default boolean purgePartition(String partitionName)
       throws NoSuchPartitionException, UnsupportedOperationException {
     throw new UnsupportedOperationException("Partition purging is not supported");
   }

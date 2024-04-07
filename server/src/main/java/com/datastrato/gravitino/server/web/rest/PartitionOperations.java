@@ -163,8 +163,7 @@ public class PartitionOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       @PathParam("partition") String partition,
-      @QueryParam("purge") @DefaultValue("false") boolean purge,
-      @QueryParam("ifExists") @DefaultValue("false") boolean ifExists) {
+      @QueryParam("purge") @DefaultValue("false") boolean purge) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -173,8 +172,8 @@ public class PartitionOperations {
             Table loadTable = dispatcher.loadTable(tableIdent);
             boolean dropped =
                 purge
-                    ? loadTable.supportPartitions().purgePartition(partition, ifExists)
-                    : loadTable.supportPartitions().dropPartition(partition, ifExists);
+                    ? loadTable.supportPartitions().purgePartition(partition)
+                    : loadTable.supportPartitions().dropPartition(partition);
             if (!dropped) {
               LOG.warn(
                   "Failed to drop partition {} under table {} under schema {}",

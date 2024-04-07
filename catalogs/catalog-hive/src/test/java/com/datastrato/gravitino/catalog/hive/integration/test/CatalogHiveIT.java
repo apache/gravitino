@@ -41,7 +41,6 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -834,7 +833,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
 
     // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
-    boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name(), true);
+    boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name());
     Assertions.assertTrue(dropRes1);
     Assertions.assertThrows(
         NoSuchObjectException.class,
@@ -888,8 +887,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.getParameters());
 
     // test drop partition "hive_col_name2=2024-01-02"
-    boolean dropRes2 =
-        createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02", true);
+    boolean dropRes2 = createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02");
     Assertions.assertTrue(dropRes2);
     Assertions.assertThrows(
         NoSuchObjectException.class,
@@ -911,9 +909,7 @@ public class CatalogHiveIT extends AbstractIT {
         hdfs.exists(partitionDirectory2), "The partition directory should not exist");
 
     // test no-exist partition with ifExist=false
-    Assertions.assertThrows(
-        NoSuchPartitionException.class,
-        () -> createdTable.supportPartitions().dropPartition(partitionAdded.name(), false));
+    Assertions.assertFalse(createdTable.supportPartitions().dropPartition(partitionAdded.name()));
   }
 
   @Test
@@ -922,7 +918,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable = preparePartitionedTable();
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> createdTable.supportPartitions().purgePartition("testPartition", false));
+        () -> createdTable.supportPartitions().purgePartition("testPartition"));
   }
 
   private Table preparePartitionedTable() throws TException, InterruptedException {

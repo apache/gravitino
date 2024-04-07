@@ -261,18 +261,11 @@ public class TestRelationalTable extends TestRelationalCatalog {
                 table.getPartitionRequestPath(), partitionName));
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, partitionPath, null, resp, SC_OK);
-    Assertions.assertTrue(table.supportPartitions().dropPartition(partitionName, true));
+    Assertions.assertTrue(table.supportPartitions().dropPartition(partitionName));
 
-    // test throws exception
-    ErrorResponse errorResp =
-        ErrorResponse.notFound(
-            NoSuchPartitionException.class.getSimpleName(), "partition not found");
-    buildMockResource(Method.DELETE, partitionPath, null, errorResp, SC_NOT_FOUND);
-
-    NoSuchPartitionException exception =
-        Assertions.assertThrows(
-            NoSuchPartitionException.class,
-            () -> table.supportPartitions().dropPartition(partitionName, false));
-    Assertions.assertEquals("partition not found", exception.getMessage());
+    // test not exist exception
+    DropResponse notExistResp = new DropResponse(false);
+    buildMockResource(Method.DELETE, partitionPath, null, notExistResp, SC_OK);
+    Assertions.assertFalse(table.supportPartitions().dropPartition(partitionName));
   }
 }

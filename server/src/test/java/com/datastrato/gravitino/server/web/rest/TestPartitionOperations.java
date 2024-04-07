@@ -184,16 +184,8 @@ public class TestPartitionOperations extends JerseyTest {
               }
 
               @Override
-              public boolean dropPartition(String partitionName, boolean ifExists) {
-                if (partitions.containsKey(partitionName)) {
-                  return true;
-                } else {
-                  if (ifExists) {
-                    return true;
-                  } else {
-                    throw new NoSuchPartitionException(partitionName);
-                  }
-                }
+              public boolean dropPartition(String partitionName) {
+                return partitions.containsKey(partitionName);
               }
             });
     when(dispatcher.loadTable(any())).thenReturn(mockedTable);
@@ -365,7 +357,6 @@ public class TestPartitionOperations extends JerseyTest {
     Response resp =
         target(partitionPath(metalake, catalog, schema, table) + "p1")
             .queryParam("purge", "false")
-            .queryParam("ifExists", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -377,19 +368,19 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(0, dropResponse.getCode());
     Assertions.assertTrue(dropResponse.dropped());
 
-    // Test throws exception, drop no-exist partition with ifExists=false
+    // Test drop no-exist partition and return false
     Response resp1 =
         target(partitionPath(metalake, catalog, schema, table) + "p5")
             .queryParam("purge", "false")
-            .queryParam("ifExists", "false")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
-    Assertions.assertEquals(NoSuchPartitionException.class.getSimpleName(), errorResp.getType());
+    DropResponse noExistDropResponse = resp1.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, noExistDropResponse.getCode());
+    Assertions.assertFalse(noExistDropResponse.dropped());
   }
 }

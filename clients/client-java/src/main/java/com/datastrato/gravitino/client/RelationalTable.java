@@ -225,8 +225,7 @@ public class RelationalTable implements Table, SupportsPartitions {
    * @return true if the partition is dropped, false otherwise.
    */
   @Override
-  public boolean dropPartition(String partitionName, boolean ifExists)
-      throws NoSuchPartitionException {
+  public boolean dropPartition(String partitionName) {
     DropResponse resp =
         restClient.delete(
             formatPartitionRequestPath(getPartitionRequestPath(), partitionName),
