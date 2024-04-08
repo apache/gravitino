@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate test reports
+          name: integrate-test-reports-${{ matrix.architecture }}-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
             build/reports
             integration-test/build/integration-test-integration-test.log
