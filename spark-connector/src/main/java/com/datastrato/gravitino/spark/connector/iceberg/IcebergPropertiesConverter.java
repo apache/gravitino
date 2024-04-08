@@ -11,14 +11,12 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 
 /** Transform Iceberg catalog properties between Spark and Gravitino. */
 public class IcebergPropertiesConverter implements PropertiesConverter {
 
   private static final Set<String> RESERVED_PROPERTIES =
-      ImmutableSet.of(
-          IcebergTablePropertiesMetadata.LOCATION, IcebergTablePropertiesMetadata.PROVIDER);
+      ImmutableSet.of(IcebergTablePropertiesMetadata.PROVIDER);
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
@@ -53,12 +51,6 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
         && !IcebergPropertiesConstants.SPARK_ICEBERG_DEFAULT_PROVIDER.equalsIgnoreCase(provider)) {
       throw new IllegalArgumentException("Unsupported format in USING: " + provider);
     }
-
-    String localtion = createProperties.get(IcebergTablePropertiesMetadata.LOCATION);
-    if (StringUtils.isNotBlank(localtion)) {
-      tableProperties.put(IcebergTablePropertiesMetadata.LOCATION, localtion);
-    }
-
     return tableProperties;
   }
 }
