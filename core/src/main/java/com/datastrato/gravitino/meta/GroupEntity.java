@@ -24,8 +24,11 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   public static final Field NAME =
       Field.required("name", String.class, "The name of the group entity.");
 
-  public static final Field ROLES =
-      Field.optional("roles", List.class, "The roles of the group entity.");
+  public static final Field ROLE_NAMES =
+      Field.optional("roleNames", List.class, "The role names of the group entity.");
+
+  public static final Field ROLE_IDS =
+      Field.optional("roleIds", List.class, "The role names of the group entity.");
 
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the group entity.");
@@ -33,7 +36,8 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   private Long id;
   private String name;
   private AuditInfo auditInfo;
-  private List<String> roles;
+  private List<String> roleNames;
+  private List<Long> roleIds;
   private Namespace namespace;
 
   private GroupEntity() {}
@@ -49,7 +53,8 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ROLES, roles);
+    fields.put(ROLE_NAMES, roleNames);
+    fields.put(ROLE_IDS, roleIds);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -109,7 +114,16 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
    * @return The roles of the group entity.
    */
   public List<String> roles() {
-    return roles;
+    return roleNames;
+  }
+
+  /**
+   * Returns the role ids of the group entity.
+   *
+   * @return The roles of the group entity.
+   */
+  public List<Long> roleIds() {
+    return roleIds;
   }
 
   @Override
@@ -121,12 +135,13 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roles, that.roles);
+        && Objects.equals(roleNames, that.roleNames)
+        && Objects.equals(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roles);
+    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -174,13 +189,24 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the roles of the group entity.
+     * Sets the role names of the group entity.
      *
-     * @param roles The roles of the group entity.
+     * @param roles The role names of the group entity.
      * @return The builder instance.
      */
-    public Builder withRoles(List<String> roles) {
-      groupEntity.roles = roles;
+    public Builder withRoleNames(List<String> roles) {
+      groupEntity.roleNames = roles;
+      return this;
+    }
+
+    /**
+     * Sets the role ids of the group entity.
+     *
+     * @param roleIds The role names of the group entity.
+     * @return The builder instance.
+     */
+    public Builder withRoleIds(List<Long> roleIds) {
+      groupEntity.roleIds = roleIds;
       return this;
     }
 

@@ -29,6 +29,7 @@ public class AccessControlNotAllowedFilter implements Filter {
   public static final String API_METALAKES = "/api/metalakes";
   public static final String USERS = "users";
   public static final String GROUPS = "groups";
+  public static final String GRANTS = "grants";
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {}
@@ -57,7 +58,9 @@ public class AccessControlNotAllowedFilter implements Filter {
       String[] segments = path.substring(API_METALAKES.length()).split("/");
 
       if (segments.length > 2) {
-        return USERS.equalsIgnoreCase(segments[2]) || GROUPS.equalsIgnoreCase(segments[2]);
+        return USERS.equalsIgnoreCase(segments[2])
+            || GROUPS.equalsIgnoreCase(segments[2])
+            || GRANTS.equalsIgnoreCase(segments[2]);
       } else {
         return false;
       }

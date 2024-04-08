@@ -7,7 +7,6 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -15,7 +14,10 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -23,6 +25,8 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +39,6 @@ import org.slf4j.LoggerFactory;
 class UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
-  private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
-
-  private static final String GROUP_DOES_NOT_EXIST_MSG =
-      "Group %s does not exist in th metalake %s";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -58,6 +58,7 @@ class UserGroupManager {
    * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
       UserEntity userEntity =
@@ -67,7 +68,7 @@ class UserGroupManager {
               .withNamespace(
                   Namespace.of(
                       metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
-              .withRoles(Lists.newArrayList())
+              .withRoleNames(Lists.newArrayList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -99,7 +100,7 @@ class UserGroupManager {
 
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.delete(ofUser(metalake, user), Entity.EntityType.USER);
+      return store.delete(NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -119,10 +120,22 @@ class UserGroupManager {
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.get(ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+      UserEntity entity =
+          store.get(
+              NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+
+      List<RoleEntity> roleEntities =
+          removeInvalidRoles(metalake, entity.roles(), entity.roleIds());
+
+      return UserEntity.builder()
+          .withId(entity.id())
+          .withName(entity.name())
+          .withAuditInfo(entity.auditInfo())
+          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
+          .build();
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
-      throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -147,8 +160,10 @@ class UserGroupManager {
               .withName(group)
               .withNamespace(
                   Namespace.of(
-                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
-              .withRoles(Collections.emptyList())
+                      metalake,
+                      CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
+                      SchemaEntity.GROUP_SCHEMA_NAME))
+              .withRoleNames(Collections.emptyList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -179,7 +194,7 @@ class UserGroupManager {
   public boolean removeGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.delete(ofGroup(metalake, group), Entity.EntityType.GROUP);
+      return store.delete(NameIdentifierUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
           "Removing group {} in the metalake {} failed due to storage issues",
@@ -202,23 +217,60 @@ class UserGroupManager {
   public Group getGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.get(ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
+
+      GroupEntity entity =
+          store.get(
+              NameIdentifierUtils.ofGroup(metalake, group),
+              Entity.EntityType.GROUP,
+              GroupEntity.class);
+      List<RoleEntity> roleEntities =
+          removeInvalidRoles(metalake, entity.roles(), entity.roleIds());
+      return GroupEntity.builder()
+          .withId(entity.id())
+          .withName(entity.name())
+          .withAuditInfo(entity.auditInfo())
+          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
+          .build();
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
-      throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+      throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
-  private NameIdentifier ofUser(String metalake, String user) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
-  }
+  private List<RoleEntity> removeInvalidRoles(
+      String metalake, List<String> roleNames, List<Long> roleIds) {
+    List<RoleEntity> roleEntities = Lists.newArrayList();
+    if (roleNames == null || roleNames.isEmpty()) {
+      return roleEntities;
+    }
 
-  private NameIdentifier ofGroup(String metalake, String group) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
+    int index = 0;
+    for (String role : roleNames) {
+      try {
+        RoleEntity roleEntity =
+            store.get(
+                NameIdentifierUtils.ofRole(metalake, role),
+                Entity.EntityType.ROLE,
+                RoleEntity.class);
+        if (roleEntity.id().equals(roleIds.get(index))) {
+          roleEntities.add(roleEntity);
+        }
+        index++;
+
+      } catch (IOException ioe) {
+        LOG.error(
+            "Checking roles {} failed in the metalake {} due to storage issues",
+            role,
+            metalake,
+            ioe);
+        throw new RuntimeException(ioe);
+      } catch (NoSuchEntityException nse) {
+        // ignore this entity
+      }
+    }
+    return roleEntities;
   }
 }
