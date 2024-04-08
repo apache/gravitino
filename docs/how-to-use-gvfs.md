@@ -284,3 +284,4 @@ conf.set("fs.gravitino.client.oauth2.scope", "${your_client_scope}");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
+
