@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 
 @Tag("gravitino-docker-it")
 public class CatalogKafkaIT extends AbstractIT {
@@ -62,6 +63,7 @@ public class CatalogKafkaIT extends AbstractIT {
       GravitinoITUtils.genRandomName("catalogKafkaIT_catalog");
   private static final String DEFAULT_SCHEMA_NAME = "default";
   private static final String PROVIDER = "kafka";
+  private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
 
@@ -88,10 +90,27 @@ public class CatalogKafkaIT extends AbstractIT {
       adminClient.close();
     }
 
+    copyKafkaLogs();
+
     try {
       closer.close();
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
+    }
+  }
+
+  private static void copyKafkaLogs() {
+    try {
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
+
+      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
+
+      GenericContainer<?> kafkaContainer = CONTAINER_SUITE.getKafkaContainer().getContainer();
+      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
+      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to pack kafka logs", e);
     }
   }
 

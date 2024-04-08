@@ -46,10 +46,6 @@ public class DorisContainer extends BaseContainer {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
-  public GenericContainer<?> getContainer() {
-    return container;
-  }
-
   @Override
   protected void setupContainer() {
     super.setupContainer();
