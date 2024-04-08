@@ -19,6 +19,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
   public static final String CREATOR = "creator";
   public static final String LOCATION = "location";
+  public static final String PROVIDER = "provider";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
@@ -35,6 +36,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(CREATOR, "The table creator", false),
             stringImmutablePropertyEntry(
                 LOCATION, "Iceberg location for table storage", false, null, false, false),
+            stringReservedPropertyEntry(PROVIDER, "The Iceberg table provider", false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
                 "The snapshot represents the current state of the table",

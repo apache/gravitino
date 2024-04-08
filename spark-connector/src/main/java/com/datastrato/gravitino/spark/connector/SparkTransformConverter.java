@@ -64,7 +64,7 @@ public class SparkTransformConverter {
   }
 
   public static Transform[] toGravitinoPartitionings(
-      org.apache.spark.sql.connector.expressions.Transform[] transforms) {
+      org.apache.spark.sql.connector.expressions.Transform[] transforms, boolean isHiveProvider) {
     if (ArrayUtils.isEmpty(transforms)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -73,7 +73,7 @@ public class SparkTransformConverter {
         .filter(transform -> !isSortBucketTransform(transform))
         .map(
             transform -> {
-              if (transform instanceof BucketTransform) {
+              if (transform instanceof BucketTransform && !isHiveProvider) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =

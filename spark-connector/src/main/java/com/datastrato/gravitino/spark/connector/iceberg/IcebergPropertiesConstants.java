@@ -36,5 +36,12 @@ public class IcebergPropertiesConstants {
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
 
+  public static final String SPARK_ICEBERG_DEFAULT_FILE_FORMAT = "write.format.default";
+  public static final String SPARK_ICEBERG_DEFAULT_PROVIDER = "iceberg";
+
+  public static final String SPARK_ICEBERG_PARQUET_FORMAT = "parquet";
+  public static final String SPARK_ICEBERG_AVRO_FORMAT = "avro";
+  public static final String SPARK_ICEBERG_ORC_FORMAT = "orc";
+
   private IcebergPropertiesConstants() {}
 }
