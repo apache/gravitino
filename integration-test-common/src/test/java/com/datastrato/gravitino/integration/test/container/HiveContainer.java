@@ -27,6 +27,10 @@ public class HiveContainer extends BaseContainer {
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
 
+  private static final String HIVE_LOG_PATH = "/tmp/root/hive.log";
+  private static final String HDFS_NAME_NODE_LOG_PATH = "/usr/local/hadoop/logs/hadoop-root-namenode-gravitino-ci-hive.log";
+  private static final String HDFS_DATA_NODE_LOG_PATH = "/usr/local/hadoop/logs/hadoop-root-datanode-gravitino-ci-hive.log";
+
   public static Builder builder() {
     return new Builder();
   }
@@ -50,8 +54,24 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void start() {
-    super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
+    try {
+      super.start();
+      Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
+    } finally {
+      outputContainerServiceLog();
+    }
+  }
+
+  @Override
+  protected void outputContainerServiceLog() {
+    LOG.info("--------------------Start the Hive server information--------------------------\n{}", getServiceLog(HIVE_LOG_PATH));
+    LOG.info("--------------------End the Hive server information----------------------------");
+
+    LOG.info("----------------------------Start the HDFS namenode information -----------------\n{}", getServiceLog(HDFS_NAME_NODE_LOG_PATH));
+    LOG.info("----------------------------End the HDFS namenode information -------------------");
+
+    LOG.info("----------------------------Start the HDFS datanode information -----------------\n{}", getServiceLog(HDFS_DATA_NODE_LOG_PATH));
+    LOG.info("----------------------------End the HDFS datanode information -------------------");
   }
 
   @Override

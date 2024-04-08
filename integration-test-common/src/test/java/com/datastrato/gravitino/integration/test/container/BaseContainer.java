@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
@@ -48,7 +49,7 @@ public abstract class BaseContainer implements AutoCloseable {
   // Network of the container
   private final Optional<Network> network;
 
-  private final GenericContainer<?> container;
+  protected final GenericContainer<?> container;
 
   protected BaseContainer(
       String image,
@@ -95,6 +96,18 @@ public abstract class BaseContainer implements AutoCloseable {
   // This method is used to set the log output of the container.
   protected void withLogConsumer(Consumer<OutputFrame> logConsumer) {
     container.withLogConsumer(logConsumer);
+  }
+
+  /**
+   * Output the log of service that running in the container.
+   */
+  protected void outputContainerServiceLog() {
+    // Do nothing by default
+  }
+
+  protected String getServiceLog(String path) {
+    ExecResult execResult = executeInContainer("cat", path);
+    return execResult.getStdout();
   }
 
   protected void withStartupTimeout(Duration duration) {
