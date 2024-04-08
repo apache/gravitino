@@ -76,7 +76,7 @@ public class GravitinoCatalogManager {
   public void loadRelationalCatalogs() {
     Catalog[] catalogs = metalake.listCatalogsInfo(Namespace.ofCatalog(metalake.name()));
     Arrays.stream(catalogs)
-        .filter(catalog -> Type.RELATIONAL.equals(catalog.type()))
+        .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
         .forEach(catalog -> gravitinoCatalogs.put(catalog.name(), catalog));
   }
 
