@@ -6,6 +6,7 @@ package com.datastrato.gravitino.filesystem.hadoop;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
@@ -83,14 +84,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeCache(maxCapacity, evictionMillsAfterAccess);
 
-    // initialize the Gravitino client
-    String serverUri =
-        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(serverUri),
-        "'%s' is not set in the configuration",
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-
     this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(
@@ -98,9 +91,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
-    // TODO Need support more authentication types, now we only support simple auth
-    this.client =
-        GravitinoClient.builder(serverUri).withMetalake(metalakeName).withSimpleAuth().build();
+    initializeClient(configuration);
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
@@ -141,6 +132,86 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         .setDaemon(true)
         .setNameFormat("gvfs-cache-cleaner" + "-%d")
         .build();
+  }
+
+  private void initializeClient(Configuration configuration) {
+    // initialize the Gravitino client
+    String serverUri =
+        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(serverUri),
+        "'%s' is not set in the configuration",
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
+
+    String authType =
+        configuration.get(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
+            GravitinoVirtualFileSystemConfiguration.SIMPLE_AUTH_TYPE);
+    if (authType.equalsIgnoreCase(GravitinoVirtualFileSystemConfiguration.SIMPLE_AUTH_TYPE)) {
+      this.client =
+          GravitinoClient.builder(serverUri).withMetalake(metalakeName).withSimpleAuth().build();
+    } else if (authType.equalsIgnoreCase(
+        GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE)) {
+      String authServerUri =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY,
+          authServerUri);
+
+      String credential =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY,
+          credential);
+
+      String path =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY,
+          path);
+
+      String scope =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY,
+          scope);
+
+      DefaultOAuth2TokenProvider authDataProvider =
+          DefaultOAuth2TokenProvider.builder()
+              .withUri(authServerUri)
+              .withCredential(credential)
+              .withPath(path)
+              .withScope(scope)
+              .build();
+
+      this.client =
+          GravitinoClient.builder(serverUri)
+              .withMetalake(metalakeName)
+              .withOAuth(authDataProvider)
+              .build();
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported authentication type: %s for %s.",
+              authType, GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY));
+    }
+  }
+
+  private void checkAuthConfig(String authType, String configKey, String configValue) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(configValue),
+        "%s should not be null if %s is set to %s.",
+        configKey,
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
+        authType);
   }
 
   private String concatVirtualPrefix(NameIdentifier identifier) {
@@ -219,7 +290,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         virtualUri
             .toString()
             .startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme \"%s\".");
+        "Path %s doesn't start with scheme prefix \"%s\".",
+        virtualUri,
+        GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
 
     if (StringUtils.isBlank(virtualUri.toString())) {
       throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");

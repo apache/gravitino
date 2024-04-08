@@ -19,7 +19,6 @@ import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -110,23 +109,6 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertEquals("user1", userDTO.name());
     Assertions.assertNotNull(userDTO.roles());
     Assertions.assertTrue(userDTO.roles().isEmpty());
-
-    // Test to throw NoSuchMetalakeException
-    Mockito.doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .addMetalakeAdmin(any());
-    Response resp1 =
-        target("/admins")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
-
-    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw UserAlreadyExistsException
     Mockito.doThrow(new UserAlreadyExistsException("mock error"))

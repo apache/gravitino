@@ -35,7 +35,7 @@ import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 import org.mockserver.model.Parameter;
 
-public abstract class MockServerTestBase {
+public abstract class GravitinoMockServerBase {
   private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
   private static ClientAndServer mockServer;
   private static final String MOCK_SERVER_HOST = "http://127.0.0.1:";
@@ -170,5 +170,9 @@ public abstract class MockServerTestBase {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static ClientAndServer mockServer() {
+    return mockServer;
   }
 }
