@@ -17,6 +17,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
@@ -69,47 +70,53 @@ public class SparkTransformConverter {
       return Transforms.EMPTY_TRANSFORM;
     }
 
-    return Arrays.stream(transforms)
-        .filter(transform -> !isSortBucketTransform(transform))
-        .map(
-            transform -> {
-              if (transform instanceof BucketTransform) {
-                if (isHiveProvider) {
-                  return Transforms.EMPTY_TRANSFORM;
-                }
+    List<Transform> gravitinoTransforms =
+        Arrays.stream(transforms)
+            .filter(transform -> !isBucketTransform(transform))
+            .map(
+                transform -> {
+                  if (transform instanceof IdentityTransform) {
+                    IdentityTransform identityTransform = (IdentityTransform) transform;
+                    return Transforms.identity(identityTransform.reference().fieldNames());
+                  } else if (transform instanceof HoursTransform) {
+                    HoursTransform hoursTransform = (HoursTransform) transform;
+                    return Transforms.hour(hoursTransform.reference().fieldNames());
+                  } else if (transform instanceof DaysTransform) {
+                    DaysTransform daysTransform = (DaysTransform) transform;
+                    return Transforms.day(daysTransform.reference().fieldNames());
+                  } else if (transform instanceof MonthsTransform) {
+                    MonthsTransform monthsTransform = (MonthsTransform) transform;
+                    return Transforms.month(monthsTransform.reference().fieldNames());
+                  } else if (transform instanceof YearsTransform) {
+                    YearsTransform yearsTransform = (YearsTransform) transform;
+                    return Transforms.year(yearsTransform.reference().fieldNames());
+                  } else if (transform instanceof ApplyTransform
+                      && "truncate".equals(transform.name())) {
+                    return Transforms.truncate(
+                        findWidth(transform),
+                        String.join(
+                            ConnectorConstants.DOT, transform.references()[0].fieldNames()));
+                  } else {
+                    throw new NotSupportedException(
+                        "Doesn't support Spark transform: " + transform.name());
+                  }
+                })
+            .collect(Collectors.toList());
+    if (!isHiveProvider) {
+      Arrays.stream(transforms)
+          .filter(transform -> transform instanceof BucketTransform)
+          .forEach(
+              transform -> {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =
                     Arrays.stream(bucketTransform.references())
                         .map(org.apache.spark.sql.connector.expressions.NamedReference::fieldNames)
                         .toArray(String[][]::new);
-                return Transforms.bucket(numBuckets, fieldNames);
-              } else if (transform instanceof IdentityTransform) {
-                IdentityTransform identityTransform = (IdentityTransform) transform;
-                return Transforms.identity(identityTransform.reference().fieldNames());
-              } else if (transform instanceof HoursTransform) {
-                HoursTransform hoursTransform = (HoursTransform) transform;
-                return Transforms.hour(hoursTransform.reference().fieldNames());
-              } else if (transform instanceof DaysTransform) {
-                DaysTransform daysTransform = (DaysTransform) transform;
-                return Transforms.day(daysTransform.reference().fieldNames());
-              } else if (transform instanceof MonthsTransform) {
-                MonthsTransform monthsTransform = (MonthsTransform) transform;
-                return Transforms.month(monthsTransform.reference().fieldNames());
-              } else if (transform instanceof YearsTransform) {
-                YearsTransform yearsTransform = (YearsTransform) transform;
-                return Transforms.year(yearsTransform.reference().fieldNames());
-              } else if (transform instanceof ApplyTransform
-                  && "truncate".equals(transform.name())) {
-                return Transforms.truncate(
-                    findWidth(transform),
-                    String.join(ConnectorConstants.DOT, transform.references()[0].fieldNames()));
-              } else {
-                throw new NotSupportedException(
-                    "Doesn't support Spark transform: " + transform.name());
-              }
-            })
-        .toArray(Transform[]::new);
+                gravitinoTransforms.add(Transforms.bucket(numBuckets, fieldNames));
+              });
+    }
+    return gravitinoTransforms.toArray(new Transform[0]);
   }
 
   public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
@@ -335,11 +342,6 @@ public class SparkTransformConverter {
   private static boolean isBucketTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
     return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
-  }
-
-  private static boolean isSortBucketTransform(
-      org.apache.spark.sql.connector.expressions.Transform transform) {
-    return transform instanceof SortedBucketTransform;
   }
 
   // Referred from org.apache.iceberg.spark.Spark3Util
