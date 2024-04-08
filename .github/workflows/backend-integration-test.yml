@@ -95,6 +95,7 @@ jobs:
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'container log') }}
         with:
           name: integrate test reports
           path: |
