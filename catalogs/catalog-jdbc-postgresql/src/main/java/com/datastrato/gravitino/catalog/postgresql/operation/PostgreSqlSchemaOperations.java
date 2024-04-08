@@ -118,6 +118,9 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   /**
    * Get the schema with the given name.
    *
+   * <p>Note: This method will return a result set that may contain multiple rows as the schemaName
+   * in `getSchemas` is a pattern. The result set will contain all schemas that match the pattern.
+   *
    * <p>Database in PG corresponds to Catalog in JDBC. Schema in PG corresponds to Schema in JDBC.
    *
    * @param connection the connection to the database
