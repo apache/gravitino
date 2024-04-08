@@ -180,9 +180,9 @@ public class TestJsonUtils {
     String[] field1 = {"dt"};
     String[] field2 = {"country"};
     LiteralDTO literal1 =
-        new LiteralDTO.Builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
     LiteralDTO literal2 =
-        new LiteralDTO.Builder().withDataType(Types.StringType.get()).withValue("us").build();
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
     PartitionDTO partition =
         IdentityPartitionDTO.builder()
             .withFieldNames(new String[][] {field1, field2})
@@ -223,15 +223,9 @@ public class TestJsonUtils {
         RangePartitionDTO.builder()
             .withName("p0")
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.NullType.get())
-                    .withValue("null")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.NullType.get()).withValue("null").build())
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("6")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("6").build())
             .build();
     jsonValue = JsonUtils.objectMapper().writeValueAsString(partition);
     expected =
@@ -259,21 +253,21 @@ public class TestJsonUtils {
             .withLists(
                 new LiteralDTO[][] {
                   {
-                    new LiteralDTO.Builder()
+                    LiteralDTO.builder()
                         .withDataType(Types.DateType.get())
                         .withValue("2022-04-01")
                         .build(),
-                    new LiteralDTO.Builder()
+                    LiteralDTO.builder()
                         .withDataType(Types.StringType.get())
                         .withValue("Los Angeles")
                         .build()
                   },
                   {
-                    new LiteralDTO.Builder()
+                    LiteralDTO.builder()
                         .withDataType(Types.DateType.get())
                         .withValue("2022-04-01")
                         .build(),
-                    new LiteralDTO.Builder()
+                    LiteralDTO.builder()
                         .withDataType(Types.StringType.get())
                         .withValue("San Francisco")
                         .build()

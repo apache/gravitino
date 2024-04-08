@@ -17,12 +17,13 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -87,7 +88,7 @@ public class TestTableOperations extends JerseyTest {
     }
   }
 
-  private CatalogOperationDispatcher dispatcher = mock(CatalogOperationDispatcher.class);
+  private TableOperationDispatcher dispatcher = mock(TableOperationDispatcher.class);
 
   private final String metalake = "metalake1";
 
@@ -119,7 +120,7 @@ public class TestTableOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(CatalogOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(TableOperationDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -182,7 +183,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(FieldReferenceDTO.of(columnName))
@@ -191,7 +192,7 @@ public class TestTableOperations extends JerseyTest {
 
   private SortOrderDTO[] createMockSortOrderDTO(String columnName, SortDirection direction) {
     return new SortOrderDTO[] {
-      new SortOrderDTO.Builder()
+      SortOrderDTO.builder()
           .withDirection(direction)
           .withNullOrder(NullOrdering.NULLS_FIRST)
           .withSortTerm(FieldReferenceDTO.of(columnName))
@@ -550,7 +551,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             TableChange.ColumnPosition.first(),
             false,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     Column[] columns =
         new Column[] {
           mockColumn("col3", Types.StringType.get(), false),
@@ -571,7 +573,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             TableChange.ColumnPosition.after("col2"),
             true,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),

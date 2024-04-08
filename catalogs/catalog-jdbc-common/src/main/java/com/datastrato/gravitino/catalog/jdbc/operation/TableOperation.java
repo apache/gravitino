@@ -14,6 +14,7 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.List;
@@ -53,6 +54,7 @@ public interface TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException;
 

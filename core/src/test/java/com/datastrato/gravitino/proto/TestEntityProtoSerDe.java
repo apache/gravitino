@@ -6,8 +6,11 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -79,7 +82,7 @@ public class TestEntityProtoSerDe {
 
     // Test Metalake
     com.datastrato.gravitino.meta.BaseMetalake metalake =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withProperties(props)
@@ -97,7 +100,7 @@ public class TestEntityProtoSerDe {
 
     // Test metalake without props map
     com.datastrato.gravitino.meta.BaseMetalake metalake1 =
-        new com.datastrato.gravitino.meta.BaseMetalake.Builder()
+        com.datastrato.gravitino.meta.BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withAuditInfo(auditInfo)
@@ -152,7 +155,7 @@ public class TestEntityProtoSerDe {
     Long schemaId = 1L;
     String schemaName = "schema";
     com.datastrato.gravitino.meta.SchemaEntity schemaEntity =
-        new com.datastrato.gravitino.meta.SchemaEntity.Builder()
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -165,7 +168,7 @@ public class TestEntityProtoSerDe {
 
     // Test SchemaEntity with additional fields
     com.datastrato.gravitino.meta.SchemaEntity schemaEntity1 =
-        new com.datastrato.gravitino.meta.SchemaEntity.Builder()
+        com.datastrato.gravitino.meta.SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -184,7 +187,7 @@ public class TestEntityProtoSerDe {
     Long tableId = 1L;
     String tableName = "table";
     com.datastrato.gravitino.meta.TableEntity tableEntity =
-        new com.datastrato.gravitino.meta.TableEntity.Builder()
+        com.datastrato.gravitino.meta.TableEntity.builder()
             .withId(tableId)
             .withName(tableName)
             .withAuditInfo(auditInfo)
@@ -199,7 +202,7 @@ public class TestEntityProtoSerDe {
     Long fileId = 1L;
     String fileName = "file";
     com.datastrato.gravitino.meta.FilesetEntity fileEntity =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -214,7 +217,7 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(fileEntity, fileEntityFromBytes);
 
     com.datastrato.gravitino.meta.FilesetEntity fileEntity1 =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -229,7 +232,7 @@ public class TestEntityProtoSerDe {
     Assertions.assertNull(fileEntityFromBytes1.properties());
 
     com.datastrato.gravitino.meta.FilesetEntity fileEntity2 =
-        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
+        com.datastrato.gravitino.meta.FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -274,5 +277,48 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
     Assertions.assertNull(topicEntityFromBytes1.comment());
     Assertions.assertNull(topicEntityFromBytes1.properties());
+
+    // Test UserEntity
+    Long userId = 1L;
+    String userName = "user";
+    UserEntity userEntity =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
+    UserEntity userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntity, userEntityFromBytes);
+
+    UserEntity userEntityWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
+    userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
+    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
+    Assertions.assertNull(userEntityWithoutFields.roles());
+
+    // Test GroupEntity
+    Long groupId = 1L;
+    String groupName = "group";
+
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    byte[] groupBytes = protoEntitySerDe.serialize(group);
+    GroupEntity groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(group, groupFromBytes);
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(groupId).withName(groupName).withAuditInfo(auditInfo).build();
+    groupBytes = protoEntitySerDe.serialize(groupWithoutFields);
+    groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class);
+    Assertions.assertEquals(groupWithoutFields, groupFromBytes);
+    Assertions.assertNull(groupWithoutFields.roles());
   }
 }

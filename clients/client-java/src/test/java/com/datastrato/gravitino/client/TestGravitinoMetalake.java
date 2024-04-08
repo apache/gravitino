@@ -15,6 +15,7 @@ import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdatesRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
+import com.datastrato.gravitino.dto.responses.CatalogListResponse;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
@@ -51,11 +52,11 @@ public class TestGravitinoMetalake extends TestBase {
     createMetalake(client, metalakeName);
 
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(metalakeName)
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
@@ -104,18 +105,66 @@ public class TestGravitinoMetalake extends TestBase {
   }
 
   @Test
-  public void testLoadCatalog() throws JsonProcessingException {
-    String catalogName = "mock";
-    String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
+  public void testListCatalogsInfo() throws JsonProcessingException {
+    String path = "/api/metalakes/" + metalakeName + "/catalogs";
+    Map<String, String> params = Collections.singletonMap("details", "true");
 
-    CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+    Namespace namespace = Namespace.of(metalakeName);
+
+    CatalogDTO mockCatalog1 =
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    CatalogDTO mockCatalog2 =
+        CatalogDTO.builder()
+            .withName("mock2")
+            .withComment("comment2")
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    CatalogListResponse resp =
+        new CatalogListResponse(new CatalogDTO[] {mockCatalog1, mockCatalog2});
+    buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
+
+    Catalog[] catalogs = gravitinoClient.listCatalogsInfo(namespace);
+    Assertions.assertEquals(2, catalogs.length);
+    Assertions.assertEquals("mock", catalogs[0].name());
+    Assertions.assertEquals("comment", catalogs[0].comment());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogs[0].type());
+    Assertions.assertEquals("mock2", catalogs[1].name());
+    Assertions.assertEquals("comment2", catalogs[1].comment());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogs[1].type());
+
+    // Test return no found
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, params, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> gravitinoClient.listCatalogsInfo(namespace));
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testLoadCatalog() throws JsonProcessingException {
+    String catalogName = "mock";
+    String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
+
+    CatalogDTO mockCatalog =
+        CatalogDTO.builder()
+            .withName("mock")
+            .withComment("comment")
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp = new CatalogResponse(mockCatalog);
 
@@ -138,13 +187,13 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.MESSAGING)
+            .withType(Catalog.Type.UNSUPPORTED)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
@@ -171,13 +220,13 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -198,13 +247,13 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test return unsupported catalog type
     CatalogDTO mockCatalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock")
             .withComment("comment")
-            .withType(Catalog.Type.MESSAGING)
+            .withType(Catalog.Type.UNSUPPORTED)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
@@ -263,13 +312,13 @@ public class TestGravitinoMetalake extends TestBase {
     String path = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("mock1")
             .withComment("comment1")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogResponse resp = new CatalogResponse(mockCatalog);
 
@@ -336,11 +385,11 @@ public class TestGravitinoMetalake extends TestBase {
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)
       throws JsonProcessingException {
     MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(metalakeName)
             .withComment("comment")
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     MetalakeCreateRequest req =
         new MetalakeCreateRequest(metalakeName, "comment", Collections.emptyMap());

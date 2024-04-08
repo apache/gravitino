@@ -308,7 +308,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       HiveSchema hiveSchema =
-          new HiveSchema.Builder()
+          HiveSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
@@ -596,6 +596,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     "Hive does not support altering column nullability");
               }
 
+              if (c instanceof TableChange.UpdateColumnDefaultValue) {
+                throw new IllegalArgumentException(
+                    "Hive does not support altering column default value");
+              }
+
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
                       partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
@@ -701,7 +706,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       }
 
       HiveTable hiveTable =
-          new HiveTable.Builder()
+          HiveTable.builder()
               .withName(tableIdent.name())
               .withSchemaName(schemaIdent.name())
               .withClientPool(clientPool)
@@ -785,7 +790,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
           if (change instanceof TableChange.AddColumn) {
             TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-            validateNullable(String.join(".", addColumn.fieldName()), addColumn.isNullable());
+            String fieldName = String.join(".", addColumn.fieldName());
+            validateNullable(fieldName, addColumn.isNullable());
+            validateColumnDefaultValue(fieldName, addColumn.getDefaultValue());
             doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {
@@ -802,6 +809,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
           } else if (change instanceof TableChange.UpdateColumnType) {
             doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
+
+          } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+            throw new IllegalArgumentException(
+                "Hive does not support altering column default value");
 
           } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
             throw new IllegalArgumentException(

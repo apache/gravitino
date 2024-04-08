@@ -17,13 +17,16 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -143,6 +146,31 @@ public class TestPOConverters {
     assertEquals(expectedFileset.namespace(), convertedFileset.namespace());
     assertEquals(expectedFileset.auditInfo().creator(), convertedFileset.auditInfo().creator());
     assertEquals(expectedFileset.storageLocation(), convertedFileset.storageLocation());
+  }
+
+  @Test
+  public void testFromTopicPO() throws JsonProcessingException {
+    TopicPO topicPO =
+        createTopicPO(1L, "test", 1L, 1L, 1L, "test comment", ImmutableMap.of("key", "value"));
+
+    TopicEntity expectedTopic =
+        createTopic(
+            1L,
+            "test",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment",
+            ImmutableMap.of("key", "value"));
+
+    TopicEntity convertedTopic =
+        POConverters.fromTopicPO(
+            topicPO, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    assertEquals(expectedTopic.id(), convertedTopic.id());
+    assertEquals(expectedTopic.name(), convertedTopic.name());
+    assertEquals(expectedTopic.namespace(), convertedTopic.namespace());
+    assertEquals(expectedTopic.auditInfo().creator(), convertedTopic.auditInfo().creator());
+    assertEquals(expectedTopic.comment(), convertedTopic.comment());
+    assertEquals(expectedTopic.properties(), convertedTopic.properties());
   }
 
   @Test
@@ -314,6 +342,46 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testFromTopicPOs() throws JsonProcessingException {
+    TopicPO topicPO1 =
+        createTopicPO(1L, "test1", 1L, 1L, 1L, "test comment1", ImmutableMap.of("key", "value"));
+    TopicPO topicPO2 =
+        createTopicPO(2L, "test2", 1L, 1L, 1L, "test comment2", ImmutableMap.of("key", "value"));
+    List<TopicPO> topicPOs = new ArrayList<>(Arrays.asList(topicPO1, topicPO2));
+    List<TopicEntity> convertedTopics =
+        POConverters.fromTopicPOs(
+            topicPOs, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    TopicEntity expectedTopic1 =
+        createTopic(
+            1L,
+            "test1",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment1",
+            ImmutableMap.of("key", "value"));
+    TopicEntity expectedTopic2 =
+        createTopic(
+            2L,
+            "test2",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment2",
+            ImmutableMap.of("key", "value"));
+    List<TopicEntity> expectedTopics =
+        new ArrayList<>(Arrays.asList(expectedTopic1, expectedTopic2));
+
+    int index = 0;
+    for (TopicEntity topic : convertedTopics) {
+      assertEquals(expectedTopics.get(index).id(), topic.id());
+      assertEquals(expectedTopics.get(index).name(), topic.name());
+      assertEquals(expectedTopics.get(index).namespace(), topic.namespace());
+      assertEquals(expectedTopics.get(index).auditInfo().creator(), topic.auditInfo().creator());
+      assertEquals(expectedTopics.get(index).comment(), topic.comment());
+      assertEquals(expectedTopics.get(index).properties(), topic.properties());
+      index++;
+    }
+  }
+
+  @Test
   public void testInitMetalakePOVersion() {
     BaseMetalake metalake = createMetalake(1L, "test", "this is test");
     MetalakePO initPO = POConverters.initializeMetalakePOWithVersion(metalake);
@@ -337,9 +405,7 @@ public class TestPOConverters {
     SchemaEntity schema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
-    SchemaPO.Builder builder = new SchemaPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
+    SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -350,10 +416,8 @@ public class TestPOConverters {
   public void testInitTablePOVersion() {
     TableEntity tableEntity =
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
-    TablePO.Builder builder = new TablePO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    TablePO.Builder builder =
+        TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -370,10 +434,8 @@ public class TestPOConverters {
             "this is test",
             "hdfs://localhost/test",
             new HashMap<>());
-    FilesetPO.Builder builder = new FilesetPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -416,9 +478,7 @@ public class TestPOConverters {
     SchemaEntity updatedSchema =
         createSchema(
             1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
-    SchemaPO.Builder builder = new SchemaPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
+    SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema);
     assertEquals(1, initPO.getCurrentVersion());
@@ -433,10 +493,8 @@ public class TestPOConverters {
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
     TableEntity updatedTable =
         createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
-    TablePO.Builder builder = new TablePO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    TablePO.Builder builder =
+        TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
     TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable);
     assertEquals(1, initPO.getCurrentVersion());
@@ -478,10 +536,8 @@ public class TestPOConverters {
             "hdfs://localhost/test",
             properties);
 
-    FilesetPO.Builder builder = new FilesetPO.Builder();
-    builder.withMetalakeId(1L);
-    builder.withCatalogId(1L);
-    builder.withSchemaId(1L);
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
     // map has updated
@@ -520,7 +576,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new BaseMetalake.Builder()
+    return BaseMetalake.builder()
         .withId(id)
         .withName(name)
         .withComment(comment)
@@ -536,7 +592,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new MetalakePO.Builder()
+    return MetalakePO.builder()
         .withMetalakeId(id)
         .withMetalakeName(name)
         .withMetalakeComment(comment)
@@ -573,7 +629,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new CatalogPO.Builder()
+    return CatalogPO.builder()
         .withCatalogId(id)
         .withCatalogName(name)
         .withMetalakeId(metalakeId)
@@ -594,7 +650,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new SchemaEntity.Builder()
+    return SchemaEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -611,7 +667,7 @@ public class TestPOConverters {
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
-    return new SchemaPO.Builder()
+    return SchemaPO.builder()
         .withSchemaId(id)
         .withSchemaName(name)
         .withMetalakeId(metalakeId)
@@ -628,10 +684,24 @@ public class TestPOConverters {
   private static TableEntity createTable(Long id, String name, Namespace namespace) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new TableEntity.Builder()
+    return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static TopicEntity createTopic(
+      Long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return TopicEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -641,12 +711,38 @@ public class TestPOConverters {
       throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new TablePO.Builder()
+    return TablePO.builder()
         .withTableId(id)
         .withTableName(name)
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)
         .withSchemaId(schemaId)
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static TopicPO createTopicPO(
+      Long id,
+      String name,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String comment,
+      Map<String, String> properties)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return TopicPO.builder()
+        .withTopicId(id)
+        .withTopicName(name)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaId(schemaId)
+        .withComment(comment)
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
@@ -663,7 +759,7 @@ public class TestPOConverters {
       Map<String, String> properties) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new FilesetEntity.Builder()
+    return FilesetEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
@@ -686,7 +782,7 @@ public class TestPOConverters {
       throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return new FilesetPO.Builder()
+    return FilesetPO.builder()
         .withFilesetId(id)
         .withFilesetName(name)
         .withMetalakeId(metalakeId)
@@ -712,7 +808,7 @@ public class TestPOConverters {
       String storageLocation,
       Map<String, String> properties)
       throws JsonProcessingException {
-    return new FilesetVersionPO.Builder()
+    return FilesetVersionPO.builder()
         .withId(id)
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)

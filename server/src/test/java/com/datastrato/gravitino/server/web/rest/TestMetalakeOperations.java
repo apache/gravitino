@@ -102,7 +102,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -136,7 +136,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
 
     BaseMetalake mockMetalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(1L)
             .withName("metalake")
             .withComment("comment")
@@ -185,7 +185,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -260,7 +260,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Instant now = Instant.now();
     AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
@@ -271,11 +271,10 @@ public class TestMetalakeOperations extends JerseyTest {
         Lists.newArrayList(
             new MetalakeUpdateRequest.RenameMetalakeRequest("newTest"),
             new MetalakeUpdateRequest.UpdateMetalakeCommentRequest("newComment"));
-    MetalakeChange[] changes =
-        updateRequests.stream()
-            .map(MetalakeUpdateRequest::metalakeChange)
-            .toArray(MetalakeChange[]::new);
 
+    updateRequests.stream()
+        .map(MetalakeUpdateRequest::metalakeChange)
+        .toArray(MetalakeChange[]::new);
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);

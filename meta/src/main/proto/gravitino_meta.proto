@@ -101,3 +101,17 @@ message Topic {
   map<string, string> properties = 4;
   AuditInfo audit_info = 5;
 }
+
+message User {
+  uint64 id = 1;
+  string name = 2;
+  repeated string roles = 3;
+  AuditInfo audit_info = 4;
+}
+
+message Group {
+  uint64 id = 1;
+  string name = 2;
+  repeated string roles = 3;
+  AuditInfo audit_info = 4;
+}

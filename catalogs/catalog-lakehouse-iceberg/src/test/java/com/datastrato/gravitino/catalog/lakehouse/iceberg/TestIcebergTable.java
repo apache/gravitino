@@ -130,14 +130,14 @@ public class TestIcebergTable {
     properties.put("key2", "val2");
 
     IcebergColumn col1 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_1")
             .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .withNullable(true)
             .build();
     IcebergColumn col2 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
@@ -155,7 +155,7 @@ public class TestIcebergTable {
                 "string_field", Types.StringType.get(), "string field"),
             Types.StructType.Field.nullableField("struct_field", structTypeInside, "struct field"));
     IcebergColumn col3 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_3")
             .withType(structType)
             .withComment(ICEBERG_COMMENT)
@@ -218,7 +218,7 @@ public class TestIcebergTable {
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
     IcebergColumn withDefaultValue =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col")
             .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
@@ -253,13 +253,13 @@ public class TestIcebergTable {
     properties.put("key2", "val2");
 
     IcebergColumn col1 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("city")
             .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("date")
             .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
@@ -333,13 +333,13 @@ public class TestIcebergTable {
     properties.put("key2", "val2");
 
     IcebergColumn col1 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_1")
             .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
@@ -383,13 +383,13 @@ public class TestIcebergTable {
     properties.put("key2", "val2");
 
     IcebergColumn col1 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_1")
             .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
@@ -463,23 +463,38 @@ public class TestIcebergTable {
 
     Column[] expected =
         new Column[] {
-          new IcebergColumn.Builder()
+          IcebergColumn.builder()
               .withName("col_2_new")
               .withType(Types.DateType.get())
               .withComment(ICEBERG_COMMENT)
               .build(),
-          new IcebergColumn.Builder()
+          IcebergColumn.builder()
               .withName("col_1")
               .withType(Types.IntegerType.get())
               .withComment(ICEBERG_COMMENT + "_new")
               .build(),
-          new IcebergColumn.Builder()
+          IcebergColumn.builder()
               .withName("col_3")
               .withType(Types.StringType.get())
               .withComment(null)
               .build()
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());
+
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.StringType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.alterTable(
+                    NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
+                    withDefaultValue));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support column default value"),
+        "The exception message is: " + exception.getMessage());
 
     // test delete column change
     icebergCatalog
@@ -548,13 +563,13 @@ public class TestIcebergTable {
   @Test
   public void testTableDistribution() {
     IcebergColumn col_1 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_1")
             .withType(Types.LongType.get())
             .withComment("test")
             .build();
     IcebergColumn col_2 =
-        new IcebergColumn.Builder()
+        IcebergColumn.builder()
             .withName("col_2")
             .withType(Types.IntegerType.get())
             .withComment("test2")
@@ -567,7 +582,7 @@ public class TestIcebergTable {
           }
         };
     IcebergTable icebergTable =
-        new IcebergTable.Builder()
+        IcebergTable.builder()
             .withName("test_table")
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
@@ -598,7 +613,7 @@ public class TestIcebergTable {
             "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
 
     IcebergTable newTable =
-        new IcebergTable.Builder()
+        IcebergTable.builder()
             .withName("test_table2")
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test2").withCreateTime(Instant.now()).build())

@@ -40,7 +40,7 @@ const EmptyText = () => {
 const TableView = () => {
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
-  const metalake = searchParams['metalake'] || ''
+  const metalake = searchParams.get('metalake') || ''
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
@@ -151,6 +151,7 @@ const TableView = () => {
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowDetails({ row, type: 'catalog' })}
+            data-refer={`view-catalog-${row.name}`}
           >
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
@@ -160,6 +161,7 @@ const TableView = () => {
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
             onClick={() => handleShowEditDialog({ row, type: 'catalog' })}
+            data-refer={`edit-catalog-${row.name}`}
           >
             <EditIcon />
           </IconButton>
@@ -168,7 +170,8 @@ const TableView = () => {
             title='Delete'
             size='small'
             sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDelete({ name: row.name, type: 'catalog' })}
+            onClick={() => handleDelete({ name: row.name, type: 'catalog', catalogType: row.type })}
+            data-refer={`delete-catalog-${row.name}`}
           >
             <DeleteIcon />
           </IconButton>
@@ -342,9 +345,9 @@ const TableView = () => {
     }
   }
 
-  const handleDelete = ({ name, type }) => {
+  const handleDelete = ({ name, type, catalogType }) => {
     setOpenConfirmDelete(true)
-    setConfirmCacheData({ name, type })
+    setConfirmCacheData({ name, type, catalogType })
   }
 
   const handleCloseConfirm = () => {
@@ -355,7 +358,7 @@ const TableView = () => {
   const handleConfirmDeleteSubmit = () => {
     if (confirmCacheData) {
       if (confirmCacheData.type === 'catalog') {
-        dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name }))
+        dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name, type: confirmCacheData.catalogType }))
       }
 
       setOpenConfirmDelete(false)
@@ -365,7 +368,7 @@ const TableView = () => {
   const checkColumns = () => {
     if (paramsSize == 1 && searchParams.has('metalake')) {
       return catalogsColumns
-    } else if (paramsSize == 4 && searchParams.has('table')) {
+    } else if (paramsSize == 5 && searchParams.has('table')) {
       return tableColumns
     } else {
       return columns
@@ -387,6 +390,7 @@ const TableView = () => {
             borderTop: 0
           }
         }}
+        data-refer='table-grid'
         loading={store.tableLoading}
         rows={store.tableData}
         getRowId={row => row?.name}

@@ -13,6 +13,8 @@ public class TestSchema extends BaseSchema {
   private TestSchema() {}
 
   public static class Builder extends BaseSchema.BaseSchemaBuilder<Builder, TestSchema> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected TestSchema internalBuild() {
@@ -25,5 +27,14 @@ public class TestSchema extends BaseSchema {
 
       return schema;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

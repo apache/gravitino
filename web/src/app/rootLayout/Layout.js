@@ -5,16 +5,20 @@
 
 'use client'
 
-import dynamic from 'next/dynamic'
-
 import { Box, Fab } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
 import AppBar from './AppBar'
 import Footer from './Footer'
-import MainContent from './MainContent'
+import Loading from './Loading'
 import ScrollToTop from './ScrollToTop'
+import dynamic from 'next/dynamic'
+
+const DynamicMainContent = dynamic(() => import('./MainContent'), {
+  loading: () => <Loading />,
+  ssr: false
+})
 
 const Layout = ({ children, scrollToTop }) => {
   return (
@@ -26,7 +30,7 @@ const Layout = ({ children, scrollToTop }) => {
           }
         />
         <AppBar />
-        <MainContent>{children}</MainContent>
+        <DynamicMainContent>{children}</DynamicMainContent>
         <Footer />
         {scrollToTop ? (
           scrollToTop(props)
@@ -42,5 +46,4 @@ const Layout = ({ children, scrollToTop }) => {
   )
 }
 
-// ** use dynamic export instead of export default Layout
-export default dynamic(() => Promise.resolve(Layout), { ssr: false })
+export default Layout

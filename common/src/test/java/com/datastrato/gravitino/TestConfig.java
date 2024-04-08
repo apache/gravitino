@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestConfig {
 
-  class DummyConfig extends Config {
+  static class DummyConfig extends Config {
     public DummyConfig(boolean loadSystemProperties) {
       super(loadSystemProperties);
     }

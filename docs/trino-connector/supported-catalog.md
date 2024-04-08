@@ -17,7 +17,8 @@ The catalogs currently supported by the Gravitino connector are as follows:
 
 Trino itself does not support creating catalogs. 
 Users can create catalogs through the Gravitino connector and then load them into Trino. 
-The Gravitino connector provides the following stored procedures to create and delete catalogs.
+The Gravitino connector provides the following stored procedures to create, delete, and alter catalogs.
+User can also use the system table `catalog` to describe all the catalogs.
 
 Create catalog:
 
@@ -43,11 +44,39 @@ Drop catalog:
 drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 ```
 
-- CATALOG: The catalog name to be created.
+- CATALOG: The catalog name to be deleted.
 - IGNORE_NOT_EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
 
-The two stored procedures are under the `gravitino` connector, and the `system` schema.
+
+Alter catalog:
+
+```sql
+alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROPERTIES ARRY[VARCHAR]);
+```
+
+- CATALOG: The catalog name to be altered.
+- SET_PROPERTIES: The properties to be set.
+- REMOVE_PROPERTIES: The properties to be removed.
+
+These stored procedures are under the `gravitino` connector and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
+
+
+Describe catalogs:
+
+The system table `gravitino.system.catalog` is used to describe all the catalogs.
+
+```sql
+select * from gravitino.system.catalog;
+```
+
+The result is like:
+
+```test
+     name     | provider |                                                 properties
+--------------+----------+-------------------------------------------------------------------------------------------------------------
+ test.gt_hive | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083}
+```
 
 Example:
 You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
@@ -58,8 +87,8 @@ call gravitino.system.create_catalog(
     'mysql',
     'jdbc-mysql',
     Map(
-        Array('jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'),
-        Array('jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver')
+        Array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
+        Array['jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
     )
 )
 call gravitino.system.drop_datalog('mysql');
@@ -69,8 +98,8 @@ call gravitino.system.create_catalog(
     catalog =>'mysql',
     provider => 'jdbc-mysql',
     properties => Map(
-        Array('jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'),
-        Array('jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver')
+        Array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
+        Array['jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
     ),
     ignore_exist => true
 )
@@ -79,10 +108,19 @@ call gravitino.system.drop_datalog(
     catalog => 'mysql'
     ignore_not_exist => true
 );
+
+call gravitino.system.alter_catalog(
+    catalog => 'mysql',
+    set_properties=> Map(
+        Array['jdbc-url'],
+        Array['jdbc:mysql:127.0.0.1:3306?useSSL=false']
+    ),
+    remove_properties => Array['jdbc-driver']
+)
 ```
 
 if you need more information about catalog, please refer to:
-[Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
+[Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Data type mapping between Trino and Gravitino
 
@@ -109,4 +147,4 @@ Hive does not support `TIME` data type.
 | MapType        | MAP        |
 | StructType     | ROW        |
 
-For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-metadata-using-gravitino.md#gravitino-table-column-type).
+For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-relational-metadata-using-gravitino.md#gravitino-table-column-type).

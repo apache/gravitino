@@ -72,20 +72,17 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private IcebergSchemaPropertiesMetadata icebergSchemaPropertiesMetadata;
 
-  private CatalogInfo info;
-
   private IcebergTableOpsHelper icebergTableOpsHelper;
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
    *
    * @param conf The configuration map for the Iceberg catalog operations.
-   * @param entity The catalog entity associated with this operations instance.
+   * @param info The catalog info associated with this operations instance.
    * @throws RuntimeException if initialization fails.
    */
   @Override
   public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
-    this.info = info;
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
@@ -156,7 +153,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     try {
       String currentUser = currentUser();
       IcebergSchema createdSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
@@ -201,7 +198,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       GetNamespaceResponse response =
           icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(
                   Optional.of(response)
@@ -257,7 +254,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
               .orElse(null);
       IcebergSchema icebergSchema =
-          new IcebergSchema.Builder()
+          IcebergSchema.builder()
               .withName(ident.name())
               .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)
@@ -317,6 +314,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+    if (!schemaExists(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
+    }
+
     try {
       ListTablesResponse listTablesResponse =
           icebergTableOps.listTable(IcebergTableOpsHelper.getIcebergNamespace(namespace));
@@ -480,13 +482,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           Arrays.stream(columns)
               .map(
                   column -> {
-                    // Iceberg column default value is WIP, see
-                    // https://github.com/apache/iceberg/pull/4525
-                    Preconditions.checkArgument(
-                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
-                        "Iceberg does not support column default value. Illegal column: "
-                            + column.name());
-                    return new IcebergColumn.Builder()
+                    IcebergTableOpsHelper.validateColumnDefaultValue(
+                        column.name(), column.defaultValue());
+                    return IcebergColumn.builder()
                         .withName(column.name())
                         .withType(column.dataType())
                         .withComment(column.comment())
@@ -496,7 +494,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
-          new IcebergTable.Builder()
+          IcebergTable.builder()
               .withName(tableIdent.name())
               .withColumns(icebergColumns)
               .withComment(comment)

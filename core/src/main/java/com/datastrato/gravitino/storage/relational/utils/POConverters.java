@@ -16,12 +16,14 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +45,7 @@ public class POConverters {
    */
   public static MetalakePO initializeMetalakePOWithVersion(BaseMetalake baseMetalake) {
     try {
-      return new MetalakePO.Builder()
+      return MetalakePO.builder()
           .withMetalakeId(baseMetalake.id())
           .withMetalakeName(baseMetalake.name())
           .withMetalakeComment(baseMetalake.comment())
@@ -73,7 +75,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new MetalakePO.Builder()
+      return MetalakePO.builder()
           .withMetalakeId(newMetalake.id())
           .withMetalakeName(newMetalake.name())
           .withMetalakeComment(newMetalake.comment())
@@ -98,7 +100,7 @@ public class POConverters {
    */
   public static BaseMetalake fromMetalakePO(MetalakePO metalakePO) {
     try {
-      return new BaseMetalake.Builder()
+      return BaseMetalake.builder()
           .withId(metalakePO.getMetalakeId())
           .withName(metalakePO.getMetalakeName())
           .withComment(metalakePO.getMetalakeComment())
@@ -134,7 +136,7 @@ public class POConverters {
   public static CatalogPO initializeCatalogPOWithVersion(
       CatalogEntity catalogEntity, Long metalakeId) {
     try {
-      return new CatalogPO.Builder()
+      return CatalogPO.builder()
           .withCatalogId(catalogEntity.id())
           .withCatalogName(catalogEntity.name())
           .withMetalakeId(metalakeId)
@@ -166,7 +168,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new CatalogPO.Builder()
+      return CatalogPO.builder()
           .withCatalogId(newCatalog.id())
           .withCatalogName(newCatalog.name())
           .withMetalakeId(metalakeId)
@@ -260,7 +262,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new SchemaPO.Builder()
+      return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())
           .withSchemaName(newSchema.name())
           .withMetalakeId(oldSchemaPO.getMetalakeId())
@@ -286,7 +288,7 @@ public class POConverters {
    */
   public static SchemaEntity fromSchemaPO(SchemaPO schemaPO, Namespace namespace) {
     try {
-      return new SchemaEntity.Builder()
+      return SchemaEntity.builder()
           .withId(schemaPO.getSchemaId())
           .withName(schemaPO.getSchemaName())
           .withNamespace(namespace)
@@ -347,7 +349,7 @@ public class POConverters {
     // Will set the version to the last version + 1 when having some fields need be multiple version
     Long nextVersion = lastVersion;
     try {
-      return new TablePO.Builder()
+      return TablePO.builder()
           .withTableId(oldTablePO.getTableId())
           .withTableName(newTable.name())
           .withMetalakeId(oldTablePO.getMetalakeId())
@@ -372,7 +374,7 @@ public class POConverters {
    */
   public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
     try {
-      return new TableEntity.Builder()
+      return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
           .withNamespace(namespace)
@@ -407,7 +409,7 @@ public class POConverters {
       FilesetEntity filesetEntity, FilesetPO.Builder builder) {
     try {
       FilesetVersionPO filesetVersionPO =
-          new FilesetVersionPO.Builder()
+          FilesetVersionPO.builder()
               .withMetalakeId(builder.getFilesetMetalakeId())
               .withCatalogId(builder.getFilesetCatalogId())
               .withSchemaId(builder.getFilesetSchemaId())
@@ -452,7 +454,7 @@ public class POConverters {
         lastVersion++;
         currentVersion = lastVersion;
         newFilesetVersionPO =
-            new FilesetVersionPO.Builder()
+            FilesetVersionPO.builder()
                 .withMetalakeId(oldFilesetPO.getMetalakeId())
                 .withCatalogId(oldFilesetPO.getCatalogId())
                 .withSchemaId(oldFilesetPO.getSchemaId())
@@ -468,7 +470,7 @@ public class POConverters {
         currentVersion = oldFilesetPO.getCurrentVersion();
         newFilesetVersionPO = oldFilesetPO.getFilesetVersionPO();
       }
-      return new FilesetPO.Builder()
+      return FilesetPO.builder()
           .withFilesetId(newFileset.id())
           .withFilesetName(newFileset.name())
           .withMetalakeId(oldFilesetPO.getMetalakeId())
@@ -497,6 +499,9 @@ public class POConverters {
     try {
       Map<String, String> oldProperties =
           JsonUtils.anyFieldMapper().readValue(oldFilesetVersionPO.getProperties(), Map.class);
+      if (oldProperties == null) {
+        return newFileset.properties() != null;
+      }
       return !oldProperties.equals(newFileset.properties());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
@@ -512,7 +517,7 @@ public class POConverters {
    */
   public static FilesetEntity fromFilesetPO(FilesetPO filesetPO, Namespace namespace) {
     try {
-      return new FilesetEntity.Builder()
+      return FilesetEntity.builder()
           .withId(filesetPO.getFilesetId())
           .withName(filesetPO.getFilesetName())
           .withNamespace(namespace)
@@ -524,6 +529,22 @@ public class POConverters {
                   .readValue(filesetPO.getFilesetVersionPO().getProperties(), Map.class))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(filesetPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static TopicEntity fromTopicPO(TopicPO topicPO, Namespace namespace) {
+    try {
+      return TopicEntity.builder()
+          .withId(topicPO.getTopicId())
+          .withName(topicPO.getTopicName())
+          .withNamespace(namespace)
+          .withComment(topicPO.getComment())
+          .withProperties(JsonUtils.anyFieldMapper().readValue(topicPO.getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(topicPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
@@ -542,5 +563,52 @@ public class POConverters {
     return filesetPOs.stream()
         .map(filesetPO -> POConverters.fromFilesetPO(filesetPO, namespace))
         .collect(Collectors.toList());
+  }
+
+  public static List<TopicEntity> fromTopicPOs(List<TopicPO> topicPOs, Namespace namespace) {
+    return topicPOs.stream()
+        .map(topicPO -> POConverters.fromTopicPO(topicPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  public static TopicPO initializeTopicPOWithVersion(
+      TopicEntity topicEntity, TopicPO.Builder builder) {
+    try {
+      return builder
+          .withTopicId(topicEntity.id())
+          .withTopicName(topicEntity.name())
+          .withComment(topicEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static TopicPO updateTopicPOWithVersion(TopicPO oldTopicPO, TopicEntity newEntity) {
+    Long lastVersion = oldTopicPO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return TopicPO.builder()
+          .withTopicId(oldTopicPO.getTopicId())
+          .withTopicName(newEntity.name())
+          .withMetalakeId(oldTopicPO.getMetalakeId())
+          .withCatalogId(oldTopicPO.getCatalogId())
+          .withSchemaId(oldTopicPO.getSchemaId())
+          .withComment(newEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
   }
 }

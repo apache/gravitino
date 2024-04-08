@@ -17,6 +17,8 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
@@ -78,10 +80,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
     }
+
+    Preconditions.checkArgument(
+        distribution == Distributions.NONE, "MySQL does not support distribution");
+
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
@@ -298,6 +305,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -383,7 +396,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           "Auto increment is not allowed, type: " + column.dataType());
     }
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
@@ -416,7 +429,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(change.nullable())
@@ -480,7 +493,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     JdbcColumn updateColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
@@ -527,6 +540,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
+    // Append default value if available
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
+    }
+
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
@@ -565,7 +586,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
                 + newColumnName
                 + BACK_QUOTE);
     JdbcColumn newColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(newColumnName)
             .withType(column.dataType())
             .withComment(column.comment())
@@ -622,6 +643,25 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
   }
 
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    JdbcColumn newColumn =
+        JdbcColumn.builder()
+            .withName(col)
+            .withType(column.dataType())
+            .withNullable(column.nullable())
+            .withComment(column.comment())
+            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
+            .build();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
+  }
+
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
@@ -631,7 +671,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
     JdbcColumn newColumn =
-        new JdbcColumn.Builder()
+        JdbcColumn.builder()
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())

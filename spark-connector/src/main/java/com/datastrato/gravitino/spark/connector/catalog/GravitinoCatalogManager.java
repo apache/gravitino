@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.spark.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -58,6 +57,7 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
     gravitinoClient.close();
+    gravitinoCatalogManager = null;
   }
 
   public Catalog getGravitinoCatalogInfo(String name) {
@@ -73,21 +73,21 @@ public class GravitinoCatalogManager {
     return metalakeName;
   }
 
-  public Set<String> listCatalogs() {
-    NameIdentifier[] catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
-    LOG.info(
-        "Load metalake {}'s catalogs. catalogs: {}.",
-        metalake.name(),
-        Arrays.toString(catalogNames));
-    return Arrays.stream(catalogNames)
-        .map(identifier -> identifier.name())
-        .collect(Collectors.toSet());
+  public void loadRelationalCatalogs() {
+    Catalog[] catalogs = metalake.listCatalogsInfo(Namespace.ofCatalog(metalake.name()));
+    Arrays.stream(catalogs)
+        .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
+        .forEach(catalog -> gravitinoCatalogs.put(catalog.name(), catalog));
+  }
+
+  public Set<String> getCatalogNames() {
+    return gravitinoCatalogs.asMap().keySet().stream().collect(Collectors.toSet());
   }
 
   private Catalog loadCatalog(String catalogName) {
     Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
     Preconditions.checkArgument(
-        Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
+        Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
     LOG.info("Load catalog {} from Gravitino successfully.", catalogName);
     return catalog;
   }

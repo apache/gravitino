@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.client;
 
 import static com.datastrato.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
 import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import static com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
@@ -93,14 +94,14 @@ public class TestRelationalCatalog extends TestBase {
     metalake = TestGravitinoMetalake.createMetalake(client, metalakeName);
 
     CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
             .withProvider(provider)
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "k2"))
             .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
     CatalogCreateRequest catalogCreateRequest =
@@ -388,7 +389,7 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(expectedTable.columns()[1].name(), table.columns()[1].name());
     Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
     Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
-    assertTableEquals(expectedTable, table);
+    assertTableEquals(fromDTO(expectedTable), table);
 
     // test validate column default value
     Column[] errorColumns =
@@ -400,7 +401,7 @@ public class TestRelationalCatalog extends TestBase {
               "comment2",
               false,
               false,
-              new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
+              LiteralDTO.builder().withValue(null).withDataType(Types.NullType.get()).build())
         };
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -484,7 +485,7 @@ public class TestRelationalCatalog extends TestBase {
             .asTableCatalog()
             .createTable(
                 tableId, fromDTOs(columns), "comment", Collections.emptyMap(), EMPTY_PARTITIONING);
-    assertTableEquals(expectedTable, table);
+    assertTableEquals(fromDTO(expectedTable), table);
 
     // Test partitioning
     Partitioning[] partitioning = {
@@ -518,7 +519,7 @@ public class TestRelationalCatalog extends TestBase {
             .asTableCatalog()
             .createTable(
                 tableId, fromDTOs(columns), "comment", Collections.emptyMap(), partitioning);
-    assertTableEquals(expectedTable, table);
+    assertTableEquals(fromDTO(expectedTable), table);
 
     // Test throw TableAlreadyExistsException
     ErrorResponse errorResp1 =
@@ -618,7 +619,7 @@ public class TestRelationalCatalog extends TestBase {
                 DistributionDTO.NONE,
                 SortOrderDTO.EMPTY_SORT,
                 indexDTOS);
-    assertTableEquals(expectedTable, table);
+    assertTableEquals(fromDTO(expectedTable), table);
 
     // Test throw TableAlreadyExistsException
     ErrorResponse errorResp1 =
@@ -644,7 +645,7 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
-  private void assertTableEquals(TableDTO expected, Table actual) {
+  private void assertTableEquals(Table expected, Table actual) {
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(expected.comment(), actual.comment());
     Assertions.assertEquals(expected.properties(), actual.properties());
@@ -683,7 +684,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.GET, tablePath, null, resp, SC_OK);
 
     Table table = catalog.asTableCatalog().loadTable(tableId);
-    assertTableEquals(expectedTable, table);
+    assertTableEquals(fromDTO(expectedTable), table);
 
     // Test throw NoSuchTableException
     ErrorResponse errorResp =
@@ -821,7 +822,8 @@ public class TestRelationalCatalog extends TestBase {
             "comment2",
             TableChange.ColumnPosition.after("col1"),
             false,
-            false);
+            false,
+            null);
 
     testAlterTable(tableId, req, expectedTable);
   }
@@ -953,21 +955,21 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(Strategy.HASH)
         .withNumber(bucketNum)
         .withArgs(
-            new FunctionArg[] {new FieldReferenceDTO.Builder().withColumnName(columnName).build()})
+            new FunctionArg[] {FieldReferenceDTO.builder().withColumnName(columnName).build()})
         .build();
   }
 
   private SortOrderDTO[] createMockSortOrderDTO(String columnName, SortDirection direction) {
     return new SortOrderDTO[] {
-      new SortOrderDTO.Builder()
+      SortOrderDTO.builder()
           .withDirection(direction)
           .withNullOrder(direction.defaultNullOrdering())
           .withSortTerm(
-              new FieldReferenceDTO.Builder().withFieldName(new String[] {columnName}).build())
+              FieldReferenceDTO.builder().withFieldName(new String[] {columnName}).build())
           .build()
     };
   }
@@ -1113,12 +1115,11 @@ public class TestRelationalCatalog extends TestBase {
 
   protected static SchemaDTO createMockSchema(
       String name, String comment, Map<String, String> props) {
-    return new SchemaDTO.Builder()
+    return SchemaDTO.builder()
         .withName(name)
         .withComment(comment)
         .withProperties(props)
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -1175,15 +1176,14 @@ public class TestRelationalCatalog extends TestBase {
       DistributionDTO distributionDTO,
       SortOrderDTO[] sortOrderDTOs,
       IndexDTO[] indexDTOS) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(name)
         .withColumns(columns)
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(distributionDTO)
         .withSortOrders(sortOrderDTOs)
-        .withAudit(
-            new AuditDTO.Builder<>().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .withPartitioning(partitioning)
         .withIndex(indexDTOS)
         .build();

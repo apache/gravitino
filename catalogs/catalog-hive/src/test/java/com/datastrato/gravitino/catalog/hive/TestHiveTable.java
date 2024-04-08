@@ -130,13 +130,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_1")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
@@ -203,7 +203,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
     HiveColumn illegalColumn =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_3")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
@@ -230,7 +230,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
     HiveColumn withDefault =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_3")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
@@ -267,13 +267,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("city")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("dt")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
@@ -350,13 +350,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_1")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
@@ -399,13 +399,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_1")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
@@ -497,6 +497,32 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         "Hive does not support altering column nullability", exception.getMessage());
 
+    TableChange tableChange8 =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange8));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
+    TableChange tableChange9 =
+        TableChange.updateColumnDefaultValue(
+            new String[] {"col_1"}, Literals.of("0", Types.ByteType.get()));
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange9));
+
+    Assertions.assertEquals(
+        "Hive does not support altering column default value", exception.getMessage());
+
     // test alter
     tableCatalog.alterTable(
         tableIdentifier,
@@ -535,17 +561,17 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Column[] expected =
         new Column[] {
-          new HiveColumn.Builder()
+          HiveColumn.builder()
               .withName("col_3_new")
               .withType(Types.StringType.get())
               .withComment(null)
               .build(),
-          new HiveColumn.Builder()
+          HiveColumn.builder()
               .withName("col_1")
               .withType(Types.IntegerType.get())
               .withComment(HIVE_COMMENT + "_new")
               .build(),
-          new HiveColumn.Builder()
+          HiveColumn.builder()
               .withName("col_2")
               .withType(Types.DateType.get())
               .withComment(HIVE_COMMENT)
@@ -586,13 +612,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_1")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
@@ -626,13 +652,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));
 
     HiveColumn col1 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_1")
             .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
-        new HiveColumn.Builder()
+        HiveColumn.builder()
             .withName("col_2")
             .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)

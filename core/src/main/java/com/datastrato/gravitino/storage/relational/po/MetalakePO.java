@@ -92,7 +92,7 @@ public class MetalakePO {
   public static class Builder {
     private final MetalakePO metalakePO;
 
-    public Builder() {
+    private Builder() {
       metalakePO = new MetalakePO();
     }
 
@@ -155,5 +155,13 @@ public class MetalakePO {
       validate();
       return metalakePO;
     }
+  }
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

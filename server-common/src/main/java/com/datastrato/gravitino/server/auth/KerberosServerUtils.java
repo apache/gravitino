@@ -140,17 +140,15 @@ public class KerberosServerUtils {
   public static final String getServicePrincipal(String service, String hostname)
       throws UnknownHostException {
     String fqdn = hostname;
-    String shortprinc = null;
-    String realmString = null;
     if (null == fqdn || fqdn.equals("") || fqdn.equals("0.0.0.0")) {
       fqdn = getLocalHostName();
     }
     // convert hostname to lowercase as kerberos does not work with hostnames
     // with uppercase characters.
     fqdn = fqdn.toLowerCase(Locale.US);
-    shortprinc = service + "/" + fqdn;
+    String shortprinc = service + "/" + fqdn;
     // Obtain the realm name inferred from the domain of the host
-    realmString = getDomainRealm(shortprinc);
+    String realmString = getDomainRealm(shortprinc);
     if (null == realmString || realmString.equals("")) {
       return shortprinc;
     } else {

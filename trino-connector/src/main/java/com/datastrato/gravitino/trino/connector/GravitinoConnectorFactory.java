@@ -6,12 +6,15 @@ package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
 
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
 import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
+import com.datastrato.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
 import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
@@ -19,6 +22,7 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,11 +32,15 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   private CatalogConnectorManager catalogConnectorManager;
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   @Override
   public String getName() {
     return DEFAULT_CONNECTOR_NAME;
+  }
+
+  @VisibleForTesting
+  public CatalogConnectorManager getCatalogConnectorManager() {
+    return catalogConnectorManager;
   }
 
   /**
@@ -61,15 +69,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
-
-          // For testing
-          if (GravitinoPlugin.gravitinoClient != null) {
-            catalogConnectorManager.setGravitinoClient(GravitinoPlugin.gravitinoClient);
-            GravitinoPlugin.catalogConnectorManager = catalogConnectorManager;
-          }
+          catalogConnectorManager.setGravitinoClient(clientProvider().get());
           catalogConnectorManager.start();
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+          new GravitinoSystemTableFactory(catalogConnectorManager);
 
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
@@ -93,8 +96,15 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
       catalogConnectorManager.addMetalake(metalake);
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
+          new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
 
-      return new GravitinoSystemConnector(metalake, catalogConnectorManager);
+      return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
     }
+  }
+
+  @VisibleForTesting
+  Supplier<GravitinoAdminClient> clientProvider() {
+    return () -> null;
   }
 }

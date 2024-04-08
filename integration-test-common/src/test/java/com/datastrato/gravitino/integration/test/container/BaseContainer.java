@@ -97,6 +97,10 @@ public abstract class BaseContainer implements AutoCloseable {
     container.withLogConsumer(logConsumer);
   }
 
+  protected void withStartupTimeout(Duration duration) {
+    container.withStartupTimeout(duration);
+  }
+
   // This method is used to get the expose port number of the container.
   public Integer getMappedPort(int exposedPort) {
     return container.getMappedPort(exposedPort);

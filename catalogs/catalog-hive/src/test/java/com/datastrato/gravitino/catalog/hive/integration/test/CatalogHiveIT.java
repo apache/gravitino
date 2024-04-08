@@ -39,9 +39,6 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -624,8 +621,7 @@ public class CatalogHiveIT extends AbstractIT {
                 TABLE_COMMENT,
                 properties,
                 new Transform[] {
-                  IdentityPartitioningDTO.of(columns[1].name()),
-                  IdentityPartitioningDTO.of(columns[2].name())
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
 
     // Directly get table from hive metastore to check if the table is created successfully.
@@ -642,8 +638,7 @@ public class CatalogHiveIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Transform[] transforms =
         new Transform[] {
-          IdentityPartitioningDTO.of(columns[0].name()),
-          IdentityPartitioningDTO.of(columns[1].name())
+          Transforms.identity(columns[0].name()), Transforms.identity(columns[1].name())
         };
     RuntimeException exception =
         assertThrows(
@@ -870,7 +865,7 @@ public class CatalogHiveIT extends AbstractIT {
         distribution == null
             ? Collections.emptyList()
             : Arrays.stream(distribution.expressions())
-                .map(t -> ((FieldReferenceDTO) t).fieldName()[0])
+                .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
                 .collect(Collectors.toList());
     Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
 
@@ -879,14 +874,14 @@ public class CatalogHiveIT extends AbstractIT {
           sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
-          ((FieldReferenceDTO) sortOrders[i].expression()).fieldName()[0],
+          ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],
           hiveTab.getSd().getSortCols().get(i).getCol());
     }
     Assertions.assertNotNull(createdTable.partitioning());
     Assertions.assertEquals(createdTable.partitioning().length, hiveTab.getPartitionKeys().size());
     List<String> partitionKeys =
         Arrays.stream(createdTable.partitioning())
-            .map(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0])
+            .map(p -> ((Transform.SingleFieldTransform) p).fieldName()[0])
             .collect(Collectors.toList());
     List<String> hivePartitionKeys =
         hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -916,7 +911,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 createProperties(),
-                new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+                new Transform[] {Transforms.identity(columns[2].name())});
     Assertions.assertNull(createdTable.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
@@ -975,6 +970,21 @@ public class CatalogHiveIT extends AbstractIT {
               tableCatalog.alterTable(id, updateType);
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
+
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
 
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
@@ -1266,7 +1276,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1291,7 +1301,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1318,7 +1328,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1345,7 +1355,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
-            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));

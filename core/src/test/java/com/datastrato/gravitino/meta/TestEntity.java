@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -47,10 +48,18 @@ public class TestEntity {
   private final Long topicId = 1L;
   private final String topicName = "testTopic";
 
+  // User test data
+  private final Long userId = 1L;
+  private final String userName = "testUser";
+
+  // Group test data
+  private final Long groupId = 1L;
+  private final String groupName = "testGroup";
+
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
-        new BaseMetalake.Builder()
+        BaseMetalake.builder()
             .withId(metalakeId)
             .withName(metalakeName)
             .withAuditInfo(auditInfo)
@@ -93,7 +102,7 @@ public class TestEntity {
   @Test
   public void testSchema() {
     SchemaEntity testSchema =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -105,7 +114,7 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(SchemaEntity.AUDIT_INFO));
 
     SchemaEntity testSchema1 =
-        new SchemaEntity.Builder()
+        SchemaEntity.builder()
             .withId(schemaId)
             .withName(schemaName)
             .withAuditInfo(auditInfo)
@@ -120,11 +129,7 @@ public class TestEntity {
   @Test
   public void testTable() {
     TableEntity testTable =
-        new TableEntity.Builder()
-            .withId(tableId)
-            .withName(tableName)
-            .withAuditInfo(auditInfo)
-            .build();
+        TableEntity.builder().withId(tableId).withName(tableName).withAuditInfo(auditInfo).build();
 
     Map<Field, Object> fields = testTable.fields();
     Assertions.assertEquals(tableId, fields.get(TableEntity.ID));
@@ -135,7 +140,7 @@ public class TestEntity {
   @Test
   public void testFile() {
     FilesetEntity testFile =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -154,7 +159,7 @@ public class TestEntity {
     Assertions.assertEquals("testLocation", fields.get(FilesetEntity.STORAGE_LOCATION));
 
     FilesetEntity testFile1 =
-        new FilesetEntity.Builder()
+        FilesetEntity.builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
@@ -169,7 +174,7 @@ public class TestEntity {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              new FilesetEntity.Builder()
+              FilesetEntity.builder()
                   .withId(fileId)
                   .withName(fileName)
                   .withAuditInfo(auditInfo)
@@ -203,5 +208,48 @@ public class TestEntity {
         TopicEntity.builder().withId(topicId).withName(topicName).withAuditInfo(auditInfo).build();
     Assertions.assertNull(testTopic1.comment());
     Assertions.assertNull(testTopic1.properties());
+  }
+
+  @Test
+  public void testUser() {
+    UserEntity testUserEntity =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+
+    Map<Field, Object> fields = testUserEntity.fields();
+    Assertions.assertEquals(userId, fields.get(UserEntity.ID));
+    Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
+
+    UserEntity testUserEntityWithoutFields =
+        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+
+    Assertions.assertNull(testUserEntityWithoutFields.roles());
+  }
+
+  @Test
+  public void testGroup() {
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList("role"))
+            .build();
+    Map<Field, Object> fields = group.fields();
+    Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
+    Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLES));
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+
+    Assertions.assertNull(groupWithoutFields.roles());
   }
 }

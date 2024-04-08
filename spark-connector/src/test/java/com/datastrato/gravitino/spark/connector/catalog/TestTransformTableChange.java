@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.expressions.LiteralValue;
@@ -222,5 +223,51 @@ public class TestTransformTableChange {
     Assertions.assertTrue(
         gravitinoUpdateColumnAfter.getPosition()
             instanceof com.datastrato.gravitino.rel.TableChange.After);
+  }
+
+  @Test
+  void testTransformUpdateColumnNullability() {
+    TableChange.UpdateColumnNullability sparkUpdateColumnNullability =
+        (TableChange.UpdateColumnNullability)
+            TableChange.updateColumnNullability(new String[] {"col1"}, true);
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkUpdateColumnNullability);
+
+    Assertions.assertTrue(
+        gravitinoChange
+            instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability);
+    com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability
+        gravitinoUpdateColumnNullability =
+            (com.datastrato.gravitino.rel.TableChange.UpdateColumnNullability) gravitinoChange;
+
+    Assertions.assertArrayEquals(
+        sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
+    Assertions.assertEquals(
+        sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValue() {
+    String[] fieldNames = new String[] {"col"};
+    String newDedauleValue = "col_default_value";
+    TableChange.UpdateColumnDefaultValue sparkUpdateColumnDefaultValue =
+        (TableChange.UpdateColumnDefaultValue)
+            TableChange.updateColumnDefaultValue(fieldNames, newDedauleValue);
+
+    com.datastrato.gravitino.rel.TableChange gravitinoChange =
+        GravitinoCatalog.transformTableChange(sparkUpdateColumnDefaultValue);
+
+    Assertions.assertTrue(
+        gravitinoChange
+            instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue);
+    com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue
+        gravitinoUpdateColumnDefaultValue =
+            (com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue) gravitinoChange;
+
+    Assertions.assertArrayEquals(
+        sparkUpdateColumnDefaultValue.fieldNames(), gravitinoUpdateColumnDefaultValue.fieldName());
+    Assertions.assertEquals(
+        Literals.stringLiteral(newDedauleValue),
+        gravitinoUpdateColumnDefaultValue.getNewDefaultValue());
   }
 }
