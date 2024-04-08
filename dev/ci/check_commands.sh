@@ -4,6 +4,8 @@
 # This software is licensed under the Apache License version 2.
 #
 
+set -ex
+
 if ! command -v docker &> /dev/null; then
     echo "docker could not be found, exiting."
     exit 1
