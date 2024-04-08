@@ -517,7 +517,7 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyRefreshedTablePage(List<String> treeNodes) {
+  public boolean verifyTreeNodes(List<String> treeNodes) {
     try {
       List<WebElement> list =
           treeView.findElements(

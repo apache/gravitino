@@ -279,9 +279,27 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
   }
 
-  // test schema show table list
   @Test
   @Order(11)
+  public void testRefreshCatalogPage() {
+    driver.navigate().refresh();
+    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
+    List<String> treeNodes =
+        Arrays.asList(
+            MODIFIED_CATALOG_NAME,
+            SCHEMA_NAME,
+            ICEBERG_CATALOG_NAME,
+            MYSQL_CATALOG_NAME,
+            PG_CATALOG_NAME,
+            FILESET_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+  }
+
+  // test schema show table list
+  @Test
+  @Order(12)
   public void testClickSchemaLink() {
     // create table
     createTableAndColumn(
@@ -291,9 +309,28 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
   }
 
+  @Test
+  @Order(13)
+  public void testRefreshSchemaPage() {
+    driver.navigate().refresh();
+    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    List<String> treeNodes =
+        Arrays.asList(
+            MODIFIED_CATALOG_NAME,
+            SCHEMA_NAME,
+            TABLE_NAME,
+            ICEBERG_CATALOG_NAME,
+            MYSQL_CATALOG_NAME,
+            PG_CATALOG_NAME,
+            FILESET_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+  }
+
   // test table show column list
   @Test
-  @Order(12)
+  @Order(14)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
@@ -303,7 +340,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(13)
+  @Order(15)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
@@ -320,11 +357,11 @@ public class CatalogsPageTest extends AbstractWebIT {
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
             FILESET_CATALOG_NAME);
-    Assertions.assertTrue(catalogsPage.verifyRefreshedTablePage(treeNodes));
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
-  @Order(14)
+  @Order(16)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
@@ -334,7 +371,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(15)
+  @Order(17)
   public void testClickTreeList() throws InterruptedException {
     String icebergNode =
         String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE);
@@ -375,7 +412,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(16)
+  @Order(18)
   public void testTreeNodeRefresh() throws InterruptedException {
     createTableAndColumn(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
@@ -398,7 +435,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(17)
+  @Order(19)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
