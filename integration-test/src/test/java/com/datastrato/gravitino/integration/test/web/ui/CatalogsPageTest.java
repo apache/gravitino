@@ -277,6 +277,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
   }
 
   @Test
@@ -295,6 +296,7 @@ public class CatalogsPageTest extends AbstractWebIT {
             PG_CATALOG_NAME,
             FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
   }
 
   // test schema show table list
@@ -307,6 +309,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   @Test
@@ -326,6 +329,7 @@ public class CatalogsPageTest extends AbstractWebIT {
             PG_CATALOG_NAME,
             FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   // test table show column list
@@ -337,6 +341,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }
 
   @Test
@@ -358,6 +363,7 @@ public class CatalogsPageTest extends AbstractWebIT {
             PG_CATALOG_NAME,
             FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }
 
   @Test

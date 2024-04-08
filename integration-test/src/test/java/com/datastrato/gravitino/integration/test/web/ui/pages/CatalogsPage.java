@@ -535,4 +535,17 @@ public class CatalogsPage extends AbstractWebIT {
       return false;
     }
   }
+
+  public boolean verifySelectedNode(String nodeName) {
+    try {
+      WebElement selectedNode =
+          treeView.findElement(
+              By.xpath(
+                  ".//div[contains(@class, 'ant-tree-node-selected')]//span[@class='ant-tree-title']/p"));
+      return selectedNode.getText().equals(nodeName);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
 }
