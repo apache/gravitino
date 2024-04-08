@@ -75,7 +75,6 @@ jobs:
 
       - name: Check required command
         run: |
-          chmod +x dev/ci/check_commands.sh 
           dev/ci/check_commands.sh
 
       - name: Package Gravitino

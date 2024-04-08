@@ -10,7 +10,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 if ! file $(which docker) | grep -q 'executable'; then
-    echo "docker is not a real executable file, exiting."
+    echo "docker is not a executable file, exiting."
     exit 1
 fi
 
@@ -20,7 +20,7 @@ if ! command -v docker-proxy &> /dev/null; then
 fi
 
 if ! file $(which docker-proxy) | grep -q 'executable'; then
-    echo "docker-proxy is not a real executable file, exiting."
+    echo "docker-proxy is not a executable file, exiting."
     exit 1
 fi
 
