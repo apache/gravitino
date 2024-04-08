@@ -26,29 +26,46 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
-  private static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
-  private static final String GVFS_ABSTRACT_IMPL_CLASS = Gvfs.class.getName();
-
-  private Configuration conf = null;
-  private Path localDirPath = null;
-  private Path localFilePath = null;
-  private Path managedFilesetPath = null;
-  private Path externalFilesetPath = null;
+public class TestGvfsBase extends GravitinoMockServerBase {
+  protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
+  protected static final String GVFS_ABSTRACT_IMPL_CLASS = Gvfs.class.getName();
+  protected static Configuration conf = new Configuration();
+  protected Path localDirPath = null;
+  protected Path localFilePath = null;
+  protected Path managedFilesetPath = null;
+  protected Path externalFilesetPath = null;
 
   @BeforeAll
   public static void setup() {
-    MockServerTestBase.setup();
+    GravitinoMockServerBase.setup();
+    conf.set("fs.gvfs.impl", GVFS_IMPL_CLASS);
+    conf.set("fs.AbstractFileSystem.gvfs.impl", GVFS_ABSTRACT_IMPL_CLASS);
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        GravitinoMockServerBase.serverUri());
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, metalakeName);
+    // close the cache
+    conf.set(
+        String.format(
+            "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
+        "true");
+  }
+
+  @AfterAll
+  public static void tearDown() {
+    GravitinoMockServerBase.tearDown();
   }
 
   @BeforeEach
-  public void init() throws IOException {
+  public void init() {
     mockMetalakeDTO(metalakeName, "comment");
     mockCatalogDTO(catalogName, provider, "comment");
 
@@ -77,21 +94,6 @@ public class TestGravitinoVirtualFileSystem extends MockServerTestBase {
         localFilePath.toString());
     externalFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, externalFilesetName);
-
-    Configuration configuration = new Configuration();
-    configuration.set("fs.gvfs.impl", GVFS_IMPL_CLASS);
-    configuration.set("fs.AbstractFileSystem.gvfs.impl", GVFS_ABSTRACT_IMPL_CLASS);
-    configuration.set(
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
-        MockServerTestBase.serverUri());
-    configuration.set(
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, metalakeName);
-    // close the cache
-    configuration.set(
-        String.format(
-            "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
-        "true");
-    conf = configuration;
   }
 
   @AfterEach
