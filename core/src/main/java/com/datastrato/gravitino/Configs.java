@@ -9,6 +9,7 @@ import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
@@ -239,4 +240,20 @@ public interface Configs {
           .version(ConfigConstants.VERSION_0_4_0)
           .longConf()
           .createWithDefault(CLEAN_INTERVAL_IN_SECS);
+
+  ConfigEntry<Boolean> ENABLE_AUTHORIZATION =
+      new ConfigBuilder("gravitino.authorization.enable")
+          .doc("Enable the authorization")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  ConfigEntry<List<String>> SERVICE_ADMINS =
+      new ConfigBuilder("gravitino.authorization.serviceAdmins")
+          .doc("The admins of Gravitino service")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .toSequence()
+          .create();
 }

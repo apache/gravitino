@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.Entity.EntityType.FILESET;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.TYPE_AND_NAME_SEPARATOR;
@@ -146,18 +147,22 @@ public class BinaryEntityEncoderUtil {
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TOPIC.getShortName()));
         break;
       case CATALOG:
         prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TOPIC.getShortName()));
         break;
       case SCHEMA:
         prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         prefixes.add(replacePrefixTypeInfo(encode, FILESET.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TOPIC.getShortName()));
         break;
       case TABLE:
       case FILESET:
+      case TOPIC:
         break;
       default:
         LOG.warn("Currently unknown type: {}, please check it", type);

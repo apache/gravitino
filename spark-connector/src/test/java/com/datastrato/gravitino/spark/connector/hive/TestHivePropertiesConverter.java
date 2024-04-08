@@ -79,6 +79,24 @@ public class TestHivePropertiesConverter {
   }
 
   @Test
+  void testExternalTable() {
+    Map<String, String> hiveProperties =
+        hivePropertiesConverter.toGravitinoTableProperties(
+            ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"));
+    Assertions.assertEquals(
+        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE),
+        HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE);
+
+    hiveProperties =
+        hivePropertiesConverter.toSparkTableProperties(
+            ImmutableMap.of(
+                HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
+                HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE));
+    Assertions.assertEquals(
+        ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"), hiveProperties);
+  }
+
+  @Test
   void testOptionProperties() {
     Map<String, String> properties =
         HivePropertiesConverter.fromOptionProperties(

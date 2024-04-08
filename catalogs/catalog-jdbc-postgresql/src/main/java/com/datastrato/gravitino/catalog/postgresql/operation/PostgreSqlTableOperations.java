@@ -15,6 +15,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -254,6 +255,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, tableName));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -448,6 +455,36 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column =
+        (JdbcColumn)
+            Arrays.stream(jdbcTable.columns())
+                .filter(c -> c.name().equals(col))
+                .findFirst()
+                .orElse(null);
+    if (null == column) {
+      throw new NoSuchColumnException("Column %s does not exist.", col);
+    }
+
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    sqlBuilder
+        .append("\n")
+        .append(ALTER_COLUMN)
+        .append(PG_QUOTE)
+        .append(col)
+        .append(PG_QUOTE)
+        .append(" SET DEFAULT ")
+        .append(
+            columnDefaultValueConverter.fromGravitino(
+                updateColumnDefaultValue.getNewDefaultValue()));
+    return sqlBuilder.append(";").toString();
+  }
+
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
@@ -547,6 +584,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add NOT NULL if the column is marked as such
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
+    }
+
+    // Append default value if available
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
     }
 
     // Append position if available

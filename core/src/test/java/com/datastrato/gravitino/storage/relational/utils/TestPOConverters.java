@@ -17,13 +17,16 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -143,6 +146,31 @@ public class TestPOConverters {
     assertEquals(expectedFileset.namespace(), convertedFileset.namespace());
     assertEquals(expectedFileset.auditInfo().creator(), convertedFileset.auditInfo().creator());
     assertEquals(expectedFileset.storageLocation(), convertedFileset.storageLocation());
+  }
+
+  @Test
+  public void testFromTopicPO() throws JsonProcessingException {
+    TopicPO topicPO =
+        createTopicPO(1L, "test", 1L, 1L, 1L, "test comment", ImmutableMap.of("key", "value"));
+
+    TopicEntity expectedTopic =
+        createTopic(
+            1L,
+            "test",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment",
+            ImmutableMap.of("key", "value"));
+
+    TopicEntity convertedTopic =
+        POConverters.fromTopicPO(
+            topicPO, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    assertEquals(expectedTopic.id(), convertedTopic.id());
+    assertEquals(expectedTopic.name(), convertedTopic.name());
+    assertEquals(expectedTopic.namespace(), convertedTopic.namespace());
+    assertEquals(expectedTopic.auditInfo().creator(), convertedTopic.auditInfo().creator());
+    assertEquals(expectedTopic.comment(), convertedTopic.comment());
+    assertEquals(expectedTopic.properties(), convertedTopic.properties());
   }
 
   @Test
@@ -309,6 +337,46 @@ public class TestPOConverters {
       assertEquals(
           expectedFilesets.get(index).auditInfo().creator(), fileset.auditInfo().creator());
       assertEquals(expectedFilesets.get(index).storageLocation(), fileset.storageLocation());
+      index++;
+    }
+  }
+
+  @Test
+  public void testFromTopicPOs() throws JsonProcessingException {
+    TopicPO topicPO1 =
+        createTopicPO(1L, "test1", 1L, 1L, 1L, "test comment1", ImmutableMap.of("key", "value"));
+    TopicPO topicPO2 =
+        createTopicPO(2L, "test2", 1L, 1L, 1L, "test comment2", ImmutableMap.of("key", "value"));
+    List<TopicPO> topicPOs = new ArrayList<>(Arrays.asList(topicPO1, topicPO2));
+    List<TopicEntity> convertedTopics =
+        POConverters.fromTopicPOs(
+            topicPOs, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    TopicEntity expectedTopic1 =
+        createTopic(
+            1L,
+            "test1",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment1",
+            ImmutableMap.of("key", "value"));
+    TopicEntity expectedTopic2 =
+        createTopic(
+            2L,
+            "test2",
+            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "test comment2",
+            ImmutableMap.of("key", "value"));
+    List<TopicEntity> expectedTopics =
+        new ArrayList<>(Arrays.asList(expectedTopic1, expectedTopic2));
+
+    int index = 0;
+    for (TopicEntity topic : convertedTopics) {
+      assertEquals(expectedTopics.get(index).id(), topic.id());
+      assertEquals(expectedTopics.get(index).name(), topic.name());
+      assertEquals(expectedTopics.get(index).namespace(), topic.namespace());
+      assertEquals(expectedTopics.get(index).auditInfo().creator(), topic.auditInfo().creator());
+      assertEquals(expectedTopics.get(index).comment(), topic.comment());
+      assertEquals(expectedTopics.get(index).properties(), topic.properties());
       index++;
     }
   }
@@ -624,6 +692,20 @@ public class TestPOConverters {
         .build();
   }
 
+  private static TopicEntity createTopic(
+      Long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return TopicEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
   private static TablePO createTablePO(
       Long id, String name, Long metalakeId, Long catalogId, Long schemaId)
       throws JsonProcessingException {
@@ -635,6 +717,32 @@ public class TestPOConverters {
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)
         .withSchemaId(schemaId)
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static TopicPO createTopicPO(
+      Long id,
+      String name,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String comment,
+      Map<String, String> properties)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return TopicPO.builder()
+        .withTopicId(id)
+        .withTopicName(name)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaId(schemaId)
+        .withComment(comment)
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)

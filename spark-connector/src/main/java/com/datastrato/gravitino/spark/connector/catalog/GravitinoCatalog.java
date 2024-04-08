@@ -13,6 +13,7 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
@@ -419,6 +420,12 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
           (TableChange.UpdateColumnNullability) change;
       return com.datastrato.gravitino.rel.TableChange.updateColumnNullability(
           updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+          (TableChange.UpdateColumnDefaultValue) change;
+      return com.datastrato.gravitino.rel.TableChange.updateColumnDefaultValue(
+          updateColumnDefaultValue.fieldNames(),
+          Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

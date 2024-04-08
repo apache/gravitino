@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
+
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
@@ -15,6 +17,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterAll;
@@ -44,6 +47,7 @@ public class TestAccessControlManager {
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
+    config.set(SERVICE_ADMINS, Lists.newArrayList("admin1", "admin2"));
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
@@ -51,7 +55,7 @@ public class TestAccessControlManager {
 
     entityStore.put(metalakeEntity, true);
 
-    accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator());
+    accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
   }
 
   @AfterAll
@@ -149,5 +153,33 @@ public class TestAccessControlManager {
     // Test to remove non-existed group
     boolean removed1 = accessControlManager.removeUser("metalake", "no-exist");
     Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testMetalakeAdmin() {
+    User user = accessControlManager.addMetalakeAdmin("test");
+    Assertions.assertEquals("test", user.name());
+    Assertions.assertTrue(user.roles().isEmpty());
+    Assertions.assertTrue(accessControlManager.isMetalakeAdmin("test"));
+
+    // Test with UserAlreadyExistsException
+    Assertions.assertThrows(
+        UserAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("test"));
+
+    // Test to remove admin
+    boolean removed = accessControlManager.removeMetalakeAdmin("test");
+    Assertions.assertTrue(removed);
+    Assertions.assertFalse(accessControlManager.isMetalakeAdmin("test"));
+
+    // Test to remove non-existed admin
+    boolean removed1 = accessControlManager.removeMetalakeAdmin("no-exist");
+    Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testServiceAdmin() {
+    Assertions.assertTrue(accessControlManager.isServiceAdmin("admin1"));
+    Assertions.assertTrue(accessControlManager.isServiceAdmin("admin2"));
+    Assertions.assertFalse(accessControlManager.isServiceAdmin("admin3"));
   }
 }
