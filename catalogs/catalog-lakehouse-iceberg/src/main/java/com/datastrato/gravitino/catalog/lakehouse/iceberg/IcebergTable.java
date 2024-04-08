@@ -73,9 +73,6 @@ public class IcebergTable extends BaseTable {
     switch (distribution.strategy()) {
       case HASH:
         Preconditions.checkArgument(
-            ArrayUtils.isEmpty(distribution.expressions()),
-            "Iceberg's Distribution Mode.HASH does not support set expressions.");
-        Preconditions.checkArgument(
             ArrayUtils.isNotEmpty(partitioning),
             "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty.");
         return DistributionMode.HASH.modeName();

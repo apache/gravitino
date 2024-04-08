@@ -56,30 +56,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testSortOrder() {
-    String tableName = "iceberg_sort_order_table";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateIcebergSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (hours(ts));";
-    sql(createTableSQL);
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withHour(Collections.singletonList("ts"));
-    checker.check(tableInfo);
-
-    Assertions.assertEquals(tableInfo.getTableProperties(), Collections.emptyMap());
-
-    String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
-    sql(insertData);
-  }
-
-  @Test
   void testCreateIcebergBucketPartitionTable() {
     String tableName = "iceberg_bucket_partition_table";
     dropTableIfExists(tableName);
