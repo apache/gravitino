@@ -6,7 +6,7 @@
 
 set -ex
 
-if ! command -v docker &> /dev/null; then
+if ! command -v docker; then
     echo "docker could not be found, exiting."
     exit 1
 fi
@@ -16,7 +16,7 @@ if ! file $(which docker) | grep -q 'executable'; then
     exit 1
 fi
 
-if ! command -v docker-proxy &> /dev/null; then
+if ! command -v docker-proxy; then
     echo "docker-proxy could not be found, exiting."
     exit 1
 fi
