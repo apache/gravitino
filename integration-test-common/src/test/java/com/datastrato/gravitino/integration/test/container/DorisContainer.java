@@ -18,6 +18,7 @@ import java.util.Set;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
 public class DorisContainer extends BaseContainer {
@@ -29,9 +30,6 @@ public class DorisContainer extends BaseContainer {
   public static final String PASSWORD = "root";
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
-
-  private static final String DORIS_FE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/fe/log/fe.log";
-  private static final String DORIS_BE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/be/log/be.INFO";
 
   public static Builder builder() {
     return new Builder();
@@ -48,6 +46,10 @@ public class DorisContainer extends BaseContainer {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
+  public GenericContainer<?> getContainer() {
+    return container;
+  }
+
   @Override
   protected void setupContainer() {
     super.setupContainer();
@@ -57,26 +59,9 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   public void start() {
-    try {
-      super.start();
-      Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
-      Preconditions.check("Doris container password change failed!", changePassword());
-    } finally {
-      outputContainerServiceLog();
-    }
-  }
-
-  @Override
-  protected void outputContainerServiceLog() {
-    LOG.info(
-        "--------------------Start the Doris FE server information--------------------------\n{}",
-        getServiceLog(DORIS_FE_PATH));
-    LOG.info("--------------------End the Doris FE server information----------------------------");
-
-    LOG.info(
-        "--------------------Start the Doris BE server information--------------------------\n{}",
-        getServiceLog(DORIS_BE_PATH));
-    LOG.info("--------------------End the Doris BE server information----------------------------");
+    super.start();
+    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
+    Preconditions.check("Doris container password change failed!", changePassword());
   }
 
   @Override

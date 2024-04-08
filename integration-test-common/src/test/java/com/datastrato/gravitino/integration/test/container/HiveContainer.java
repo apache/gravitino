@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.container;
 import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Map;
@@ -27,11 +28,8 @@ public class HiveContainer extends BaseContainer {
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
 
-  private static final String HIVE_LOG_PATH = "/tmp/root/hive.log";
-  private static final String HDFS_NAME_NODE_LOG_PATH =
-      "/usr/local/hadoop/logs/hadoop-root-namenode-gravitino-ci-hive.log";
-  private static final String HDFS_DATA_NODE_LOG_PATH =
-      "/usr/local/hadoop/logs/hadoop-root-datanode-gravitino-ci-hive.log";
+  private static final String HIVE_LOG_PATH = "/tmp/root/";
+  private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
 
   public static Builder builder() {
     return new Builder();
@@ -60,26 +58,27 @@ public class HiveContainer extends BaseContainer {
       super.start();
       Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
     } finally {
-      outputContainerServiceLog();
+      copyHiveLog();
     }
   }
 
-  @Override
-  protected void outputContainerServiceLog() {
-    LOG.info(
-        "--------------------Start the Hive server information--------------------------\n{}",
-        getServiceLog(HIVE_LOG_PATH));
-    LOG.info("--------------------End the Hive server information----------------------------");
+  private void copyHiveLog() {
+    try {
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy hive log file to {}", destPath);
 
-    LOG.info(
-        "----------------------------Start the HDFS namenode information -----------------\n{}",
-        getServiceLog(HDFS_NAME_NODE_LOG_PATH));
-    LOG.info("----------------------------End the HDFS namenode information -------------------");
+      String hiveLogJarPath = "/hive.tar";
+      String HdfsLogJarPath = "/hdfs.tar";
 
-    LOG.info(
-        "----------------------------Start the HDFS datanode information -----------------\n{}",
-        getServiceLog(HDFS_DATA_NODE_LOG_PATH));
-    LOG.info("----------------------------End the HDFS datanode information -------------------");
+      // Pack the jar files
+      container.execInContainer("tar", "cf", hiveLogJarPath, HIVE_LOG_PATH);
+      container.execInContainer("tar", "cf", HdfsLogJarPath, HDFS_LOG_PATH);
+
+      container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
+      container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
+    } catch (Exception e) {
+      LOG.warn("Can't copy hive log for:", e);
+    }
   }
 
   @Override
