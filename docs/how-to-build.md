@@ -80,6 +80,15 @@ This software is licensed under the Apache License version 2."
     ```shell
     ./gradlew build -PpythonVersion=3.11
     ```
+   
+4. Build Gravitino Spark connector
+
+    ```shell
+    ./gradlew spark-connector:spark-connector-runtime:shadowJar
+    ```
+
+   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/spark-connector-runtime/build/libs` directory.
+
 
 :::note
 The first time you build the project, downloading the dependencies may take a while. You can add
@@ -133,18 +142,3 @@ server distribution package.
     ```
 
    This creates `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
-
-6. Assemble the Gravitino Spark connector package
-
-   ```shell
-    ./gradlew assembleSparkConnector
-    ```
-
-   or
-
-    ```shell
-    ./gradlew assembleDistribution
-    ```
-
-   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` and `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar.sha256` under the `distribution` directory.
-
