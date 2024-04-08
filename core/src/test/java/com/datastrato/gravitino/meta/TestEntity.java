@@ -281,9 +281,10 @@ public class TestEntity {
     Assertions.assertEquals(
         Lists.newArrayList(Privileges.LoadCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
     Assertions.assertEquals(
-        Entity.EntityType.METALAKE, fields.get(RoleEntity.PRIVILEGE_ENTITY_TYPE));
+        Entity.EntityType.CATALOG, fields.get(RoleEntity.PRIVILEGE_ENTITY_TYPE));
     Assertions.assertEquals(
-        NameIdentifier.of(metalakeName), fields.get(RoleEntity.PRIVILEGE_ENTITY_IDENTIFIER));
+        NameIdentifier.of(metalakeName, catalogName),
+        fields.get(RoleEntity.PRIVILEGE_ENTITY_IDENTIFIER));
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
