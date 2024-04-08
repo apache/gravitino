@@ -280,18 +280,16 @@ public class KvEntityStore implements EntityStore {
                 ident, subEntities);
           }
 
-          for (byte[] prefix : subEntityPrefix) {
-            transactionalKvBackend.deleteRange(
-                new KvRange.KvRangeBuilder()
-                    .start(prefix)
-                    .startInclusive(true)
-                    .end(Bytes.increment(Bytes.wrap(prefix)).get())
-                    .build());
-          }
+          // Remove id-name mapping;
+          unbindNameAndId(ident, entityType);
 
-          deleteAuthorizationEntitiesIfNecessary(ident, entityType);
           return transactionalKvBackend.delete(dataKey);
         });
+  }
+
+  private void unbindNameAndId(NameIdentifier ident, EntityType entityType) throws IOException {
+    String identNameToIdKey = generateKeyForMapping(ident, entityType, nameMappingService);
+    nameMappingService.unbindNameAndId(identNameToIdKey);
   }
 
   @Override
