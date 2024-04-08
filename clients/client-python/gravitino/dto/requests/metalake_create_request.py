@@ -11,9 +11,7 @@ from dataclasses_json import DataClassJsonMixin
 
 @dataclass
 class MetalakeCreateRequest(DataClassJsonMixin):
-    """"
-    Represents a request to create a Metalake.
-    """
+    """"Represents a request to create a Metalake."""
     name: str
     comment: Optional[str]
     properties: Optional[Dict[str, str]]

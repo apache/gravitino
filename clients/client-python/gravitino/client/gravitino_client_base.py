@@ -25,12 +25,14 @@ class GravitinoClientBase:
         self.rest_client = HTTPClient(uri)
 
     def load_metalake(self, ident: NameIdentifier) -> GravitinoMetalake:
-        """
-        Loads a specific Metalake from the Gravitino API.
+        """Loads a specific Metalake from the Gravitino API.
+
         Args:
             ident The identifier of the Metalake to be loaded.
+
         Return:
             A GravitinoMetalake instance representing the loaded Metalake.
+
         Raises:
             NoSuchMetalakeException If the specified Metalake does not exist.
         """
@@ -43,8 +45,8 @@ class GravitinoClientBase:
         return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
 
     def get_version(self) -> GravitinoVersion:
-        """
-        Retrieves the version of the Gravitino API.
+        """Retrieves the version of the Gravitino API.
+
         Return:
             A GravitinoVersion instance representing the version of the Gravitino API.
         """
@@ -54,9 +56,7 @@ class GravitinoClientBase:
         return GravitinoVersion(resp.get_version())
 
     def close(self):
-        """
-        Closes the GravitinoClient and releases any underlying resources.
-        """
+        """Closes the GravitinoClient and releases any underlying resources."""
         if self.rest_client is not None:
             try:
                 self.rest_client.close()
