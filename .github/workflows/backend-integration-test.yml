@@ -76,8 +76,9 @@ jobs:
         uses: docker/setup-qemu-action@v2
 
       - name: Check required command
-        run: dev/ci/check_commands.sh
-        shell: bash
+        run: |
+          chmod +x dev/ci/check_commands.sh 
+          dev/ci/check_commands.sh
 
       - name: Package Gravitino
         run: |
