@@ -38,6 +38,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -80,6 +81,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   public String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
   public String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
   public String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
+  public String POSTGRESQL_COL_NAME4 = "postgresql_col_name4";
   private final String provider = "jdbc-postgresql";
 
   private GravitinoMetalake metalake;
@@ -193,8 +195,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col1 = Column.of(POSTGRESQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(POSTGRESQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(POSTGRESQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
+    Column col4 =
+        Column.of(
+            POSTGRESQL_COL_NAME4, Types.ListType.of(IntegerType.get(), true), "col_4_comment");
 
-    return new Column[] {col1, col2, col3};
+    return new Column[] {col1, col2, col3, col4};
   }
 
   private Column[] columnsWithSpecialNames() {
