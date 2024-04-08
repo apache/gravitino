@@ -231,14 +231,18 @@ In order for tensorflow to support GVFS, you need to recompile the [tensorflow-i
 
 ## Authentication
 
-Currently, Gravitino Virtual File System supports two kinds of authentication types to access Gravitino server: `simple` and `oauth2`.  
-`simple` type is the default authentication type in Gravitino Virtual File System.
+Currently, Gravitino Virtual File System supports two kinds of authentication types to access Gravitino server: `simple` and `oauth2`.
+
+The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
 ### How to use
+
 #### Use `simple` authentication type
 
-Please make sure that your Gravitino server also configure the `simple` authentication mode firstly.  
+Please make sure that your Gravitino server also configure the `simple` authentication mode firstly.
+
 Then, you can configure the Hadoop configuration like this:
+
 ```java
 // Simple type allows the client to use the environment variable `GRAVITINO_USER` as the user.
 // If the environment variable `GRAVITINO_USER` isn't set,
@@ -260,9 +264,10 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 #### Use `oauth2` authentication type
 
 If you want to use `oauth2` authentication type for the Gravitino client in Gravitino Virtual File System,
-please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](./security.md).  
+please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](./security.md).
 
 Then, you can configure the Hadoop configuration like this:
+
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.Gvfs");
