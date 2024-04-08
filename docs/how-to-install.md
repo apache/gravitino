@@ -47,6 +47,11 @@ The Gravitino binary distribution package contains the following files:
     └── scripts/                    # Extra scripts for Gravitino.
 ```
 
+#### Initialize the RDBMS (Optional)
+
+If you want to use the relational backend storage, you need to initialize the RDBMS firstly. For
+the details on how to initialize the RDBMS, please check [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+
 #### Configure the Gravitino server
 
 The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino
