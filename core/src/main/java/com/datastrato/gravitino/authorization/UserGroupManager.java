@@ -59,6 +59,7 @@ public class UserGroupManager {
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
@@ -73,7 +74,6 @@ public class UserGroupManager {
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {

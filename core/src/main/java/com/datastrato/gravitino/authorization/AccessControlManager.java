@@ -24,6 +24,8 @@ public class AccessControlManager {
 
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
+  private final Object adminOperationLock = new Object();
+  private final Object nonAdminOperationLock = new Object();
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
@@ -39,8 +41,10 @@ public class AccessControlManager {
    * @throws UserAlreadyExistsException If a User with the same identifier already exists.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public synchronized User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    return userGroupManager.addUser(metalake, name);
+  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.addUser(metalake, name);
+    }
   }
 
   /**
@@ -51,8 +55,10 @@ public class AccessControlManager {
    * @return `true` if the User was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  public synchronized boolean removeUser(String metalake, String user) {
-    return userGroupManager.removeUser(metalake, user);
+  public boolean removeUser(String metalake, String user) {
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.removeUser(metalake, user);
+    }
   }
 
   /**
@@ -64,8 +70,10 @@ public class AccessControlManager {
    * @throws NoSuchUserException If the User with the given identifier does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
-  public synchronized User getUser(String metalake, String user) throws NoSuchUserException {
-    return userGroupManager.getUser(metalake, user);
+  public User getUser(String metalake, String user) throws NoSuchUserException {
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.getUser(metalake, user);
+    }
   }
 
   /**
@@ -78,7 +86,9 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
-    return userGroupManager.addGroup(metalake, group);
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.addGroup(metalake, group);
+    }
   }
 
   /**
@@ -89,8 +99,10 @@ public class AccessControlManager {
    * @return `true` if the Group was successfully removed, `false` otherwise.
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
-  public synchronized boolean removeGroup(String metalake, String group) {
-    return userGroupManager.removeGroup(metalake, group);
+  public boolean removeGroup(String metalake, String group) {
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.removeGroup(metalake, group);
+    }
   }
 
   /**
@@ -102,8 +114,10 @@ public class AccessControlManager {
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
-  public synchronized Group getGroup(String metalake, String group) throws NoSuchGroupException {
-    return userGroupManager.getGroup(metalake, group);
+  public Group getGroup(String metalake, String group) throws NoSuchGroupException {
+    synchronized (nonAdminOperationLock) {
+      return userGroupManager.getGroup(metalake, group);
+    }
   }
 
   /**
@@ -115,7 +129,9 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addMetalakeAdmin(String user) {
-    return adminManager.addMetalakeAdmin(user);
+    synchronized (adminOperationLock) {
+      return adminManager.addMetalakeAdmin(user);
+    }
   }
 
   /**
@@ -126,7 +142,9 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeMetalakeAdmin(String user) {
-    return adminManager.removeMetalakeAdmin(user);
+    synchronized (adminOperationLock) {
+      return adminManager.removeMetalakeAdmin(user);
+    }
   }
 
   /**
@@ -146,6 +164,8 @@ public class AccessControlManager {
    * @return true, if the user is metalake admin, otherwise false.
    */
   public boolean isMetalakeAdmin(String user) {
-    return adminManager.isMetalakeAdmin(user);
+    synchronized (adminOperationLock) {
+      return adminManager.isMetalakeAdmin(user);
+    }
   }
 }
