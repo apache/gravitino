@@ -97,7 +97,7 @@ public class TestAccessControlManager {
 
     // Test with NoSuchMetalakeException
     Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to get non-existed user
     Throwable exception =
@@ -112,7 +112,7 @@ public class TestAccessControlManager {
 
     // Test with NoSuchMetalakeException
     Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to remove user
     boolean removed = accessControlManager.removeUser("metalake", "testRemove");
@@ -136,7 +136,7 @@ public class TestAccessControlManager {
 
     // Test with NoSuchMetalakeException
     Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test with GroupAlreadyExistsException
     Assertions.assertThrows(
@@ -153,7 +153,7 @@ public class TestAccessControlManager {
 
     // Test with NoSuchMetalakeException
     Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to get non-existed group
     Throwable exception =
@@ -169,7 +169,7 @@ public class TestAccessControlManager {
 
     // Test with NoSuchMetalakeException
     Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to remove group
     boolean removed = accessControlManager.removeGroup("metalake", "testRemove");
