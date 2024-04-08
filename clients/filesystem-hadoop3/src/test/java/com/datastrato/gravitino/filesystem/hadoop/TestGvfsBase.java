@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.file.Fileset;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -493,6 +495,69 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               .replaceFirst(
                   GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                   FileSystemTestUtils.localRootPrefix()));
+    }
+  }
+
+  @Test
+  public void testExtractIdentifier() throws IOException, URISyntaxException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      NameIdentifier identifier =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier);
+
+      NameIdentifier identifier2 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier2);
+
+      NameIdentifier identifier3 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/files"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier3);
+
+      NameIdentifier identifier4 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier4);
+
+      NameIdentifier identifier5 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier5);
+
+      NameIdentifier identifier6 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier6);
+
+      NameIdentifier identifier7 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier7);
+
+      NameIdentifier identifier8 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier8);
+
+      NameIdentifier identifier9 =
+          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier9);
+
+      NameIdentifier identifier10 =
+          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("hdfs://fileset/catalog1/schema1/fileset1")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("/catalog1/schema1/")));
     }
   }
 }

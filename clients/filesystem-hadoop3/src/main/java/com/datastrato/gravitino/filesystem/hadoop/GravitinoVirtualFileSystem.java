@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -50,6 +52,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, Pair<Fileset, FileSystem>> filesetCache;
   private ScheduledThreadPoolExecutor scheduler;
+
+  private static final Pattern IDENTIFIER_PATTERN =
+      Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:[/[^/]+]*)$");
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -83,14 +88,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY);
 
     initializeCache(maxCapacity, evictionMillsAfterAccess);
-
-    // initialize the Gravitino client
-    String serverUri =
-        configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(serverUri),
-        "'%s' is not set in the configuration",
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
 
     this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
@@ -279,6 +276,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     String filePath = fileStatus.getPath().toString();
     if (!filePath.startsWith(actualPrefix)) {
       throw new InvalidPathException(
+          filePath,
           String.format("Path %s doesn't start with prefix \"%s\".", filePath, actualPrefix));
     }
     Path path = new Path(filePath.replaceFirst(actualPrefix, virtualPrefix));
@@ -287,27 +285,22 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  private NameIdentifier extractIdentifier(URI virtualUri) {
-    if (StringUtils.isBlank(virtualUri.toString())) {
-      throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
+  @VisibleForTesting
+  NameIdentifier extractIdentifier(URI virtualUri) {
+    String virtualPath = virtualUri.toString();
+    if (StringUtils.isBlank(virtualPath)) {
+      throw new InvalidPathException(
+          virtualPath, "Uri which need be extracted cannot be null or empty.");
     }
 
-    String realUri =
-        virtualUri
-            .toString()
-            .replaceFirst(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX, "");
-
-    // remove first '/' symbol with empty string
-    if (realUri.startsWith("/")) {
-      realUri = realUri.replaceFirst("/", "");
-    }
-
-    String[] reservedDirs = realUri.split("/");
+    Matcher matcher = IDENTIFIER_PATTERN.matcher(virtualPath);
     Preconditions.checkArgument(
-        reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", virtualUri);
+        matcher.matches() && matcher.groupCount() == 3,
+        "URI %s doesn't contains valid identifier",
+        virtualUri);
 
     return NameIdentifier.ofFileset(
-        metalakeName, reservedDirs[0], reservedDirs[1], reservedDirs[2]);
+        metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));
   }
 
   private FilesetContext getFilesetContext(Path virtualPath) {
