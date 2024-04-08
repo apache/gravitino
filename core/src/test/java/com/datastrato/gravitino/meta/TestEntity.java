@@ -267,9 +267,9 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
-            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName, catalogName))
+            .withPrivilegeEntityType(Entity.EntityType.CATALOG)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(map)
             .build();
 
@@ -279,7 +279,7 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
     Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
     Assertions.assertEquals(
-        Lists.newArrayList(Privileges.LoadMetalake.get()), fields.get(RoleEntity.PRIVILEGES));
+        Lists.newArrayList(Privileges.LoadCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
     Assertions.assertEquals(
         Entity.EntityType.METALAKE, fields.get(RoleEntity.PRIVILEGE_ENTITY_TYPE));
     Assertions.assertEquals(
@@ -290,9 +290,9 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
-            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName, catalogName))
+            .withPrivilegeEntityType(Entity.EntityType.CATALOG)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
   }

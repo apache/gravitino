@@ -18,34 +18,34 @@ public class Privileges {
     Privilege.Name name = Privilege.Name.valueOf(privilege);
 
     switch (name) {
-      case LOAD_METALAKE:
-        return LoadMetalake.get();
+      case LOAD_CATALOG:
+        return LoadCatalog.get();
       default:
         throw new IllegalArgumentException("Don't support the privilege: " + privilege);
     }
   }
 
   /** The privilege of load a metalake. */
-  public static class LoadMetalake implements Privilege {
-    private static final LoadMetalake INSTANCE = new LoadMetalake();
+  public static class LoadCatalog implements Privilege {
+    private static final LoadCatalog INSTANCE = new LoadCatalog();
 
     /** @return The instance of the privilege. */
-    public static LoadMetalake get() {
+    public static LoadCatalog get() {
       return INSTANCE;
     }
 
-    private LoadMetalake() {}
+    private LoadCatalog() {}
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return Name.LOAD_METALAKE;
+      return Name.LOAD_CATALOG;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "load metalake";
+      return "load catalog";
     }
   }
 }

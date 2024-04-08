@@ -18,7 +18,7 @@ public interface Privilege {
 
   /** The name of this privilege. */
   enum Name {
-    /** The privilege of load a metalake. */
-    LOAD_METALAKE
+    /** The privilege of load a catalog. */
+    LOAD_CATALOG
   }
 }

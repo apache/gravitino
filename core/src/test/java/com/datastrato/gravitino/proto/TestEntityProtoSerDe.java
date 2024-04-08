@@ -333,9 +333,9 @@ public class TestEntityProtoSerDe {
             .withId(roleId)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
-            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName, catalogName))
+            .withPrivilegeEntityType(Entity.EntityType.CATALOG)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(props)
             .build();
     byte[] roleBytes = protoEntitySerDe.serialize(roleEntity);
@@ -347,9 +347,9 @@ public class TestEntityProtoSerDe {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
-            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalakeName, catalogName))
+            .withPrivilegeEntityType(Entity.EntityType.CATALOG)
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     roleBytes = protoEntitySerDe.serialize(roleWithoutFields);
     roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class);
