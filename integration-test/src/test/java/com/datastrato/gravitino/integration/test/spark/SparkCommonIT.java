@@ -670,10 +670,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
-  protected void checkTableLocation(Path dir) {
-    Assertions.assertTrue(dir.toString().equals(hdfs.getUri() + "/user/hive/external_db"));
-  }
-
   protected void deleteDirIfExists(String path) {
     try {
       Path dir = new Path(path);

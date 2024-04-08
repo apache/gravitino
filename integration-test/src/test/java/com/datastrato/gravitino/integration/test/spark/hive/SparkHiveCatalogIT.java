@@ -230,21 +230,21 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   @Test
   void testHiveFormatWithLocationTable() {
     String tableName = "test_hive_format_with_location_table";
+    String location = "/user/hive/external_db";
     Boolean[] isExternals = {Boolean.TRUE, Boolean.FALSE};
 
     Arrays.stream(isExternals)
         .forEach(
             isExternal -> {
               dropTableIfExists(tableName);
-              deleteDirIfExists("/user/hive/external_db");
+              deleteDirIfExists(location);
               String createTableSql = getCreateSimpleTableString(tableName, isExternal);
-              createTableSql = createTableSql + "LOCATION '/user/hive/external_db'";
+              createTableSql = createTableSql + "LOCATION '" + location + "'";
               sql(createTableSql);
 
               SparkTableInfo tableInfo = getTableInfo(tableName);
               checkTableReadWrite(tableInfo);
-              Path tableLocation = new Path(tableInfo.getTableLocation());
-              checkTableLocation(tableLocation);
+              Assertions.assertTrue(tableInfo.getTableLocation().equals(hdfs.getUri() + location));
             });
   }
 
