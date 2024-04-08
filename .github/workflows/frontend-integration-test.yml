@@ -73,6 +73,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
       - name: Package Gravitino
         run: |
           ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
