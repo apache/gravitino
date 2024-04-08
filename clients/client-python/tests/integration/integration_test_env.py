@@ -7,6 +7,7 @@ import os
 import unittest
 import subprocess
 import time
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def get_gravitino_server_version():
         response.close()
         return True
     except requests.exceptions.RequestException as e:
-        logger.error("Failed to access the server: {}", e)
+        logger.warning("Failed to access the server: {}", e)
         return False
 
 
@@ -44,8 +45,8 @@ def _init_logging():
     logger.addHandler(console_handler)
 
 
-# Provide real test environment for the Gravitino Server
 class IntegrationTestEnv(unittest.TestCase):
+    """Provide real test environment for the Gravitino Server"""
     gravitino_startup_script = None
 
     @classmethod
@@ -76,6 +77,8 @@ class IntegrationTestEnv(unittest.TestCase):
         if not check_gravitino_server_status():
             logger.error("ERROR: Can't start Gravitino server!")
             quit(0)
+
+        cls.clean_test_date()
 
     @classmethod
     def tearDownClass(cls):
