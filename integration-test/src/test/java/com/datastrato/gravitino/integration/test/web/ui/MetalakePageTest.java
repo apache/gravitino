@@ -14,10 +14,16 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
+  private static final String WEB_TITLE = "Gravitino";
+  private static final String METALAKE_NAME = "metalake_name";
+  private static final String EDITED_METALAKE_NAME = METALAKE_NAME + "_edited";
+  private static final String FOOTER_LINK_DATASTRATO = "https://datastrato.ai/";
+  private static final String FOOTER_LINK_DOCS = "https://datastrato.ai/docs/";
+  private static final String FOOTER_LINK_LICENSE =
+      "https://github.com/datastrato/gravitino/blob/main/LICENSE";
+  private static final String FOOTER_LINK_SUPPORT =
+      "https://github.com/datastrato/gravitino/issues";
   MetalakePage metalakePage = new MetalakePage();
-
-  String metalakeName = "metalake_name";
-  String editedMetalakeName = metalakeName + "_edited";
 
   // Create a metalake by name, set the default comment and properties.
   public void createMetalakeAction(String name) throws InterruptedException {
@@ -35,36 +41,36 @@ public class MetalakePageTest extends AbstractWebIT {
   @Order(0)
   public void homePage() {
     String title = driver.getTitle();
-    Assertions.assertEquals("Gravitino", title);
+    Assertions.assertEquals(WEB_TITLE, title);
   }
 
   @Test
   @Order(1)
   public void testCreateMetalake() throws InterruptedException {
-    createMetalakeAction(metalakeName);
-    Assertions.assertTrue(metalakePage.verifyCreateMetalake(metalakeName));
+    createMetalakeAction(METALAKE_NAME);
+    Assertions.assertTrue(metalakePage.verifyCreateMetalake(METALAKE_NAME));
   }
 
   @Test
   @Order(2)
   public void testViewMetalakeDetails() throws InterruptedException {
-    metalakePage.clickViewMetalakeBtn(metalakeName);
-    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(metalakeName));
+    metalakePage.clickViewMetalakeBtn(METALAKE_NAME);
+    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(METALAKE_NAME));
   }
 
   @Test
   @Order(3)
   public void testEditMetalake() {
-    metalakePage.clickEditMetalakeBtn(metalakeName);
-    metalakePage.setMetalakeNameField(editedMetalakeName);
+    metalakePage.clickEditMetalakeBtn(METALAKE_NAME);
+    metalakePage.setMetalakeNameField(EDITED_METALAKE_NAME);
     metalakePage.submitHandleMetalakeBtn.click();
-    Assertions.assertTrue(metalakePage.verifyEditedMetalake(editedMetalakeName));
+    Assertions.assertTrue(metalakePage.verifyEditedMetalake(EDITED_METALAKE_NAME));
   }
 
   @Test
   @Order(4)
   public void testDeleteMetalake() {
-    metalakePage.clickDeleteMetalakeBtn(editedMetalakeName);
+    metalakePage.clickDeleteMetalakeBtn(EDITED_METALAKE_NAME);
     metalakePage.confirmDeleteBtn.click();
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
@@ -112,5 +118,50 @@ public class MetalakePageTest extends AbstractWebIT {
     createMetalakeAction(name);
     metalakePage.clickMetalakeLink(name);
     Assertions.assertTrue(metalakePage.verifyLinkToCatalogsPage(name));
+  }
+
+  @Test
+  @Order(9)
+  public void testRefreshPage() {
+    driver.navigate().refresh();
+
+    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertTrue(metalakePage.verifyRefreshPage());
+  }
+
+  @Test
+  @Order(10)
+  public void testCheckLinkDatastrato() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkDatastrato.click();
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_DATASTRATO, false));
+  }
+
+  @Test
+  @Order(11)
+  public void testCheckLinkLicense() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkLicense.click();
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_LICENSE, false));
+  }
+
+  @Test
+  @Order(12)
+  public void testCheckLinkDocs() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkDocs.click();
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_DOCS, true));
+  }
+
+  @Test
+  @Order(13)
+  public void testCheckLinkSupport() {
+    String originalWindowHandle = driver.getWindowHandle();
+    metalakePage.footerLinkSupport.click();
+    Assertions.assertTrue(
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_SUPPORT, false));
   }
 }

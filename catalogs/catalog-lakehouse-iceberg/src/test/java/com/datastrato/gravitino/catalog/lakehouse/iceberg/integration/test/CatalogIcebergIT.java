@@ -440,6 +440,61 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
+  void testTimestampTypeConversion() {
+
+    Column col1 =
+        Column.of("iceberg_column_1", Types.TimestampType.withTimeZone(), "col_1_comment");
+    Column col2 =
+        Column.of("iceberg_column_2", Types.TimestampType.withoutTimeZone(), "col_2_comment");
+
+    Column[] columns = new Column[] {col1, col2};
+
+    String timestampTableName = "timestamp_table";
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, timestampTableName);
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, table_comment, properties);
+    Assertions.assertEquals("iceberg_column_1", createdTable.columns()[0].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), createdTable.columns()[0].dataType());
+    Assertions.assertEquals("col_1_comment", createdTable.columns()[0].comment());
+
+    Assertions.assertEquals("iceberg_column_2", createdTable.columns()[1].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(), createdTable.columns()[1].dataType());
+    Assertions.assertEquals("col_2_comment", createdTable.columns()[1].comment());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("iceberg_column_1", loadTable.columns()[0].name());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(), loadTable.columns()[0].dataType());
+    Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
+
+    Assertions.assertEquals("iceberg_column_2", loadTable.columns()[1].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(), loadTable.columns()[1].dataType());
+    Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
+
+    org.apache.iceberg.Table table =
+        hiveCatalog.loadTable(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
+    org.apache.iceberg.Schema icebergSchema = table.schema();
+    Assertions.assertEquals("iceberg_column_1", icebergSchema.columns().get(0).name());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampType.withZone(),
+        icebergSchema.columns().get(0).type());
+    Assertions.assertEquals("col_1_comment", icebergSchema.columns().get(0).doc());
+
+    Assertions.assertEquals("iceberg_column_2", icebergSchema.columns().get(1).name());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampType.withoutZone(),
+        icebergSchema.columns().get(1).type());
+    Assertions.assertEquals("col_2_comment", icebergSchema.columns().get(1).doc());
+  }
+
+  @Test
   void testListAndDropIcebergTable() {
     Column[] columns = createColumns();
 
@@ -629,6 +684,18 @@ public class CatalogIcebergIT extends AbstractIT {
         assertThrows(
             IllegalArgumentException.class, () -> tableCatalog.alterTable(tableIdentifier, change));
     Assertions.assertTrue(illegalArgumentException.getMessage().contains("no_column"));
+
+    TableChange change2 =
+        TableChange.updateColumnDefaultValue(
+            new String[] {col1.name()}, Literals.of("hello", Types.StringType.get()));
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, change2));
+    Assertions.assertTrue(
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg doesn't support update column default value"));
 
     catalog
         .asTableCatalog()

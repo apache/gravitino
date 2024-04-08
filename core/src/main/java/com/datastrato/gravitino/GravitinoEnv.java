@@ -116,7 +116,12 @@ public class GravitinoEnv {
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     // Create and initialize access control related modules
-    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(

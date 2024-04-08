@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
@@ -45,6 +47,9 @@ import org.apache.commons.lang3.StringUtils;
   @JsonSubTypes.Type(
       value = TableUpdateRequest.RenameTableColumnRequest.class,
       name = "renameColumn"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateTableColumnDefaultValueRequest.class,
+      name = "updateColumnDefaultValue"),
   @JsonSubTypes.Type(
       value = TableUpdateRequest.UpdateTableColumnTypeRequest.class,
       name = "updateColumnType"),
@@ -434,6 +439,61 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.renameColumn(oldFieldName, newFieldName);
+    }
+  }
+
+  /** Represents a request to update the default value of a column of a table. */
+  @EqualsAndHashCode
+  @ToString
+  class UpdateTableColumnDefaultValueRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("newDefaultValue")
+    @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+    @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+    private final Expression newDefaultValue;
+
+    /**
+     * Constructor for UpdateTableColumnDefaultValueRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newDefaultValue the new default value of the field
+     */
+    public UpdateTableColumnDefaultValueRequest(String[] fieldName, Expression newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateTableColumnDefaultValueRequest() {
+      this(null, null);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"newDefaultValue\" field is required and cannot be empty");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
     }
   }
 

@@ -99,3 +99,21 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     KEY `idx_cid` (`catalog_id`),
     KEY `idx_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset version info';
+
+CREATE TABLE IF NOT EXISTS `topic_meta` (
+    `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
+    `topic_name` VARCHAR(128) NOT NULL COMMENT 'topic name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `comment` VARCHAR(256) DEFAULT '' COMMENT 'topic comment',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'topic properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'topic audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'topic deleted at',
+    PRIMARY KEY (`topic_id`),
+    UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `topic_name`, `deleted_at`),
+    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_cid` (`catalog_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'topic metadata';
