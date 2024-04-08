@@ -45,7 +45,7 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "list metalake";
+      return "load metalake";
     }
   }
 }
