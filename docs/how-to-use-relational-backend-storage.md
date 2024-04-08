@@ -87,6 +87,3 @@ Finally, you can run the script in the distribution package directory to start t
 ```shell
 ./${GRAVITINO_HOME}/bin/gravitino.sh start
 ```
-
-
-
