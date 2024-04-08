@@ -98,9 +98,7 @@ public abstract class BaseContainer implements AutoCloseable {
     container.withLogConsumer(logConsumer);
   }
 
-  /**
-   * Output the log of service that running in the container.
-   */
+  /** Output the log of service that running in the container. */
   protected void outputContainerServiceLog() {
     // Do nothing by default
   }

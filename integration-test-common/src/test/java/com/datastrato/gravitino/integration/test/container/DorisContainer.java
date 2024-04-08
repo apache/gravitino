@@ -68,10 +68,14 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   protected void outputContainerServiceLog() {
-    LOG.info("--------------------Start the Doris FE server information--------------------------\n{}", getServiceLog(DORIS_FE_PATH));
+    LOG.info(
+        "--------------------Start the Doris FE server information--------------------------\n{}",
+        getServiceLog(DORIS_FE_PATH));
     LOG.info("--------------------End the Doris FE server information----------------------------");
 
-    LOG.info("--------------------Start the Doris BE server information--------------------------\n{}", getServiceLog(DORIS_BE_PATH));
+    LOG.info(
+        "--------------------Start the Doris BE server information--------------------------\n{}",
+        getServiceLog(DORIS_BE_PATH));
     LOG.info("--------------------End the Doris BE server information----------------------------");
   }
 
