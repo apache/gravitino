@@ -63,7 +63,7 @@ class AdminManager {
                     Entity.SYSTEM_METALAKE_RESERVED_NAME,
                     Entity.AUTHORIZATION_CATALOG_NAME,
                     Entity.ADMIN_SCHEMA_NAME))
-            .withRoles(Lists.newArrayList())
+            .withRoleNames(Lists.newArrayList())
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())

@@ -30,13 +30,17 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
 
-  public static final Field ROLES =
-      Field.optional("roles", List.class, "The roles of the user entity");
+  public static final Field ROLE_NAMES =
+      Field.optional("role_names", List.class, "The role names of the user entity");
+
+  public static final Field ROLE_IDS =
+      Field.optional("role_ids", List.class, "The role ids of the user entity");
 
   private Long id;
   private String name;
   private AuditInfo auditInfo;
-  private List<String> roles;
+  private List<String> roleNames;
+  private List<Long> roleIds;
   private Namespace namespace;
 
   private UserEntity() {}
@@ -52,7 +56,8 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ROLES, roles);
+    fields.put(ROLE_NAMES, roleNames);
+    fields.put(ROLE_IDS, roleIds);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -113,7 +118,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<String> roles() {
-    return roles;
+    return roleNames;
+  }
+
+  /**
+   * Returns the role ids of the user entity.
+   *
+   * @return The roles of the user entity.
+   */
+  public List<Long> roleIds() {
+    return roleIds;
   }
 
   @Override
@@ -125,12 +139,13 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roles, that.roles);
+        && Objects.equals(roleNames, that.roleNames)
+        && Objects.equals(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roles);
+    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -178,13 +193,24 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the roles of the user entity.
+     * Sets the role names of the user entity.
      *
-     * @param roles The roles of the user entity.
+     * @param roles The role names of the user entity.
      * @return The builder instance.
      */
-    public Builder withRoles(List<String> roles) {
-      userEntity.roles = roles;
+    public Builder withRoleNames(List<String> roles) {
+      userEntity.roleNames = roles;
+      return this;
+    }
+
+    /**
+     * Sets the role ids of the user entity.
+     *
+     * @param roleIds The role names of the user entity.
+     * @return The builder instance.
+     */
+    public Builder withRoleIds(List<Long> roleIds) {
+      userEntity.roleIds = roleIds;
       return this;
     }
 

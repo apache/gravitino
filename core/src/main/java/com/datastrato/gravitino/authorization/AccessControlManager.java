@@ -30,6 +30,7 @@ public class AccessControlManager {
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
+  private final GrantManager grantManager;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
 
@@ -37,6 +38,7 @@ public class AccessControlManager {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator);
+    this.grantManager = new GrantManager(store);
   }
 
   /**
@@ -113,6 +115,22 @@ public class AccessControlManager {
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
     return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
+  }
+
+  public boolean addRoleToUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> grantManager.addRoleToUser(metalake, role, user));
+  }
+
+  public boolean addRoleToGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> grantManager.addRoleToGroup(metalake, role, group));
+  }
+
+  public synchronized boolean removeRoleFromGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> grantManager.removeRoleFromGroup(metalake, role, group));
+  }
+
+  public synchronized boolean removeRoleFromUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> grantManager.removeRoleFromUser(metalake, role, user));
   }
 
   /**

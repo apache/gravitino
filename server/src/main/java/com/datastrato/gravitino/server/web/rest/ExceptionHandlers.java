@@ -79,6 +79,11 @@ public class ExceptionHandlers {
     return TopicExceptionHandler.INSTANCE.handle(op, topic, schema, e);
   }
 
+  public static Response handleGrantException(
+      OperationType op, String role, String parent, Exception e) {
+    return GrantExceptionHandler.INSTANCE.handle(op, role, parent, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -410,6 +415,37 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, topic, schema, e);
+      }
+    }
+  }
+
+  private static class GrantExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new GrantExceptionHandler();
+
+    private static String getGrantErrorMsg(
+        String role, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate role(s)%s operation [%s] under user/group [%s], reason [%s]",
+          role, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String role, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(role) ? "" : " [" + role + "]";
+      String errorMsg = getGrantErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof RoleAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, role, parent, e);
       }
     }
   }

@@ -39,12 +39,12 @@ public class TestAccessControlManager {
 
   private static Config config;
 
-  private static String metalake = "metalake";
+  private static String METALAKE = "metalake";
 
   private static BaseMetalake metalakeEntity =
       BaseMetalake.builder()
           .withId(1L)
-          .withName(metalake)
+          .withName(METALAKE)
           .withAuditInfo(
               AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .withVersion(SchemaVersion.V_0_1)

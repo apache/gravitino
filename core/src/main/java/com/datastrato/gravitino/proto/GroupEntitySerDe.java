@@ -18,7 +18,11 @@ public class GroupEntitySerDe implements ProtoSerDe<GroupEntity, Group> {
             .setAuditInfo(new AuditInfoSerDe().serialize(groupEntity.auditInfo()));
 
     if (isCollectionNotEmpty(groupEntity.roles())) {
-      builder.addAllRoles(groupEntity.roles());
+      builder.addAllRoleNames(groupEntity.roles());
+    }
+
+    if (isCollectionNotEmpty(groupEntity.roleIds())) {
+      builder.addAllRoleIds(groupEntity.roleIds());
     }
 
     return builder.build();
@@ -32,8 +36,12 @@ public class GroupEntitySerDe implements ProtoSerDe<GroupEntity, Group> {
             .withName(group.getName())
             .withAuditInfo(new AuditInfoSerDe().deserialize(group.getAuditInfo()));
 
-    if (group.getRolesCount() > 0) {
-      builder.withRoles(group.getRolesList());
+    if (group.getRoleNamesCount() > 0) {
+      builder.withRoleNames(group.getRoleNamesList());
+    }
+
+    if (group.getRoleIdsCount() > 0) {
+      builder.withRoleIds(group.getRoleIdsList());
     }
 
     return builder.build();
