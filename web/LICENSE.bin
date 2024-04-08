@@ -207,12 +207,12 @@
    Apache Zeppelin
    ./web/WEB-INF/web.xml
    
-   aira-query
-   axobject-query
    @humanwhocodes/config-array
    @humanwhocodes/module-importer
    @pkgjs/parseargs
    @swc/helpers
+   aira-query
+   axobject-query
    didyoumean
    doctrine
    eslint-visitor-keys
