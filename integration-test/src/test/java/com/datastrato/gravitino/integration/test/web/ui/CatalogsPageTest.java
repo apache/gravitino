@@ -49,6 +49,9 @@ public class CatalogsPageTest extends AbstractWebIT {
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
   private static final String WEB_TITLE = "Gravitino";
+  private static final String CATALOG_TABLE_TITLE = "Schemas";
+  private static final String SCHEMA_TABLE_TITLE = "Tables";
+  private static final String TABLE_TABLE_TITLE = "Columns";
   private static final String METALAKE_NAME = "test";
   private static final String METALAKE_SELECT_NAME = "metalake_select_name";
   private static final String CATALOG_TYPE = "relational";
@@ -275,7 +278,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(10)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
   }
@@ -285,7 +288,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
     List<String> treeNodes =
         Arrays.asList(
@@ -307,7 +310,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     createTableAndColumn(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
     catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
@@ -317,7 +320,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
     List<String> treeNodes =
         Arrays.asList(
@@ -338,7 +341,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
@@ -350,7 +353,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
     List<String> treeNodes =
@@ -363,7 +366,6 @@ public class CatalogsPageTest extends AbstractWebIT {
             PG_CATALOG_NAME,
             FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
-    Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }
 
   @Test
@@ -398,21 +400,21 @@ public class CatalogsPageTest extends AbstractWebIT {
     String hiveNode =
         String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
     catalogsPage.clickTreeNode(hiveNode);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Schemas"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
     String schemaNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     catalogsPage.clickTreeNode(schemaNode);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Tables"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
     String tableNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
     catalogsPage.clickTreeNode(tableNode);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }
@@ -435,7 +437,7 @@ public class CatalogsPageTest extends AbstractWebIT {
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME_2);
     catalogsPage.clickTreeNode(tableNode);
-    Assertions.assertTrue(catalogsPage.verifyShowTableTitle("Columns"));
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }

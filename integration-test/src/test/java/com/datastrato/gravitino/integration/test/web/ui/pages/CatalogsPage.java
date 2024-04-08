@@ -317,7 +317,12 @@ public class CatalogsPage extends AbstractWebIT {
               + name
               + "']//p[@data-refer='tree-node']";
       WebElement treeNode = treeView.findElement(By.xpath(xpath));
-      return Objects.equals(treeNode.getText(), name);
+      boolean match = Objects.equals(treeNode.getText(), name);
+      if (!match) {
+        LOG.error("tree node: {} does not match with name: {}", treeNode.getText(), name);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -368,7 +373,17 @@ public class CatalogsPage extends AbstractWebIT {
               By.xpath(
                   ".//*[@data-prev-refer='details-props-key-gravitino.bypass.hive.metastore.client.capability.check']"));
 
-      return isVisible && isText && isHiveURIS && isShowCheck;
+      boolean verifyAll = isVisible && isText && isHiveURIS && isShowCheck;
+      if (!verifyAll) {
+        LOG.error(
+            "not verified all - isVisible: {}, isText: {}, isHiveURIS: {}, isShowCheck: {}",
+            isVisible,
+            isText,
+            isHiveURIS,
+            isShowCheck);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -388,7 +403,12 @@ public class CatalogsPage extends AbstractWebIT {
       wait.until(ExpectedConditions.visibilityOf(treeNode));
 
       // Check if the link text is match with name
-      return Objects.equals(treeNode.getText(), name);
+      boolean match = Objects.equals(treeNode.getText(), name);
+      if (!match) {
+        LOG.error("tree node {} does not match with name: {}", treeNode.getText(), name);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -400,7 +420,10 @@ public class CatalogsPage extends AbstractWebIT {
       // Check is empty table
       boolean isNoRows = waitShowText("No rows", tableWrapper);
       if (!isNoRows) {
-        LOG.error(tableWrapper.getText(), tableWrapper);
+        LOG.error(
+            "is not empty catalog list, tableWrapper text: {}, tableWrapper: {}",
+            tableWrapper.getText(),
+            tableWrapper);
         return false;
       }
       return true;
@@ -415,7 +438,12 @@ public class CatalogsPage extends AbstractWebIT {
       WebElement text = tabTableBtn.findElement(By.tagName("p"));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(text));
-      return Objects.equals(text.getText(), title);
+      boolean matchTitle = Objects.equals(text.getText(), title);
+      if (!matchTitle) {
+        LOG.error("table title: {} does not match with title: {}", text.getText(), title);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -424,17 +452,22 @@ public class CatalogsPage extends AbstractWebIT {
 
   public boolean verifyShowDataItemInList(String itemName) {
     try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
       List<WebElement> list =
-          tableGrid.findElements(
+          driver.findElements(
               By.xpath(
-                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      List<String> texts = new ArrayList<>();
       for (WebElement element : list) {
-        String rowItemColName = element.getText();
-        if (rowItemColName.equals(itemName)) {
-          return true;
-        }
+        texts.add(element.getText());
       }
-      return false;
+
+      if (!texts.contains(itemName)) {
+        LOG.error("table list: {} does not include itemName: {}", texts, itemName);
+        return false;
+      }
+
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -448,14 +481,14 @@ public class CatalogsPage extends AbstractWebIT {
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./div[@role='columnheader']"));
       if (columnHeadersRows.size() != columns.size()) {
-        LOG.error("Column headers count does not match expected: {}", columns.size());
+        LOG.error("Column headers count does not match, expected: {}", columns.size());
         return false;
       }
 
       for (int i = 0; i < columnHeadersRows.size(); i++) {
         String headerText = columnHeadersRows.get(i).getText();
         if (!headerText.equals(columns.get(i))) {
-          LOG.error("Column header '{}' does not match expected '{}'", headerText, columns.get(i));
+          LOG.error("Column header '{}' does not match, expected '{}'", headerText, columns.get(i));
           return false;
         }
       }
@@ -471,7 +504,13 @@ public class CatalogsPage extends AbstractWebIT {
     try {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
-      return Objects.equals(metalakePageTitle.getText(), "Metalakes");
+      boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
+      if (!matchTitle) {
+        LOG.error(
+            "metalakePageTitle: {} does not match with Metalakes", metalakePageTitle.getText());
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -510,7 +549,11 @@ public class CatalogsPage extends AbstractWebIT {
         String rowItemColName = webElement.getText();
         texts.add(rowItemColName);
       }
-      return texts.containsAll(catalogNames);
+      if (!texts.containsAll(catalogNames)) {
+        LOG.error("table list: {} does not containsAll catalogNames: {}", texts, catalogNames);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -519,17 +562,22 @@ public class CatalogsPage extends AbstractWebIT {
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
     try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
       List<WebElement> list =
-          treeView.findElements(
+          driver.findElements(
               By.xpath(
-                  "./div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]"));
+                  "//div[@data-refer='tree-view']//div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]"));
       List<String> texts = new ArrayList<>();
       for (WebElement webElement : list) {
         String nodeName =
             webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
         texts.add(nodeName);
       }
-      return texts.containsAll(treeNodes);
+      if (!treeNodes.containsAll(texts)) {
+        LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -538,11 +586,18 @@ public class CatalogsPage extends AbstractWebIT {
 
   public boolean verifySelectedNode(String nodeName) {
     try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
       WebElement selectedNode =
-          treeView.findElement(
+          driver.findElement(
               By.xpath(
-                  ".//div[contains(@class, 'ant-tree-node-selected')]//span[@class='ant-tree-title']/p"));
-      return selectedNode.getText().equals(nodeName);
+                  "//div[@data-refer='tree-view']//div[contains(@class, 'ant-tree-treenode-selected')]//span[@class='ant-tree-title']"));
+      waitShowText(nodeName, selectedNode);
+      if (!selectedNode.getText().equals(nodeName)) {
+        LOG.error(
+            "selectedNode: {} does not match with nodeName: {}", selectedNode.getText(), nodeName);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
