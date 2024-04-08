@@ -84,7 +84,7 @@ This software is licensed under the Apache License version 2."
 4. Build Gravitino Spark connector
 
     ```shell
-    ./gradlew spark-connector:spark-connector-runtime:shadowJar
+    ./gradlew spark-connector:spark-connector-runtime:build
     ```
 
    This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/spark-connector-runtime/build/libs` directory.
