@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
@@ -14,8 +15,6 @@ import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
@@ -119,6 +118,6 @@ public class GroupOperations {
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 }

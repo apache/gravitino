@@ -277,11 +277,7 @@ public class AbstractIT {
     Assertions.assertEquals(tableComment, table.comment());
     Assertions.assertEquals(columns.size(), table.columns().length);
     for (int i = 0; i < columns.size(); i++) {
-      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
-      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
-      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
-      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
-      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
+      assertColumn(columns.get(i), table.columns()[i]);
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));

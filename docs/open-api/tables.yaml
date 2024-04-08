@@ -377,6 +377,7 @@ components:
         - $ref: "#/components/schemas/UpdateTableColumnCommentRequest"
         - $ref: "#/components/schemas/UpdateTableColumnPositionRequest"
         - $ref: "#/components/schemas/UpdateTableColumnNullabilityRequest"
+        - $ref: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
         - $ref: "#/components/schemas/DeleteTableColumnRequest"
       discriminator:
         propertyName: "@type"
@@ -391,6 +392,7 @@ components:
           updateColumnComment: "#/components/schemas/UpdateTableColumnCommentRequest"
           updateColumnPosition: "#/components/schemas/UpdateTableColumnPositionRequest"
           updateColumnNullability: "#/components/schemas/UpdateTableColumnNullabilityRequest"
+          updateColumnDefaultValue: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
           deleteColumn: "#/components/schemas/DeleteTableColumnRequest"
 
     RenameTableRequest:
@@ -501,13 +503,28 @@ components:
           description: Whether the column to add is nullable
           nullable: true
           default: true
+        autoIncrement:
+          type: boolean
+          description: Whether the column to add should auto increment
+          nullable: true
+          default: false
+        defaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
+          description: The default value of the column to add
+          nullable: true
       example: {
         "@type": "addColumn",
         "fieldName": [ "new_column" ],
         "type": "integer",
         "comment": "new integer column comment",
         "position": "first",
-        "nullable": true
+        "nullable": true,
+        "autoIncrement": false,
+        "defaultValue" : {
+          "type": "literal",
+          "dataType": "integer",
+          "value": "1024"
+        }
       }
 
     RenameTableColumnRequest:
@@ -625,6 +642,29 @@ components:
         "@type": "updateColumnNullability",
         "fieldName": [ "existing_column" ],
         "nullable": true
+      }
+
+    UpdateTableColumnDefaultValueRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - newDefaultValue
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateColumnDefaultValue"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to update
+        newDefaultValue:
+          $ref: "#/components/schemas/ColumnDefaultValue"
+          description: The new default value of the column 
+      example: {
+        "@type": "updateColumnDefaultValue",
+        "fieldName": [ "existing_column" ],
+        "newDefaultValue": { "type": "literal", "dataType": "varchar(100)", "value": "new default value" }
       }
 
     DeleteTableColumnRequest:

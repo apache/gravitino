@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -12,15 +13,17 @@ import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
 
 /**
- * AccessControlManager is used for manage users, roles, grant information, this class is an
+ * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
  * entrance class for tenant management.
  */
 public class AccessControlManager {
 
   private final UserGroupManager userGroupManager;
+  private final AdminManager adminManager;
 
-  public AccessControlManager(EntityStore store, IdGenerator idGenerator) {
+  public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
+    this.adminManager = new AdminManager(store, idGenerator, config);
   }
 
   /**
@@ -97,5 +100,48 @@ public class AccessControlManager {
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
     return userGroupManager.getGroup(metalake, group);
+  }
+
+  /**
+   * Adds a new metalake admin.
+   *
+   * @param user The name of the User.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  public User addMetalakeAdmin(String user) {
+    return adminManager.addMetalakeAdmin(user);
+  }
+
+  /**
+   * Removes a metalake admin.
+   *
+   * @param user The name of the User.
+   * @return `true` if the User was successfully removed, `false` otherwise.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  public boolean removeMetalakeAdmin(String user) {
+    return adminManager.removeMetalakeAdmin(user);
+  }
+
+  /**
+   * Judges whether the user is the service admin.
+   *
+   * @param user the name of the user
+   * @return true, if the user is service admin, otherwise false.
+   */
+  public boolean isServiceAdmin(String user) {
+    return adminManager.isServiceAdmin(user);
+  }
+
+  /**
+   * Judges whether the user is the metalake admin.
+   *
+   * @param user the name of the user
+   * @return true, if the user is metalake admin, otherwise false.
+   */
+  public boolean isMetalakeAdmin(String user) {
+    return adminManager.isMetalakeAdmin(user);
   }
 }
