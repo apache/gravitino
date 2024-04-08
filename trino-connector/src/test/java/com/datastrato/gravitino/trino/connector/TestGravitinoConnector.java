@@ -34,11 +34,6 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
 
-  @BeforeMethod
-  public void reloadCatalog() {
-    server.reloadCatalogs();
-  }
-
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
     server = closeAfterClass(new GravitinoMockServer());
