@@ -7,6 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 
 import com.datastrato.gravitino.Catalog;
@@ -164,7 +165,8 @@ public class CatalogConnectorManager {
             (NameIdentifier nameIdentifier) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(nameIdentifier);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
+                GravitinoCatalog gravitinoCatalog =
+                    new GravitinoCatalog(metalake.name(), catalog, config.simplifyCatalogNames());
                 if (catalogConnectors.containsKey(gravitinoCatalog.getFullName())) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(metalake, gravitinoCatalog);
@@ -217,23 +219,9 @@ public class CatalogConnectorManager {
   public CatalogConnectorContext getCatalogConnector(String catalogName) {
     CatalogConnectorContext connectorContext = catalogConnectors.get(catalogName);
     if (connectorContext == null) {
-      connectorContext = catalogConnectors.get(canonical(catalogName));
+      connectorContext = catalogConnectors.get(catalogName);
     }
     return connectorContext;
-  }
-
-  private String simplified(String catalogName) {
-    if (config.simplifyCatalogNames() && catalogName.startsWith(config.getMetalake() + ".")) {
-      return catalogName.substring(config.getMetalake().length() + 1);
-    }
-    return catalogName;
-  }
-
-  private String canonical(String catalogName) {
-    if (config.simplifyCatalogNames() && !catalogName.startsWith(config.getMetalake() + ".")) {
-      return config.getMetalake() + "." + catalogName;
-    }
-    return catalogName;
   }
 
   public List<GravitinoCatalog> getCatalogs() {
@@ -378,6 +366,12 @@ public class CatalogConnectorManager {
   }
 
   public void addMetalake(String metalake) {
+    if (config.simplifyCatalogNames()) {
+      if (!usedMetalakes.isEmpty())
+        throw new TrinoException(
+            GRAVITINO_MISSING_CONFIG,
+            "Multiple meta lakes are not supported when setting gravitino.simplify-catalog-names = true");
+    }
     usedMetalakes.add(metalake);
   }
 }
