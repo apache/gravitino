@@ -10,8 +10,7 @@ This software is licensed under the Apache License version 2."
 Gravitino supports using `Relational Entity Storage` to store metadata after version `0.5.0`.  
 
 #### Target users
-`Relational Entity Storage` is mainly aimed at users who are accustomed to using RDBMS to store data or lack available KV storage
-to help them better to use Gravitino.  
+`Relational Entity Storage` is mainly aimed at users who are accustomed to using `RDBMS` to store data or lack available a KV storage, and want to use Gravitino.  
 
 #### Advantages
 With `Relational Entity Storage`, you can quickly deploy Gravitino in a production environment and take advantage of relational
