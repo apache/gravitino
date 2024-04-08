@@ -148,7 +148,9 @@ public class CatalogConnectorManager {
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
-        Arrays.stream(catalogNames).map(NameIdentifier::toString).collect(Collectors.toSet());
+        Arrays.stream(catalogNames)
+            .map(config.simplifyCatalogNames() ? NameIdentifier::name : NameIdentifier::toString)
+            .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
       if (!catalogNameStrings.contains(entry.getKey())
@@ -370,7 +372,7 @@ public class CatalogConnectorManager {
       if (!usedMetalakes.isEmpty())
         throw new TrinoException(
             GRAVITINO_MISSING_CONFIG,
-            "Multiple meta lakes are not supported when setting gravitino.simplify-catalog-names = true");
+            "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
     }
     usedMetalakes.add(metalake);
   }
