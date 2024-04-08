@@ -38,7 +38,14 @@ public class HivePropertiesConverter implements PropertiesConverter {
           "hive.input-format",
           HivePropertiesConstants.GRAVITINO_HIVE_INPUT_FORMAT,
           "hive.serde",
-          HivePropertiesConstants.GRAVITINO_HIVE_SERDE_LIB);
+          HivePropertiesConstants.GRAVITINO_HIVE_SERDE_LIB,
+          HivePropertiesConstants.SPARK_HIVE_LOCATION,
+          HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION);
+
+  static final Map<String, String> gravitinoToSparkPropertyMap =
+      ImmutableMap.of(
+          HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION,
+          HivePropertiesConstants.SPARK_HIVE_LOCATION);
 
   /**
    * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored-as" = "PARQUET" in property.
@@ -80,6 +87,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
           HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
           HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE.name());
     }
+
     sparkToGravitinoPropertyMap.forEach(
         (sparkProperty, gravitinoProperty) -> {
           if (gravitinoTableProperties.containsKey(sparkProperty)) {
@@ -96,10 +104,19 @@ public class HivePropertiesConverter implements PropertiesConverter {
     Map<String, String> sparkTableProperties = toOptionProperties(properties);
     String hiveTableType =
         sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
+
     if (HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE.equalsIgnoreCase(hiveTableType)) {
       sparkTableProperties.remove(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
       sparkTableProperties.put(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true");
     }
+
+    gravitinoToSparkPropertyMap.forEach(
+        (gravitinoProperty, sparkProperty) -> {
+          if (sparkTableProperties.containsKey(gravitinoProperty)) {
+            String value = sparkTableProperties.remove(gravitinoProperty);
+            sparkTableProperties.put(sparkProperty, value);
+          }
+        });
 
     return sparkTableProperties;
   }

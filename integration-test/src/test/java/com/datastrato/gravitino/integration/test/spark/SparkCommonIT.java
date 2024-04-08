@@ -670,6 +670,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
+  protected void deleteDirIfExists(String path) {
+    try {
+      Path dir = new Path(path);
+      if (hdfs.exists(dir)) {
+        hdfs.delete(dir, true);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   void testTableOptions() {
     String tableName = "options_table";
