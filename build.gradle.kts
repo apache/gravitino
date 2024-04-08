@@ -61,7 +61,6 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Found unsupported Scala version: $scalaVersion")
 }
-val sparkMajorVersion: String = libs.versions.spark.get().substringBeforeLast(".")
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
@@ -609,7 +608,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleSparkConnector")
+    dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -630,17 +629,9 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
-  val assembleSparkConnector by register("assembleSparkConnector", Copy::class) {
-    dependsOn("spark-connector:spark-connector-runtime:shadowJar")
-    group = "gravitino distribution"
-    finalizedBy("checksumSparkConnector")
-    from("spark-connector/spark-connector-runtime/build/libs/${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar")
-    into(projectDir.dir("distribution"))
-  }
-
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumSparkConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -657,10 +648,6 @@ tasks {
   register("checksumTrinoConnector") {
     group = "gravitino distribution"
     dependsOn(assembleTrinoConnector)
-    // To fix gradle assembleDistribution errors: "Task ':checksumTrinoConnector' uses this output
-    // of task ':assembleSparkConnector' without declaring an explicit or implicit dependency", this
-    // will not add depends on assembleSparkConnector.
-    mustRunAfter(assembleSparkConnector)
     val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -670,21 +657,6 @@ tasks {
     doLast {
       checksumFile.get().writeText(
         serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  register("checksumSparkConnector") {
-    group = "gravitino distribution"
-    dependsOn(assembleSparkConnector)
-    val sparkJarName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion-$version.jar"
-    var sparkJarFile = projectDir.dir("distribution").asFile.resolve(sparkJarName)
-    var checksumFile = file("$sparkJarFile.sha256")
-    inputs.file(sparkJarFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.writeText(
-        serviceOf<ChecksumService>().sha256(sparkJarFile).toString()
       )
     }
   }
