@@ -516,4 +516,23 @@ public class CatalogsPage extends AbstractWebIT {
       return false;
     }
   }
+
+  public boolean verifyRefreshedTablePage(List<String> treeNodes) {
+    try {
+      List<WebElement> list =
+          treeView.findElements(
+              By.xpath(
+                  "./div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement webElement : list) {
+        String nodeName =
+            webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
+        texts.add(nodeName);
+      }
+      return texts.containsAll(treeNodes);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
 }
