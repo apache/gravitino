@@ -5,12 +5,18 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
+import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
+import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -18,12 +24,16 @@ import com.datastrato.gravitino.storage.IdGenerator;
  */
 public class AccessControlManager {
 
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+  private static final Logger LOG = LoggerFactory.getLogger(AccessControlManager.class);
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
+  private final EntityStore store;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
+    this.store = store;
   }
 
   /**
@@ -36,6 +46,7 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+    checkMetalakeExists(metalake);
     return userGroupManager.addUser(metalake, name);
   }
 
@@ -48,6 +59,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeUser(String metalake, String user) {
+    checkMetalakeExists(metalake);
     return userGroupManager.removeUser(metalake, user);
   }
 
@@ -61,6 +73,7 @@ public class AccessControlManager {
    * @throws RuntimeException If getting the User encounters storage issues.
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
+    checkMetalakeExists(metalake);
     return userGroupManager.getUser(metalake, user);
   }
 
@@ -74,6 +87,7 @@ public class AccessControlManager {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+    checkMetalakeExists(metalake);
     return userGroupManager.addGroup(metalake, group);
   }
 
@@ -86,6 +100,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   public boolean removeGroup(String metalake, String group) {
+    checkMetalakeExists(metalake);
     return userGroupManager.removeGroup(metalake, group);
   }
 
@@ -99,6 +114,7 @@ public class AccessControlManager {
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
+    checkMetalakeExists(metalake);
     return userGroupManager.getGroup(metalake, group);
   }
 
@@ -143,5 +159,18 @@ public class AccessControlManager {
    */
   public boolean isMetalakeAdmin(String user) {
     return adminManager.isMetalakeAdmin(user);
+  }
+
+  private void checkMetalakeExists(String metalake) throws NoSuchMetalakeException {
+    try {
+      NameIdentifier metalakeIdent = NameIdentifier.ofMetalake(metalake);
+      if (!store.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
+        LOG.warn("Metalake {} does not exist", metalakeIdent);
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to do storage operation", e);
+      throw new RuntimeException(e);
+    }
   }
 }
