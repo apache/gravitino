@@ -1,0 +1,334 @@
+
+*****************************************************
+Summary
+-------
+Generated at: 2024-04-05T15:42:29+11:00
+
+Notes: 2
+Binaries: 8
+Archives: 1
+Standards: 107
+
+Apache Licensed: 2
+Generated Documents: 0
+
+JavaDocs are generated, thus a license header is optional.
+Generated files do not require license headers.
+
+13 Unknown Licenses
+
+*****************************************************
+
+Files with unapproved licenses:
+
+  ./NOTICE.bin
+  ./next-env.d.ts
+  ./pnpm-lock.yaml
+  ./rat.txt
+  ./build/tmp/buildWar/MANIFEST.MF
+  ./build/tmp/war/MANIFEST.MF
+  ./dist/ui/404.html
+  ./dist/ui/index.html
+  ./dist/ui/index.txt
+  ./dist/ui/login.html
+  ./dist/ui/login.txt
+  ./dist/ui/metalakes.html
+  ./dist/ui/metalakes.txt
+
+*****************************************************
+
+Archives:
+
+ + ./build/libs/gravitino-web-0.5.0-SNAPSHOT.war
+ 
+*****************************************************
+  Files with Apache License headers will be marked AL
+  Binary files (which do not require any license headers) will be marked B
+  Compressed archives will be marked A
+  Notices, licenses etc. will be marked N
+  B     ./.DS_Store
+  DS    ./.editorconfig
+  DS    ./.env
+  DS    ./.env.analyze
+  DS    ./.env.static
+  DS    ./.eslintrc.js
+  DS    ./.gitignore
+  DS    ./.npmrc
+  DS    ./.nvmrc
+  DS    ./.prettierignore
+  DS    ./.prettierrc.js
+  N     ./LICENSE
+  AL    ./LICENSE.bin
+  N     ./NOTICE
+ !????? ./NOTICE.bin
+  DS    ./README.md
+  DS    ./build.gradle.kts
+ !????? ./next-env.d.ts
+  DS    ./next.config.js
+  B     ./package.json
+ !????? ./pnpm-lock.yaml
+  DS    ./postcss.config.js
+ !????? ./rat.txt
+  DS    ./tailwind.config.js
+  B     ./tsconfig.json
+  AL    ./WEB-INF/web.xml
+  A     ./build/libs/gravitino-web-0.5.0-SNAPSHOT.war
+ !????? ./build/tmp/buildWar/MANIFEST.MF
+ !????? ./build/tmp/war/MANIFEST.MF
+ !????? ./dist/ui/404.html
+ !????? ./dist/ui/index.html
+ !????? ./dist/ui/index.txt
+ !????? ./dist/ui/login.html
+ !????? ./dist/ui/login.txt
+ !????? ./dist/ui/metalakes.html
+ !????? ./dist/ui/metalakes.txt
+  B     ./dist/ui/icons/favicon.ico
+  B     ./dist/ui/icons/gravitino.ico
+  DS    ./dist/ui/icons/gravitino.svg
+  B     ./lib/.DS_Store
+  B     ./public/icons/favicon.ico
+  B     ./public/icons/gravitino.ico
+  DS    ./public/icons/gravitino.svg
+  DS    ./src/app/layout.js
+  DS    ./src/app/page.js
+  DS    ./src/app/template.js
+  DS    ./src/app/login/page.js
+  DS    ./src/app/metalakes/CreateMetalakeDialog.js
+  DS    ./src/app/metalakes/TableBody.js
+  DS    ./src/app/metalakes/TableHeader.js
+  DS    ./src/app/metalakes/layout.js
+  DS    ./src/app/metalakes/page.js
+  DS    ./src/app/metalakes/metalake/MetalakePageLeftBar.js
+  DS    ./src/app/metalakes/metalake/MetalakeTree.js
+  DS    ./src/app/metalakes/metalake/MetalakeView.js
+  DS    ./src/app/metalakes/metalake/rightContent/CreateCatalogDialog.js
+  DS    ./src/app/metalakes/metalake/rightContent/MetalakePath.js
+  DS    ./src/app/metalakes/metalake/rightContent/RightContent.js
+  DS    ./src/app/metalakes/metalake/rightContent/tabsContent/TabsContent.js
+  DS    ./src/app/metalakes/metalake/rightContent/tabsContent/detailsView/DetailsView.js
+  DS    ./src/app/metalakes/metalake/rightContent/tabsContent/tableView/TableView.js
+  DS    ./src/app/rootLayout/AppBar.js
+  DS    ./src/app/rootLayout/Footer.js
+  DS    ./src/app/rootLayout/Layout.js
+  DS    ./src/app/rootLayout/Loading.js
+  DS    ./src/app/rootLayout/Logout.js
+  DS    ./src/app/rootLayout/MainContent.js
+  DS    ./src/app/rootLayout/ScrollToTop.js
+  DS    ./src/app/rootLayout/VersionView.js
+  DS    ./src/app/rootLayout/navigation-events.js
+  DS    ./src/components/ColumnTypeChip.js
+  DS    ./src/components/ConfirmDeleteDialog.js
+  DS    ./src/components/DetailsDrawer.js
+  DS    ./src/components/EmptyText.js
+  DS    ./src/components/Icon.js
+  DS    ./src/components/StyledToast.js
+  DS    ./src/lib/api/auth/index.js
+  DS    ./src/lib/api/catalogs/index.js
+  DS    ./src/lib/api/filesets/index.js
+  DS    ./src/lib/api/metalakes/index.js
+  DS    ./src/lib/api/schemas/index.js
+  DS    ./src/lib/api/tables/index.js
+  DS    ./src/lib/api/version/index.js
+  DS    ./src/lib/enums/columnTypeEnum.ts
+  MIT   ./src/lib/enums/httpEnum.ts
+  DS    ./src/lib/hooks/useHasMounted.js
+  DS    ./src/lib/hooks/useStore.js
+  DS    ./src/lib/provider/client.js
+  DS    ./src/lib/provider/emotion.js
+  DS    ./src/lib/provider/index.js
+  DS    ./src/lib/provider/session.js
+  DS    ./src/lib/provider/store.js
+  DS    ./src/lib/provider/theme.js
+  DS    ./src/lib/settings/index.js
+  DS    ./src/lib/store/index.js
+  DS    ./src/lib/store/auth/index.js
+  DS    ./src/lib/store/metalakes/index.js
+  DS    ./src/lib/store/sys/index.js
+  DS    ./src/lib/styles/globals.css
+  DS    ./src/lib/theme/colors.js
+  DS    ./src/lib/theme/mui.js
+  DS    ./src/lib/theme/screens.js
+  DS    ./src/lib/theme/tailwind.js
+  DS    ./src/lib/utils/color.js
+  DS    ./src/lib/utils/date.js
+  DS    ./src/lib/utils/index.js
+  DS    ./src/lib/utils/initial.js
+  DS    ./src/lib/utils/is.ts
+  DS    ./src/lib/utils/regex.js
+  MIT   ./src/lib/utils/axios/Axios.ts
+  MIT   ./src/lib/utils/axios/axiosCancel.ts
+  MIT   ./src/lib/utils/axios/axiosRetry.ts
+  MIT   ./src/lib/utils/axios/axiosTransform.ts
+  MIT   ./src/lib/utils/axios/checkStatus.ts
+  MIT   ./src/lib/utils/axios/helper.ts
+  MIT   ./src/lib/utils/axios/index.ts
+  MIT   ./src/types/axios.d.ts
+  DS    ./src/types/global.d.ts
+ 
+*****************************************************
+
+ Printing headers for text files without a valid license header...
+ 
+=====================================================
+== File: ./NOTICE.bin
+=====================================================
+Gravitino
+Copyright 2023 Datastrato Pvt Ltd
+
+This product includes software developed at
+Datastrato (https://datastrato.ai).
+
+Apache Zeppelin
+Copyright 2016-2023 The Apache Software Foundation
+
+=====================================================
+== File: ./next-env.d.ts
+=====================================================
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/basic-features/typescript for more information.
+
+=====================================================
+== File: ./pnpm-lock.yaml
+=====================================================
+lockfileVersion: '6.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+dependencies:
+  '@emotion/cache':
+    specifier: ^11.11.0
+    version: 11.11.0
+  '@emotion/react':
+    specifier: ^11.11.1
+    version: 11.11.3(@types/react@18.2.47)(react@18.2.0)
+  '@emotion/styled':
+    specifier: ^11.11.0
+    version: 11.11.0(@emotion/react@11.11.3)(@types/react@18.2.47)(react@18.2.0)
+  '@hookform/resolvers':
+    specifier: ^3.3.2
+    version: 3.3.4(react-hook-form@7.49.3)
+  '@mui/icons-material':
+    specifier: ^5.15.11
+    version: 5.15.11(@mui/material@5.15.3)(@types/react@18.2.47)(react@18.2.0)
+  '@mui/lab':
+    specifier: ^5.0.0-alpha.153
+    version: 5.0.0-alpha.159(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@mui/material@5.15.3)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
+  '@mui/material':
+    specifier: ^5.14.18
+    version: 5.15.3(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
+  '@mui/x-data-grid':
+    specifier: ^6.18.2
+    version: 6.18.7(@mui/material@5.15.3)(@mui/system@5.15.3)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
+  '@mui/x-tree-view':
+    specifier: ^6.17.0
+    version: 6.17.0(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@mui/material@5.15.3)(@mui/system@5.15.3)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
+  '@reduxjs/toolkit':
+    specifier: ^1.9.7
+    version: 1.9.7(react-redux@8.1.3)(react@18.2.0)
+  antd:
+    specifier: ^5.13.3
+    version: 5.13.3(react-dom@18.2.0)(react@18.2.0)
+  axios:
+    specifier: ^1.6.8
+    version: 1.6.8
+  chroma-js:
+    specifier: ^2.4.2
+    version: 2.4.2
+  clsx:
+    specifier: ^2.0.0
+    version: 2.1.0
+  dayjs:
+
+=====================================================
+== File: ./rat.txt
+=====================================================
+
+=====================================================
+== File: ./build/tmp/buildWar/MANIFEST.MF
+=====================================================
+Manifest-Version: 1.0
+
+
+=====================================================
+== File: ./build/tmp/war/MANIFEST.MF
+=====================================================
+Manifest-Version: 1.0
+
+
+=====================================================
+== File: ./dist/ui/404.html
+=====================================================
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/ui/_next/static/css/650463e418ce8170.css" crossorigin="" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin=""/><script src="/ui/_next/static/chunks/c141e8ea-85f4c6d5270b2c42.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/569-d492bcc6dcbd8264.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/main-app-0011ac6e902669a4.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/278-2b2a5ff5b0c3bd66.js" async=""></script><script src="/ui/_next/static/chunks/176-e0585bca503d4139.js" async=""></script><script src="/ui/_next/static/chunks/927-178968f1e8a38df6.js" async=""></script><script src="/ui/_next/static/chunks/801-1592f4dbf5b8b808.js" async=""></script><script src="/ui/_next/static/chunks/959-6e445271d3a26971.js" async=""></script><script src="/ui/_next/static/chunks/277-98f8602386b472ce.js" async=""></script><script src="/ui/_next/static/chunks/779-7b1cd3db3187ad4f.js" async=""></script><script src="/ui/_next/static/chunks/app/layout-24a36e31748abce4.js" async=""></script><title>Gravitino</title><meta name="description" content="A high-performance, geo-distributed and federated metadata lake."/><link rel="icon" href="/ui/icons/gravitino.svg"/><script src="/ui/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js" crossorigin="" noModule=""></script></head><body><div><div style="position:fixed;z-index:9999;top:16px;left:16px;right:16px;bottom:16px;pointer-events:none"></div></div><script src="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin="" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])</script><script>self.__next_f.push([1,"1:HL[\"/ui/_next/static/css/650463e418ce8170.css\",\"style\",{\"crossOrigin\":\"\"}]\n0:\"$L2\"\n"])</script><script>self.__next_f.push([1,"3:I[45574,[],\"\"]\n5:I[14191,[],\"\"]\n6:I[94419,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n7:I[89869,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585"])</script><script>self.__next_f.push([1,"bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"NavigationEvents\"]\n8:I[59180,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.j"])</script><script>self.__next_f.push([1,"s\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n9:I[20825,[],\"\"]\na:I[94348,[],\"\"]\n10:I[39142,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b4"])</script><script>self.__next_f.push([1,"72ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\nc:{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"}\nd:{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"}\ne:{\"dis"])</script><script>self.__next_f.push([1,"play\":\"inline-block\"}\nf:{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0}\n"])</script><script>self.__next_f.push([1,"2:[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/ui/_next/static/css/650463e418ce8170.css\",\"precedence\":\"next\",\"crossOrigin\":\"\"}]],[\"$\",\"$L3\",null,{\"buildId\":\"gQPuwgPwXOJJ37OKAvBUg\",\"assetPrefix\":\"/ui\",\"initialCanonicalUrl\":\"/_not-found\",\"initialTree\":[\"\",{\"children\":[\"__PAGE__\",{}]},\"$undefined\",\"$undefined\",true],\"initialHead\":[false,\"$L4\"],\"globalErrorComponent\":\"$5\",\"children\":[null,[\"$\",\"html\",null,{\"lang\":\"en\",\"suppressHydrationWarning\":true,\"children\":[\"$\",\"body\",null,{\"children\":[[\"$\",\"$L6\",null,{\"children\":[[\"$\",\"$L7\",null,{}],[\"$\",\"$L8\",null,{\"children\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"div\",null,{\"className\":\"root-template twc-h-full\",\"children\":[\"$\",\"$La\",null,{}]}],\"templateStyles\":[],\"templateScripts\":[],\"notFound\":[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":\"404\"}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],\"notFoundStyles\":[],\"initialChildNode\":[\"$Lb\",[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":\"$c\",\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":\"$d\",\"children\":\"404\"}],[\"$\",\"div\",null,{\"style\":\"$e\",\"children\":[\"$\",\"h2\",null,{\"style\":\"$f\",\"children\":\"This page could not be found.\"}]}]]}]}]],null],\"childPropSegment\":\"__PAGE__\",\"styles\":null}]}]]}],[\"$\",\"$L10\",null,{}]]}]}],null]}]]\n"])</script><script>self.__next_f.push([1,"4:[[\"$\",\"meta\",\"0\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1\"}],[\"$\",\"meta\",\"1\",{\"charSet\":\"utf-8\"}],[\"$\",\"title\",\"2\",{\"children\":\"Gravitino\"}],[\"$\",\"meta\",\"3\",{\"name\":\"description\",\"content\":\"A high-performance, geo-distributed and federated metadata lake.\"}],[\"$\",\"link\",\"4\",{\"rel\":\"icon\",\"href\":\"/ui/icons/gravitino.svg\"}]]\nb:null\n"])</script><script>self.__next_f.push([1,""])</script></body></html>
+
+=====================================================
+== File: ./dist/ui/index.html
+=====================================================
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/ui/_next/static/css/650463e418ce8170.css" crossorigin="" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin=""/><script src="/ui/_next/static/chunks/c141e8ea-85f4c6d5270b2c42.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/569-d492bcc6dcbd8264.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/main-app-0011ac6e902669a4.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/278-2b2a5ff5b0c3bd66.js" async=""></script><script src="/ui/_next/static/chunks/176-e0585bca503d4139.js" async=""></script><script src="/ui/_next/static/chunks/927-178968f1e8a38df6.js" async=""></script><script src="/ui/_next/static/chunks/801-1592f4dbf5b8b808.js" async=""></script><script src="/ui/_next/static/chunks/959-6e445271d3a26971.js" async=""></script><script src="/ui/_next/static/chunks/277-98f8602386b472ce.js" async=""></script><script src="/ui/_next/static/chunks/779-7b1cd3db3187ad4f.js" async=""></script><script src="/ui/_next/static/chunks/app/layout-24a36e31748abce4.js" async=""></script><script src="/ui/_next/static/chunks/app/page-d0bfe4be1fa2d53d.js" async=""></script><title>Gravitino</title><meta name="description" content="A high-performance, geo-distributed and federated metadata lake."/><link rel="icon" href="/ui/icons/gravitino.svg"/><script src="/ui/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js" crossorigin="" noModule=""></script></head><body><div><div style="position:fixed;z-index:9999;top:16px;left:16px;right:16px;bottom:16px;pointer-events:none"></div></div><script src="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin="" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])</script><script>self.__next_f.push([1,"1:HL[\"/ui/_next/static/css/650463e418ce8170.css\",\"style\",{\"crossOrigin\":\"\"}]\n0:\"$L2\"\n"])</script><script>self.__next_f.push([1,"3:I[45574,[],\"\"]\n5:I[14191,[],\"\"]\n6:I[94419,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n7:I[89869,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585"])</script><script>self.__next_f.push([1,"bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"NavigationEvents\"]\n8:I[59180,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.j"])</script><script>self.__next_f.push([1,"s\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n9:I[20825,[],\"\"]\na:I[94348,[],\"\"]\nc:I[88303,[],\"\"]\nd:I[19661,[\"931\",\"static/chunks/app/page-d0bfe4be1fa2d53d.js\"],\"\"]\ne:I[39142,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\","])</script><script>self.__next_f.push([1,"\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n"])</script><script>self.__next_f.push([1,"2:[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/ui/_next/static/css/650463e418ce8170.css\",\"precedence\":\"next\",\"crossOrigin\":\"\"}]],[\"$\",\"$L3\",null,{\"buildId\":\"gQPuwgPwXOJJ37OKAvBUg\",\"assetPrefix\":\"/ui\",\"initialCanonicalUrl\":\"/\",\"initialTree\":[\"\",{\"children\":[\"__PAGE__\",{}]},\"$undefined\",\"$undefined\",true],\"initialHead\":[false,\"$L4\"],\"globalErrorComponent\":\"$5\",\"children\":[null,[\"$\",\"html\",null,{\"lang\":\"en\",\"suppressHydrationWarning\":true,\"children\":[\"$\",\"body\",null,{\"children\":[[\"$\",\"$L6\",null,{\"children\":[[\"$\",\"$L7\",null,{}],[\"$\",\"$L8\",null,{\"children\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"div\",null,{\"className\":\"root-template twc-h-full\",\"children\":[\"$\",\"$La\",null,{}]}],\"templateStyles\":[],\"templateScripts\":[],\"notFound\":[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":\"404\"}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],\"notFoundStyles\":[],\"initialChildNode\":[\"$Lb\",[\"$\",\"$Lc\",null,{\"propsForComponent\":{\"params\":{}},\"Component\":\"$d\",\"isStaticGeneration\":true}],null],\"childPropSegment\":\"__PAGE__\",\"styles\":null}]}]]}],[\"$\",\"$Le\",null,{}]]}]}],null]}]]\n"])</script><script>self.__next_f.push([1,"4:[[\"$\",\"meta\",\"0\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1\"}],[\"$\",\"meta\",\"1\",{\"charSet\":\"utf-8\"}],[\"$\",\"title\",\"2\",{\"children\":\"Gravitino\"}],[\"$\",\"meta\",\"3\",{\"name\":\"description\",\"content\":\"A high-performance, geo-distributed and federated metadata lake.\"}],[\"$\",\"link\",\"4\",{\"rel\":\"icon\",\"href\":\"/ui/icons/gravitino.svg\"}]]\nb:null\n"])</script><script>self.__next_f.push([1,""])</script></body></html>
+
+=====================================================
+== File: ./dist/ui/index.txt
+=====================================================
+1:HL["/ui/_next/static/css/650463e418ce8170.css","style",{"crossOrigin":""}]
+0:["gQPuwgPwXOJJ37OKAvBUg",[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"/ui/_next/static/css/650463e418ce8170.css","precedence":"next","crossOrigin":""}]],"$L3"]]]]
+4:I[94419,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+5:I[89869,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],"NavigationEvents"]
+6:I[59180,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+7:I[20825,[],""]
+8:I[94348,[],""]
+a:I[88303,[],""]
+b:I[19661,["931","static/chunks/app/page-d0bfe4be1fa2d53d.js"],""]
+c:I[39142,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+2:[null,["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":["$","body",null,{"children":[["$","$L4",null,{"children":[["$","$L5",null,{}],["$","$L6",null,{"children":["$","$L7",null,{"parallelRouterKey":"children","segmentPath":["children"],"loading":"$undefined","loadingStyles":"$undefined","loadingScripts":"$undefined","hasLoading":false,"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","div",null,{"className":"root-template twc-h-full","children":["$","$L8",null,{}]}],"templateStyles":[],"templateScripts":[],"notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"initialChildNode":["$L9",["$","$La",null,{"propsForComponent":{"params":{}},"Component":"$b","isStaticGeneration":true}],null],"childPropSegment":"__PAGE__","styles":null}]}]]}],["$","$Lc",null,{}]]}]}],null]
+3:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"Gravitino"}],["$","meta","3",{"name":"description","content":"A high-performance, geo-distributed and federated metadata lake."}],["$","link","4",{"rel":"icon","href":"/ui/icons/gravitino.svg"}]]
+9:null
+
+=====================================================
+== File: ./dist/ui/login.html
+=====================================================
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/ui/_next/static/css/650463e418ce8170.css" crossorigin="" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin=""/><script src="/ui/_next/static/chunks/c141e8ea-85f4c6d5270b2c42.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/569-d492bcc6dcbd8264.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/main-app-0011ac6e902669a4.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/278-2b2a5ff5b0c3bd66.js" async=""></script><script src="/ui/_next/static/chunks/176-e0585bca503d4139.js" async=""></script><script src="/ui/_next/static/chunks/927-178968f1e8a38df6.js" async=""></script><script src="/ui/_next/static/chunks/801-1592f4dbf5b8b808.js" async=""></script><script src="/ui/_next/static/chunks/959-6e445271d3a26971.js" async=""></script><script src="/ui/_next/static/chunks/277-98f8602386b472ce.js" async=""></script><script src="/ui/_next/static/chunks/779-7b1cd3db3187ad4f.js" async=""></script><script src="/ui/_next/static/chunks/app/layout-24a36e31748abce4.js" async=""></script><script src="/ui/_next/static/chunks/48-bac643e16523a2e1.js" async=""></script><script src="/ui/_next/static/chunks/app/login/page-cdaef1390593782e.js" async=""></script><title>Gravitino</title><meta name="description" content="A high-performance, geo-distributed and federated metadata lake."/><link rel="icon" href="/ui/icons/gravitino.svg"/><script src="/ui/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js" crossorigin="" noModule=""></script></head><body><div><div style="position:fixed;z-index:9999;top:16px;left:16px;right:16px;bottom:16px;pointer-events:none"></div></div><script src="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin="" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])</script><script>self.__next_f.push([1,"1:HL[\"/ui/_next/static/css/650463e418ce8170.css\",\"style\",{\"crossOrigin\":\"\"}]\n0:\"$L2\"\n"])</script><script>self.__next_f.push([1,"3:I[45574,[],\"\"]\n5:I[14191,[],\"\"]\n6:I[94419,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n7:I[89869,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585"])</script><script>self.__next_f.push([1,"bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"NavigationEvents\"]\n8:I[59180,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.j"])</script><script>self.__next_f.push([1,"s\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n9:I[20825,[],\"\"]\na:I[94348,[],\"\"]\nc:I[88303,[],\"\"]\nd:I[63530,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"48\",\"static/chunks/48-bac643e16523a2e1.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"626\",\"static/chunks/app/login/page-cdaef1390593782e.js\"],\"\"]\ne:I[391"])</script><script>self.__next_f.push([1,"42,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n"])</script><script>self.__next_f.push([1,"2:[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/ui/_next/static/css/650463e418ce8170.css\",\"precedence\":\"next\",\"crossOrigin\":\"\"}]],[\"$\",\"$L3\",null,{\"buildId\":\"gQPuwgPwXOJJ37OKAvBUg\",\"assetPrefix\":\"/ui\",\"initialCanonicalUrl\":\"/login\",\"initialTree\":[\"\",{\"children\":[\"login\",{\"children\":[\"__PAGE__\",{}]}]},\"$undefined\",\"$undefined\",true],\"initialHead\":[false,\"$L4\"],\"globalErrorComponent\":\"$5\",\"children\":[null,[\"$\",\"html\",null,{\"lang\":\"en\",\"suppressHydrationWarning\":true,\"children\":[\"$\",\"body\",null,{\"children\":[[\"$\",\"$L6\",null,{\"children\":[[\"$\",\"$L7\",null,{}],[\"$\",\"$L8\",null,{\"children\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"div\",null,{\"className\":\"root-template twc-h-full\",\"children\":[\"$\",\"$La\",null,{}]}],\"templateStyles\":[],\"templateScripts\":[],\"notFound\":[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":\"404\"}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],\"notFoundStyles\":[],\"initialChildNode\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\",\"login\",\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"$La\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":\"$undefined\",\"notFoundStyles\":\"$undefined\",\"initialChildNode\":[\"$Lb\",[\"$\",\"$Lc\",null,{\"propsForComponent\":{\"params\":{}},\"Component\":\"$d\",\"isStaticGeneration\":true}],null],\"childPropSegment\":\"__PAGE__\",\"styles\":null}],\"childPropSegment\":\"login\",\"styles\":null}]}]]}],[\"$\",\"$Le\",null,{}]]}]}],null]}]]\n"])</script><script>self.__next_f.push([1,"4:[[\"$\",\"meta\",\"0\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1\"}],[\"$\",\"meta\",\"1\",{\"charSet\":\"utf-8\"}],[\"$\",\"title\",\"2\",{\"children\":\"Gravitino\"}],[\"$\",\"meta\",\"3\",{\"name\":\"description\",\"content\":\"A high-performance, geo-distributed and federated metadata lake.\"}],[\"$\",\"link\",\"4\",{\"rel\":\"icon\",\"href\":\"/ui/icons/gravitino.svg\"}]]\nb:null\n"])</script><script>self.__next_f.push([1,""])</script></body></html>
+
+=====================================================
+== File: ./dist/ui/login.txt
+=====================================================
+1:HL["/ui/_next/static/css/650463e418ce8170.css","style",{"crossOrigin":""}]
+0:["gQPuwgPwXOJJ37OKAvBUg",[[["",{"children":["login",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"/ui/_next/static/css/650463e418ce8170.css","precedence":"next","crossOrigin":""}]],"$L3"]]]]
+4:I[94419,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+5:I[89869,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],"NavigationEvents"]
+6:I[59180,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+7:I[20825,[],""]
+8:I[94348,[],""]
+a:I[88303,[],""]
+b:I[63530,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","48","static/chunks/48-bac643e16523a2e1.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","626","static/chunks/app/login/page-cdaef1390593782e.js"],""]
+c:I[39142,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+2:[null,["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":["$","body",null,{"children":[["$","$L4",null,{"children":[["$","$L5",null,{}],["$","$L6",null,{"children":["$","$L7",null,{"parallelRouterKey":"children","segmentPath":["children"],"loading":"$undefined","loadingStyles":"$undefined","loadingScripts":"$undefined","hasLoading":false,"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","div",null,{"className":"root-template twc-h-full","children":["$","$L8",null,{}]}],"templateStyles":[],"templateScripts":[],"notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"initialChildNode":["$","$L7",null,{"parallelRouterKey":"children","segmentPath":["children","login","children"],"loading":"$undefined","loadingStyles":"$undefined","loadingScripts":"$undefined","hasLoading":false,"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L8",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","initialChildNode":["$L9",["$","$La",null,{"propsForComponent":{"params":{}},"Component":"$b","isStaticGeneration":true}],null],"childPropSegment":"__PAGE__","styles":null}],"childPropSegment":"login","styles":null}]}]]}],["$","$Lc",null,{}]]}]}],null]
+3:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"Gravitino"}],["$","meta","3",{"name":"description","content":"A high-performance, geo-distributed and federated metadata lake."}],["$","link","4",{"rel":"icon","href":"/ui/icons/gravitino.svg"}]]
+9:null
+
+=====================================================
+== File: ./dist/ui/metalakes.html
+=====================================================
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/ui/_next/static/css/650463e418ce8170.css" crossorigin="" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin=""/><script src="/ui/_next/static/chunks/c141e8ea-85f4c6d5270b2c42.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/569-d492bcc6dcbd8264.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/main-app-0011ac6e902669a4.js" async="" crossorigin=""></script><script src="/ui/_next/static/chunks/278-2b2a5ff5b0c3bd66.js" async=""></script><script src="/ui/_next/static/chunks/176-e0585bca503d4139.js" async=""></script><script src="/ui/_next/static/chunks/927-178968f1e8a38df6.js" async=""></script><script src="/ui/_next/static/chunks/801-1592f4dbf5b8b808.js" async=""></script><script src="/ui/_next/static/chunks/959-6e445271d3a26971.js" async=""></script><script src="/ui/_next/static/chunks/277-98f8602386b472ce.js" async=""></script><script src="/ui/_next/static/chunks/779-7b1cd3db3187ad4f.js" async=""></script><script src="/ui/_next/static/chunks/app/layout-24a36e31748abce4.js" async=""></script><script src="/ui/_next/static/chunks/48-bac643e16523a2e1.js" async=""></script><script src="/ui/_next/static/chunks/875-1a27c465bd36bd52.js" async=""></script><script src="/ui/_next/static/chunks/415-2485c1c4dcc5cc7a.js" async=""></script><script src="/ui/_next/static/chunks/322-553c57bbba39aca1.js" async=""></script><script src="/ui/_next/static/chunks/app/metalakes/layout-bcc2cd6e67d1ca5e.js" async=""></script><script src="/ui/_next/static/chunks/app/metalakes/page-41371082f56906b1.js" async=""></script><title>Gravitino</title><meta name="description" content="A high-performance, geo-distributed and federated metadata lake."/><link rel="icon" href="/ui/icons/gravitino.svg"/><script src="/ui/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js" crossorigin="" noModule=""></script></head><body><div><div style="position:fixed;z-index:9999;top:16px;left:16px;right:16px;bottom:16px;pointer-events:none"></div></div><script src="/ui/_next/static/chunks/webpack-02228d551a6ca896.js" crossorigin="" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])</script><script>self.__next_f.push([1,"1:HL[\"/ui/_next/static/css/650463e418ce8170.css\",\"style\",{\"crossOrigin\":\"\"}]\n0:\"$L2\"\n"])</script><script>self.__next_f.push([1,"3:I[45574,[],\"\"]\n5:I[14191,[],\"\"]\n6:I[94419,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n7:I[89869,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585"])</script><script>self.__next_f.push([1,"bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"NavigationEvents\"]\n8:I[59180,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.j"])</script><script>self.__next_f.push([1,"s\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\n9:I[20825,[],\"\"]\na:I[94348,[],\"\"]\n"])</script><script>self.__next_f.push([1,"b:I[6372,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"48\",\"static/chunks/48-bac643e16523a2e1.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"875\",\"static/chunks/875-1a27c465bd36bd52.js\",\"415\",\"static/chunks/415-2485c1c4dcc5cc7a.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"322\",\"static/chunks/322-553c57bbba39aca1.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"702\",\"static/chunks/app/metalakes/layout-bcc2cd6e67d1ca5e.js\"],\"\"]\n"])</script><script>self.__next_f.push([1,"d:I[88303,[],\"\"]\ne:I[51236,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"48\",\"static/chunks/48-bac643e16523a2e1.js\",\"927\",\"static/chunks/927-178968f1e8a38df6.js\",\"415\",\"static/chunks/415-2485c1c4dcc5cc7a.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"465\",\"static/chunks/app/metalakes/page-41371082f56906b1.js\"],\"\"]\n10:I[39142,[\"278\",\"static/chunks/278-2b2a5ff5b0c3bd66.js\",\"176\",\"static/chunks/176-e0585bca503d4139.js\",\"927\",\"static/chunks/927-178968f1e8a38df"])</script><script>self.__next_f.push([1,"6.js\",\"801\",\"static/chunks/801-1592f4dbf5b8b808.js\",\"959\",\"static/chunks/959-6e445271d3a26971.js\",\"277\",\"static/chunks/277-98f8602386b472ce.js\",\"779\",\"static/chunks/779-7b1cd3db3187ad4f.js\",\"185\",\"static/chunks/app/layout-24a36e31748abce4.js\"],\"\"]\nf:{}\n"])</script><script>self.__next_f.push([1,"2:[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/ui/_next/static/css/650463e418ce8170.css\",\"precedence\":\"next\",\"crossOrigin\":\"\"}]],[\"$\",\"$L3\",null,{\"buildId\":\"gQPuwgPwXOJJ37OKAvBUg\",\"assetPrefix\":\"/ui\",\"initialCanonicalUrl\":\"/metalakes\",\"initialTree\":[\"\",{\"children\":[\"metalakes\",{\"children\":[\"__PAGE__\",{}]}]},\"$undefined\",\"$undefined\",true],\"initialHead\":[false,\"$L4\"],\"globalErrorComponent\":\"$5\",\"children\":[null,[\"$\",\"html\",null,{\"lang\":\"en\",\"suppressHydrationWarning\":true,\"children\":[\"$\",\"body\",null,{\"children\":[[\"$\",\"$L6\",null,{\"children\":[[\"$\",\"$L7\",null,{}],[\"$\",\"$L8\",null,{\"children\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"div\",null,{\"className\":\"root-template twc-h-full\",\"children\":[\"$\",\"$La\",null,{}]}],\"templateStyles\":[],\"templateScripts\":[],\"notFound\":[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":\"404\"}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],\"notFoundStyles\":[],\"initialChildNode\":[null,[\"$\",\"$Lb\",null,{\"children\":[\"$\",\"$L9\",null,{\"parallelRouterKey\":\"children\",\"segmentPath\":[\"children\",\"metalakes\",\"children\"],\"loading\":\"$undefined\",\"loadingStyles\":\"$undefined\",\"loadingScripts\":\"$undefined\",\"hasLoading\":false,\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"$La\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":\"$undefined\",\"notFoundStyles\":\"$undefined\",\"initialChildNode\":[\"$Lc\",[\"$\",\"$Ld\",null,{\"propsForComponent\":{\"params\":{}},\"Component\":\"$e\",\"isStaticGeneration\":true}],null],\"childPropSegment\":\"__PAGE__\",\"styles\":null}],\"params\":\"$f\"}],null],\"childPropSegment\":\"metalakes\",\"styles\":null}]}]]}],[\"$\",\"$L10\",null,{}]]}]}],null]}]]\n"])</script><script>self.__next_f.push([1,"4:[[\"$\",\"meta\",\"0\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1\"}],[\"$\",\"meta\",\"1\",{\"charSet\":\"utf-8\"}],[\"$\",\"title\",\"2\",{\"children\":\"Gravitino\"}],[\"$\",\"meta\",\"3\",{\"name\":\"description\",\"content\":\"A high-performance, geo-distributed and federated metadata lake.\"}],[\"$\",\"link\",\"4\",{\"rel\":\"icon\",\"href\":\"/ui/icons/gravitino.svg\"}]]\nc:null\n"])</script><script>self.__next_f.push([1,""])</script></body></html>
+
+=====================================================
+== File: ./dist/ui/metalakes.txt
+=====================================================
+1:HL["/ui/_next/static/css/650463e418ce8170.css","style",{"crossOrigin":""}]
+0:["gQPuwgPwXOJJ37OKAvBUg",[[["",{"children":["metalakes",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],"$L2",[[["$","link","0",{"rel":"stylesheet","href":"/ui/_next/static/css/650463e418ce8170.css","precedence":"next","crossOrigin":""}]],"$L3"]]]]
+4:I[94419,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+5:I[89869,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],"NavigationEvents"]
+6:I[59180,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+7:I[20825,[],""]
+8:I[94348,[],""]
+9:I[6372,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","48","static/chunks/48-bac643e16523a2e1.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","875","static/chunks/875-1a27c465bd36bd52.js","415","static/chunks/415-2485c1c4dcc5cc7a.js","801","static/chunks/801-1592f4dbf5b8b808.js","322","static/chunks/322-553c57bbba39aca1.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","702","static/chunks/app/metalakes/layout-bcc2cd6e67d1ca5e.js"],""]
+b:I[88303,[],""]
+c:I[51236,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","48","static/chunks/48-bac643e16523a2e1.js","927","static/chunks/927-178968f1e8a38df6.js","415","static/chunks/415-2485c1c4dcc5cc7a.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","465","static/chunks/app/metalakes/page-41371082f56906b1.js"],""]
+e:I[39142,["278","static/chunks/278-2b2a5ff5b0c3bd66.js","176","static/chunks/176-e0585bca503d4139.js","927","static/chunks/927-178968f1e8a38df6.js","801","static/chunks/801-1592f4dbf5b8b808.js","959","static/chunks/959-6e445271d3a26971.js","277","static/chunks/277-98f8602386b472ce.js","779","static/chunks/779-7b1cd3db3187ad4f.js","185","static/chunks/app/layout-24a36e31748abce4.js"],""]
+d:{}
+2:[null,["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":["$","body",null,{"children":[["$","$L4",null,{"children":[["$","$L5",null,{}],["$","$L6",null,{"children":["$","$L7",null,{"parallelRouterKey":"children","segmentPath":["children"],"loading":"$undefined","loadingStyles":"$undefined","loadingScripts":"$undefined","hasLoading":false,"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","div",null,{"className":"root-template twc-h-full","children":["$","$L8",null,{}]}],"templateStyles":[],"templateScripts":[],"notFound":[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":"404"}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],"notFoundStyles":[],"initialChildNode":[null,["$","$L9",null,{"children":["$","$L7",null,{"parallelRouterKey":"children","segmentPath":["children","metalakes","children"],"loading":"$undefined","loadingStyles":"$undefined","loadingScripts":"$undefined","hasLoading":false,"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L8",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","initialChildNode":["$La",["$","$Lb",null,{"propsForComponent":{"params":{}},"Component":"$c","isStaticGeneration":true}],null],"childPropSegment":"__PAGE__","styles":null}],"params":"$d"}],null],"childPropSegment":"metalakes","styles":null}]}]]}],["$","$Le",null,{}]]}]}],null]
+3:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"Gravitino"}],["$","meta","3",{"name":"description","content":"A high-performance, geo-distributed and federated metadata lake."}],["$","link","4",{"rel":"icon","href":"/ui/icons/gravitino.svg"}]]
+a:null
