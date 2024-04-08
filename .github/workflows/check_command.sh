@@ -6,7 +6,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 if ! command -v docker-proxy &> /dev/null; then
-    echo "wget could not be found, exiting."
+    echo "docker-proxy could not be found, exiting."
     exit 1
 fi
 
