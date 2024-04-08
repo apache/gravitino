@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.spark.connector.iceberg;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
-import com.datastrato.gravitino.shaded.com.google.common.collect.ImmutableMap;
 import com.datastrato.gravitino.shaded.com.google.common.collect.ImmutableSet;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import java.util.HashMap;
@@ -32,10 +31,10 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
   }
 
   private Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
-    ImmutableMap.Builder<String, String> tableProperties = ImmutableMap.builder();
+    Map<String, String> tableProperties = new HashMap<>();
     createProperties.entrySet().stream()
         .filter(entry -> !RESERVED_PROPERTIES.contains(entry.getKey()))
-        .forEach(tableProperties::put);
+        .forEach(entry -> tableProperties.put(entry.getKey(), entry.getValue()));
 
     String provider = createProperties.get(IcebergTablePropertiesMetadata.PROVIDER);
     if (IcebergPropertiesConstants.SPARK_ICEBERG_PARQUET_FORMAT.equalsIgnoreCase(provider)) {
@@ -60,6 +59,6 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
       tableProperties.put(IcebergTablePropertiesMetadata.LOCATION, localtion);
     }
 
-    return tableProperties.build();
+    return tableProperties;
   }
 }

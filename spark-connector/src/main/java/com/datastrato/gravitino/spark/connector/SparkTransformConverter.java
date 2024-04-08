@@ -73,7 +73,10 @@ public class SparkTransformConverter {
         .filter(transform -> !isSortBucketTransform(transform))
         .map(
             transform -> {
-              if (transform instanceof BucketTransform && !isHiveProvider) {
+              if (transform instanceof BucketTransform) {
+                if (isHiveProvider) {
+                  return Transforms.EMPTY_TRANSFORM;
+                }
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =
