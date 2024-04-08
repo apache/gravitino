@@ -297,7 +297,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     Preconditions.checkArgument(
         matcher.matches() && matcher.groupCount() == 3,
         "URI %s doesn't contains valid identifier",
-        virtualUri);
+        virtualPath);
 
     return NameIdentifier.ofFileset(
         metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));

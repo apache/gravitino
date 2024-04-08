@@ -43,11 +43,11 @@ public class FileSystemTestUtils {
   }
 
   public static Path createLocalRootDir(String filesetCatalog) {
-    return new Path(LOCAL_FS_PREFIX + filesetCatalog);
+    return new Path(String.format("%s/%s", LOCAL_FS_PREFIX, filesetCatalog));
   }
 
   public static Path createLocalDirPrefix(String filesetCatalog, String schema, String fileset) {
-    return new Path(LOCAL_FS_PREFIX + "/" + filesetCatalog + "/" + schema + "/" + fileset);
+    return new Path(String.format("%s/%s/%s/%s", LOCAL_FS_PREFIX, filesetCatalog, schema, fileset));
   }
 
   public static void create(Path path, FileSystem fileSystem) throws IOException {
