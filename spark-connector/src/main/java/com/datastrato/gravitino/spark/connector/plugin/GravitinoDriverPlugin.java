@@ -44,8 +44,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
-    Set<String> catalogs = catalogManager.listCatalogs();
-    registerGravitinoCatalogs(conf, catalogs);
+    catalogManager.loadRelationalCatalogs();
+    Set<String> catalogNames = catalogManager.getCatalogNames();
+    registerGravitinoCatalogs(conf, catalogNames);
     registerSqlExtensions();
     return Collections.emptyMap();
   }
