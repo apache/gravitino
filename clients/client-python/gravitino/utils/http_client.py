@@ -2,7 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
-
+import logging
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -12,6 +12,7 @@ from gravitino.typing import JSON_ro
 from gravitino.utils.exceptions import handle_error
 from gravitino.constants import TIMEOUT
 
+logger = logging.getLogger(__name__)
 
 class Response:
     def __init__(self, response):
@@ -19,6 +20,11 @@ class Response:
         self._body = response.read()
         self._headers = response.info()
         self._url = response.url
+
+        logging.basicConfig(level=logging.DEBUG)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        logger.addHandler(console_handler)
 
     @property
     def status_code(self):
@@ -100,10 +106,16 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
+        logger.error("Requesting {}".format(endpoint))
+
         if headers:
             self._update_headers(headers)
+        else:
+            headers = {'Content-Type': 'application/json', 'Accept': 'application/vnd.gravitino.v1+json'}
+            self._update_headers(headers)
+
         if json:
-            request_data = _json.dumps(json).encode("utf-8")
+            request_data = json.to_json().encode("utf-8")
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -127,6 +139,9 @@ class HTTPClient:
 
     def put(self, endpoint, json=None, **kwargs):
         return self._request("put", endpoint, json=json, **kwargs)
+
+    def close(self):
+        self._request("close")
 
 
 def unpack(path: str):
