@@ -240,12 +240,17 @@ Currently, Gravitino Virtual File System supports two kinds of authentication ty
 Please make sure that your Gravitino server also configure the `simple` authentication mode firstly.  
 Then, you can configure the Hadoop configuration like this:
 ```java
+    // Simple type allows the client to use the environment variable `GRAVITINO_USER` as the user.
+    // If the environment variable `GRAVITINO_USER` isn't set,
+    // the client uses the user of the machine that sends requests.
+    System.setProperty("GRAVITINO_USER", "test");
+
     Configuration conf = new Configuration();
     conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.Gvfs");
     conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
-    // configure the auth type to simple,
+    // Configure the auth type to simple,
     // or do not configure this configuration, gvfs will use simple type as default.
     conf.set("fs.gravitino.client.authType", "simple");
     Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
@@ -264,9 +269,9 @@ Then, you can configure the Hadoop configuration like this:
     conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
-    // configure the auth type to oatuh2,
+    // Configure the auth type to oatuh2.
     conf.set("fs.gravitino.client.authType", "oauth2");
-    // configure the oauth conifiguration
+    // Configure the oauth conifiguration.
     conf.set("fs.gravitino.client.oauth2.serverUri", "${your_oauth_server_uri}");
     conf.set("fs.gravitino.client.oauth2.credential", "${your_client_credential}");
     conf.set("fs.gravitino.client.oauth2.path", "${your_oauth_server_path}");
