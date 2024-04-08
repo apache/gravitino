@@ -7,7 +7,16 @@ This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino supports using `Relational Entity Storage` to store metadata after version `0.5.0`. Currently, you can use `MySQL` as the jdbc backend for `Relational Entity Storage`.
+Gravitino supports using `Relational Entity Storage` to store metadata after version `0.5.0`.  
+
+#### Target users
+`Relational Entity Storage` is mainly aimed at users who are accustomed to using RDBMS to store data or lack available KV storage
+to help them better to use Gravitino.  
+
+#### Advantages
+With `Relational Entity Storage`, you can quickly deploy Gravitino in a production environment and take advantage of relational
+storage to manage metadata.  
+Currently, you can use `MySQL` as the jdbc backend for `Relational Entity Storage`.
 
 ## Steps for usage
 
@@ -22,7 +31,7 @@ Gravitino supports using `Relational Entity Storage` to store metadata after ver
 You need `download` and `unzip` the distribution package firstly, please see: [How to install Gravitino](how-to-install.md).
 Then you can get the initialization script in the directory:
 ```text
-${distribution_package_directory}/scripts/relational-entity-store/jdbc/mysql/
+${distribution_package_directory}/scripts/relational-entity-store/mysql/
 ```
 The script names like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.  
 For example, if your Gravitino version is `0.5.0`, then you should choose the `schema-0.5.0-mysql.sql` script.
