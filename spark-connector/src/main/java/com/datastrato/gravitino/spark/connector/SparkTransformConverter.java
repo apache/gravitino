@@ -70,9 +70,18 @@ public class SparkTransformConverter {
     }
 
     return Arrays.stream(transforms)
+        .filter(transform -> !isSortBucketTransform(transform))
         .map(
             transform -> {
-              if (transform instanceof IdentityTransform) {
+              if (transform instanceof BucketTransform) {
+                BucketTransform bucketTransform = (BucketTransform) transform;
+                int numBuckets = (int) bucketTransform.numBuckets().value();
+                String[][] fieldNames =
+                    Arrays.stream(bucketTransform.references())
+                        .map(org.apache.spark.sql.connector.expressions.NamedReference::fieldNames)
+                        .toArray(String[][]::new);
+                return Transforms.bucket(numBuckets, fieldNames);
+              } else if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
               } else if (transform instanceof HoursTransform) {
@@ -323,6 +332,11 @@ public class SparkTransformConverter {
   private static boolean isBucketTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
     return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
+  }
+
+  private static boolean isSortBucketTransform(
+      org.apache.spark.sql.connector.expressions.Transform transform) {
+    return transform instanceof SortedBucketTransform;
   }
 
   // Referred from org.apache.iceberg.spark.Spark3Util

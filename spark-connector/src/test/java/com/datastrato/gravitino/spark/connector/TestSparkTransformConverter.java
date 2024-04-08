@@ -203,6 +203,9 @@ public class TestSparkTransformConverter {
         SparkTransformConverter.createSparkIdentityTransform("a.b"),
         Transforms.identity(new String[] {"a", "b"}));
     sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkBucketTransform(10, new String[] {"a"}),
+        Transforms.bucket(10, new String[] {"a"}));
+    sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkHoursTransform(new String[] {"date"}),
         Transforms.hour("date"));
     sparkToGravitinoPartitionTransformMaps.put(
