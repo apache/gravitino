@@ -15,14 +15,24 @@ import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 
 public class TestDorisAbstractIT extends TestJdbcAbstractIT {
+  private static final Logger LOG = LoggerFactory.getLogger(TestDorisAbstractIT.class);
+
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
+
+  private static final String DORIS_FE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/fe/";
+  private static final String DORIS_BE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/be/";
 
   @BeforeAll
   public static void startup() {
@@ -40,6 +50,34 @@ public class TestDorisAbstractIT extends TestJdbcAbstractIT {
         new DorisTypeConverter(),
         new DorisColumnDefaultValueConverter(),
         Collections.emptyMap());
+  }
+
+  // Overwrite the stop method to close the data source and stop the container
+  @AfterAll
+  public static void stop() {
+    try {
+      GenericContainer<?> dorisContainer = containerSuite.getDorisContainer().getContainer();
+      // stop Doris container
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy doris log file to {}", destPath);
+
+      String feTarPath = "/doris-be.tar";
+      String beTarPath = "/doris-fe.tar";
+
+      // Pack the jar files
+      dorisContainer.execInContainer("tar", "cf", feTarPath, DORIS_BE_PATH + "log");
+      dorisContainer.execInContainer("tar", "cf", beTarPath, DORIS_FE_PATH + "log");
+
+      dorisContainer.copyFileFromContainer(feTarPath, destPath + File.separator + "doris-be.tar");
+      dorisContainer.copyFileFromContainer(beTarPath, destPath + File.separator + "doris-fe.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to copy container log to local", e);
+    }
+
+    DataSourceUtils.closeDataSource(DATA_SOURCE);
+    if (null != CONTAINER) {
+      CONTAINER.stop();
+    }
   }
 
   private static Map<String, String> getDorisCatalogProperties() {

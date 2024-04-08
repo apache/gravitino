@@ -95,12 +95,14 @@ jobs:
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate test reports
+          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
             build/reports
             integration-test/build/integration-test-integration-test.log
+            integration-test/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
+            catalogs/**/*.tar
