@@ -20,9 +20,15 @@ include(
 )
 include("catalogs:catalog-hadoop")
 include("catalogs:catalog-messaging-kafka")
-include("clients:client-java", "clients:client-java-runtime")
+include(
+  "clients:client-java",
+  "clients:client-java-runtime",
+  "clients:filesystem-hadoop3",
+  "clients:filesystem-hadoop3-runtime",
+  "clients:client-python"
+)
 include("trino-connector")
-include("spark-connector")
+include("spark-connector:spark-connector", "spark-connector:spark-connector-runtime")
 include("web")
 include("docs")
 include("integration-test-common")

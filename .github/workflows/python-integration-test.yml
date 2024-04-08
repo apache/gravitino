@@ -1,0 +1,83 @@
+name: Python Client Integration Test
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main", "branch-*" ]
+  pull_request:
+    branches: [ "main", "branch-*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - clients/client-python/**
+              - common/**
+              - conf/**
+              - core/**
+              - meta/**
+              - server/**
+              - server-common/**
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
+  # Integration test for AMD64 architecture
+  test-amd64-arch:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 8 ]
+    env:
+      PLATFORM: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Python Client Integration Test
+        id: integrationTest
+        run: |
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          for pythonVersion in "3.8" "3.9" "3.10" "3.11"
+          do
+            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :client:client-python:integrationTest
+          done
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        with:
+          name: integrate test reports
+          path: |
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log

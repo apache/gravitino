@@ -21,6 +21,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
@@ -32,7 +33,6 @@ import java.util.Objects;
  */
 @Evolving
 public interface TableChange {
-
   /**
    * Create a TableChange for renaming a table.
    *
@@ -90,7 +90,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType) {
-    return new AddColumn(fieldName, dataType, null, null, true, false);
+    return new AddColumn(
+        fieldName, dataType, null, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -106,7 +107,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, String comment) {
-    return new AddColumn(fieldName, dataType, comment, null, true, false);
+    return new AddColumn(
+        fieldName, dataType, comment, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -122,7 +124,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, null, position, true, false);
+    return new AddColumn(
+        fieldName, dataType, null, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -140,7 +143,8 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, comment, position, true, false);
+    return new AddColumn(
+        fieldName, dataType, comment, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -156,7 +160,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, boolean nullable) {
-    return new AddColumn(fieldName, dataType, null, null, nullable, false);
+    return new AddColumn(
+        fieldName, dataType, null, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -170,7 +175,67 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, null, nullable, false);
+    return new AddColumn(
+        fieldName, dataType, comment, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldName, Type dataType, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, String comment, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, ColumnPosition position, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, position, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, position, true, false, defaultValue);
   }
 
   /**
@@ -193,7 +258,8 @@ public interface TableChange {
       String comment,
       ColumnPosition position,
       boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, position, nullable, false);
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -218,7 +284,42 @@ public interface TableChange {
       ColumnPosition position,
       boolean nullable,
       boolean autoIncrement) {
-    return new AddColumn(fieldName, dataType, comment, position, nullable, autoIncrement);
+    return new AddColumn(
+        fieldName,
+        dataType,
+        comment,
+        position,
+        nullable,
+        autoIncrement,
+        Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @param autoIncrement The new column's autoIncrement.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
   }
 
   /**
@@ -235,6 +336,21 @@ public interface TableChange {
    */
   static TableChange renameColumn(String[] fieldName, String newName) {
     return new RenameColumn(fieldName, newName);
+  }
+
+  /**
+   * Create a TableChange for updating the default value of a field.
+   *
+   * <p>The name is used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName The field name of the column to update.
+   * @param newDefaultValue The new default value.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
+    return new UpdateColumnDefaultValue(fieldName, newDefaultValue);
   }
 
   /**
@@ -830,8 +946,8 @@ public interface TableChange {
     private final String comment;
     private final ColumnPosition position;
     private final boolean nullable;
-
     private final boolean autoIncrement;
+    private final Expression defaultValue;
 
     private AddColumn(
         String[] fieldName,
@@ -839,13 +955,15 @@ public interface TableChange {
         String comment,
         ColumnPosition position,
         boolean nullable,
-        boolean autoIncrement) {
+        boolean autoIncrement,
+        Expression defaultValue) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
       this.autoIncrement = autoIncrement;
+      this.defaultValue = defaultValue;
     }
 
     /**
@@ -903,6 +1021,15 @@ public interface TableChange {
     }
 
     /**
+     * Retrieves the default value of the new column.
+     *
+     * @return The default value of the column.
+     */
+    public Expression getDefaultValue() {
+      return defaultValue;
+    }
+
+    /**
      * Compares this AddColumn instance with another object for equality. The comparison is based on
      * the field name, data type, comment, position, and nullability.
      *
@@ -919,7 +1046,8 @@ public interface TableChange {
           && Arrays.equals(fieldName, addColumn.fieldName)
           && Objects.equals(dataType, addColumn.dataType)
           && Objects.equals(comment, addColumn.comment)
-          && Objects.equals(position, addColumn.position);
+          && Objects.equals(position, addColumn.position)
+          && Objects.equals(defaultValue, addColumn.defaultValue);
     }
 
     /**
@@ -930,7 +1058,7 @@ public interface TableChange {
      */
     @Override
     public int hashCode() {
-      int result = Objects.hash(dataType, comment, position, nullable, autoIncrement);
+      int result = Objects.hash(dataType, comment, position, nullable, autoIncrement, defaultValue);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }
@@ -1007,6 +1135,71 @@ public interface TableChange {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+  }
+
+  /**
+   * A TableChange to update the default of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class UpdateColumnDefaultValue implements ColumnChange {
+    private final String[] fieldName;
+    private final Expression newDefaultValue;
+
+    private UpdateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /**
+     * Retrieves the field name of the column whose default value is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    /**
+     * Retrieves the new default value for the column.
+     *
+     * @return The new default value of the column.
+     */
+    public Expression getNewDefaultValue() {
+      return newDefaultValue;
+    }
+
+    /**
+     * Compares this UpdateColumnDefaultValue instance with another object for equality. The
+     * comparison is based on the field name array and the new default value.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same default value update; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnDefaultValue that = (UpdateColumnDefaultValue) o;
+      return Arrays.equals(fieldName, that.fieldName)
+          && Objects.equals(newDefaultValue, that.newDefaultValue);
+    }
+
+    /**
+     * Generates a hash code for this UpdateColumnDefaultValue instance. The hash code is based on
+     * both the hierarchical field name and the new default value.
+     *
+     * @return A hash code value for this default value update operation.
+     */
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newDefaultValue);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
   }
 

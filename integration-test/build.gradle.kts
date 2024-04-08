@@ -23,13 +23,13 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":clients:filesystem-hadoop3"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector")) {
-    exclude("org.apache.iceberg")
+  testImplementation(project(":spark-connector:spark-connector")) {
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
@@ -135,16 +135,17 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    val skipWebITs = project.hasProperty("skipWebITs")
     if (skipWebITs) {
       exclude("**/integration/test/web/ui/**")
     }
 
     dependsOn(":trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar", ":catalogs:catalog-jdbc-doris:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")

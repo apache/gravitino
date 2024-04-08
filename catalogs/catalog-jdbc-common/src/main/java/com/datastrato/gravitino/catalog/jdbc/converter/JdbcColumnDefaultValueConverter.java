@@ -19,6 +19,8 @@ public class JdbcColumnDefaultValueConverter {
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+  protected static final DateTimeFormatter DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {

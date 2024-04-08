@@ -24,8 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Parameters;
@@ -33,8 +31,6 @@ import org.testng.annotations.Test;
 
 @Parameters({"-Xmx4G"})
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
-
-  private static final Logger LOG = LoggerFactory.getLogger(TestGravitinoConnector.class);
 
   GravitinoMockServer server;
 

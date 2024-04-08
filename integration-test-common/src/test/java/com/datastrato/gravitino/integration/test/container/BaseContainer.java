@@ -48,7 +48,7 @@ public abstract class BaseContainer implements AutoCloseable {
   // Network of the container
   private final Optional<Network> network;
 
-  private final GenericContainer<?> container;
+  protected final GenericContainer<?> container;
 
   protected BaseContainer(
       String image,
@@ -95,6 +95,10 @@ public abstract class BaseContainer implements AutoCloseable {
   // This method is used to set the log output of the container.
   protected void withLogConsumer(Consumer<OutputFrame> logConsumer) {
     container.withLogConsumer(logConsumer);
+  }
+
+  protected void withStartupTimeout(Duration duration) {
+    container.withStartupTimeout(duration);
   }
 
   // This method is used to get the expose port number of the container.

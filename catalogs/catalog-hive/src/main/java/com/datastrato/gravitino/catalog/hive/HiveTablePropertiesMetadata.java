@@ -57,11 +57,11 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   @VisibleForTesting
   public static final String ORC_SERDE_CLASS = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
 
-  private static final String PARQUET_INPUT_FORMAT_CLASS =
+  public static final String PARQUET_INPUT_FORMAT_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
-  private static final String PARQUET_OUTPUT_FORMAT_CLASS =
+  public static final String PARQUET_OUTPUT_FORMAT_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat";
-  private static final String PARQUET_SERDE_CLASS =
+  public static final String PARQUET_SERDE_CLASS =
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
   private static final String COLUMNAR_SERDE_CLASS =
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
@@ -89,7 +89,10 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
     VIRTUAL_INDEX,
   }
 
-  enum StorageFormat {
+  // In embedded test mode, HiveTablePropertiesMetadata will be loaded by spark connector which has
+  // different classloaders with Hive catalog. If StorageFormat is package scope, it couldn't
+  // be accessed by Hive catalog related classes in same package, so making it public.
+  public enum StorageFormat {
     SEQUENCEFILE(
         SEQUENCEFILE_INPUT_FORMAT_CLASS, SEQUENCEFILE_OUTPUT_FORMAT_CLASS, LAZY_SIMPLE_SERDE_CLASS),
     TEXTFILE(TEXT_INPUT_FORMAT_CLASS, IGNORE_KEY_OUTPUT_FORMAT_CLASS, LAZY_SIMPLE_SERDE_CLASS),

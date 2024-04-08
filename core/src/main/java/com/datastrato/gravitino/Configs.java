@@ -7,7 +7,9 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 public interface Configs {
@@ -32,6 +34,24 @@ public interface Configs {
 
   Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
   String KV_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
+
+  // Config for data keep time after soft deletion, in milliseconds.
+  String STORE_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.deleteAfterTimeMs";
+  // using the fallback default value
+  Long DEFAULT_STORE_DELETE_AFTER_TIME = DEFAULT_KV_DELETE_AFTER_TIME;
+  // The maximum allowed keep time for data deletion, in milliseconds. Equivalent to 30 days.
+  Long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L;
+  // The minimum allowed keep time for data deletion, in milliseconds. Equivalent to 10 minutes.
+  Long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L;
+
+  // Count of versions allowed to be retained, including the current version, used to delete old
+  // versions data.
+  String VERSION_RETENTION_COUNT_KEY = "gravitino.entity.store.versionRetentionCount";
+  Long DEFAULT_VERSION_RETENTION_COUNT = 1L;
+  // The maximum allowed count of versions to be retained
+  Long MAX_VERSION_RETENTION_COUNT = 10L;
+  // The minimum allowed count of versions to be retained
+  Long MIN_VERSION_RETENTION_COUNT = 1L;
 
   // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
@@ -146,10 +166,57 @@ public interface Configs {
   ConfigEntry<Long> KV_DELETE_AFTER_TIME =
       new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
           .doc(
-              "The maximum time in milliseconds that the deleted data and old version data is kept")
-          .version(ConfigConstants.VERSION_0_3_0)
+              String.format(
+                  "The maximum time in milliseconds that the deleted data and old version data is kept, "
+                      + "max delete time allow is %s ms(30 days), "
+                      + "min delete time allow is %s ms(10 minutes)",
+                  MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
+          .version(ConfigConstants.VERSION_0_5_0)
+          .deprecated()
           .longConf()
+          .checkValue(
+              v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  KV_DELETE_AFTER_TIME_KEY, MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW))
           .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);
+
+  ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
+      new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
+          .doc(
+              String.format(
+                  "The maximum time in milliseconds that the deleted data and old version data is kept, "
+                      + "max delete time allow is %s ms(30 days), "
+                      + "min delete time allow is %s ms(10 minutes)",
+                  MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
+          .version(ConfigConstants.VERSION_0_5_0)
+          .alternatives(Lists.newArrayList(KV_DELETE_AFTER_TIME_KEY))
+          .longConf()
+          .checkValue(
+              v -> v >= MIN_DELETE_TIME_ALLOW && v <= MAX_DELETE_TIME_ALLOW,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  STORE_DELETE_AFTER_TIME_KEY, MIN_DELETE_TIME_ALLOW, MAX_DELETE_TIME_ALLOW))
+          .createWithDefault(DEFAULT_STORE_DELETE_AFTER_TIME);
+
+  ConfigEntry<Long> VERSION_RETENTION_COUNT =
+      new ConfigBuilder(VERSION_RETENTION_COUNT_KEY)
+          .doc(
+              String.format(
+                  "The count of versions allowed to be retained, including the current version, "
+                      + "max version retention count is %s, "
+                      + "min version retention count is %s",
+                  MAX_VERSION_RETENTION_COUNT, MIN_VERSION_RETENTION_COUNT))
+          .version(ConfigConstants.VERSION_0_5_0)
+          .longConf()
+          .checkValue(
+              v -> v >= MIN_VERSION_RETENTION_COUNT && v <= MAX_VERSION_RETENTION_COUNT,
+              String.format(
+                  "The value of %s is out of range, which must be between %s and %s",
+                  VERSION_RETENTION_COUNT_KEY,
+                  MIN_VERSION_RETENTION_COUNT,
+                  MAX_VERSION_RETENTION_COUNT))
+          .createWithDefault(DEFAULT_VERSION_RETENTION_COUNT);
 
   // The followings are configurations for tree lock
 
@@ -173,4 +240,20 @@ public interface Configs {
           .version(ConfigConstants.VERSION_0_4_0)
           .longConf()
           .createWithDefault(CLEAN_INTERVAL_IN_SECS);
+
+  ConfigEntry<Boolean> ENABLE_AUTHORIZATION =
+      new ConfigBuilder("gravitino.authorization.enable")
+          .doc("Enable the authorization")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  ConfigEntry<List<String>> SERVICE_ADMINS =
+      new ConfigBuilder("gravitino.authorization.serviceAdmins")
+          .doc("The admins of Gravitino service")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .toSequence()
+          .create();
 }
