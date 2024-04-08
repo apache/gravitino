@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.container;
 
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 import com.google.common.base.Preconditions;
 import java.net.Socket;
 import java.net.URISyntaxException;
@@ -12,6 +14,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
@@ -48,46 +51,52 @@ public class KafkaContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-
     String address = getContainerIpAddress();
     Preconditions.checkArgument(
         Strings.isNotBlank(address), "Kafka container IP address is not available.");
     String broker = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
 
-    while (nRetry < retryLimit) {
-      try {
-        Container.ExecResult result =
-            executeInContainer(
-                "sh",
-                "/opt/kafka/bin/kafka-cluster.sh",
-                "cluster-id",
-                "--bootstrap-server",
-                broker);
-        if (result.getStdout().startsWith("Cluster ID:")) {
-          LOG.info("Kafka server has started." + result.getStdout());
-          return true;
-        }
-      } catch (Exception ex) {
-        LOG.warn("Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-      }
+    await()
+        .atMost(1, TimeUnit.MINUTES)
+        .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result =
+                    executeInContainer(
+                        "sh",
+                        "/opt/kafka/bin/kafka-cluster.sh",
+                        "cluster-id",
+                        "--bootstrap-server",
+                        broker);
+                if (result.getStdout().startsWith("Cluster ID:")) {
+                  LOG.info("Kafka server has started." + result.getStdout());
+                  return true;
+                }
+              } catch (Exception ex) {
+                LOG.warn(
+                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
+              }
+              return false;
+            });
 
-      try (Socket socket = new Socket()) {
-        socket.connect(
-            new java.net.InetSocketAddress(getContainerIpAddress(), DEFAULT_BROKER_PORT), 3000);
-      } catch (Exception ex) {
-        LOG.warn("Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
-      }
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try (Socket socket = new Socket()) {
+                socket.connect(
+                    new java.net.InetSocketAddress(getContainerIpAddress(), DEFAULT_BROKER_PORT),
+                    3000);
+              } catch (Exception ex) {
+                LOG.warn(
+                    "Could not connect to Kafka server[{}:{}]", address, DEFAULT_BROKER_PORT, ex);
+                return false;
+              }
+              return true;
+            });
 
-      LOG.info("Kafka container is not ready. Retry in 5 seconds.");
-      try {
-        Thread.sleep(5000);
-      } catch (InterruptedException ex) {
-        LOG.error("Thread sleep interrupted", ex);
-      }
-      nRetry++;
-    }
-    return false;
+    return true;
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, KafkaContainer> {

@@ -18,7 +18,6 @@ import java.util.Set;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
 public class DorisContainer extends BaseContainer {
