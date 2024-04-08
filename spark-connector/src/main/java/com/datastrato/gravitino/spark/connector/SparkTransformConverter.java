@@ -70,7 +70,6 @@ public class SparkTransformConverter {
     }
 
     return Arrays.stream(transforms)
-        .filter(transform -> !isBucketTransform(transform))
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
