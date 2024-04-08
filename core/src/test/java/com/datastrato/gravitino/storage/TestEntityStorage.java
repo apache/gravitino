@@ -1175,18 +1175,19 @@ public class TestEntityStorage {
 
   private static RoleEntity createRole(String metalake, String name, AuditInfo auditInfo) {
     return RoleEntity.builder()
-            .withId(1L)
-            .withNamespace(
-                    Namespace.of(
-                            metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
-            .withName(name)
-            .withAuditInfo(auditInfo)
-            .withPrivilegeEntityIdentifier(NameIdentifier.of(metalake))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
-            .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
-            .withProperties(Collections.emptyMap())
-            .build();
+        .withId(1L)
+        .withNamespace(
+            Namespace.of(
+                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+        .withName(name)
+        .withAuditInfo(auditInfo)
+        .withPrivilegeEntityIdentifier(NameIdentifier.of(metalake))
+        .withPrivilegeEntityType(Entity.EntityType.METALAKE)
+        .withPrivileges(Lists.newArrayList(Privileges.LoadMetalake.get()))
+        .withProperties(Collections.emptyMap())
+        .build();
   }
+
   private void validateDeleteTopicCascade(EntityStore store, TopicEntity topic1)
       throws IOException {
     // Delete the topic 'metalake.catalog.schema1.topic1'
