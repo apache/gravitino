@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -426,17 +427,14 @@ public class CatalogsPage extends AbstractWebIT {
       List<WebElement> list =
           tableGrid.findElements(
               By.xpath(
-                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']"));
+                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
       for (WebElement element : list) {
-        String rowItemColName =
-            element.findElement(By.xpath(".//div[@data-field='name']")).getText();
-        if (!rowItemColName.equals(itemName)) {
-          LOG.error(
-              "the rowItemColName: {} does not match with itemName: {}", rowItemColName, itemName);
-          return false;
+        String rowItemColName = element.getText();
+        if (rowItemColName.equals(itemName)) {
+          return true;
         }
       }
-      return true;
+      return false;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -495,6 +493,24 @@ public class CatalogsPage extends AbstractWebIT {
         return false;
       }
       return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyCreatedCatalogs(List<String> catalogNames) {
+    try {
+      List<WebElement> list =
+          tableGrid.findElements(
+              By.xpath(
+                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement webElement : list) {
+        String rowItemColName = webElement.getText();
+        texts.add(rowItemColName);
+      }
+      return texts.containsAll(catalogNames);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;

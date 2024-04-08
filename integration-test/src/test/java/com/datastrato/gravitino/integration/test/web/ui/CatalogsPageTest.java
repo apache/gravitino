@@ -18,6 +18,8 @@ import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -232,6 +234,14 @@ public class CatalogsPageTest extends AbstractWebIT {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
+    List<String> catalogsNames =
+        Arrays.asList(
+            HIVE_CATALOG_NAME,
+            ICEBERG_CATALOG_NAME,
+            MYSQL_CATALOG_NAME,
+            PG_CATALOG_NAME,
+            FILESET_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyCreatedCatalogs(catalogsNames));
   }
 
   @Test
