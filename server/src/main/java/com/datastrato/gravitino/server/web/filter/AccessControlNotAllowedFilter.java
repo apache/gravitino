@@ -28,6 +28,7 @@ public class AccessControlNotAllowedFilter implements ContainerRequestFilter {
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
+
     requestContext.abortWith(
         Response.status(
                 SC_METHOD_NOT_ALLOWED,

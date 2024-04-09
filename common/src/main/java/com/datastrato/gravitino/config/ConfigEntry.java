@@ -169,10 +169,15 @@ public class ConfigEntry<T> {
    * @return The ConfigEntry instance.
    */
   public ConfigEntry<List<T>> toSequence() {
+    if (validator != null) {
+      throw new IllegalArgumentException(
+          "You can't call the method `checkValue` before calling the method `toSequence`");
+    }
+
     ConfigEntry<List<T>> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     conf.setValueConverter((String str) -> strToSeq(str, valueConverter));
-    conf.setStringConverter((List<T> val) -> seqToStr(val, stringConverter));
+    conf.setStringConverter((List<T> val) -> val == null ? "null" : seqToStr(val, stringConverter));
     return conf;
   }
 

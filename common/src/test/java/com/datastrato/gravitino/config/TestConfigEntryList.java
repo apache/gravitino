@@ -39,7 +39,6 @@ public class TestConfigEntryList {
             .doc("test")
             .internal()
             .stringConf()
-            .checkValue(value -> value == null, "error")
             .toSequence()
             .checkValue(valueList -> valueList.stream().allMatch("test-string"::equals), "error")
             .createWithDefault(Lists.newArrayList("test-string", "test-string", "test-string"));
@@ -130,6 +129,14 @@ public class TestConfigEntryList {
             .checkValue(Objects::nonNull, "error")
             .create();
     Assertions.assertThrows(
-        NullPointerException.class, () -> testConfNoDefault.readFrom(configMap));
+        IllegalArgumentException.class, () -> testConfNoDefault.readFrom(configMap));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new ConfigBuilder("gravitino.test")
+                .intConf()
+                .checkValue(value -> value > 0, "error")
+                .toSequence());
   }
 }
