@@ -81,6 +81,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @AfterAll
   public static void shutdown() {
+    // todo: add drop catalog after it's supported
     client.dropMetalake(NameIdentifier.of(METALAKE_NAME));
     if (adminClient != null) {
       adminClient.close();

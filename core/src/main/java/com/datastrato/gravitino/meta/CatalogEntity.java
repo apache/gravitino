@@ -125,8 +125,8 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Sets the namespace of the catalog entity. because the {@link CatalogEntitySerDe} serializes the
-   * namespace field
+   * Sets the namespace of the catalog entity. because the {@link CatalogEntitySerDe} does not
+   * serialize the namespace field
    *
    * @param namespace the namespace of the catalog entity.
    * @return the instance of the source catalog entity.
