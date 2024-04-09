@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.client;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
-
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
@@ -102,7 +100,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return fromDTO(resp.getTopic());
+    return resp.getTopic();
   }
 
   /**
@@ -140,7 +138,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return fromDTO(resp.getTopic());
+    return resp.getTopic();
   }
 
   /**
@@ -173,7 +171,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return fromDTO(resp.getTopic());
+    return resp.getTopic();
   }
 
   /**

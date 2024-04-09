@@ -13,7 +13,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.dto.messaging.TopicDTO;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
@@ -177,7 +176,6 @@ public class CatalogKafkaIT extends AbstractIT {
             .loadTopic(
                 NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName));
 
-    Assertions.assertFalse(createdTopic instanceof TopicDTO);
     Assertions.assertEquals(createdTopic, loadedTopic);
     assertTopicWithKafka(createdTopic);
     checkTopicReadWrite(topicName);

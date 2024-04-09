@@ -71,7 +71,6 @@ import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -768,56 +767,6 @@ public class DTOConverters {
       @Override
       public Audit auditInfo() {
         return tableDTO.auditInfo();
-      }
-    };
-  }
-
-  /**
-   * Converts a TopicDTO to a Topic.
-   *
-   * @param topicDTO The topic DTO to be converted.
-   * @return The topic.
-   */
-  public static Topic fromDTO(TopicDTO topicDTO) {
-    return new Topic() {
-      @Override
-      public String name() {
-        return topicDTO.name();
-      }
-
-      @Override
-      public String comment() {
-        return topicDTO.comment();
-      }
-
-      @Override
-      public Map<String, String> properties() {
-        return topicDTO.properties();
-      }
-
-      @Override
-      public Audit auditInfo() {
-        return topicDTO.auditInfo();
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(name(), comment(), properties(), auditInfo());
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (this == o) {
-          return true;
-        }
-        if (!(o instanceof Topic)) {
-          return false;
-        }
-        Topic topic = (Topic) o;
-        return Objects.equals(name(), topic.name())
-            && Objects.equals(comment(), topic.comment())
-            && Objects.equals(properties(), topic.properties())
-            && Objects.equals(auditInfo(), topic.auditInfo());
       }
     };
   }
