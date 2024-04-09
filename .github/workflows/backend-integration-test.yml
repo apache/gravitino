@@ -106,7 +106,8 @@ jobs:
             build/reports
             integration-test/build/*.log
             integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log/*
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log

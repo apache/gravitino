@@ -17,6 +17,9 @@ fi
 
 cd ${playground_dir}
 
+# create log dir
+mkdir -p ../build/trino-ci-container-log
+
 docker compose up -d
 
 if [ -n "$GRAVITINO_LOG_PATH" ]; then
@@ -29,12 +32,11 @@ echo "The docker compose log is: $LOG_PATH"
 
 nohup docker compose logs -f  -t >> $LOG_PATH &
 
-max_attempts=600
+max_attempts=0
 
-for ((i = 0; i < max_attempts; i++)); do
+while true; do
     docker compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
-        echo "All docker compose service is now available."
-        exit 0
+        break;
     }
 
     num_container=$(docker ps --format '{{.Names}}' | grep trino-ci | wc -l)
@@ -44,7 +46,20 @@ for ((i = 0; i < max_attempts; i++)); do
     fi
 
     sleep 1
+
+    if [ "$max_attempts" -ge 600 ]; then 
+        echo "ERROR: Trino service did not start within the specified time."
+        exit 1
+    fi
+    ((count++))
 done
 
-echo "ERROR: Trino service did not start within the specified time."
-exit 1
+
+echo "All docker compose service is now available."
+
+docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
+docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
+ls -l ../build/trino-ci-container-log
+ls -l ../build/trino-ci-container-log/hive
+ls -l ../build/trino-ci-container-log/hdfs
+
