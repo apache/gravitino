@@ -95,16 +95,16 @@ public class SparkHiveTable extends HiveTable implements SparkBaseTable {
   // override the scala methods because inherited HiveTable
   @Override
   public boolean canEqual(Object that) {
-    throw new UnsupportedOperationException("Unsupported operation");
+    return ((HiveTable) sparkTable).canEqual(that);
   }
 
   @Override
   public Object productElement(int n) {
-    throw new UnsupportedOperationException("Unsupported operation");
+    return ((HiveTable) sparkTable).productElement(n);
   }
 
   @Override
   public int productArity() {
-    throw new UnsupportedOperationException("Unsupported operation");
+    return ((HiveTable) sparkTable).productArity();
   }
 }
