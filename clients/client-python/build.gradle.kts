@@ -21,6 +21,17 @@ fun deleteCacheDir(targetDir: String) {
   }
 }
 
+fun gravitinoServer(operation: String) {
+    val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
+    val exitCode = process.waitFor()
+    if (exitCode == 0) {
+      val currentContext = process.inputStream.bufferedReader().readText()
+      println("Current docker context is: $currentContext")
+    } else {
+      println("checkOrbStackStatus Command execution failed with exit code $exitCode")
+    }
+}
+
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
@@ -35,12 +46,20 @@ tasks {
   }
 
   val integrationTest by registering(VenvTask::class) {
+    doFirst() {
+      gravitinoServer("start")
+    }
+
     dependsOn(pipInstall)
     venvExec = "python"
-    args = listOf("-m", "unittest", "tests/test_integration_gravitino_client.py")
+    args = listOf("-m", "unittest")
     workingDir = projectDir.resolve(".")
     environment = mapOf("PROJECT_VERSION" to project.version,
-      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package")
+      "GRADLE_START_GRAVITINO" to "True")
+
+    doLast {
+      gravitinoServer("stop")
+    }
   }
 
   val build by registering(VenvTask::class) {
