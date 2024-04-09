@@ -6,15 +6,11 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
-import com.datastrato.gravitino.lock.LockType;
-import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
@@ -51,17 +47,12 @@ public class UserOperations {
   @ResponseMetered(name = "get-user", absolute = true)
   public Response getUser(@PathParam("metalake") String metalake, @PathParam("user") String user) {
     try {
-      NameIdentifier ident = ofUser(metalake, user);
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new UserResponse(
-                      DTOConverters.toDTO(
-                          TreeLockUtils.doWithTreeLock(
-                              ident,
-                              LockType.READ,
-                              () -> accessControlManager.getUser(metalake, user))))));
+                      DTOConverters.toDTO(accessControlManager.getUser(metalake, user)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
     }
@@ -73,17 +64,13 @@ public class UserOperations {
   @ResponseMetered(name = "add-user", absolute = true)
   public Response addUser(@PathParam("metalake") String metalake, UserAddRequest request) {
     try {
-      NameIdentifier ident = ofUser(metalake, request.getName());
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new UserResponse(
                       DTOConverters.toDTO(
-                          TreeLockUtils.doWithTreeLock(
-                              ident,
-                              LockType.WRITE,
-                              () -> accessControlManager.addUser(metalake, request.getName()))))));
+                          accessControlManager.addUser(metalake, request.getName())))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -101,10 +88,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = ofUser(metalake, user);
-            boolean removed =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> accessControlManager.removeUser(metalake, user));
+            boolean removed = accessControlManager.removeUser(metalake, user);
             if (!removed) {
               LOG.warn("Failed to remove user {} under metalake {}", user, metalake);
             }
@@ -113,10 +97,5 @@ public class UserOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, metalake, e);
     }
-  }
-
-  private NameIdentifier ofUser(String metalake, String user) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 }

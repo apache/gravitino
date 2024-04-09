@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.container;
 import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Map;
@@ -26,6 +27,9 @@ public class HiveContainer extends BaseContainer {
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
+
+  private static final String HIVE_LOG_PATH = "/tmp/root/";
+  private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
 
   public static Builder builder() {
     return new Builder();
@@ -50,8 +54,31 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void start() {
-    super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
+    try {
+      super.start();
+      Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
+    } finally {
+      copyHiveLog();
+    }
+  }
+
+  private void copyHiveLog() {
+    try {
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy hive log file to {}", destPath);
+
+      String hiveLogJarPath = "/hive.tar";
+      String HdfsLogJarPath = "/hdfs.tar";
+
+      // Pack the jar files
+      container.execInContainer("tar", "cf", hiveLogJarPath, HIVE_LOG_PATH);
+      container.execInContainer("tar", "cf", HdfsLogJarPath, HDFS_LOG_PATH);
+
+      container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
+      container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
+    } catch (Exception e) {
+      LOG.warn("Can't copy hive log for:", e);
+    }
   }
 
   @Override
