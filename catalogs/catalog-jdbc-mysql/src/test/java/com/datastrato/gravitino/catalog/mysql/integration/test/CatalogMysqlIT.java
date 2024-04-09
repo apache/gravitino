@@ -1032,7 +1032,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     RuntimeException exception =
         Assertions.assertThrowsExactly(
-            RuntimeException.class,
+            UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(identer, "comment", null));
     Assertions.assertTrue(
         exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));

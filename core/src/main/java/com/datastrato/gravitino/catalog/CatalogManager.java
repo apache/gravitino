@@ -494,7 +494,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity);
+      return createCatalogWrapper(entity.withNamespace(ident.namespace()));
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);

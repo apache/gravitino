@@ -73,6 +73,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
       - name: Package Gravitino
         run: |
           ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
@@ -94,12 +98,14 @@ jobs:
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate test reports
+          name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            integration-test/build/integration-test.log
+            integration-test/build/integration-test-integration-test.log
+            integration-test/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
+            catalogs/**/*.tar
