@@ -77,7 +77,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
                 Integer.parseInt(type.getColumnSize()),
                 Integer.parseInt(type.getScale())));
       case DATE:
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case TIME:
         return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case TIMESTAMP:

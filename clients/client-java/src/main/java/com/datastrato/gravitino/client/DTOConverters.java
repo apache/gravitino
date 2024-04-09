@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
@@ -15,9 +17,13 @@ import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
+import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.messaging.TopicChange;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 
 class DTOConverters {
   private DTOConverters() {}
@@ -82,6 +88,15 @@ class DTOConverters {
             .build();
 
       case MESSAGING:
+        return MessagingCatalog.builder()
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
     }
@@ -183,21 +198,51 @@ class DTOConverters {
     }
   }
 
+  static TopicUpdateRequest toTopicUpdateRequest(TopicChange change) {
+    if (change instanceof TopicChange.UpdateTopicComment) {
+      return new TopicUpdateRequest.UpdateTopicCommentRequest(
+          ((TopicChange.UpdateTopicComment) change).getNewComment());
+    } else if (change instanceof TopicChange.SetProperty) {
+      return new TopicUpdateRequest.SetTopicPropertyRequest(
+          ((TopicChange.SetProperty) change).getProperty(),
+          ((TopicChange.SetProperty) change).getValue());
+    } else if (change instanceof TopicChange.RemoveProperty) {
+      return new TopicUpdateRequest.RemoveTopicPropertyRequest(
+          ((TopicChange.RemoveProperty) change).getProperty());
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
   private static TableUpdateRequest toColumnUpdateRequest(TableChange.ColumnChange change) {
     if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      Expression defaultValue;
+      if (addColumn.getDefaultValue() == null
+          || addColumn.getDefaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+        defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+      } else {
+        defaultValue = toFunctionArg(addColumn.getDefaultValue());
+      }
       return new TableUpdateRequest.AddTableColumnRequest(
           addColumn.fieldName(),
           addColumn.getDataType(),
           addColumn.getComment(),
           addColumn.getPosition(),
           addColumn.isNullable(),
-          addColumn.isAutoIncrement());
+          addColumn.isAutoIncrement(),
+          defaultValue);
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
       return new TableUpdateRequest.RenameTableColumnRequest(
           renameColumn.fieldName(), renameColumn.getNewName());
+
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      return new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+          change.fieldName(),
+          toFunctionArg(((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue()));
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return new TableUpdateRequest.UpdateTableColumnTypeRequest(

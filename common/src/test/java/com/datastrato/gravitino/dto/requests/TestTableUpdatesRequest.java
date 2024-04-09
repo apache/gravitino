@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -26,6 +29,12 @@ public class TestTableUpdatesRequest {
             new TableUpdateRequest.RemoveTablePropertyRequest("key"),
             new TableUpdateRequest.RenameTableColumnRequest(
                 new String[] {"oldColumn"}, "newColumn"),
+            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+                new String[] {"column"},
+                LiteralDTO.builder()
+                    .withDataType(Types.DateType.get())
+                    .withValue("2023-04-01")
+                    .build()),
             new TableUpdateRequest.UpdateTableColumnTypeRequest(
                 new String[] {"column"}, Types.StringType.get()),
             new TableUpdateRequest.UpdateTableColumnCommentRequest(
@@ -64,6 +73,17 @@ public class TestTableUpdatesRequest {
             + "        \"oldColumn\"\n"
             + "      ],\n"
             + "      \"newFieldName\": \"newColumn\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"@type\": \"updateColumnDefaultValue\",\n"
+            + "      \"fieldName\": [\n"
+            + "        \"column\"\n"
+            + "      ],\n"
+            + "      \"newDefaultValue\": {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2023-04-01\"\n"
+            + "      }\n"
             + "    },\n"
             + "    {\n"
             + "      \"@type\": \"updateColumnType\",\n"
@@ -112,6 +132,24 @@ public class TestTableUpdatesRequest {
 
     setTablePropertyRequest = new TableUpdateRequest.SetTablePropertyRequest("key", "");
     Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
+
+    // test validate DEFAULT_VALUE_NOT_SET or null property value
+    TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
+    Throwable exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception1.getMessage().contains("field is required and cannot be empty"));
+
+    updateTableColumnDefaultValueRequest =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[] {"key"}, null);
+    Throwable exception2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception2.getMessage().contains("field is required and cannot be empty"));
   }
 
   @Test
@@ -123,7 +161,8 @@ public class TestTableUpdatesRequest {
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
             false,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
     String expected =
         "{\n"
@@ -137,7 +176,12 @@ public class TestTableUpdatesRequest {
             + "    \"after\": \"afterColumn\"\n"
             + "  },\n"
             + "  \"nullable\": false,\n"
-            + "  \"autoIncrement\": false\n"
+            + "  \"autoIncrement\": false,\n"
+            + "  \"defaultValue\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"string\",\n"
+            + "    \"value\": \"hello\"\n"
+            + "  }\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));

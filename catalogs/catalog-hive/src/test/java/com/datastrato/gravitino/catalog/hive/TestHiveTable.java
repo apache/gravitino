@@ -497,6 +497,32 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         "Hive does not support altering column nullability", exception.getMessage());
 
+    TableChange tableChange8 =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange8));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
+    TableChange tableChange9 =
+        TableChange.updateColumnDefaultValue(
+            new String[] {"col_1"}, Literals.of("0", Types.ByteType.get()));
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, tableChange9));
+
+    Assertions.assertEquals(
+        "Hive does not support altering column default value", exception.getMessage());
+
     // test alter
     tableCatalog.alterTable(
         tableIdentifier,

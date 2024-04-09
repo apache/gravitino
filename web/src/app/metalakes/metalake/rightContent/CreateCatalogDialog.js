@@ -43,7 +43,7 @@ import { useSearchParams } from 'next/navigation'
 const defaultValues = {
   name: '',
   type: 'relational',
-  provider: 'hive',
+  provider: '',
   comment: '',
   propItems: providers[0].defaultProps
 }
@@ -58,7 +58,7 @@ const schema = yup.object().shape({
       nameRegex,
       'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
     ),
-  type: yup.mixed().oneOf(['relational']).required(),
+  type: yup.mixed().oneOf(['relational', 'fileset']).required(),
   provider: yup.mixed().oneOf(providerTypeValues).required(),
   propItems: yup.array().of(
     yup.object().shape({
@@ -87,6 +87,8 @@ const CreateCatalogDialog = props => {
 
   const [cacheData, setCacheData] = useState()
 
+  const [providerTypes, setProviderTypes] = useState(providers)
+
   const {
     control,
     reset,
@@ -103,6 +105,7 @@ const CreateCatalogDialog = props => {
   })
 
   const providerSelect = watch('provider')
+  const typeSelect = watch('type')
 
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
@@ -281,6 +284,18 @@ const CreateCatalogDialog = props => {
   }
 
   useEffect(() => {
+    if (typeSelect === 'fileset') {
+      setProviderTypes(providers.filter(p => p.value === 'hadoop'))
+      setValue('provider', 'hadoop')
+    } else {
+      setProviderTypes(providers.filter(p => p.value !== 'hadoop'))
+      setValue('provider', 'hive')
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeSelect, open])
+
+  useEffect(() => {
     let defaultProps = []
 
     const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
@@ -410,6 +425,7 @@ const CreateCatalogDialog = props => {
                       disabled={type === 'update'}
                     >
                       <MenuItem value={'relational'}>relational</MenuItem>
+                      <MenuItem value={'fileset'}>fileset</MenuItem>
                     </Select>
                   )}
                 />
@@ -436,10 +452,13 @@ const CreateCatalogDialog = props => {
                       labelId='select-catalog-provider'
                       disabled={type === 'update'}
                     >
-                      <MenuItem value={'hive'}>hive</MenuItem>
-                      <MenuItem value={'lakehouse-iceberg'}>iceberg</MenuItem>
-                      <MenuItem value={'jdbc-mysql'}>mysql</MenuItem>
-                      <MenuItem value={'jdbc-postgresql'}>postgresql</MenuItem>
+                      {providerTypes.map(item => {
+                        return (
+                          <MenuItem key={item.label} value={item.value}>
+                            {item.label}
+                          </MenuItem>
+                        )
+                      })}
                     </Select>
                   )}
                 />

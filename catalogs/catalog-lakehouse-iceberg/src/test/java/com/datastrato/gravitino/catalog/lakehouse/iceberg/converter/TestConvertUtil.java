@@ -278,12 +278,20 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         ConvertUtil.formIcebergType(Types.TimeType.get())
             instanceof com.datastrato.gravitino.rel.types.Types.TimeType);
+    com.datastrato.gravitino.rel.types.Type TimestampTypeWithoutZone =
+        ConvertUtil.formIcebergType(Types.TimestampType.withoutZone());
     Assertions.assertTrue(
-        ConvertUtil.formIcebergType(Types.TimestampType.withoutZone())
-            instanceof com.datastrato.gravitino.rel.types.Types.TimestampType);
+        TimestampTypeWithoutZone instanceof com.datastrato.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertFalse(
+        ((com.datastrato.gravitino.rel.types.Types.TimestampType) TimestampTypeWithoutZone)
+            .hasTimeZone());
+    com.datastrato.gravitino.rel.types.Type TimestampTypeWithZone =
+        ConvertUtil.formIcebergType(Types.TimestampType.withZone());
     Assertions.assertTrue(
-        ConvertUtil.formIcebergType(Types.TimestampType.withZone())
-            instanceof com.datastrato.gravitino.rel.types.Types.TimestampType);
+        TimestampTypeWithZone instanceof com.datastrato.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.TimestampType) TimestampTypeWithZone)
+            .hasTimeZone());
     Assertions.assertTrue(
         ConvertUtil.formIcebergType(Types.DoubleType.get())
             instanceof com.datastrato.gravitino.rel.types.Types.DoubleType);

@@ -164,6 +164,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             .map(DTOConverters::toFilesetUpdateRequest)
             .collect(Collectors.toList());
     FilesetUpdatesRequest req = new FilesetUpdatesRequest(updates);
+    req.validate();
 
     FilesetResponse resp =
         restClient.put(

@@ -48,7 +48,7 @@ public abstract class BaseContainer implements AutoCloseable {
   // Network of the container
   private final Optional<Network> network;
 
-  private final GenericContainer<?> container;
+  protected final GenericContainer<?> container;
 
   protected BaseContainer(
       String image,
