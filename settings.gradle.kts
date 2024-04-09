@@ -28,7 +28,7 @@ include(
   "clients:client-python"
 )
 include("trino-connector")
-include("spark-connector")
+include("spark-connector:spark-connector", "spark-connector:spark-connector-runtime")
 include("web")
 include("docs")
 include("integration-test-common")

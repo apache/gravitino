@@ -291,6 +291,7 @@ subprojects {
         "ArrayToString",
         "ArraysAsListPrimitiveArray",
         "ArrayFillIncompatibleType",
+        "BadImport",
         "BoxedPrimitiveEquality",
         "ChainingConstructorIgnoresParameter",
         "CheckNotNullMultipleTimes",
@@ -668,8 +669,8 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "spark-connector"
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
+        it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -682,8 +683,8 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
+        !it.name.startsWith("spark-connector") &&
         it.name != "trino-connector" &&
-        it.name != "spark-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
       ) {
@@ -700,7 +701,8 @@ tasks {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
-      ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
+      // TODO. Enable packaging the catalog-jdbc-doris module when it is ready for shipping
+      // ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",

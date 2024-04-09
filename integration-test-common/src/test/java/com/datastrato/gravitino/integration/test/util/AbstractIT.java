@@ -228,7 +228,7 @@ public class AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE) && miniGravitino != null) {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();

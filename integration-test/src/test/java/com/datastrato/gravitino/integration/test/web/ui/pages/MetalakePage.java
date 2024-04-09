@@ -8,7 +8,9 @@ package com.datastrato.gravitino.integration.test.web.ui.pages;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -17,6 +19,8 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class MetalakePage extends AbstractWebIT {
+  private static final String PAGE_TITLE = "Metalakes";
+
   @FindBy(
       xpath =
           "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
@@ -72,6 +76,24 @@ public class MetalakePage extends AbstractWebIT {
       xpath =
           "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]")
   public WebElement metalakeTableWrapper;
+
+  @FindBy(xpath = "//*[@data-refer='back-home-btn']")
+  public WebElement backHomeBtn;
+
+  @FindBy(xpath = "//*[@data-refer='metalake-page-title']")
+  public WebElement metalakePageTitle;
+
+  @FindBy(xpath = "//a[@data-refer='footer-link-datastrato']")
+  public WebElement footerLinkDatastrato;
+
+  @FindBy(xpath = "//a[@data-refer='footer-link-license']")
+  public WebElement footerLinkLicense;
+
+  @FindBy(xpath = "//a[@data-refer='footer-link-docs']")
+  public WebElement footerLinkDocs;
+
+  @FindBy(xpath = "//a[@data-refer='footer-link-support']")
+  public WebElement footerLinkSupport;
 
   public MetalakePage() {
     PageFactory.initElements(driver, this);
@@ -281,7 +303,7 @@ public class MetalakePage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyLinkToCatalogsPage(String name) {
+  public boolean verifyLinkToCatalogsPage(String name) throws InterruptedException {
     try {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
@@ -297,6 +319,61 @@ public class MetalakePage extends AbstractWebIT {
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
+    } finally {
+      clickAndWait(backHomeBtn);
+    }
+  }
+
+  public boolean verifyRefreshPage() {
+    try {
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(
+          webDriver ->
+              ((JavascriptExecutor) webDriver)
+                  .executeScript("return document.readyState")
+                  .equals("complete"));
+      String pageTitle = metalakePageTitle.getText();
+      boolean isPageTitle = pageTitle.equals(PAGE_TITLE);
+      if (!isPageTitle) {
+        LOG.error("No match with title, get {}", pageTitle);
+        return false;
+      }
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+      if (dataList.isEmpty()) {
+        LOG.error("Table List should not be empty");
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyLinkInNewWindow(
+      String originalWindowHandle, String expectedUrl, boolean contains) {
+    try {
+      Set<String> allWindowHandles = driver.getWindowHandles();
+      for (String windowHandle : allWindowHandles) {
+        if (!windowHandle.equals(originalWindowHandle)) {
+          driver.switchTo().window(windowHandle);
+          break;
+        }
+      }
+
+      String actualUrl = driver.getCurrentUrl();
+
+      if (contains) {
+        return actualUrl.contains(expectedUrl);
+      }
+      return actualUrl.equals(expectedUrl);
+
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    } finally {
+      driver.close();
+      driver.switchTo().window(originalWindowHandle);
     }
   }
 }

@@ -206,24 +206,28 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
-   Apache Hadoop
    Apache Hive
    Apache Iceberg
    Apache Kafka
    Apache Spark
    Apache Submarine
    Apache Zeppelin
-   Apache ZooKeeper  
+   Apache ZooKeeper
    Java Classmate
    Jackson Annotations
    Jackson Core
    Jackson Databind
+   Jackson Data Mapper
    Jackson Datatype Guava
    Jackson Datatype JDK8
    Jackson Datatype Joda
    Jackson Datatype JSR310
+   Jackson JAX RS Provider For JSON Content Type
    Jackson Jaxb Annotations
+   Jackson JAXRS
+   Jackson JAXRS JSON
    Jackson Parameter Names
+   Jackson Xml Compatibility Extensions
    Caffeine
    Dropwizard Hadoop Metrics
    GSON
@@ -278,10 +282,18 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop Annotatations
+   Apache Hadoop Auth
+   Apache Hadoop Client Aggregator
+   Apache Hadoop Common
    Apache Hadoop HDFS Client
+   Apache Hadoop MapReduce Common
+   Apache Hadoop MapReduce Core
+   Apache Hadoop MapReduce JobClient
    Apache Hadoop Yarn Client
    Apache Hive
    Apache HTrace
+   Apache HttpCore
    Apache HttpClient
    Apache Iceberg
    Apache Ivy
@@ -331,6 +343,17 @@
    SQLite JDBC Driver
    Immutables
    MyBatis
+   Javax Inject
+   Javax JDO API
+   JBoss Threads
+   JCIP Annotations Under Apache License
+   Jetty SSLEngine
+   JJWT
+   LZ4 and XxHash
+   Prometheus Java Simpleclient
+   Snappy Java
+   XNIO API
+   WildFly
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -355,6 +378,9 @@
    JSch
    ASM
    Protobuf
+   ParaNamer
+   RE2/J
+   ZSTD JNI
 
    This product bundles various third-party components also under the
    MIT license
@@ -369,9 +395,10 @@
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
 
-   Activation
+   Javax Activation
    Stax API
    Java Servlet API
+   JSR311 API
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.1
@@ -385,6 +412,13 @@
 
    Logback
    Eclipse Jetty
+   Eclipse Jetty Continuation
+   Eclipse Jetty Security
+   Eclipse Jetty Server
+   Eclipse Jetty Servlet
+   Eclipse Jetty IO
+   Eclipse Jetty Utilities
+   Eclipse Jetty Utilities JSON
    Eclipse Jetty Webapp
    Eclipse Jetty XML
    JTA
@@ -397,6 +431,7 @@
    Eclipse Jetty
    Eclipse Jersey
    Eclipse GlassFish
+   Jakarta Activation API
    Jakarta Annotations API
    Jakarta Inject
    Jakarta Transaction API
@@ -413,13 +448,8 @@
 
    Javassist
 
-
    This product bundles various third-party components also placed in
    the public domain.
 
    AOP Alliance
-
-  This product bundles various third-party components also under the
-  COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) license
-
-  Javax Activation
+   XZ For Java
