@@ -582,7 +582,7 @@ public class TestEntityStorage {
       // metalake
       BaseMetalake metalakeNew =
           createBaseMakeLake(
-                  RandomIdGenerator.INSTANCE.nextId(),
+              RandomIdGenerator.INSTANCE.nextId(),
               metalake.name(),
               (AuditInfo) metalake.auditInfo());
       store.put(metalakeNew);
