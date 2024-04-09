@@ -10,7 +10,12 @@ import com.datastrato.gravitino.annotation.Evolving;
 import java.util.List;
 import java.util.Map;
 
-/** The interface of a role. The role is the entity which has kinds of privileges. */
+/**
+ * The interface of a role. The role is the entity which has kinds of privileges. One role can have
+ * multiple privileges of one entity. For example, if you want to create a role which has the
+ * privilege to read a table. You should set the privilege of the table as privilege entity
+ * identifier. And you should set the EntityType.Table as the privilege entity type.
+ */
 @Evolving
 public interface Role extends Auditable {
 

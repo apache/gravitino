@@ -14,18 +14,26 @@ public class Privileges {
    * @return The Privilege.
    */
   public static Privilege fromString(String privilege) {
-
     Privilege.Name name = Privilege.Name.valueOf(privilege);
+    return fromName(name);
+  }
 
+  /**
+   * Returns the Privilege from the `Privilege.Name`.
+   *
+   * @param name The `Privilege.Name` of the privilege.
+   * @return The Privilege.
+   */
+  public static Privilege fromName(Privilege.Name name) {
     switch (name) {
       case LOAD_CATALOG:
         return LoadCatalog.get();
       default:
-        throw new IllegalArgumentException("Don't support the privilege: " + privilege);
+        throw new IllegalArgumentException("Don't support the privilege: " + name);
     }
   }
 
-  /** The privilege of load a metalake. */
+  /** The privilege of load a catalog. */
   public static class LoadCatalog implements Privilege {
     private static final LoadCatalog INSTANCE = new LoadCatalog();
 

@@ -6,7 +6,10 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.annotation.Evolving;
 
-/** The interface of a privilege. */
+/**
+ * The interface of a privilege. The privilege represents the ability to execute kinds of operations
+ * for kinds of entities
+ */
 @Evolving
 public interface Privilege {
 
