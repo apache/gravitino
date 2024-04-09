@@ -45,5 +45,5 @@ public interface Role extends Auditable {
    *
    * @return The privilege entity identifier of the role.
    */
-  String resourceEntity();
+  String resourceName();
 }

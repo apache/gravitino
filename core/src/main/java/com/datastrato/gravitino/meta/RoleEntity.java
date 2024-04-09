@@ -90,7 +90,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    * @return The resource entity which is contained by the role.
    */
   @Override
-  public String resourceEntity() {
+  public String resourceName() {
     if (privilegeEntityIdentifier.hasNamespace()) {
       String[] levels = privilegeEntityIdentifier.namespace().levels();
       StringBuilder identBuilder = new StringBuilder();
