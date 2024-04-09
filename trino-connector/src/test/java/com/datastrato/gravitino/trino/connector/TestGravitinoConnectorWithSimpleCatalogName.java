@@ -40,14 +40,12 @@ public class TestGravitinoConnectorWithSimpleCatalogName extends AbstractTestQue
       queryRunner.installPlugin(gravitinoPlugin);
       queryRunner.installPlugin(new MemoryPlugin());
 
-      {
-        // create a gravitino connector named gravitino using metalake test
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("gravitino.metalake", "test");
-        properties.put("gravitino.uri", "http://127.0.0.1:8090");
-        properties.put("gravitino.simplify-catalog-names", "true");
-        queryRunner.createCatalog("gravitino", "gravitino", properties);
-      }
+      // create a gravitino connector named gravitino using metalake test
+      HashMap<String, String> properties = new HashMap<>();
+      properties.put("gravitino.metalake", "test");
+      properties.put("gravitino.uri", "http://127.0.0.1:8090");
+      properties.put("gravitino.simplify-catalog-names", "true");
+      queryRunner.createCatalog("gravitino", "gravitino", properties);
 
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();

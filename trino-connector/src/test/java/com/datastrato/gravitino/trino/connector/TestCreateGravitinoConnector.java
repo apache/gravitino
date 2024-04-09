@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import io.trino.Session;
-import io.trino.plugin.memory.MemoryPlugin;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.QueryRunner;
 import java.util.HashMap;
@@ -29,7 +28,6 @@ public class TestCreateGravitinoConnector {
     TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin();
     gravitinoPlugin.setGravitinoClient(gravitinoClient);
     queryRunner.installPlugin(gravitinoPlugin);
-    queryRunner.installPlugin(new MemoryPlugin());
 
     {
       // create a gravitino connector named gravitino using metalake test
