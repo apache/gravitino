@@ -33,7 +33,8 @@ default storage for `JDBCBackend`.
 
 ### Step 1: Get the initialization script
 
-You need `download` and `unzip` the distribution package firstly, please see [How to install Gravitino](how-to-install.md).
+You need to `download` and `unzip` the distribution package firstly, please see
+[How to install Gravitino](how-to-install.md).
 
 Then you can get the initialization script in the directory:
 
@@ -43,11 +44,11 @@ ${GRAVITINO_HOME}/scripts/mysql/
 
 The script name is like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.
 For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script
-file that is equal or smaller than `0.6.0`. For example, you can choose the `schema-0.5.0-mysql.sql` script.
+file that is equal or smaller than `0.6.0`, you can choose the `schema-0.5.0-mysql.sql` script.
 
 ### Step 2: Initialize the database
 
-Please `create a database` in MySQL in advance, and `execute` the initialization script obtained above in the database.
+Please create a database in MySQL in advance, and execute the initialization script obtained above in the database.
 
 ### Step 3: Place the MySQL connector Jar
 
