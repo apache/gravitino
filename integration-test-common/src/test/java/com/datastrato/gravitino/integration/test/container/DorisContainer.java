@@ -18,7 +18,6 @@ import java.util.Set;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
 public class DorisContainer extends BaseContainer {
@@ -44,10 +43,6 @@ public class DorisContainer extends BaseContainer {
       Map<String, String> envVars,
       Optional<Network> network) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
-  }
-
-  public GenericContainer<?> getContainer() {
-    return container;
   }
 
   @Override

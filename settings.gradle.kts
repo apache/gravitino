@@ -19,7 +19,7 @@ include(
   "catalogs:catalog-jdbc-postgresql"
 )
 include("catalogs:catalog-hadoop")
-include("catalogs:catalog-messaging-kafka")
+include("catalogs:catalog-kafka")
 include(
   "clients:client-java",
   "clients:client-java-runtime",

@@ -706,7 +706,7 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-messaging-kafka:copyLibAndConfig"
+      "catalogs:catalog-kafka:copyLibAndConfig"
     )
   }
 
