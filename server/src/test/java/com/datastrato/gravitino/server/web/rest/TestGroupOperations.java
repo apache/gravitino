@@ -32,6 +32,7 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -83,7 +84,7 @@ public class TestGroupOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(AccessControlManager.class).ranked(2);
+            bind(Optional.of(manager)).to(Optional.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

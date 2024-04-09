@@ -15,7 +15,7 @@
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
 
-package com.datastrato.gravitino.server.auth;
+package com.datastrato.gravitino.server.authentication;
 
 import com.datastrato.gravitino.auth.KerberosUtils;
 import java.io.File;

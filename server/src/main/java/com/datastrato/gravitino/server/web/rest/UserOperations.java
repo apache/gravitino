@@ -12,7 +12,9 @@ import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -26,6 +28,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/users")
 public class UserOperations {
 
@@ -36,8 +39,9 @@ public class UserOperations {
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public UserOperations(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
+  public UserOperations(Optional accessControlManager) {
+
+    this.accessControlManager = (AccessControlManager) accessControlManager.orElse(null);
   }
 
   @GET
