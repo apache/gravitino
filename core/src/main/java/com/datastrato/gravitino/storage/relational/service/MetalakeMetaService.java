@@ -171,8 +171,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)));
-                    mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     UserMetaMapper.class,
