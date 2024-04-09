@@ -12,7 +12,7 @@ RDBMS is widely used in the industry, starting from the version `0.5.0`, Graviti
 RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
 relational backend storage in Gravitino.
 
-Relational backend storage mainly aims to the users who are accustomed to using `RDBMS` to
+Relational backend storage mainly aims to the users who are accustomed to using RDBMS to
 store data or lack available a KV storage, and want to use Gravitino.
 
 With relational backend storage, you can quickly deploy Gravitino in a production environment and
@@ -21,7 +21,7 @@ take advantage of relational storage to manage metadata.
 ### What kind of backend storage are supported
 
 Currently, relational backend storage supports the `JDBCBackend`, and uses `MySQL` as the
-default storage for `JDBC Backend`.
+default storage for `JDBCBackend`.
 
 ## How to use
 
