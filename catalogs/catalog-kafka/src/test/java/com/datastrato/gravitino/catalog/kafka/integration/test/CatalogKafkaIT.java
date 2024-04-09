@@ -99,21 +99,6 @@ public class CatalogKafkaIT extends AbstractIT {
     }
   }
 
-  private static void copyKafkaLogs() {
-    try {
-      String destPath = System.getenv("IT_PROJECT_DIR");
-      LOG.info("Copy kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
-
-      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
-
-      GenericContainer<?> kafkaContainer = CONTAINER_SUITE.getKafkaContainer().getContainer();
-      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
-      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
-    } catch (Exception e) {
-      LOG.error("Failed to pack kafka logs", e);
-    }
-  }
-
   @Test
   public void testDefaultSchema() {
     NameIdentifier[] schemas =
@@ -272,6 +257,21 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
     Assertions.assertTrue(
         ex.getMessage().contains("This server does not host this topic-partition"));
+  }
+
+  private static void copyKafkaLogs() {
+    try {
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
+
+      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
+
+      GenericContainer<?> kafkaContainer = CONTAINER_SUITE.getKafkaContainer().getContainer();
+      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
+      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to pack kafka logs", e);
+    }
   }
 
   private void assertTopicWithKafka(Topic createdTopic)
