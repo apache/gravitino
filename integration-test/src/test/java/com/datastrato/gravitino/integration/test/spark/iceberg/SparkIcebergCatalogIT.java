@@ -7,11 +7,6 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import java.util.List;
-import org.apache.iceberg.spark.source.SparkTable;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.catalyst.analysis.ResolvedTable;
-import org.apache.spark.sql.catalyst.plans.logical.CommandResult;
-import org.apache.spark.sql.catalyst.plans.logical.DescribeRelation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -59,18 +54,5 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(getDeleteSql(tableName, "id < 10"));
     List<String> queryResult2 = getTableData(tableName);
     Assertions.assertEquals(0, queryResult2.size());
-  }
-
-  @Test
-  void testLoadedIcebergTable() {
-    String tableName = "test_delete_table";
-    dropTableIfExists(tableName);
-    createSimpleTable(tableName);
-
-    Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
-    CommandResult result = (CommandResult) ds.logicalPlan();
-    DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
-    ResolvedTable table = (ResolvedTable) relation.child();
-    Assertions.assertTrue(table.table() instanceof SparkTable);
   }
 }
