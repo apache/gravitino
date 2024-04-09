@@ -515,7 +515,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         "Jdbc catalog doesn't support topic related operations");
   }
 
-  public static void deregisterDriver(Driver driver) throws SQLException {
+  public void deregisterDriver(Driver driver) throws SQLException {
     if (driver.getClass().getClassLoader().getClass()
         == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
       DriverManager.deregisterDriver(driver);

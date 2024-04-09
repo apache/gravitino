@@ -24,7 +24,6 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
-  implementation(libs.caffeine)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
