@@ -15,7 +15,6 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -59,23 +58,22 @@ public class UserGroupManager {
    * @throws RuntimeException If adding the User encounters storage issues.
    */
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    UserEntity userEntity =
-        UserEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(name)
-            .withNamespace(
-                Namespace.of(
-                    metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    UserEntity.USER_SCHEMA_NAME))
-            .withRoles(Lists.newArrayList())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      UserEntity userEntity =
+          UserEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(
+                  Namespace.of(
+                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
+              .withRoles(Lists.newArrayList())
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .build();
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -100,6 +98,7 @@ public class UserGroupManager {
   public boolean removeUser(String metalake, String user) {
 
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
       return store.delete(ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -119,6 +118,7 @@ public class UserGroupManager {
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
       return store.get(ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
@@ -139,23 +139,22 @@ public class UserGroupManager {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
-    GroupEntity groupEntity =
-        GroupEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(group)
-            .withNamespace(
-                Namespace.of(
-                    metalake,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    GroupEntity.GROUP_SCHEMA_NAME))
-            .withRoles(Collections.emptyList())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      GroupEntity groupEntity =
+          GroupEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(group)
+              .withNamespace(
+                  Namespace.of(
+                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
+              .withRoles(Collections.emptyList())
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .build();
       store.put(groupEntity, false /* overwritten */);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -179,6 +178,7 @@ public class UserGroupManager {
    */
   public boolean removeGroup(String metalake, String group) {
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
       return store.delete(ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
@@ -201,6 +201,7 @@ public class UserGroupManager {
    */
   public Group getGroup(String metalake, String group) {
     try {
+      AuthorizationUtils.checkMetalakeExists(store, metalake);
       return store.get(ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
@@ -213,11 +214,11 @@ public class UserGroupManager {
 
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, UserEntity.USER_SCHEMA_NAME, user);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
   private NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, GroupEntity.GROUP_SCHEMA_NAME, group);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 }

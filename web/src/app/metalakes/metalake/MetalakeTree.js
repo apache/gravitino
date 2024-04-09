@@ -39,6 +39,27 @@ const MetalakeTree = props => {
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
 
+  const checkCatalogIcon = ({ type, provider }) => {
+    switch (type) {
+      case 'relational':
+        switch (provider) {
+          case 'hive':
+            return 'simple-icons:apachehive'
+          case 'lakehouse-iceberg':
+            return 'openmoji:iceberg'
+          case 'jdbc-mysql':
+            return 'devicon:mysql-wordmark'
+          case 'jdbc-postgresql':
+            return 'devicon:postgresql-wordmark'
+          default:
+            return 'bx:book'
+        }
+      case 'fileset':
+      default:
+        return 'bx:book'
+    }
+  }
+
   const handleClickIcon = (e, nodeProps) => {
     e.stopPropagation()
 
@@ -121,7 +142,14 @@ const MetalakeTree = props => {
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
           >
-            <Icon icon={isHover !== nodeProps.data.key ? 'bx:book' : 'mdi:reload'} fontSize='inherit' />
+            <Icon
+              icon={
+                isHover !== nodeProps.data.key
+                  ? checkCatalogIcon({ type: nodeProps.data.type, provider: nodeProps.data.provider })
+                  : 'mdi:reload'
+              }
+              fontSize='inherit'
+            />
           </IconButton>
         )
 
