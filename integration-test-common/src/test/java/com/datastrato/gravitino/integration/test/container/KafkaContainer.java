@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
@@ -27,6 +28,7 @@ public class KafkaContainer extends BaseContainer {
   private static final String DEFAULT_KAFKA_IMAGE =
       System.getenv("GRAVITINO_CI_KAFKA_DOCKER_IMAGE");
   private static final String DEFAULT_HOST_NAME = "gravitino-ci-kafka";
+  private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
 
   protected KafkaContainer(
       String image,
@@ -45,8 +47,27 @@ public class KafkaContainer extends BaseContainer {
 
   @Override
   public void start() {
-    super.start();
-    Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
+    try{
+      super.start();
+      Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
+    } finally{
+      copyKafkaLogs();
+    }
+  }
+
+  private void copyKafkaLogs() {
+    try {
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy Kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
+
+      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
+
+      GenericContainer<?> kafkaContainer = getContainer();
+      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
+      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to pack Kafka logs", e);
+    }
   }
 
   @Override

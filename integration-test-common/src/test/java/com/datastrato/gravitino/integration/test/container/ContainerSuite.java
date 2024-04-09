@@ -153,7 +153,7 @@ public class ContainerSuite implements Closeable {
   public void startKafkaContainer() {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
-        if (dorisContainer == null) {
+        if (kafkaContainer == null) {
           KafkaContainer container = closer.register(KafkaContainer.builder().build());
           try {
             container.start();

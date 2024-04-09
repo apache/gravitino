@@ -50,7 +50,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
 
 @Tag("gravitino-docker-it")
 public class CatalogKafkaIT extends AbstractIT {
@@ -62,21 +61,19 @@ public class CatalogKafkaIT extends AbstractIT {
       GravitinoITUtils.genRandomName("catalogKafkaIT_catalog");
   private static final String DEFAULT_SCHEMA_NAME = "default";
   private static final String PROVIDER = "kafka";
-  private static final String KAFKA_LOGS_DIR = "/opt/kafka/logs";
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
-
-  private static String kafka_bootstrap_servers;
+  private static String kafkaBootstrapServers;
   private static AdminClient adminClient;
 
   @BeforeAll
-  public static void startup() {
+  public static void startUp() {
     CONTAINER_SUITE.startKafkaContainer();
-    kafka_bootstrap_servers =
+    kafkaBootstrapServers =
         String.format(
             "%s:%d",
             CONTAINER_SUITE.getKafkaContainer().getContainerIpAddress(), DEFAULT_BROKER_PORT);
-    adminClient = AdminClient.create(ImmutableMap.of(BOOTSTRAP_SERVERS, kafka_bootstrap_servers));
+    adminClient = AdminClient.create(ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
 
     createMetalake();
     createCatalog();
@@ -88,8 +85,6 @@ public class CatalogKafkaIT extends AbstractIT {
     if (adminClient != null) {
       adminClient.close();
     }
-
-    copyKafkaLogs();
 
     try {
       closer.close();
@@ -257,21 +252,6 @@ public class CatalogKafkaIT extends AbstractIT {
         ex.getMessage().contains("This server does not host this topic-partition"));
   }
 
-  private static void copyKafkaLogs() {
-    try {
-      String destPath = System.getenv("IT_PROJECT_DIR");
-      LOG.info("Copy kafka logs file from {} to {}", KAFKA_LOGS_DIR, destPath);
-
-      String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
-
-      GenericContainer<?> kafkaContainer = CONTAINER_SUITE.getKafkaContainer().getContainer();
-      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
-      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
-    } catch (Exception e) {
-      LOG.error("Failed to pack kafka logs", e);
-    }
-  }
-
   private void assertTopicWithKafka(Topic createdTopic)
       throws ExecutionException, InterruptedException {
     // get topic from Kafka directly
@@ -309,7 +289,7 @@ public class CatalogKafkaIT extends AbstractIT {
         new KafkaProducer<>(
             ImmutableMap.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                kafka_bootstrap_servers,
+                kafkaBootstrapServers,
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                 StringSerializer.class.getName(),
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
@@ -331,7 +311,7 @@ public class CatalogKafkaIT extends AbstractIT {
         new KafkaConsumer<>(
             ImmutableMap.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                kafka_bootstrap_servers,
+                kafkaBootstrapServers,
                 ConsumerConfig.GROUP_ID_CONFIG,
                 topicName,
                 ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
@@ -372,11 +352,9 @@ public class CatalogKafkaIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  // test create catalog exception
-
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(BOOTSTRAP_SERVERS, kafka_bootstrap_servers);
+    properties.put(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
     metalake.createCatalog(
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
         Catalog.Type.MESSAGING,
