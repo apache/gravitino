@@ -48,9 +48,9 @@ public interface SparkBaseTable extends Table, SupportsRead, SupportsWrite {
 
   TableCatalog getSparkCatalog();
 
-  PropertiesConverter getPropertiesConverter();
-
   Table getSparkTable();
+
+  PropertiesConverter getPropertiesConverter();
 
   @Override
   default String name() {
