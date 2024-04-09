@@ -17,6 +17,7 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
@@ -24,7 +25,10 @@ import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
+import com.datastrato.gravitino.storage.relational.po.UserPO;
+import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -607,6 +611,79 @@ public class POConverters {
           .withLastVersion(nextVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize UserPO
+   *
+   * @param userEntity UserEntity object
+   * @return UserPO object with version initialized
+   */
+  public static UserPO initializeUserPOWithVersion(UserEntity userEntity, UserPO.Builder builder) {
+    try {
+      return builder
+          .withUserId(userEntity.id())
+          .withUserName(userEntity.name())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link UserPO} to {@link UserEntity}
+   *
+   * @param userPO UserPo object to be converted
+   * @param namespace Namespace object to be associated with the user
+   * @return UserEntity object from UserPO object
+   */
+  public static UserEntity fromUserPO(UserPO userPO, List<String> roles, Namespace namespace) {
+    try {
+      return UserEntity.builder()
+          .withId(userPO.getUserId())
+          .withName(userPO.getUserName())
+          .withRoles(roles)
+          .withNamespace(namespace)
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize UserRoleRelPO
+   *
+   * @param userEntity UserEntity object
+   * @param roleIds list of role ids
+   * @return UserRoleRelPO object with version initialized
+   */
+  public static List<UserRoleRelPO> initializeUserRoleRelsPOWithVersion(
+      UserEntity userEntity, List<Long> roleIds) {
+    try {
+      List<UserRoleRelPO> userRoleRelPOs = Lists.newArrayList();
+      for (Long roleId : roleIds) {
+        UserRoleRelPO roleRelPO =
+            UserRoleRelPO.builder()
+                .withUserId(userEntity.id())
+                .withRoleId(roleId)
+                .withAuditInfo(
+                    JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+                .withCurrentVersion(INIT_VERSION)
+                .withLastVersion(INIT_VERSION)
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build();
+        userRoleRelPOs.add(roleRelPO);
+      }
+      return userRoleRelPOs;
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }

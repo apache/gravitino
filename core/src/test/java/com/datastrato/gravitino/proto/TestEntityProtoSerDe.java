@@ -293,11 +293,16 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(userEntity, userEntityFromBytes);
 
     UserEntity userEntityWithoutFields =
-        UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoles(Lists.newArrayList())
+            .build();
     userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
     userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class);
     Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
-    Assertions.assertNull(userEntityWithoutFields.roles());
+    Assertions.assertEquals(0, userEntityWithoutFields.roles().size());
 
     // Test GroupEntity
     Long groupId = 1L;

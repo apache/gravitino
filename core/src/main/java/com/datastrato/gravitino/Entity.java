@@ -47,6 +47,7 @@ public interface Entity extends Serializable {
     TOPIC("to", 6),
     USER("us", 7),
     GROUP("gr", 8),
+    ROLE("ro", 9),
 
     AUDIT("au", 65534);
 

@@ -21,12 +21,14 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
+import com.datastrato.gravitino.storage.relational.service.UserMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.IOException;
 import java.util.List;
@@ -93,6 +95,8 @@ public class JDBCBackend implements RelationalBackend {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
     } else if (e instanceof TopicEntity) {
       TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
+    } else if (e instanceof UserEntity) {
+      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -138,6 +142,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) FilesetMetaService.getInstance().getFilesetByIdentifier(ident);
       case TOPIC:
         return (E) TopicMetaService.getInstance().getTopicByIdentifier(ident);
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -159,6 +165,8 @@ public class JDBCBackend implements RelationalBackend {
         return FilesetMetaService.getInstance().deleteFileset(ident);
       case TOPIC:
         return TopicMetaService.getInstance().deleteTopic(ident);
+      case USER:
+        return UserMetaService.getInstance().deleteUser(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
