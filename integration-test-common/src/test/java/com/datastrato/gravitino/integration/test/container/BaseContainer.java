@@ -106,6 +106,10 @@ public abstract class BaseContainer implements AutoCloseable {
     return container.getMappedPort(exposedPort);
   }
 
+  public GenericContainer<?> getContainer() {
+    return container;
+  }
+
   // This method is used to get the IP address of the container.
   public String getContainerIpAddress() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
