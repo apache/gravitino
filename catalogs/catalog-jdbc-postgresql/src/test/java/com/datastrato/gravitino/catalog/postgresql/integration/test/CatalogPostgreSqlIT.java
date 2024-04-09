@@ -195,11 +195,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col1 = Column.of(POSTGRESQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(POSTGRESQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(POSTGRESQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
-    Column col4 =
-        Column.of(
-            POSTGRESQL_COL_NAME4, Types.ListType.of(IntegerType.get(), false), "col_4_comment");
-
-    return new Column[] {col1, col2, col3, col4};
+    return new Column[] {col1, col2, col3};
   }
 
   private Column[] columnsWithSpecialNames() {
@@ -241,6 +237,33 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           false,
           Literals.NULL)
     };
+  }
+
+  @Test
+  void testCreateTableWithArrayType() {
+    String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column[] columns = new Column[] {col};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], loadTable.columns()[i]);
+    }
   }
 
   @Test
