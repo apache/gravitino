@@ -31,8 +31,8 @@ public class TestDorisAbstractIT extends TestJdbcAbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
-  private static final String DORIS_FE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/fe/";
-  private static final String DORIS_BE_PATH = "/opt/apache-doris-1.2.7.1-bin-arm64/be/";
+  private static final String DORIS_FE_PATH = "/opt/apache-doris/fe/";
+  private static final String DORIS_BE_PATH = "/opt/apache-doris/be/";
 
   @BeforeAll
   public static void startup() {
