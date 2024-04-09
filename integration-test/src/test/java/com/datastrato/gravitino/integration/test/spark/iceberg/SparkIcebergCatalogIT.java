@@ -118,7 +118,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "id_bucket=4";
@@ -147,7 +147,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_hour=12";
@@ -176,7 +176,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_day=2024-01-01";
@@ -205,7 +205,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_month=2024-01";
@@ -234,7 +234,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_year=2024";
@@ -263,7 +263,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
-    Assertions.assertTrue(queryResult.size() == 1);
+    Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "name_trunc=a";

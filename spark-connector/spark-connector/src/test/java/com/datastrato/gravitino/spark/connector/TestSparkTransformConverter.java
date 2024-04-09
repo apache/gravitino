@@ -46,10 +46,28 @@ public class TestSparkTransformConverter {
         (sparkTransform, gravitinoTransform) -> {
           Transform[] gravitinoPartitionings =
               SparkTransformConverter.toGravitinoPartitionings(
-                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform});
+                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform},
+                  false);
           Assertions.assertTrue(
               gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
           Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
+        });
+
+    sparkToGravitinoPartitionTransformMaps.forEach(
+        (sparkTransform, gravitinoTransform) -> {
+          Transform[] gravitinoPartitionings =
+              SparkTransformConverter.toGravitinoPartitionings(
+                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform},
+                  true);
+          if (sparkTransform instanceof BucketTransform) {
+            Assertions.assertTrue(
+                gravitinoPartitionings != null && gravitinoPartitionings.length == 0);
+          } else {
+            Assertions.assertTrue(
+                gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
+            Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
+            Assertions.assertFalse(gravitinoPartitionings[0] instanceof Transforms.BucketTransform);
+          }
         });
 
     sparkToGravitinoPartitionTransformMaps.forEach(
@@ -202,6 +220,9 @@ public class TestSparkTransformConverter {
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkIdentityTransform("a.b"),
         Transforms.identity(new String[] {"a", "b"}));
+    sparkToGravitinoPartitionTransformMaps.put(
+        SparkTransformConverter.createSparkBucketTransform(10, new String[] {"a"}),
+        Transforms.bucket(10, new String[] {"a"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkHoursTransform(new String[] {"date"}),
         Transforms.hour("date"));

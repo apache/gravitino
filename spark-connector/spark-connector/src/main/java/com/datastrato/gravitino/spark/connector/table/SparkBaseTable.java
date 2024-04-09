@@ -91,9 +91,13 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
 
   @Override
   public Map<String, String> properties() {
-    Map properties = new HashMap();
+    Map<String, String> properties = new HashMap<>();
     if (gravitinoTable.properties() != null) {
       properties.putAll(gravitinoTable.properties());
+    }
+
+    if (getSparkTable().properties() != null) {
+      properties.putAll(getSparkTable().properties());
     }
 
     properties = propertiesConverter.toSparkTableProperties(properties);
