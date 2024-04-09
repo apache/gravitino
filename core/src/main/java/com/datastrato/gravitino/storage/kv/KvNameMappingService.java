@@ -20,6 +20,8 @@ import javax.annotation.concurrent.ThreadSafe;
 /**
  * {@link KvNameMappingService} is an implementation that use {@link KvBackend} to store name to id
  * mapping.
+ *
+ * // To trigger CI, just for test
  */
 @ThreadSafe
 public class KvNameMappingService implements NameMappingService {
