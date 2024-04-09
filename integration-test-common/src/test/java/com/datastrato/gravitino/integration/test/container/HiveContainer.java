@@ -56,7 +56,7 @@ public class HiveContainer extends BaseContainer {
   public void start() {
     try {
       super.start();
-      Preconditions.check("Hive container startup failed!", checkContainerStatus(5));
+      Preconditions.check("Hive container startup failed!", checkContainerStatus(20));
     } finally {
       copyHiveLog();
     }
