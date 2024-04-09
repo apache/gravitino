@@ -47,10 +47,10 @@ public class KafkaContainer extends BaseContainer {
 
   @Override
   public void start() {
-    try{
+    try {
       super.start();
       Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
-    } finally{
+    } finally {
       copyKafkaLogs();
     }
   }
@@ -66,7 +66,7 @@ public class KafkaContainer extends BaseContainer {
       kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
       kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
     } catch (Exception e) {
-      LOG.error("Failed to pack Kafka logs", e);
+      LOG.error("Failed to package Kafka logs", e);
     }
   }
 
