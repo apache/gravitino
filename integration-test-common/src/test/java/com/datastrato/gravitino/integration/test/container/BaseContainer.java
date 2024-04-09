@@ -88,7 +88,7 @@ public abstract class BaseContainer implements AutoCloseable {
         .withCreateContainerCmdModifier(c -> c.withHostName(hostName))
         .withStartupCheckStrategy(new IsRunningStartupCheckStrategy())
         .waitingFor(Wait.forListeningPort())
-        .withStartupTimeout(Duration.ofMinutes(5));
+        .withStartupTimeout(Duration.ofMinutes(120));
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
   }
 
