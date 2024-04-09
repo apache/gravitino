@@ -104,7 +104,7 @@ jobs:
           name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
             build/reports
-            integration-test/build/integration-test-integration-test.log
+            integration-test/build/*.log
             integration-test/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
