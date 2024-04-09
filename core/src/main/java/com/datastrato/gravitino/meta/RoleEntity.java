@@ -114,6 +114,10 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     return privilegeEntityType.toString();
   }
 
+  public NameIdentifier privilegeEntityIdentifier() {
+    return privilegeEntityIdentifier;
+  }
+
   /**
    * The privileges of the role. All privileges belong to one entity. For example: If the entity is
    * a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc.

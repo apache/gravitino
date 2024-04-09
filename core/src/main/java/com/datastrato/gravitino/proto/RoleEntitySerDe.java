@@ -29,7 +29,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 roleEntity.privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .setPrivilegeEntityIdentifier(roleEntity.resourceEntity())
+            .setPrivilegeEntityIdentifier(roleEntity.privilegeEntityIdentifier().toString())
             .setPrivilegeEntityType(roleEntity.privilegeEntityType());
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
