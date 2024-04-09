@@ -71,7 +71,7 @@ public class TableOperations {
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
+                    LockType.READ,
                     () -> dispatcher.listTables(tableNS));
             return Utils.ok(new EntityListResponse(idents));
           });
@@ -100,7 +100,7 @@ public class TableOperations {
 
             Table table =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.of(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createTable(
@@ -169,7 +169,9 @@ public class TableOperations {
                     .toArray(TableChange[]::new);
             Table t =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.alterTable(ident, changes));
+                    NameIdentifier.of(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.alterTable(ident, changes));
             return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
           });
 
@@ -196,7 +198,7 @@ public class TableOperations {
             NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.of(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident));
             if (!dropped) {
