@@ -39,6 +39,7 @@ public interface GravitinoCatalogAdaptor {
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       PropertiesConverter propertiesConverter);
 
   /**

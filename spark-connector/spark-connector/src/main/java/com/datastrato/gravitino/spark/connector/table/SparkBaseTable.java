@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsWrite;
@@ -50,6 +49,8 @@ public interface SparkBaseTable extends Table, SupportsRead, SupportsWrite {
   TableCatalog getSparkCatalog();
 
   PropertiesConverter getPropertiesConverter();
+
+  Table getSparkTable();
 
   @Override
   default String name() {
@@ -122,14 +123,6 @@ public interface SparkBaseTable extends Table, SupportsRead, SupportsWrite {
     Distribution distribution = gravitinoTable.distribution();
     SortOrder[] sortOrders = gravitinoTable.sortOrder();
     return SparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
-  }
-
-  default Table getSparkTable() {
-    try {
-      return getSparkCatalog().loadTable(getIdentifier());
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   default boolean isCaseSensitive() {

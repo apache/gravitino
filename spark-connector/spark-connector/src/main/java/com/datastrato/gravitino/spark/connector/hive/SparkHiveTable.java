@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
+import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import lombok.Getter;
@@ -16,18 +17,21 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 public class SparkHiveTable implements SparkBaseTable {
 
   private final Identifier identifier;
-  private final com.datastrato.gravitino.rel.Table gravitinoTable;
+  private final Table gravitinoTable;
   private final TableCatalog sparkCatalog;
+  private final org.apache.spark.sql.connector.catalog.Table sparkTable;
   private final PropertiesConverter propertiesConverter;
 
   public SparkHiveTable(
       Identifier identifier,
-      com.datastrato.gravitino.rel.Table gravitinoTable,
+      Table gravitinoTable,
       TableCatalog sparkHiveCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkHiveTable,
       PropertiesConverter propertiesConverter) {
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.sparkCatalog = sparkHiveCatalog;
+    this.sparkTable = sparkHiveTable;
     this.propertiesConverter = propertiesConverter;
   }
 

@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
+import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.Map;
@@ -29,21 +30,24 @@ public class SparkIcebergTable extends SparkTable implements SparkBaseTable, Sup
   private final Identifier identifier;
   private final com.datastrato.gravitino.rel.Table gravitinoTable;
   private final TableCatalog sparkCatalog;
+  private final org.apache.spark.sql.connector.catalog.Table sparkTable;
   private final PropertiesConverter propertiesConverter;
 
   public SparkIcebergTable(
       Identifier identifier,
-      com.datastrato.gravitino.rel.Table gravitinoTable,
+      Table gravitinoTable,
       TableCatalog sparkIcebergCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkIcebergTable,
       PropertiesConverter propertiesConverter) {
     // The purpose of inheritance SparkTable is in order to go through the `isIcebergTable` check in
     // IcebergSparkSqlExtensionsParser.
     // For details, please refer to:
     // https://github.com/apache/iceberg/blob/main/spark/v3.4/spark-extensions/src/main/scala/org/apache/spark/sql/catalyst/parser/extensions/IcebergSparkSqlExtensionsParser.scala#L127-L186
-    super(null, false);
+    super(((SparkTable) sparkIcebergTable).table(), false);
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.sparkCatalog = sparkIcebergCatalog;
+    this.sparkTable = sparkIcebergTable;
     this.propertiesConverter = propertiesConverter;
   }
 
