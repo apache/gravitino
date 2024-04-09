@@ -84,14 +84,24 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The privilege entity identifier of the role. For example: If the entity is a table, the
+   * The resource entity which is contained by the role. For example: If the entity is a table, the
    * identifier may be `catalog1.schema1.table1`.
    *
-   * @return The privilege entity identifier of the role.
+   * @return The resource entity which is contained by the role.
    */
   @Override
-  public NameIdentifier privilegeEntityIdentifier() {
-    return privilegeEntityIdentifier;
+  public String resourceEntity() {
+    if (privilegeEntityIdentifier.hasNamespace()) {
+      String[] levels = privilegeEntityIdentifier.namespace().levels();
+      StringBuilder identBuilder = new StringBuilder();
+      for (int i = 1; i < levels.length; i++) {
+        identBuilder.append(levels[i]).append(".");
+      }
+      identBuilder.append(privilegeEntityIdentifier.name());
+      return identBuilder.toString();
+    } else {
+      return privilegeEntityIdentifier.name();
+    }
   }
 
   /**
@@ -100,7 +110,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    *
    * @return The privilege entity type of the role.
    */
-  @Override
   public String privilegeEntityType() {
     return privilegeEntityType.toString();
   }

@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Auditable;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.List;
 import java.util.Map;
@@ -46,13 +45,5 @@ public interface Role extends Auditable {
    *
    * @return The privilege entity identifier of the role.
    */
-  NameIdentifier privilegeEntityIdentifier();
-
-  /**
-   * The privilege entity type of the role. For example: If the entity is a table, the type will be
-   * TABLE.
-   *
-   * @return The privilege entity type of the role.
-   */
-  String privilegeEntityType();
+  String resourceEntity();
 }
