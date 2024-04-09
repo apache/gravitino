@@ -127,9 +127,6 @@ public class KafkaContainer extends BaseContainer {
       this.exposePorts = ImmutableSet.of(DEFAULT_BROKER_PORT);
       this.envVars =
           ImmutableMap.<String, String>builder()
-              //              .put(
-              //                  "KAFKA_ADVERTISED_LISTENERS",
-              //                  "PLAINTEXT://" + hostName + ":" + DEFAULT_BROKER_PORT)
               .put("KAFKA_PROCESS_ROLES", "broker,controller")
               .put("KAFKA_NODE_ID", "1")
               .put("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@" + hostName + ":9093")
