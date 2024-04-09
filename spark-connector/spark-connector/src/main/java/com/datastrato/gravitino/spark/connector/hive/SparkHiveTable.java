@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
+import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -38,7 +40,10 @@ public class SparkHiveTable extends HiveTable implements SparkBaseTable {
       TableCatalog sparkHiveCatalog,
       org.apache.spark.sql.connector.catalog.Table sparkHiveTable,
       PropertiesConverter propertiesConverter) {
-    super();
+    super(
+        SparkSession.active(),
+        ((HiveTable) sparkHiveTable).catalogTable(),
+        (HiveTableCatalog) sparkHiveCatalog);
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.sparkCatalog = sparkHiveCatalog;
@@ -87,6 +92,7 @@ public class SparkHiveTable extends HiveTable implements SparkBaseTable {
     return false;
   }
 
+  // override the scala methods because inherited HiveTable
   @Override
   public boolean canEqual(Object that) {
     throw new UnsupportedOperationException("Unsupported operation");
