@@ -50,7 +50,8 @@ public class TrinoITContainers implements AutoCloseable {
     LOG.info("Command {} output:\n{}", command, output);
 
     String outputString = output.toString();
-    if (Strings.isNotEmpty(outputString) && !outputString.contains("All docker compose service is now available")) {
+    if (Strings.isNotEmpty(outputString)
+        && !outputString.contains("All docker compose service is now available")) {
       throw new ContainerLaunchException("Failed to start containers:\n " + outputString);
     }
 
