@@ -46,17 +46,12 @@ public class MySQLCatalogOperations extends JdbcCatalogOperations {
           .invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
 
-      // Deregister the MySQL driver, only deregister the driver if it is loaded by
+      // Unload the MySQL driver, only Unload the driver if it is loaded by
       // IsolatedClassLoader.
-      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://127.0.0.1:3306");
-      LOG.info(
-          "MySQL driver class loader: {}",
-          mysqlDriver.getClass().getClassLoader().getClass().getName());
-
+      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
       deregisterDriver(mysqlDriver);
     } catch (Exception e) {
-      // Ignore
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or Deregister MySQL driver", e);
+      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
     }
   }
 }

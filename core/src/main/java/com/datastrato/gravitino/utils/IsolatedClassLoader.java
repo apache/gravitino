@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
  */
 public class IsolatedClassLoader implements Closeable {
 
+  public static final Class<?> CUSTOM_CLASS_LOADER_CLASS =
+      IsolatedClassLoader.CustomURLClassLoader.class;
+
   private static final Logger LOG = LoggerFactory.getLogger(IsolatedClassLoader.class);
 
   private final List<URL> execJars;
@@ -140,6 +143,55 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
+  class CustomURLClassLoader extends URLClassLoader {
+    private final ClassLoader baseClassLoader;
+
+    public CustomURLClassLoader(URL[] urls, ClassLoader parent, ClassLoader baseClassLoader) {
+      super(urls, parent);
+      this.baseClassLoader = baseClassLoader;
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+      Class<?> clazz = findLoadedClass(name);
+
+      try {
+        return clazz == null ? doLoadClass(name, resolve) : clazz;
+      } catch (Exception e) {
+        throw new ClassNotFoundException("Class no found " + name, e);
+      }
+    }
+
+    private Class<?> doLoadClass(String name, boolean resolve) throws Exception {
+      if (isBarrierClass(name)) {
+        // For barrier classes, copy the class bytecode and reconstruct the class.
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("barrier class: {}", name);
+        }
+        byte[] bytes = loadClassBytes(name);
+        return defineClass(name, bytes, 0, bytes.length);
+
+      } else if (!isSharedClass(name)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("isolated class: {} - {}", name, getResources(classToPath(name)));
+        }
+        return super.loadClass(name, resolve);
+
+      } else {
+        // For shared classes, delegate to base classloader.
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("shared class: {}", name);
+        }
+        try {
+          return baseClassLoader.loadClass(name);
+        } catch (ClassNotFoundException e) {
+          // Fall through.
+          return super.loadClass(name, resolve);
+        }
+      }
+    }
+  }
+
   private synchronized URLClassLoader classLoader() throws Exception {
     if (classLoader != null) {
       return classLoader;
@@ -147,48 +199,7 @@ public class IsolatedClassLoader implements Closeable {
 
     ClassLoader parent = Thread.currentThread().getContextClassLoader();
     this.classLoader =
-        new URLClassLoader(execJars.toArray(new URL[0]), parent) {
-          @Override
-          protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            Class<?> clazz = findLoadedClass(name);
-
-            try {
-              return clazz == null ? doLoadClass(name, resolve) : clazz;
-            } catch (Exception e) {
-              throw new ClassNotFoundException("Class no found " + name, e);
-            }
-          }
-
-          private Class<?> doLoadClass(String name, boolean resolve) throws Exception {
-            if (isBarrierClass(name)) {
-              // For barrier classes, copy the class bytecode and reconstruct the class.
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("barrier class: {}", name);
-              }
-              byte[] bytes = loadClassBytes(name);
-              return defineClass(name, bytes, 0, bytes.length);
-
-            } else if (!isSharedClass(name)) {
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("isolated class: {} - {}", name, getResources(classToPath(name)));
-              }
-              return super.loadClass(name, resolve);
-
-            } else {
-              // For shared classes, delegate to base classloader.
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("shared class: {}", name);
-              }
-              try {
-                return baseClassLoader.loadClass(name);
-              } catch (ClassNotFoundException e) {
-                // Fall through.
-                return super.loadClass(name, resolve);
-              }
-            }
-          }
-        };
-
+        new CustomURLClassLoader(execJars.toArray(new URL[0]), parent, baseClassLoader);
     return classLoader;
   }
 

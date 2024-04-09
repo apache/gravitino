@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -163,24 +164,16 @@ public class IcebergTableOps implements AutoCloseable {
           .invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
 
-      // Deregister the MySQL driver, only deregister the driver if it is loaded by
+      // Unload the MySQL driver, only Unload the driver if it is loaded by
       // IsolatedClassLoader.
-      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://127.0.0.1:3306");
-      LOG.info(
-          "MySQL driver class loader: {}",
-          mysqlDriver.getClass().getClassLoader().getClass().getName());
-      if (mysqlDriver
-          .getClass()
-          .getClassLoader()
-          .getClass()
-          .getName()
-          .equals("com.datastrato.gravitino.utils.IsolatedClassLoader$1")) {
+      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
+      if (mysqlDriver.getClass().getClassLoader().getClass()
+          == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
         DriverManager.deregisterDriver(mysqlDriver);
         LOG.info("Driver {} has been deregistered...", mysqlDriver);
       }
     } catch (Exception e) {
-      // Ignore
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or Deregister MySQL driver", e);
+      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
     }
   }
 }
