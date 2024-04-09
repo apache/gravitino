@@ -124,6 +124,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
   private String fromGravitinoArrayType(ListType listType) {
     Type elementType = listType.elementType();
     Preconditions.checkArgument(
+        !listType.elementNullable(), "PostgreSQL doesn't support element to nullable");
+    Preconditions.checkArgument(
         !(elementType instanceof ListType),
         "PostgreSQL doesn't support multidimensional list internally, please use one dimensional list");
     String elementTypeString = fromGravitinoType(elementType);
@@ -133,6 +135,6 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
   private ListType toGravitinoArrayType(String typeName) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
-    return ListType.of(toGravitinoType(bean), true);
+    return ListType.of(toGravitinoType(bean), false);
   }
 }

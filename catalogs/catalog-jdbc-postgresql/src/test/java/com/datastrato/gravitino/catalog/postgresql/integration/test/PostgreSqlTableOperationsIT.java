@@ -339,7 +339,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
     columns.add(
         JdbcColumn.builder()
             .withName("col_16")
-            .withType(Types.ListType.of(Types.IntegerType.get(), true))
+            .withType(Types.ListType.of(Types.IntegerType.get(), false))
             .withNullable(true)
             .build());
 

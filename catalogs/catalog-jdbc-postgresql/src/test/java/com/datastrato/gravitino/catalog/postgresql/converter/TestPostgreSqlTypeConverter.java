@@ -57,12 +57,19 @@ public class TestPostgreSqlTypeConverter {
   @Test
   public void testArrayType() {
     Type elmentType = Types.IntegerType.get();
-    Type list1 = Types.ListType.of(elmentType, true);
+    Type list1 = Types.ListType.of(elmentType, false);
 
     checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list1);
     checkJdbcTypeToGravitinoType(list1, JDBC_ARRAY_PREFIX + INT_4, null, null);
 
-    Type list2 = Types.ListType.of(list1, true);
+    // not support element nullable
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, Types.ListType.of(elmentType, true)));
+
+    // not support multidimensional
+    Type list2 = Types.ListType.of(list1, false);
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list2));

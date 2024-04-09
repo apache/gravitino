@@ -197,7 +197,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col3 = Column.of(POSTGRESQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
     Column col4 =
         Column.of(
-            POSTGRESQL_COL_NAME4, Types.ListType.of(IntegerType.get(), true), "col_4_comment");
+            POSTGRESQL_COL_NAME4, Types.ListType.of(IntegerType.get(), false), "col_4_comment");
 
     return new Column[] {col1, col2, col3, col4};
   }
