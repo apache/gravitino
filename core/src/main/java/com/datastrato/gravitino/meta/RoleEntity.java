@@ -84,7 +84,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The privilege entity identifier of the role.
+   * The privilege entity identifier of the role. For example: If the entity is a table, the
+   * identifier may be `catalog1.schema1.table1`.
    *
    * @return The privilege entity identifier of the role.
    */
@@ -94,7 +95,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The privilege entity type of the role.
+   * The privilege entity type of the role. For example: If the entity is a table, the type will be
+   * TABLE.
    *
    * @return The privilege entity type of the role.
    */
@@ -104,7 +106,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The privileges of the role.
+   * The privileges of the role. All privileges belong to one entity. For example: If the entity is
+   * a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc.
    *
    * @return The privileges of the role.
    */
