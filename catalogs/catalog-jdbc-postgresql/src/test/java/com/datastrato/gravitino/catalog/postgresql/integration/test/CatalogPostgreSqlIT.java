@@ -81,7 +81,6 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   public String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
   public String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
   public String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
-  public String POSTGRESQL_COL_NAME4 = "postgresql_col_name4";
   private final String provider = "jdbc-postgresql";
 
   private GravitinoMetalake metalake;
@@ -195,6 +194,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col1 = Column.of(POSTGRESQL_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(POSTGRESQL_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(POSTGRESQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
+
     return new Column[] {col1, col2, col3};
   }
 
@@ -252,15 +252,15 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Table createdTable =
         tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
 
-    Assertions.assertEquals(createdTable.name(), tableName);
-    Assertions.assertEquals(createdTable.columns().length, columns.length);
+    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertEquals(columns.length, createdTable.columns().length);
     for (int i = 0; i < columns.length; i++) {
       assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
-    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    Assertions.assertEquals(columns.length, loadTable.columns().length);
     for (int i = 0; i < columns.length; i++) {
       assertColumn(columns[i], loadTable.columns()[i]);
     }
