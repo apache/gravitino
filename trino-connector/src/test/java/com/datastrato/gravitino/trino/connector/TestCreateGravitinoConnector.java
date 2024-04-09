@@ -4,24 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import io.trino.Session;
-import io.trino.plugin.memory.MemoryPlugin;
-import io.trino.testing.AbstractTestQueryFramework;
-import io.trino.testing.DistributedQueryRunner;
-import io.trino.testing.MaterializedResult;
-import io.trino.testing.MaterializedRow;
-import io.trino.testing.QueryRunner;
-import org.testng.annotations.Parameters;
-import org.testng.annotations.Test;
-
-import java.util.HashMap;
-import java.util.List;
-
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testng.Assert.assertEquals;
+
+import com.datastrato.gravitino.client.GravitinoAdminClient;
+import io.trino.Session;
+import io.trino.plugin.memory.MemoryPlugin;
+import io.trino.testing.DistributedQueryRunner;
+import io.trino.testing.QueryRunner;
+import java.util.HashMap;
+import org.testng.annotations.Test;
 
 public class TestCreateGravitinoConnector {
 

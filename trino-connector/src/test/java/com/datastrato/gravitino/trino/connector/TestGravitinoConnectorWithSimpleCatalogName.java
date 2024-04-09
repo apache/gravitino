@@ -19,8 +19,6 @@ import io.trino.testing.MaterializedRow;
 import io.trino.testing.QueryRunner;
 import java.util.HashMap;
 import java.util.List;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
 public class TestGravitinoConnectorWithSimpleCatalogName extends AbstractTestQueryFramework {
