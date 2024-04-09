@@ -106,8 +106,6 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
-        logger.error("Requesting {}".format(endpoint))
-
         if headers:
             self._update_headers(headers)
         else:
