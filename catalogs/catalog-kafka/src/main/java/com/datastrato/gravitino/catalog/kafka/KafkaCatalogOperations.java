@@ -133,7 +133,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         AdminClientConfig.CLIENT_ID_CONFIG,
         String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));
 
-    createDefaultSchema();
     adminClient = AdminClient.create(adminClientConfig);
   }
 
@@ -329,6 +328,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    createDefaultSchemaIfNecessary();
     try {
       List<SchemaEntity> schemas =
           store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA);
@@ -352,6 +352,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+    createDefaultSchemaIfNecessary();
     try {
       SchemaEntity schema = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
 
@@ -429,6 +430,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   private void checkSchemaExists(NameIdentifier ident) throws NoSuchSchemaException {
+    if (ident.equals(defaultSchemaIdent)) {
+      createDefaultSchemaIfNecessary();
+      return;
+    }
+
     if (!schemaExists(ident)) {
       LOG.warn("Kafka catalog schema {} does not exist", ident);
       throw new NoSuchSchemaException("Schema %s does not exist", ident);
@@ -521,10 +527,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private NewTopic buildNewTopic(NameIdentifier ident, Map<String, String> properties) {
     Optional<Integer> partitionCount =
         Optional.ofNullable(
-            (int) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, PARTITION_COUNT));
+            (Integer) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, PARTITION_COUNT));
     Optional<Short> replicationFactor =
         Optional.ofNullable(
-            (short) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, REPLICATION_FACTOR));
+            (Short) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, REPLICATION_FACTOR));
     NewTopic newTopic = new NewTopic(ident.name(), partitionCount, replicationFactor);
     return newTopic.configs(buildNewTopicConfigs(properties));
   }
@@ -533,10 +539,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     Map<String, String> topicConfigs = Maps.newHashMap(properties);
     topicConfigs.remove(PARTITION_COUNT);
     topicConfigs.remove(REPLICATION_FACTOR);
+    topicConfigs.remove(ID_KEY);
     return topicConfigs;
   }
 
-  private void createDefaultSchema() {
+  private synchronized void createDefaultSchemaIfNecessary() {
     // If the default schema already exists, do nothing
     try {
       if (store.exists(defaultSchemaIdent, Entity.EntityType.SCHEMA)) {
