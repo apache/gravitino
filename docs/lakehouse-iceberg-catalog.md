@@ -58,7 +58,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema 
 
@@ -72,7 +72,7 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table 
 
@@ -215,7 +215,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
 ### Table properties
@@ -241,7 +241,7 @@ The Gravitino server doesn't allow passing the following reserved fields.
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 

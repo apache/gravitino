@@ -20,11 +20,13 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.service.TableMetaService;
+import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.IOException;
 import java.util.List;
@@ -58,6 +60,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
+      case TOPIC:
+        return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -87,6 +91,8 @@ public class JDBCBackend implements RelationalBackend {
       TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
+    } else if (e instanceof TopicEntity) {
+      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -108,6 +114,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TableMetaService.getInstance().updateTable(ident, updater);
       case FILESET:
         return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
+      case TOPIC:
+        return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -128,6 +136,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TableMetaService.getInstance().getTableByIdentifier(ident);
       case FILESET:
         return (E) FilesetMetaService.getInstance().getFilesetByIdentifier(ident);
+      case TOPIC:
+        return (E) TopicMetaService.getInstance().getTopicByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -147,6 +157,8 @@ public class JDBCBackend implements RelationalBackend {
         return TableMetaService.getInstance().deleteTable(ident);
       case FILESET:
         return FilesetMetaService.getInstance().deleteFileset(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().deleteTopic(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

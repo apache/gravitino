@@ -22,7 +22,8 @@ import {
   removeExpandedNode,
   setSelectedNodes,
   setLoadedNodes,
-  getTableDetails
+  getTableDetails,
+  getFilesetDetails
 } from '@/lib/store/metalakes'
 
 import { extractPlaceholder } from '@/lib/utils'
@@ -38,6 +39,27 @@ const MetalakeTree = props => {
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
 
+  const checkCatalogIcon = ({ type, provider }) => {
+    switch (type) {
+      case 'relational':
+        switch (provider) {
+          case 'hive':
+            return 'simple-icons:apachehive'
+          case 'lakehouse-iceberg':
+            return 'openmoji:iceberg'
+          case 'jdbc-mysql':
+            return 'devicon:mysql-wordmark'
+          case 'jdbc-postgresql':
+            return 'devicon:postgresql-wordmark'
+          default:
+            return 'bx:book'
+        }
+      case 'fileset':
+      default:
+        return 'bx:book'
+    }
+  }
+
   const handleClickIcon = (e, nodeProps) => {
     e.stopPropagation()
 
@@ -46,6 +68,12 @@ const MetalakeTree = props => {
         const pathArr = extractPlaceholder(nodeProps.data.key)
         const [metalake, catalog, schema, table] = pathArr
         dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+      }
+    } else if (nodeProps.data.node === 'fileset') {
+      if (store.selectedNodes.includes(nodeProps.data.key)) {
+        const pathArr = extractPlaceholder(nodeProps.data.key)
+        const [metalake, catalog, schema, fileset] = pathArr
+        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
       }
     } else {
       dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
@@ -113,8 +141,16 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
-            <Icon icon={isHover !== nodeProps.data.key ? 'bx:book' : 'mdi:reload'} fontSize='inherit' />
+            <Icon
+              icon={
+                isHover !== nodeProps.data.key
+                  ? checkCatalogIcon({ type: nodeProps.data.type, provider: nodeProps.data.provider })
+                  : 'mdi:reload'
+              }
+              fontSize='inherit'
+            />
           </IconButton>
         )
 
@@ -126,6 +162,7 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:coin-stack' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
@@ -139,8 +176,23 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:table' : 'mdi:reload'} fontSize='inherit' />
+          </IconButton>
+        )
+      case 'fileset':
+        return (
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
+          >
+            <Icon icon={isHover !== nodeProps.data.key ? 'bx:file' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
 
@@ -152,7 +204,11 @@ const MetalakeTree = props => {
   const renderNode = nodeData => {
     if (nodeData.path) {
       return (
-        <Typography sx={{ color: theme => theme.palette.text.secondary }} data-refer='tree-node'>
+        <Typography
+          sx={{ color: theme => theme.palette.text.secondary }}
+          data-refer='tree-node'
+          data-refer-node={nodeData.key}
+        >
           {nodeData.title}
         </Typography>
       )

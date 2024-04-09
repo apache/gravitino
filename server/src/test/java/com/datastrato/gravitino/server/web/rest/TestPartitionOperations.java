@@ -19,6 +19,7 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
+import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
@@ -184,7 +185,7 @@ public class TestPartitionOperations extends JerseyTest {
 
               @Override
               public boolean dropPartition(String partitionName) {
-                return false;
+                return partitions.containsKey(partitionName);
               }
             });
     when(dispatcher.loadTable(any())).thenReturn(mockedTable);
@@ -346,5 +347,40 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(
         PartitionAlreadyExistsException.class.getSimpleName(), errorResp2.getType());
     Assertions.assertTrue(errorResp2.getMessage().contains(partition1.name()));
+  }
+
+  @Test
+  public void testDropPartition() {
+    mockPartitionedTable();
+
+    // drop exist partition with ifExists=ture
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table) + "p1")
+            .queryParam("purge", "false")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    DropResponse dropResponse = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse.getCode());
+    Assertions.assertTrue(dropResponse.dropped());
+
+    // Test drop no-exist partition and return false
+    Response resp1 =
+        target(partitionPath(metalake, catalog, schema, table) + "p5")
+            .queryParam("purge", "false")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    DropResponse noExistDropResponse = resp1.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, noExistDropResponse.getCode());
+    Assertions.assertFalse(noExistDropResponse.dropped());
   }
 }

@@ -4,12 +4,36 @@
  */
 package com.datastrato.gravitino;
 
+import com.google.common.collect.ImmutableList;
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
 /** This interface defines an entity within the Gravitino framework. */
 public interface Entity extends Serializable {
+
+  // The below constants are used for virtual metalakes, catalogs and schemas
+  // The system doesn't need to create them. The system uses these constants
+  // to organize the system information better.
+
+  /** The system reserved metalake name. */
+  String SYSTEM_METALAKE_RESERVED_NAME = "system";
+
+  /** The system reserved catalog name. */
+  String SYSTEM_CATALOG_RESERVED_NAME = "system";
+
+  /** The authorization catalog name in the system metalake. */
+  String AUTHORIZATION_CATALOG_NAME = "authorization";
+
+  /** The user schema name in the system catalog. */
+  String USER_SCHEMA_NAME = "user";
+
+  /** The group schema name in the system catalog. */
+  String GROUP_SCHEMA_NAME = "group";
+
+  /** The admin schema name in the authorization catalog of the system metalake. */
+  String ADMIN_SCHEMA_NAME = "admin";
 
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
@@ -42,6 +66,35 @@ public interface Entity extends Serializable {
         }
       }
       throw new IllegalArgumentException("Unknown entity type: " + shortName);
+    }
+
+    /**
+     * Returns the parent entity types of the given entity type. The parent entity types are the
+     * entity types that are higher in the hierarchy than the given entity type. For example, the
+     * parent entity types of a table are metalake, catalog, and schema. (Sequence: root to leaf)
+     *
+     * @param entityType The entity type for which to get the parent entity types.
+     * @return The parent entity types of the given entity type.
+     */
+    public static List<EntityType> getParentEntityTypes(EntityType entityType) {
+      switch (entityType) {
+        case METALAKE:
+          return ImmutableList.of();
+        case CATALOG:
+          return ImmutableList.of(METALAKE);
+        case SCHEMA:
+          return ImmutableList.of(METALAKE, CATALOG);
+        case TABLE:
+        case FILESET:
+        case TOPIC:
+        case USER:
+        case GROUP:
+          return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
+        case COLUMN:
+          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);
+        default:
+          throw new IllegalArgumentException("Unknown entity type: " + entityType);
+      }
     }
   }
 

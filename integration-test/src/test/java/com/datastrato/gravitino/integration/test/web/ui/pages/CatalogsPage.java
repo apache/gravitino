@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -19,7 +20,6 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class CatalogsPage extends AbstractWebIT {
-
   @FindBy(xpath = "//*[@data-refer='back-home-btn']")
   public WebElement backHomeBtn;
 
@@ -77,9 +77,6 @@ public class CatalogsPage extends AbstractWebIT {
   @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
   public WebElement metalakeNameLink;
 
-  @FindBy(xpath = "//div[@data-prev-refer='props-metastore.uris']//input[@name='value']")
-  public WebElement hiveCatalogURIInput;
-
   @FindBy(xpath = "//div[contains(@class, 'MuiDataGrid-columnHeaders')]//div[@role='row']")
   public WebElement columnHeaders;
 
@@ -88,6 +85,18 @@ public class CatalogsPage extends AbstractWebIT {
 
   @FindBy(xpath = "//*[@data-refer='details-props-table']")
   public WebElement detailsPropsTable;
+
+  @FindBy(xpath = "//*[@data-refer='catalog-provider-selector']")
+  public WebElement catalogProviderSelector;
+
+  @FindBy(xpath = "//*[@data-refer='catalog-type-selector']")
+  public WebElement catalogTypeSelector;
+
+  @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-provider']")
+  public WebElement catalogProviderList;
+
+  @FindBy(xpath = "//ul[@aria-labelledby='select-catalog-type']")
+  public WebElement catalogTypeList;
 
   public CatalogsPage() {
     PageFactory.initElements(driver, this);
@@ -129,15 +138,19 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void setHiveCatalogURI(String value) {
+  // set the required fixed catalog properties
+  public void setCatalogFixedProp(String key, String value) {
     try {
-      hiveCatalogURIInput.sendKeys(value);
+      String xpath = "//div[@data-prev-refer='props-" + key + "']//input[@name='value']";
+      WebElement propItem = driver.findElement(By.xpath(xpath));
+      propItem.sendKeys(value);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
   }
 
-  public void setCatalogProps(int index, String key, String value) {
+  // set the indexed catalog properties
+  public void setCatalogPropsAt(int index, String key, String value) {
     try {
       // Set the indexed props key
       String keyPath = "//div[@data-refer='props-key-" + index + "']//input[@name='key']";
@@ -188,9 +201,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickCatalogLink(String metalakeName, String catalogName) {
+  public void clickCatalogLink(String metalakeName, String catalogName, String catalogType) {
     try {
-      String xpath = "//a[@href='?metalake=" + metalakeName + "&catalog=" + catalogName + "']";
+      String xpath =
+          "//a[@href='?metalake="
+              + metalakeName
+              + "&catalog="
+              + catalogName
+              + "&type="
+              + catalogType
+              + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -200,13 +220,16 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public void clickSchemaLink(String metalakeName, String catalogName, String schemaName) {
+  public void clickSchemaLink(
+      String metalakeName, String catalogName, String catalogType, String schemaName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "']";
@@ -220,13 +243,19 @@ public class CatalogsPage extends AbstractWebIT {
   }
 
   public void clickTableLink(
-      String metalakeName, String catalogName, String schemaName, String tableName) {
+      String metalakeName,
+      String catalogName,
+      String catalogType,
+      String schemaName,
+      String tableName) {
     try {
       String xpath =
           "//a[@href='?metalake="
               + metalakeName
               + "&catalog="
               + catalogName
+              + "&type="
+              + catalogType
               + "&schema="
               + schemaName
               + "&table="
@@ -251,14 +280,49 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyCreateHiveCatalog(String name) {
+  public void clickSelectProvider(String provider) throws InterruptedException {
+    WebElement providerItem =
+        catalogProviderList.findElement(By.xpath(".//li[@data-value='" + provider + "']"));
+    clickAndWait(providerItem);
+  }
+
+  public void clickSelectType(String type) throws InterruptedException {
+    WebElement typeItem =
+        catalogTypeList.findElement(By.xpath(".//li[@data-value='" + type + "']"));
+    clickAndWait(typeItem);
+  }
+
+  public void clickTreeNode(String nodeKey) throws InterruptedException {
+    WebElement treeNode = driver.findElement(By.xpath("//p[@data-refer-node='" + nodeKey + "']"));
+    clickAndWait(treeNode);
+  }
+
+  public void clickTreeNodeRefresh(String nodeKey) throws InterruptedException {
+    WebElement treeNodeRefreshBtn =
+        driver.findElement(By.xpath("//button[@data-refer='tree-node-refresh-" + nodeKey + "']"));
+    try {
+      int reTry = 3;
+      for (int i = 0; i < reTry; i++) {
+        clickAndWait(treeNodeRefreshBtn);
+      }
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public boolean verifyGetCatalog(String name) {
     try {
       String xpath =
           "//div[contains(@class, 'ant-tree-treenode')]//span[@title='"
               + name
               + "']//p[@data-refer='tree-node']";
       WebElement treeNode = treeView.findElement(By.xpath(xpath));
-      return Objects.equals(treeNode.getText(), name);
+      boolean match = Objects.equals(treeNode.getText(), name);
+      if (!match) {
+        LOG.error("tree node: {} does not match with name: {}", treeNode.getText(), name);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -309,7 +373,17 @@ public class CatalogsPage extends AbstractWebIT {
               By.xpath(
                   ".//*[@data-prev-refer='details-props-key-gravitino.bypass.hive.metastore.client.capability.check']"));
 
-      return isVisible && isText && isHiveURIS && isShowCheck;
+      boolean verifyAll = isVisible && isText && isHiveURIS && isShowCheck;
+      if (!verifyAll) {
+        LOG.error(
+            "not verified all - isVisible: {}, isText: {}, isHiveURIS: {}, isShowCheck: {}",
+            isVisible,
+            isText,
+            isHiveURIS,
+            isShowCheck);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -329,7 +403,12 @@ public class CatalogsPage extends AbstractWebIT {
       wait.until(ExpectedConditions.visibilityOf(treeNode));
 
       // Check if the link text is match with name
-      return Objects.equals(treeNode.getText(), name);
+      boolean match = Objects.equals(treeNode.getText(), name);
+      if (!match) {
+        LOG.error("tree node {} does not match with name: {}", treeNode.getText(), name);
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -341,7 +420,10 @@ public class CatalogsPage extends AbstractWebIT {
       // Check is empty table
       boolean isNoRows = waitShowText("No rows", tableWrapper);
       if (!isNoRows) {
-        LOG.error(tableWrapper.getText(), tableWrapper);
+        LOG.error(
+            "is not empty catalog list, tableWrapper text: {}, tableWrapper: {}",
+            tableWrapper.getText(),
+            tableWrapper);
         return false;
       }
       return true;
@@ -356,7 +438,36 @@ public class CatalogsPage extends AbstractWebIT {
       WebElement text = tabTableBtn.findElement(By.tagName("p"));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(text));
-      return Objects.equals(text.getText(), title);
+      boolean matchTitle = Objects.equals(text.getText(), title);
+      if (!matchTitle) {
+        LOG.error("table title: {} does not match with title: {}", text.getText(), title);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyShowDataItemInList(String itemName) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      List<WebElement> list =
+          driver.findElements(
+              By.xpath(
+                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement element : list) {
+        texts.add(element.getText());
+      }
+
+      if (!texts.contains(itemName)) {
+        LOG.error("table list: {} does not include itemName: {}", texts, itemName);
+        return false;
+      }
+
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -370,14 +481,14 @@ public class CatalogsPage extends AbstractWebIT {
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./div[@role='columnheader']"));
       if (columnHeadersRows.size() != columns.size()) {
-        LOG.error("Column headers count does not match expected: {}", columns.size());
+        LOG.error("Column headers count does not match, expected: {}", columns.size());
         return false;
       }
 
       for (int i = 0; i < columnHeadersRows.size(); i++) {
         String headerText = columnHeadersRows.get(i).getText();
         if (!headerText.equals(columns.get(i))) {
-          LOG.error("Column header '{}' does not match expected '{}'", headerText, columns.get(i));
+          LOG.error("Column header '{}' does not match, expected '{}'", headerText, columns.get(i));
           return false;
         }
       }
@@ -393,7 +504,13 @@ public class CatalogsPage extends AbstractWebIT {
     try {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
-      return Objects.equals(metalakePageTitle.getText(), "Metalakes");
+      boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
+      if (!matchTitle) {
+        LOG.error(
+            "metalakePageTitle: {} does not match with Metalakes", metalakePageTitle.getText());
+        return false;
+      }
+      return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       return false;
@@ -412,6 +529,72 @@ public class CatalogsPage extends AbstractWebIT {
       boolean isDisplayed = metalakeNameLink.isDisplayed();
       if (!isDisplayed) {
         LOG.error("No match with link, get {}", metalakeNameLink.getText());
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyCreatedCatalogs(List<String> catalogNames) {
+    try {
+      List<WebElement> list =
+          tableGrid.findElements(
+              By.xpath(
+                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement webElement : list) {
+        String rowItemColName = webElement.getText();
+        texts.add(rowItemColName);
+      }
+      if (!texts.containsAll(catalogNames)) {
+        LOG.error("table list: {} does not containsAll catalogNames: {}", texts, catalogNames);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyTreeNodes(List<String> treeNodes) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      List<WebElement> list =
+          driver.findElements(
+              By.xpath(
+                  "//div[@data-refer='tree-view']//div[@class='ant-tree-list-holder']/div/div[@class='ant-tree-list-holder-inner']/div[contains(@class, 'ant-tree-treenode')]"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement webElement : list) {
+        String nodeName =
+            webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
+        texts.add(nodeName);
+      }
+      if (!treeNodes.containsAll(texts)) {
+        LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifySelectedNode(String nodeName) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      WebElement selectedNode =
+          driver.findElement(
+              By.xpath(
+                  "//div[@data-refer='tree-view']//div[contains(@class, 'ant-tree-treenode-selected')]//span[@class='ant-tree-title']"));
+      waitShowText(nodeName, selectedNode);
+      if (!selectedNode.getText().equals(nodeName)) {
+        LOG.error(
+            "selectedNode: {} does not match with nodeName: {}", selectedNode.getText(), nodeName);
         return false;
       }
       return true;

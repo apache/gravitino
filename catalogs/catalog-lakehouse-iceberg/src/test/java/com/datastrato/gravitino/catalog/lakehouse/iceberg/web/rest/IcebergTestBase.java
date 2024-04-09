@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import javax.ws.rs.client.Invocation.Builder;
+import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -37,21 +37,21 @@ public class IcebergTestBase extends JerseyTest {
 
   private boolean urlPathWithPrefix = false;
 
-  public Builder getRenameTableClientBuilder() {
+  public Invocation.Builder getRenameTableClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());
   }
 
-  public Builder getTableClientBuilder() {
+  public Invocation.Builder getTableClientBuilder() {
     return getTableClientBuilder(Optional.empty());
   }
 
-  public Builder getTableClientBuilder(Optional<String> name) {
+  public Invocation.Builder getTableClientBuilder(Optional<String> name) {
     String path =
         Joiner.on("/").skipNulls().join(IcebergRestTestUtil.TABLE_PATH, name.orElseGet(() -> null));
     return getIcebergClientBuilder(path, Optional.empty());
   }
 
-  public Builder getReportMetricsClientBuilder(String name) {
+  public Invocation.Builder getReportMetricsClientBuilder(String name) {
     String path =
         Joiner.on("/")
             .skipNulls()
@@ -59,15 +59,15 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, Optional.empty());
   }
 
-  public Builder getNamespaceClientBuilder() {
+  public Invocation.Builder getNamespaceClientBuilder() {
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty());
   }
 
-  public Builder getNamespaceClientBuilder(Optional<String> namespace) {
+  public Invocation.Builder getNamespaceClientBuilder(Optional<String> namespace) {
     return getNamespaceClientBuilder(namespace, Optional.empty());
   }
 
-  public Builder getNamespaceClientBuilder(
+  public Invocation.Builder getNamespaceClientBuilder(
       Optional<String> namespace, Optional<Map<String, String>> queryParams) {
     String path =
         Joiner.on("/")
@@ -76,7 +76,7 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, queryParams);
   }
 
-  public Builder getUpdateNamespaceClientBuilder(String namespace) {
+  public Invocation.Builder getUpdateNamespaceClientBuilder(String namespace) {
     String path =
         Joiner.on("/")
             .skipNulls()
@@ -87,7 +87,7 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, Optional.empty());
   }
 
-  public Builder getConfigClientBuilder() {
+  public Invocation.Builder getConfigClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.empty());
   }
 
@@ -99,7 +99,8 @@ public class IcebergTestBase extends JerseyTest {
     return joiner.join(newItems);
   }
 
-  public Builder getIcebergClientBuilder(String path, Optional<Map<String, String>> queryParam) {
+  public Invocation.Builder getIcebergClientBuilder(
+      String path, Optional<Map<String, String>> queryParam) {
     if (urlPathWithPrefix) {
       path = injectPrefixToPath(path, IcebergRestTestUtil.PREFIX);
     }

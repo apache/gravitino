@@ -18,8 +18,6 @@ import java.util.Objects;
 
 public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
-  public static final String GROUP_SCHEMA_NAME = "group";
-
   public static final Field ID =
       Field.required("id", Long.class, " The unique id of the group entity.");
 

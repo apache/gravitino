@@ -59,6 +59,37 @@ This software is licensed under the Apache License version 2."
     ./gradlew build -PjdkVersion=17
     ```
 
+3. Build the Gravitino Python client.
+
+   The default specified Python version is 3.8, if you want to use Python 3.9, 3.10 or 3.11 to build,
+   modify the property `pythonVersion` to 3.9, 3.10 or 3.11 in the `gradle.properties` file, or specify the version
+   with `-P`, like:
+
+    ```shell
+    ./gradlew build -PpythonVersion=3.9
+    ```
+
+   Or:
+
+    ```shell
+    ./gradlew build -PpythonVersion=3.10
+    ```
+
+   Or:
+
+    ```shell
+    ./gradlew build -PpythonVersion=3.11
+    ```
+   
+4. Build Gravitino Spark connector
+
+    ```shell
+    ./gradlew spark-connector:spark-connector-runtime:build
+    ```
+
+   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/spark-connector-runtime/build/libs` directory.
+
+
 :::note
 The first time you build the project, downloading the dependencies may take a while. You can add
 `-x test` to skip the tests, by using `./gradlew build -x test`.

@@ -206,8 +206,17 @@
 
    Apache Zeppelin
    ./web/WEB-INF/web.xml
-
+   
+   @humanwhocodes/config-array
+   @humanwhocodes/module-importer
+   @pkgjs/parseargs
    @swc/helpers
+   aira-query
+   axobject-query
+   didyoumean
+   doctrine
+   eslint-visitor-keys
+   ts-interface-checker
    typescript
 
    This product bundles various third-party components also under the
@@ -219,6 +228,13 @@
    ./web/lib/enums/httpEnum.ts
    ./web/lib/utils/index.js (parts of)
 
+   @aashutoshrathi/word-wrap
+   @alloc/quick-lru
+   @ant-design/colors
+   @ant-design/cssinjs
+   @ant-design/icons
+   @ant-design/icons-svg
+   @ant-design/react-slick
    @babel/code-frame
    @babel/helper-module-imports
    @babel/helper-string-parser
@@ -226,6 +242,8 @@
    @babel/highlight
    @babel/runtime
    @babel/types
+   @ctrl/tinycolor
+   @discoveryjs/json-ext
    @emotion/babel-plugin
    @emotion/cache
    @emotion/hash
@@ -239,14 +257,25 @@
    @emotion/use-insertion-effect-with-fallbacks
    @emotion/utils
    @emotion/weak-memoize
+   @eslint-community/eslint-utils
+   @eslint-community/regexpp
+   @eslint/eslintrc
+   @eslint/js
    @floating-ui/core
    @floating-ui/dom
    @floating-ui/react-dom
    @floating-ui/utils
    @hookform/resolvers
+   @iconify/react
+   @iconify/types
+   @jridgewell/gen-mapping
+   @jridgewell/resolve-uri
+   @jridgewell/set-array
    @jridgewell/sourcemap-codec
+   @jridgewell/trace-mapping
    @mui/base
    @mui/core-downloads-tracker
+   @mui/icons-material
    @mui/lab
    @mui/material
    @mui/private-theming
@@ -256,126 +285,416 @@
    @mui/utils
    @mui/x-data-grid
    @mui/x-tree-view
+   @next/bundle-analyzer
    @next/env
+   @next/eslint-plugin-next
    @next/swc-darwin-arm64
+   @next/swc-linux-arm64-gnu
+   @next/swc-linux-arm64-musl
+   @next/swc-linux-x64-gnu
+   @next/swc-linux-x64-musl
+   @next/swc-win32-arm64-msvc
+   @next/swc-win32-ia32-msvc
+   @next/swc-win32-x64-msvc
+   @nodelib/fs.scandir
+   @nodelib/fs.stat
+   @nodelib/fs.walk
    @popperjs/core
+   @rc-component/color-picker
+   @rc-component/context
+   @rc-component/mini-decimal
+   @rc-component/mutate-observer
+   @rc-component/portal
+   @rc-component/tour
+   @rc-component/trigger
    @reduxjs/toolkit
+   @rushstack/eslint-patch
+   @types/lodash
+   @types/lodash-es
+   @types/node
    @types/hoist-non-react-statics
    @types/js-cookie
    @types/parse-json
    @types/prop-types
+   @types/qs
    @types/react-transition-group
    @types/react
    @types/scheduler
    @types/use-sync-external-store
+   @typescript-eslint/parser
+   @typescript-eslint/scope-manager
+   @typescript-eslint/types
+   @typescript-eslint/typescript-estree
+   @typescript-eslint/visitor-keys
    @xobotyi/scrollbar-width
+   acorn
+   acorn-jsx
+   acorn-walk
+   ajv
+   ansi-regex
    ansi-styles
+   any-promise
    antd
+   arg
+   array-buffer-byte-length
+   array-includes
+   array-tree-filter
+   array-union
+   array.prototype.findlast
+   array.prototype.findlastindex
+   array.prototype.flat
+   array.prototype.flatmap
+   array.prototype.toreversed
+   array.prototype.tosorted
+   arraybuffer.prototype.slice
+   ast-types-flow
    asynckit
+   async-validator
+   autoprefixer
+   available-typed-arrays
    axios
    babel-plugin-macros
+   balanced-match
+   binary-extensions
+   brace-expansion
+   braces
+   browserslist
    busboy
    call-bind
    callsites
+   camelcase-css
    chalk
+   chokidar
+   classnames
    client-only
    clsx
    color-convert
    color-name
+   commander
    combined-stream
+   compute-scroll-into-view
+   concat-map
    convert-source-map
    copy-to-clipboard
    cosmiconfig
+   cross-spawn
    css-in-js-utils
    css-tree
    csstype
+   data-view-buffer
+   data-view-byte-length
+   data-view-byte-offset
    dayjs
+   debounce
+   debug
+   deep-is
    define-data-property
    delayed-stream
+   dequal
+   dir-glob
+   dlv
    dom-helpers
+   duplexer
+   eastasianwidth
+   enhanced-resolve
+   env-cmd
    error-ex
    error-stack-parser
    escape-string-regexp
+   es-abstract
+   es-define-property
+   es-errors
+   es-iterator-helpers
+   es-object-atoms
+   es-set-tostringtag
+   es-shim-unscopables
+   es-to-primitive
+   escalade
+   eslint
+   eslint-config-next
+   eslint-config-prettier
+   eslint-import-resolver-node
+   eslint-module-utils
+   eslint-plugin-import
+   eslint-plugin-jsx-a11y
+   eslint-plugin-react
+   eslint-plugin-react-hooks
+   eslint-scope 
    fast-deep-equal
+   fast-glob
+   fast-json-stable-stringify
+   fast-levenshtein
    fast-loops
    fastest-stable-stringify
+   file-entry-cache
+   fill-range
    find-root
    follow-redirects
+   for-each
    form-data
+   raction.js
+   fsevents
    function-bind
+   function.prototype.name
+   functions-have-names
+   get-intrinsic
+   get-symbol-description
+   get-tsconfig
+   globals
+   globalthis
+   globby
    goober
    gopd
+   graphemer
+   gzip-size
+   has-bigints
+   html-escaper
    has-flag
    has-property-descriptors
    has-proto
    has-symbols
+   has-tostringtag
    hasown
+   ignore
    immer
    import-fresh
+   imurmurhash
    inline-style-prefixer
+   is-array-buffer
    is-arrayish
+   is-async-function
+   is-bigint
+   is-binary-path
+   is-boolean-object
+   is-callable
    is-core-module
+   is-data-view
+   is-date-object
+   is-extglob
+   is-finalizationregistry
+   is-fullwidth-code-point
+   is-generator-function
+   is-glob
+   is-map
+   is-negative-zero
+   is-number
+   is-number-object
+   is-path-inside
+   is-plain-object
+   is-regex
+   is-set
+   is-shared-array-buffer
+   is-string
+   is-symbol
+   is-typed-array
+   is-weakmap
+   is-weakref
+   is-weakset
+   isarray   
+   internal-slot
+   iterator.prototype
+   jiti
    js-cookie
    js-tokens
+   js-yaml
+   json-buffer
+   json-schema-traverse
+   json-stable-stringify-without-jsonify
+   json2mq
    json-parse-even-better-errors
+   jsx-ast-utils
+   keyv
+   language-tags
+   lilconfig
    lines-and-columns
+   levn
+   locate-path
+   lodash.merge
    lodash-es
    loose-envify
+   micromatch
+   minimist
    mime-db
    mime-types
+   mrmime
+   ms
+   mz
    nanoid
    next
+   node-releases
+   normalize-path
+   normalize-range
    nprogress
    object-assign
+   object.entries
+   object.fromentries
+   object.groupby
+   object.hasown
+   object-hash
    object-inspect
+   object-keys
+   object.values
+   opener
+   optionator
+   p-limit
+   p-locate
    parent-module
    parse-json
+   path-exists
+   path-is-absolute
+   path-key
    path-parse
    path-type
+   picomatch
+   pify
+   pirates
    postcss
+   possible-typed-array-names
+   postcss-import
+   postcss-js
+   postcss-load-config
+   postcss-nested
+   postcss-value-parser
+   prelude-ls
+   prettier
    prop-types
    property-expr
    proxy-from-env
+   qrcode.react
+   queue-microtask
+   rc-cascader
+   rc-checkbox
+   rc-collapse
+   rc-dialog
+   rc-drawer
+   rc-dropdown
+   rc-field-form
+   rc-image
+   rc-input
+   rc-input-number
+   rc-mentions
+   rc-menu
+   rc-motion
+   rc-notification
+   rc-overflow
+   rc-pagination
+   rc-picker
+   rc-progress
+   rc-rate
+   rc-resize-observer
+   rc-segmented
+   rc-select
+   rc-slider
+   rc-steps
+   rc-switch
+   rc-table
+   rc-tabs
+   rc-textarea
+   rc-tooltip
+   rc-tree
+   rc-tree-select
+   rc-upload
+   rc-util
+   rc-virtual-list
    react
    react-dom
    react-hook-form
    react-hot-toast
    react-is
    react-redux
+   read-cache
+   readdirp
    redux-thunk
    redux
+   reflect.getprototypeof
    regenerator-runtime
+   regexp.prototype.flags
    reselect
    resize-observer-polyfill
    resolve
    resolve-from
+   resolve-pkg-maps
    rtl-css-js
-   scheduler
+   reusify
+   run-parallel
+   safe-array-concat
+   safe-regex-test
+   scroll-into-view-if-needed
+   set-function-name
+   shebang-command
+   shebang-regex
+   sirv
    screenfull
    set-function-length
    side-channel
+   slash
    stack-generator
    stackframe
    stacktrace-gps
    stacktrace-js
    streamsearch
+   string-convert
+   string-width
+   string-width-cjs
+   string.prototype.matchall
+   string.prototype.trim
+   string.prototype.trimend
+   string.prototype.trimstart
+   strip-ansi
+   strip-ansi-cjs
+   strip-bom
+   strip-json-comments
    styled-jsx
    stylis
+   sucrase
    supports-color
    supports-preserve-symlinks-flag
-   throttle-debounce
+   tailwindcss
+   tapable
    tiny-case
+   throttle-debounce
+   thenify
+   thenify-all
    to-fast-properties
+   to-regex-range
    toggle-selection
    toposort
+   totalist
+   ts-api-utils
+   tsconfig-paths
+   type-check
+   typed-array-buffer
+   typed-array-byte-length
+   typed-array-byte-offset
+   typed-array-length
+   unbox-primitive
+   undici-types
+   update-browserslist-db
    use-sync-external-store
+   util-deprecate
    watchpack
+   webpack-bundle-analyzer
+   which-boxed-primitive
+   which-builtin-type
+   which-collection
+   which-typed-array
+   wrap-ansi
+   wrap-ansi-cjs
+   wrappy
+   ws
+   yallist
+   yocto-queue
    yup
 
    This product bundles various third-party components also under the
    CC BY 4.0 license.
 
    caniuse-lite
+
+   This product bundles various third-party components also under the
+   CC0 1.0 Universal license.
+
+   language-subtag-registry
 
    This product bundles various third-party components placed in the
    public domain.
@@ -386,11 +705,19 @@
    This product bundles various third-party components also under the
    BSD 2-Clause license.
 
+   damerau-levenshtein
    glob-to-regexp
+   espree
+   esrecurse
+   estraverse
+   esutils
+   uri-js
 
    This product bundles various third-party components also under the
    BSD 3-Clause license.
 
+   @humanwhocodes/object-schema
+   espree
    hoist-non-react-statics
    hyphenate-style-name
    react-transition-group
@@ -407,8 +734,33 @@
    This product bundles various third-party components also under the
    ISC license.
 
+   @isaacs/cliui
+   @ungap/structured-clone
+   anymatch
+   electron-to-chromium
+   eslint-import-resolver-typescript
+   fastq
+   flatted
+   foreground-child
+   fs.realpath
+   glob
+   glob-parent
    graceful-fs
+   inflight
+   inherits
+   isexe
+   lru-cache
+   minimatch
+   minipass
    picocolors
+   once
+   qrcode.react
+   rimraf
+   semver
+   signal-exit
+   which
+   wrappy
+   yallist
    yaml
 
    This product bundles various third-party components also under the
@@ -424,3 +776,19 @@
    react-use
    set-harmonic-interval
    ts-easing
+
+   This product bundles various third-party components also under the
+   Python Software Foundation License version 2.
+
+   argparse
+
+   This product bundles various third-party components also under the
+   Mozilla Public License, version 2.0.
+
+   argparse
+
+   This product bundles various third-party components also under the
+   Blue Oak Model License version 1.0.0.
+
+   jackspeak
+   path-scurry

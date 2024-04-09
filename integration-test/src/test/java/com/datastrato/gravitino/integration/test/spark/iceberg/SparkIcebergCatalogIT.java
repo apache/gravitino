@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import java.util.List;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
@@ -57,6 +59,26 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testIcebergFileLevelDeleteOperation() {
+    String tableName = "test_delete_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(getDeleteSql(tableName, "id < 10"));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(0, queryResult2.size());
+  }
+
+  @Test
   void testCreateIcebergBucketPartitionTable() {
     String tableName = "iceberg_bucket_partition_table";
     dropTableIfExists(tableName);
@@ -65,16 +87,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withBucket(16, Collections.singletonList("id"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withBucket(16, Collections.singletonList("id"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -94,16 +116,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withHour(Collections.singletonList("ts"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withHour(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -123,16 +145,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withDay(Collections.singletonList("ts"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withDay(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -152,16 +174,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withMonth(Collections.singletonList("ts"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withMonth(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -181,16 +203,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withYear(Collections.singletonList("ts"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withYear(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -210,16 +232,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createTableSQL);
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withTruncate(1, Collections.singletonList("name"));
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withTruncate(1, Collections.singletonList("name"));
     checker.check(tableInfo);
 
     String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            String.format(
+                    "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
+                    tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -241,18 +263,18 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
     SparkMetadataColumn[] metadataColumns =
-        new SparkMetadataColumn[] {
-          new SparkMetadataColumn("_spec_id", DataTypes.IntegerType, false),
-          new SparkMetadataColumn("_partition", DataTypes.StringType, true),
-          new SparkMetadataColumn("_file", DataTypes.StringType, false),
-          new SparkMetadataColumn("_pos", DataTypes.LongType, false),
-          new SparkMetadataColumn("_deleted", DataTypes.BooleanType, false)
-        };
+            new SparkMetadataColumn[] {
+                    new SparkMetadataColumn("_spec_id", DataTypes.IntegerType, false),
+                    new SparkMetadataColumn("_partition", DataTypes.StringType, true),
+                    new SparkMetadataColumn("_file", DataTypes.StringType, false),
+                    new SparkMetadataColumn("_pos", DataTypes.LongType, false),
+                    new SparkMetadataColumn("_deleted", DataTypes.BooleanType, false)
+            };
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getIcebergSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
   }
 }

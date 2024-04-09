@@ -207,6 +207,48 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testHiveFormatWithExternalTable() {
+    String tableName = "test_hive_format_with_external_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName, true);
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+
+    dropTableIfExists(tableName);
+    Path tableLocation = new Path(tableInfo.getTableLocation());
+    checkDataFileExists(tableLocation);
+  }
+
+  @Test
+  void testHiveFormatWithLocationTable() {
+    String tableName = "test_hive_format_with_location_table";
+    String location = "/user/hive/external_db";
+    Boolean[] isExternals = {Boolean.TRUE, Boolean.FALSE};
+
+    Arrays.stream(isExternals)
+        .forEach(
+            isExternal -> {
+              dropTableIfExists(tableName);
+              deleteDirIfExists(location);
+              String createTableSql = getCreateSimpleTableString(tableName, isExternal);
+              createTableSql = createTableSql + "LOCATION '" + location + "'";
+              sql(createTableSql);
+
+              SparkTableInfo tableInfo = getTableInfo(tableName);
+              checkTableReadWrite(tableInfo);
+              Assertions.assertTrue(tableInfo.getTableLocation().equals(hdfs.getUri() + location));
+            });
+  }
+
+  @Test
   void testHiveFormatWithUsing() {
     String tableName = "test_hive_format_using_table";
     dropTableIfExists(tableName);
