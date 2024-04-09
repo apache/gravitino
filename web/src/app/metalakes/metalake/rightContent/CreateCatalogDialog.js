@@ -423,6 +423,7 @@ const CreateCatalogDialog = props => {
                       error={Boolean(errors.type)}
                       labelId='select-catalog-type'
                       disabled={type === 'update'}
+                      data-refer='catalog-type-selector'
                     >
                       <MenuItem value={'relational'}>relational</MenuItem>
                       <MenuItem value={'fileset'}>fileset</MenuItem>
@@ -451,6 +452,7 @@ const CreateCatalogDialog = props => {
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
                       disabled={type === 'update'}
+                      data-refer='catalog-provider-selector'
                     >
                       {providerTypes.map(item => {
                         return (
