@@ -40,16 +40,16 @@ public class IcebergTableOps implements AutoCloseable {
 
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
-  private final String backendType;
-  private String backendUri = null;
+  private final String catalogType;
+  private String catalogUri = null;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
-    this.backendType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(backendType)) {
+    this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
+    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
-      this.backendUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
+      this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
-    catalog = IcebergCatalogUtil.loadCatalogBackend(backendType, icebergConfig.getAllConfig());
+    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
@@ -148,24 +148,20 @@ public class IcebergTableOps implements AutoCloseable {
     if (catalog instanceof AutoCloseable) {
       // JdbcCatalog need close.
       ((AutoCloseable) catalog).close();
-
-      // Because each catalog in Gravitino has its own classloader, after a catalog is longer used
-      // for a long time or dropped, the instance of classloader needs to be released. In order to
-      // let JVM GC remove the classloader, we need to release the resources of the classloader. The
-      // resources include the driver of the catalog backend and the
-      // AbandonedConnectionCleanupThread of MySQL. For me information about
-      // AbandonedConnectionCleanupThread, please refer to the corresponding java doc of MySQL
-      // driver.
-      if (backendUri != null) {
-        if (backendUri.contains("mysql")) {
-          closeMySQLCatalogResource();
-        } else if (backendUri.contains("postgresql")) {
-          closePostgreSQLCatalogResource();
-        }
-      }
     }
 
-    if (backendType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
+    // Because each catalog in Gravitino has its own classloader, after a catalog is longer used
+    // for a long time or dropped, the instance of classloader needs to be released. In order to
+    // let JVM GC remove the classloader, we need to release the resources of the classloader. The
+    // resources include the driver of the catalog backend and the
+    // AbandonedConnectionCleanupThread of MySQL. For more information about
+    // AbandonedConnectionCleanupThread, please refer to the corresponding java doc of MySQL
+    // driver.
+    if (catalogUri != null && catalogUri.contains("mysql")) {
+      closeMySQLCatalogResource();
+    } else if (catalogUri != null && catalogUri.contains("postgresql")) {
+      closePostgreSQLCatalogResource();
+    } else if (catalogType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
       // TODO(yuqi) add close for other catalog types such Hive catalog
     }
   }
@@ -181,7 +177,7 @@ public class IcebergTableOps implements AutoCloseable {
 
       // Unload the MySQL driver, only Unload the driver if it is loaded by
       // IsolatedClassLoader.
-      closeDriverLoadedByIsolatedClassLoader(backendUri);
+      closeDriverLoadedByIsolatedClassLoader(catalogUri);
     } catch (Exception e) {
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
     }
@@ -201,6 +197,6 @@ public class IcebergTableOps implements AutoCloseable {
   }
 
   private void closePostgreSQLCatalogResource() {
-    closeDriverLoadedByIsolatedClassLoader(backendUri);
+    closeDriverLoadedByIsolatedClassLoader(catalogUri);
   }
 }
