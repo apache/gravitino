@@ -12,24 +12,26 @@ import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import org.apache.iceberg.spark.source.SparkTable;
-import org.apache.spark.sql.connector.catalog.*;
+import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
-import org.apache.spark.sql.sources.Filter;
-import org.apache.spark.sql.connector.catalog.TableCapability;
+import org.apache.spark.sql.connector.catalog.SupportsDelete;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.SupportsRowLevelOperations;
+import org.apache.spark.sql.connector.catalog.TableCapability;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.connector.write.LogicalWriteInfo;
-import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.connector.write.RowLevelOperationBuilder;
 import org.apache.spark.sql.connector.write.RowLevelOperationInfo;
-
+import org.apache.spark.sql.connector.write.WriteBuilder;
+import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 @Getter
-public class SparkIcebergTable extends SparkTable implements SparkBaseTable, SupportsRowLevelOperations, SupportsMetadataColumns {
+public class SparkIcebergTable extends SparkTable
+    implements SparkBaseTable, SupportsRowLevelOperations, SupportsMetadataColumns {
 
   private final Identifier identifier;
   private final com.datastrato.gravitino.rel.Table gravitinoTable;
