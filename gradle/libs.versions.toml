@@ -28,6 +28,7 @@ commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 rocksdbjni = "7.10.2"
 iceberg = '1.3.1' # 1.4.0 causes test to fail
+paimon = '0.7.0-incubating'
 trino = '426'
 spark = "3.4.1" # 3.5.0 causes tests to fail
 scala-collection-compat = "2.7.0"
@@ -98,6 +99,7 @@ jersey-hk2 = { group = "org.glassfish.jersey.inject", name = "jersey-hk2", versi
 jersey-test-framework-core = { group = "org.glassfish.jersey.test-framework", name = "jersey-test-framework-core", version.ref = "jersey" }
 jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-framework.providers", name = "jersey-test-framework-provider-jetty", version.ref = "jersey" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockito" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
@@ -121,6 +123,9 @@ commons-collections4 = { group = "org.apache.commons", name = "commons-collectio
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
+paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
+paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-toolkit= { group = "io.trino", name = "trino-plugin-toolkit", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
@@ -170,6 +175,7 @@ log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-
 jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
+paimon = ["paimon-core", "paimon-format", "paimon-hive-catalog"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
 prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"]

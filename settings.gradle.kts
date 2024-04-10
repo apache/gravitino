@@ -12,6 +12,7 @@ include("api", "common", "core", "meta", "server", "integration-test", "server-c
 include("catalogs:bundled-catalog")
 include("catalogs:catalog-hive")
 include("catalogs:catalog-lakehouse-iceberg")
+include("catalogs:catalog-lakehouse-paimon")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
