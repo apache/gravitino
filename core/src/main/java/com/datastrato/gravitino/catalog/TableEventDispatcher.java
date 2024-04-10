@@ -69,17 +69,6 @@ public class TableEventDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    TableInfo createTableRequest =
-        new TableInfo(
-            ident.name(),
-            columns,
-            comment,
-            properties,
-            partitions,
-            distribution,
-            sortOrders,
-            indexes,
-            null);
     try {
       Table table =
           dispatcher.createTable(
@@ -88,6 +77,17 @@ public class TableEventDispatcher implements TableDispatcher {
           new CreateTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
       return table;
     } catch (Exception e) {
+      TableInfo createTableRequest =
+          new TableInfo(
+              ident.name(),
+              columns,
+              comment,
+              properties,
+              partitions,
+              distribution,
+              sortOrders,
+              indexes,
+              null);
       eventBus.dispatchEvent(
           new CreateTableFailureEvent(
               PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
