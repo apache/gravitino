@@ -33,9 +33,9 @@ import java.util.Map;
  * an {@link EventBus} after each operation is completed. This allows for event-driven workflows or
  * monitoring of table operations.
  */
-public class TableEventDispatcher implements TableCatalog {
+public class TableEventDispatcher implements TableDispatcher {
   private EventBus eventBus;
-  private TableCatalog dispatcher;
+  private TableDispatcher dispatcher;
 
   /**
    * Constructs a TableEventDispatcher with a specified EventBus and TableCatalog.
@@ -44,7 +44,7 @@ public class TableEventDispatcher implements TableCatalog {
    * @param dispatcher The underlying {@link TableOperationDispatcher} that will perform the actual
    *     table operations.
    */
-  public TableEventDispatcher(EventBus eventBus, TableCatalog dispatcher) {
+  public TableEventDispatcher(EventBus eventBus, TableDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
   }

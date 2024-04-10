@@ -9,6 +9,7 @@ import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TableEventDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
@@ -18,7 +19,6 @@ import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.annotations.VisibleForTesting;
@@ -41,7 +41,7 @@ public class GravitinoEnv {
 
   private SchemaOperationDispatcher schemaOperationDispatcher;
 
-  private TableCatalog tableOperationDispatcher;
+  private TableDispatcher tableOperationDispatcher;
 
   private FilesetOperationDispatcher filesetOperationDispatcher;
 
@@ -192,11 +192,11 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the TableOperationDispatcher associated with the Gravitino environment.
+   * Get the TableDispatcher associated with the Gravitino environment.
    *
-   * @return The TableOperationDispatcher instance.
+   * @return The TableDispatcher instance.
    */
-  public TableCatalog tableOperationDispatcher() {
+  public TableDispatcher tableOperationDispatcher() {
     return tableOperationDispatcher;
   }
 

@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
@@ -22,7 +22,6 @@ import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
@@ -45,11 +44,11 @@ import org.slf4j.LoggerFactory;
 public class PartitionOperations {
   private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);
 
-  private final TableCatalog dispatcher;
+  private final TableDispatcher dispatcher;
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public PartitionOperations(TableOperationDispatcher dispatcher) {
+  public PartitionOperations(TableDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
