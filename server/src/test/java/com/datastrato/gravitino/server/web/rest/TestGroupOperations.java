@@ -84,7 +84,6 @@ public class TestGroupOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(Optional.of(manager)).to(Optional.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
