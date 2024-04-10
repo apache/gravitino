@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.server.auth;
+package com.datastrato.gravitino.server.authentication;
 
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.config.ConfigBuilder;

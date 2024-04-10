@@ -3,10 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.server.auth;
+package com.datastrato.gravitino.server.authentication;
 
-import static com.datastrato.gravitino.server.auth.KerberosConfig.KEYTAB;
-import static com.datastrato.gravitino.server.auth.KerberosConfig.PRINCIPAL;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYTAB;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.auth.AuthConstants;
