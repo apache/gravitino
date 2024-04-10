@@ -16,11 +16,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -363,8 +365,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .createDataset(ids, Encoders.INT())
             .withColumnRenamed("value", "id")
-            .withColumn("name", null)
-            .withColumn("age", null);
+            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(200, getSparkSession().table(tableName).count());
@@ -402,8 +404,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .createDataset(ids, Encoders.INT())
             .withColumnRenamed("value", "id")
-            .withColumn("name", null)
-            .withColumn("age", null);
+            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(7500, getSparkSession().table(tableName).count());
