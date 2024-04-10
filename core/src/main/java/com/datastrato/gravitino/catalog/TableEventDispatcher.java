@@ -85,11 +85,7 @@ public class TableEventDispatcher implements TableDispatcher {
           dispatcher.createTable(
               ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
       eventBus.dispatchEvent(
-          new CreateTableEvent(
-              PrincipalUtils.getCurrentUserName(),
-              ident,
-              createTableRequest,
-              new TableInfo(table)));
+          new CreateTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
       return table;
     } catch (Exception e) {
       eventBus.dispatchEvent(

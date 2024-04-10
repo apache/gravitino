@@ -7,6 +7,7 @@ package com.datastrato.gravitino.listener.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.datastrato.gravitino.listener.info.TableInfo;
 import com.datastrato.gravitino.rel.Table;
 
 /**
@@ -18,7 +19,7 @@ import com.datastrato.gravitino.rel.Table;
  */
 @DeveloperApi
 public class CreateTableFailureEvent extends TableFailureEvent {
-  private Table createTableRequest;
+  private TableInfo createTableRequest;
 
   /**
    * Constructs a {@code CreateTableFailureEvent} instance, capturing detailed information about the
@@ -35,7 +36,7 @@ public class CreateTableFailureEvent extends TableFailureEvent {
    *     configuration options that were specified.
    */
   public CreateTableFailureEvent(
-      String user, NameIdentifier identifier, Exception exception, Table createTableRequest) {
+      String user, NameIdentifier identifier, Exception exception, TableInfo createTableRequest) {
     super(user, identifier, exception);
     this.createTableRequest = createTableRequest;
   }
@@ -48,7 +49,7 @@ public class CreateTableFailureEvent extends TableFailureEvent {
    * @return The {@link Table} instance representing the request information for the failed table
    *     creation attempt.
    */
-  public Table getCreateTableRequest() {
+  public TableInfo getCreateTableRequest() {
     return createTableRequest;
   }
 }

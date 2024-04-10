@@ -32,17 +32,23 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final List<EventListenerPlugin> eventListeners;
   private final BlockingQueue<Event> queue;
   private final Thread asyncProcessor;
+  private final int dispatcherJoinSeconds;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
   private Instant lastRecordDropEventTime;
   private final String asyncQueueListenerName;
 
-  public AsyncQueueListener(List<EventListenerPlugin> listeners, String name, int queueCapacity) {
+  public AsyncQueueListener(
+      List<EventListenerPlugin> listeners,
+      String name,
+      int queueCapacity,
+      int dispatcherJoinSeconds) {
     this.asyncQueueListenerName = NAME_PREFIX + name;
     this.eventListeners = listeners;
     this.queue = new LinkedBlockingQueue<>(queueCapacity);
     this.asyncProcessor = new Thread(() -> processEvents());
+    this.dispatcherJoinSeconds = dispatcherJoinSeconds;
     asyncProcessor.setDaemon(true);
     asyncProcessor.setName(asyncQueueListenerName);
   }
@@ -98,7 +104,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
     stopped.compareAndSet(false, true);
     asyncProcessor.interrupt();
     try {
-      asyncProcessor.join(3000);
+      asyncProcessor.join(dispatcherJoinSeconds * 1000);
     } catch (InterruptedException e) {
       LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
     }

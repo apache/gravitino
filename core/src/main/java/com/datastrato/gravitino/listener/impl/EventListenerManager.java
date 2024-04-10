@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -40,23 +39,22 @@ public class EventListenerManager {
   private static final Logger LOG = LoggerFactory.getLogger(EventListenerManager.class);
   public static final String GRAVITINO_EVENT_LISTENER_PREFIX = "gravitino.eventListener.";
   @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_NAMES = "names";
-  @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_CLASSNAME = "className";
-  private static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
+  static final String GRAVITINO_EVENT_LISTENER_CLASSNAME = "className";
+  static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
+  static final String GRAVITINO_EVENT_LISTENER_DISPATCHER_JOIN_SECONDS = "dispatcherJoinSeconds";
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
 
   private int queueCapacity;
+  private int dispatcherJoinSeconds;
   private List<EventListenerPlugin> eventListeners;
 
   public void init(Map<String, String> properties) {
-    String queueCapacity = properties.get(GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY);
-    this.queueCapacity =
-        Optional.ofNullable(queueCapacity)
-            .map(capacity -> Integer.valueOf(capacity))
-            .orElse(Integer.valueOf(1000))
-            .intValue();
+    EventListenerConfig config = new EventListenerConfig(properties);
+    this.queueCapacity = config.get(EventListenerConfig.QUEUE_CAPACITY).intValue();
+    this.dispatcherJoinSeconds = config.get(EventListenerConfig.DISPATCHER_JOIN_SECONDS);
 
-    String eventListenerNames = properties.getOrDefault(GRAVITINO_EVENT_LISTENER_NAMES, "");
+    String eventListenerNames = config.get(EventListenerConfig.LISTENER_NAMES);
     Map<String, EventListenerPlugin> userEventListenerPlugins =
         splitter
             .omitEmptyStrings()
@@ -108,7 +106,8 @@ public class EventListenerManager {
                       return new AsyncQueueListener(
                           ImmutableList.of(new EventListenerPluginWrapper(listenerName, listener)),
                           listenerName,
-                          queueCapacity);
+                          queueCapacity,
+                          dispatcherJoinSeconds);
                     }
                   } else {
                     return new EventListenerPluginWrapper(listenerName, listener);
@@ -118,7 +117,9 @@ public class EventListenerManager {
             .collect(Collectors.toList());
 
     if (sharedQueueListeners.size() > 0) {
-      listeners.add(new AsyncQueueListener(sharedQueueListeners, "default", queueCapacity));
+      listeners.add(
+          new AsyncQueueListener(
+              sharedQueueListeners, "default", queueCapacity, dispatcherJoinSeconds));
     }
     return listeners;
   }

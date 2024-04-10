@@ -7,68 +7,51 @@ package com.datastrato.gravitino.listener.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.listener.info.TableInfo;
 
 /**
- * Represents an event triggered after a table is successfully created. This class extends {@link
- * TableEvent} to encapsulate specific details related to the creation of a table, including both
- * the request used to initiate the table creation and the resulting table information provided to
- * the user upon successful creation.
+ * Represents an event triggered upon the successful creation of a table. This class extends {@link
+ * TableEvent} to provide detailed information specifically related to the table's creation. This
+ * includes the final table information as it is returned to the user once the creation process has
+ * successfully completed.
  *
- * <p>This event can be useful for auditing operations, tracking table creation activities, or
- * understanding the configuration and state of a newly created table.
+ * <p>Such an event is instrumental for a variety of purposes including, but not limited to,
+ * auditing activities associated with table creation, monitoring the creation of tables within a
+ * system, and acquiring insights into the final configuration and state of a newly created table.
  */
 @DeveloperApi
 public class CreateTableEvent extends TableEvent {
-  private Table createdTableInfo;
-  private Table createTableRequest;
+  private final TableInfo createdTableInfo;
 
   /**
-   * Constructs a {@code CreateTableEvent} instance, capturing details about a successful table
-   * creation operation.
+   * Constructs an instance of {@code CreateTableEvent}, capturing essential details about the
+   * successful creation of a table.
    *
-   * <p>This constructor initializes the event with comprehensive information about the table
-   * creation, including who initiated it, the unique identifier of the created table, the original
-   * request parameters, and the final state of the created table.
+   * <p>This constructor documents the successful culmination of the table creation process by
+   * encapsulating the final state of the table. This includes any adjustments or resolutions made
+   * to the table's properties or configuration during the creation process.
    *
-   * @param user The username of the individual who initiated the table creation operation. This
-   *     parameter is essential for auditing purposes and tracking responsibility for changes.
-   * @param identifier The unique identifier of the table that was created, providing a clear
+   * @param user The username of the individual who initiated the table creation. This information
+   *     is vital for tracking the source of changes and for audit trails.
+   * @param identifier The unique identifier of the table that was created, providing a precise
    *     reference to the affected table.
-   * @param createTableRequest The original request data used to create the table. This includes
-   *     details such as the table's schema, properties, and other configuration options specified
-   *     by the user during the creation process.
-   * @param table The table information returned upon successful creation. This represents the final
-   *     state of the table, including any defaults or properties resolved during the creation
-   *     process.
+   * @param createdTableInfo The final state of the table post-creation. This information is
+   *     reflective of the table's configuration, including any default settings or properties
+   *     applied during the creation process.
    */
-  public CreateTableEvent(
-      String user, NameIdentifier identifier, Table createTableRequest, Table table) {
+  public CreateTableEvent(String user, NameIdentifier identifier, TableInfo createdTableInfo) {
     super(user, identifier);
-    this.createTableRequest = createTableRequest;
-    this.createdTableInfo = table;
+    this.createdTableInfo = createdTableInfo;
   }
 
   /**
-   * Retrieves the final state and information of the table as returned to the user after successful
-   * creation.
+   * Retrieves the final state and configuration information of the table as it was returned to the
+   * user after successful creation.
    *
-   * @return The {@link Table} instance representing the final state of the newly created table.
+   * @return A {@link TableInfo} instance encapsulating the comprehensive details of the newly
+   *     created table, highlighting its configuration and any default settings applied.
    */
-  public Table getCreatedTableInfo() {
+  public TableInfo getCreatedTableInfo() {
     return createdTableInfo;
-  }
-
-  /**
-   * Retrieves the original request data used to create the table.
-   *
-   * <p>This information is beneficial for auditing, understanding the user's initial configuration
-   * intentions, and for potential troubleshooting of table creation operations.
-   *
-   * @return The {@link Table} instance representing the initial request data for the table
-   *     creation.
-   */
-  public Table getCreateTableRequest() {
-    return createTableRequest;
   }
 }

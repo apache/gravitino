@@ -19,10 +19,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * TableInfo exposes table interfaces for event listener, it's supposed to be read only. Most of the
- * fields are shallow copied internally not deep copies for performance.
+ * TableInfo exposes table information for event listener, it's supposed to be read only. Most of
+ * the fields are shallow copied internally not deep copies for performance.
  */
-public class TableInfo implements Table {
+public final class TableInfo {
   private String name;
   private Column[] columns;
   @Nullable private String comment;
@@ -88,49 +88,40 @@ public class TableInfo implements Table {
   }
 
   /** Audit information is null when tableInfo is generated from create table request. */
-  @Override
   @Nullable
   public Audit auditInfo() {
     return this.auditInfo;
   }
 
-  @Override
   public String name() {
     return name;
   }
 
-  @Override
   public Column[] columns() {
     return columns;
   }
 
-  @Override
   public Transform[] partitioning() {
     return partitions;
   }
 
-  @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
-  @Override
   public Distribution distribution() {
     return distribution;
   }
 
-  @Override
   public Index[] index() {
     return indexes;
   }
 
   @Nullable
-  @Override
   public String comment() {
     return comment;
   }
 
-  @Override
   public Map<String, String> properties() {
     return properties;
   }
