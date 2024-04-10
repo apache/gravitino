@@ -82,7 +82,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
                 .ranked(1);
-            bind(gravitinoEnv.tableOperationDispatcher()).to(TableDispatcher.class).ranked(1);
+            bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetOperationDispatcher())
                 .to(FilesetOperationDispatcher.class)
                 .ranked(1);

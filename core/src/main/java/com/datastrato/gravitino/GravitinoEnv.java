@@ -41,7 +41,7 @@ public class GravitinoEnv {
 
   private SchemaOperationDispatcher schemaOperationDispatcher;
 
-  private TableDispatcher tableOperationDispatcher;
+  private TableDispatcher tableDispatcher;
 
   private FilesetOperationDispatcher filesetOperationDispatcher;
 
@@ -131,7 +131,7 @@ public class GravitinoEnv {
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.tableOperationDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
     this.filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.topicOperationDispatcher =
@@ -196,8 +196,8 @@ public class GravitinoEnv {
    *
    * @return The TableDispatcher instance.
    */
-  public TableDispatcher tableOperationDispatcher() {
-    return tableOperationDispatcher;
+  public TableDispatcher tableDispatcher() {
+    return tableDispatcher;
   }
 
   /**

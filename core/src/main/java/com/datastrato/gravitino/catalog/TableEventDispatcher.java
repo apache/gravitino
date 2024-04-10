@@ -18,7 +18,6 @@ import com.datastrato.gravitino.listener.impl.EventBus;
 import com.datastrato.gravitino.listener.info.TableInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -28,7 +27,7 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 
 /**
- * {@code TableEventDispatcher} is a decorator for {@link TableCatalog} that not only delegates
+ * {@code TableEventDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
  * table operations to the underlying catalog dispatcher but also dispatches corresponding events to
  * an {@link EventBus} after each operation is completed. This allows for event-driven workflows or
  * monitoring of table operations.
