@@ -176,8 +176,20 @@ public class SparkTableInfoChecker {
                       expectedTableInfo.getTruncate(), realTableInfo.getTruncate());
                   break;
                 case METADATACOLUMN:
-                  Assertions.assertArrayEquals(
-                      expectedTableInfo.getMetadataColumns(), realTableInfo.getMetadataColumns());
+                  Assertions.assertEquals(
+                      expectedTableInfo.getMetadataColumns().length,
+                      realTableInfo.getMetadataColumns().length);
+                  for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].name(),
+                        realTableInfo.getMetadataColumns()[i].name());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].dataType(),
+                        realTableInfo.getMetadataColumns()[i].dataType());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].isNullable(),
+                        realTableInfo.getMetadataColumns()[i].isNullable());
+                  }
                   break;
                 case COMMENT:
                   Assertions.assertEquals(
