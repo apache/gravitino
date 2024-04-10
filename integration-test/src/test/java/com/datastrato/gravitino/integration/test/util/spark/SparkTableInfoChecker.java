@@ -176,7 +176,7 @@ public class SparkTableInfoChecker {
                       expectedTableInfo.getTruncate(), realTableInfo.getTruncate());
                   break;
                 case METADATACOLUMN:
-                  Assertions.assertEquals(
+                  Assertions.assertArrayEquals(
                       expectedTableInfo.getMetadataColumns(), realTableInfo.getMetadataColumns());
                   break;
                 case COMMENT:
