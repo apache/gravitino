@@ -37,15 +37,16 @@ You can check the relevant data source configuration in [data source properties]
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 
-| Configuration item   | Description                                                                                                                                                       | Default value | Required | Since Version |
-|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      | 0.3.0         |
-| `jdbc-database`      | The database of the JDBC connection. Configure it with the same value as the database in the `jdbc-url`. For example `pg_database`.                             | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                                                                               | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                                                                                | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                    | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                   | `10`          | No       | 0.3.0         |
+| Configuration item         | Description                                                                                                                                                        | Default value | Required | Since Version |
+|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`                 | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`.  | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`              | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                            | (none)        | Yes      | 0.3.0         |
+| `jdbc-database`            | The database of the JDBC connection. Configure it with the same value as the database in the `jdbc-url`. For example `pg_database`.                                | (none)        | Yes      | 0.3.0         |
+| `jdbc-user`                | The JDBC user name.                                                                                                                                                | (none)        | Yes      | 0.3.0         |
+| `jdbc-password`            | The JDBC password.                                                                                                                                                 | (none)        | Yes      | 0.3.0         |
+| `jdbc.pool.min-size`       | The minimum number of connections in the pool. `2` by default.                                                                                                     | `2`           | No       | 0.3.0         |
+| `jdbc.pool.max-size`       | The maximum number of connections in the pool. `10` by default.                                                                                                    | `10`          | No       | 0.3.0         |
+| `jdbc.pool.test-on-borrow` | Whether to test the connection on borrow.                                                                                                                          | `true`        | No       | 0.5.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
