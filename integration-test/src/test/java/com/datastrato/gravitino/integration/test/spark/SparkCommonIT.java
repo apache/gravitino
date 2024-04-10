@@ -86,10 +86,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return String.format("DELETE FROM %s where %s", tableName, condition);
   }
 
-  private static String getDeleteSql(String tableName, String condition) {
-    return String.format("DELETE FROM %s where %s", tableName, condition);
-  }
-
   private static String getUpdateTableSql(String tableName, String setClause, String whereClause) {
     return String.format("UPDATE %s SET %s WHERE %s", tableName, setClause, whereClause);
   }
