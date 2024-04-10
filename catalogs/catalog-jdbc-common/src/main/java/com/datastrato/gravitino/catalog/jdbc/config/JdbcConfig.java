@@ -70,6 +70,13 @@ public class JdbcConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
+  public static final ConfigEntry<Boolean> TEST_ON_BORROW =
+      new ConfigBuilder("jdbc.pool.test-on-borrow")
+          .doc("Whether to test the connection on borrow")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public String getJdbcUrl() {
     return get(JDBC_URL);
   }
@@ -96,6 +103,10 @@ public class JdbcConfig extends Config {
 
   public String getJdbcDatabase() {
     return get(JDBC_DATABASE);
+  }
+
+  public boolean getTestOnBorrow() {
+    return get(TEST_ON_BORROW);
   }
 
   public JdbcConfig(Map<String, String> properties) {
