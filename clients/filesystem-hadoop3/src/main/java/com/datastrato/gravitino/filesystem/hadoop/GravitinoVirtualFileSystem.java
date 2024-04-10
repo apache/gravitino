@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
@@ -53,6 +52,10 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Cache<NameIdentifier, Pair<Fileset, FileSystem>> filesetCache;
   private ScheduledThreadPoolExecutor scheduler;
 
+  // The pattern is used to match gvfs path. The scheme prefix (gvfs://) is optional.
+  // The following path can be match:
+  //     gvfs://fileset/fileset_catalog/fileset_schema/fileset1/file.txt
+  //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
   private static final Pattern IDENTIFIER_PATTERN =
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:[/[^/]+]*)$");
 
@@ -274,11 +277,11 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private FileStatus convertFileStatusPathPrefix(
       FileStatus fileStatus, String actualPrefix, String virtualPrefix) {
     String filePath = fileStatus.getPath().toString();
-    if (!filePath.startsWith(actualPrefix)) {
-      throw new InvalidPathException(
-          filePath,
-          String.format("Path %s doesn't start with prefix \"%s\".", filePath, actualPrefix));
-    }
+    Preconditions.checkArgument(
+        !filePath.startsWith(actualPrefix),
+        "Path %s doesn't start with prefix \"%s\".",
+        filePath,
+        actualPrefix);
     Path path = new Path(filePath.replaceFirst(actualPrefix, virtualPrefix));
     fileStatus.setPath(path);
 
@@ -288,10 +291,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   @VisibleForTesting
   NameIdentifier extractIdentifier(URI virtualUri) {
     String virtualPath = virtualUri.toString();
-    if (StringUtils.isBlank(virtualPath)) {
-      throw new InvalidPathException(
-          virtualPath, "Uri which need be extracted cannot be null or empty.");
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(virtualPath),
+        "Uri which need be extracted cannot be null or empty.");
 
     Matcher matcher = IDENTIFIER_PATTERN.matcher(virtualPath);
     Preconditions.checkArgument(
