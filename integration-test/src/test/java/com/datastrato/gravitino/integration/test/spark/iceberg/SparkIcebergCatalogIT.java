@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +16,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
+import org.apache.iceberg.RowLevelOperationMode;
+import org.apache.iceberg.TableProperties;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -63,11 +66,17 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         tableName);
   }
 
-  private void createIcebergV2SimpleTable(String tableName) {
+  private void createIcebergTableWithTabProperties(
+      String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
+    String partitionedClause = isPartitioned ? " PARTITIONED BY (id) " : "";
+    String tblPropertiesStr =
+        tblProperties.entrySet().stream()
+            .map(e -> String.format("'%s'='%s'", e.getKey(), e.getValue()))
+            .collect(Collectors.joining(","));
     String createSql =
         String.format(
-            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TBLPROPERTIES('format.version'='2')",
-            tableName);
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
+            tableName, partitionedClause, tblPropertiesStr);
     sql(createSql);
   }
 
@@ -515,89 +524,318 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testUpdateOperations() {
-    String tableName = "test_update_v2_table";
-    dropTableIfExists(tableName);
-    createIcebergV2SimpleTable(tableName);
-
+  void testCopyOnWriteDeleteInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_delete";
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.DELETE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
     SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableRowLevelDelete(tableName);
+  }
 
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-        new ArrayList<>(getSimpleTableColumn());
-    simpleTableColumnInfos.remove(0);
-    List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
-    realTableColumnInfos.add(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
-    realTableColumnInfos.addAll(simpleTableColumnInfos);
-    checkTableColumns(tableName, realTableColumnInfos, table);
+  @Test
+  void testCopyOnWriteDeleteInPartitionedTable() {
+    String tableName = "test_copy_on_write_delete";
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.DELETE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableRowLevelDelete(tableName);
+  }
+
+  @Test
+  void testMergeOnReadDeleteInUnPartitionedTable() {
+    String tableName = "test_merge_on_read_delete";
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.DELETE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableRowLevelDelete(tableName);
+  }
+
+  @Test
+  void testMergeOnReadDeleteInPartitionedTable() {
+    String tableName = "test_merge_on_read_delete";
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.DELETE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableRowLevelDelete(tableName);
+  }
+
+  @Test
+  void testCopyOnWriteUpdateInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_update";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.UPDATE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableReadAndUpdate(table);
   }
 
   @Test
-  void testRowLevelUpdateOperations() {
-    String tableName = "test_merge_update_v2_table";
+  void testCopyOnWriteUpdateInPartitionedTable() {
+    String tableName = "test_copy_on_write_update";
     dropTableIfExists(tableName);
-    createIcebergV2SimpleTable(tableName);
-
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.UPDATE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
     SparkTableInfo table = getTableInfo(tableName);
-
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-        new ArrayList<>(getSimpleTableColumn());
-    simpleTableColumnInfos.remove(0);
-    List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
-    realTableColumnInfos.add(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
-    realTableColumnInfos.addAll(simpleTableColumnInfos);
-    checkTableColumns(tableName, realTableColumnInfos, table);
-    checkTableRowLevelUpdate(table);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableReadAndUpdate(table);
   }
 
   @Test
-  void testRowLevelDeleteOperations() {
-    String tableName = "test_merge_delete_v2_table";
+  void testMergeOnReadUpdateInUnPartitionedTable() {
+    String tableName = "test_merge_on_read_update";
     dropTableIfExists(tableName);
-    createIcebergV2SimpleTable(tableName);
-
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.UPDATE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
     SparkTableInfo table = getTableInfo(tableName);
-
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-        new ArrayList<>(getSimpleTableColumn());
-    simpleTableColumnInfos.remove(0);
-    List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
-    realTableColumnInfos.add(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
-    realTableColumnInfos.addAll(simpleTableColumnInfos);
-    checkTableColumns(tableName, realTableColumnInfos, table);
-    checkTableRowLevelDelete(table);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableReadAndUpdate(table);
   }
 
   @Test
-  void testRowLevelInsertOperations() {
-    String tableName = "test_merge_insert_v2_table";
+  void testMergeOnReadUpdateInPartitionedTable() {
+    String tableName = "test_merge_on_read_update";
     dropTableIfExists(tableName);
-    createIcebergV2SimpleTable(tableName);
-
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.UPDATE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
     SparkTableInfo table = getTableInfo(tableName);
-
-    List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-        new ArrayList<>(getSimpleTableColumn());
-    simpleTableColumnInfos.remove(0);
-    List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
-    realTableColumnInfos.add(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
-    realTableColumnInfos.addAll(simpleTableColumnInfos);
-    checkTableColumns(tableName, realTableColumnInfos, table);
-    checkTableRowLevelInsert(table);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableReadAndUpdate(table);
   }
 
   @Test
-  void testInsertForV1Table() {
-    String tableName = "test_insert_v1_table";
+  void testCopyOnWriteMergeUpdateInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_update";
     dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
-    checkTableReadWrite(table);
+    checkTableUpdateInMerge(table);
+  }
+
+  @Test
+  void testCopyOnWriteMergeUpdateInPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_update";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableUpdateInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadMergeUpdateInUnPartitionedTable() {
+    String tableName = "test_merge_on_read_merge_update";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableUpdateInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadMergeUpdateInPartitionedTable() {
+    String tableName = "test_merge_on_read_merge_update";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableUpdateInMerge(table);
+  }
+
+  @Test
+  void testCopyOnWriteInMergeDeleteInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_delete";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableDeleteInMerge(table);
+  }
+
+  @Test
+  void testCopyOnWriteInMergeDeleteInPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_delete";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableDeleteInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadInMergeDeleteInUnPartitionedTable() {
+    String tableName = "test_merge_on_read_merge_delete";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableDeleteInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadInMergeDeleteInPartitionedTable() {
+    String tableName = "test_merge_on_read_merge_delete";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableDeleteInMerge(table);
+  }
+
+  @Test
+  void testCopyOnWriteInsertInMergeInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_insert";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableInsertInMerge(table);
+  }
+
+  @Test
+  void testCopyOnWriteInsertInMergeInPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_insert";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.MERGE_MODE, RowLevelOperationMode.COPY_ON_WRITE.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableInsertInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadInsertInMergeInUnPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_insert";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        false,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableInsertInMerge(table);
+  }
+
+  @Test
+  void testMergeOnReadInsertInMergeInPartitionedTable() {
+    String tableName = "test_copy_on_write_merge_insert";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        true,
+        ImmutableMap.of(
+            TableProperties.FORMAT_VERSION,
+            "2",
+            TableProperties.MERGE_MODE,
+            RowLevelOperationMode.MERGE_ON_READ.modeName()));
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    checkTableInsertInMerge(table);
   }
 }

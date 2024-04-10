@@ -892,7 +892,21 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
-  protected void checkTableRowLevelUpdate(SparkTableInfo table) {
+  protected void checkTableRowLevelDelete(String tableName) {
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(getDeleteSql(tableName, "id <= 2"));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult2.size());
+    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", queryResult2));
+  }
+
+  protected void checkTableUpdateInMerge(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     checkTableReadWrite(table);
 
@@ -971,7 +985,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(checkValues, queryResult.get(0));
   }
 
-  protected void checkTableRowLevelDelete(SparkTableInfo table) {
+  protected void checkTableDeleteInMerge(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     checkTableReadWrite(table);
 
@@ -1001,7 +1015,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
   }
 
-  protected void checkTableRowLevelInsert(SparkTableInfo table) {
+  protected void checkTableInsertInMerge(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     List<Object[]> queryResult = sql(getSelectAllSql(name));
     Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
