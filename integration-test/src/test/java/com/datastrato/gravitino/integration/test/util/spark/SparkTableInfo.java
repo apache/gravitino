@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,6 +17,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
@@ -156,10 +156,10 @@ public class SparkTableInfo {
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
-    if (baseTable instanceof SparkIcebergTable) {
-      SparkIcebergTable icebergTable = (SparkIcebergTable) baseTable;
+    if (baseTable instanceof SupportsMetadataColumns) {
+      SupportsMetadataColumns supportsMetadataColumns = (SupportsMetadataColumns) baseTable;
       sparkTableInfo.metadataColumns =
-          Arrays.stream(icebergTable.metadataColumns())
+          Arrays.stream(supportsMetadataColumns.metadataColumns())
               .map(
                   metadataColumn ->
                       new SparkMetadataColumn(
