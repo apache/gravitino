@@ -137,7 +137,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           children: []
         }
       })
-    } else if (pathArr.length === 4 && type === 'table') {
+    } else if (pathArr.length === 4 && type === 'relational') {
       const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
       const { identifiers = [] } = res
