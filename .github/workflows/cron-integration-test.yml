@@ -1,0 +1,100 @@
+name: Cron Integration Test
+
+# Controls when the workflow will run
+on:
+  schedule: # Runs by default on main branch
+    - cron: '0 19 * * *' # Runs every day at 19:00 PM UTC, equal to 03:00 AM the next day in GMT+8 time zone
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ contains(github.ref, 'main') }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - bin/**
+              - catalogs/**
+              - clients/**
+              - common/**
+              - conf/**
+              - core/**
+              - dev/**
+              - gradle/**
+              - integration-test/**
+              - meta/**
+              - server/**
+              - server-common/**
+              - spark-connector/**
+              - trino-connector/**
+              - web/**
+              - docs/open-api/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
+  # Integration test for AMD64 architecture
+  test-amd64-arch:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 8, 11, 17 ]
+        test-mode: [ embedded, deploy ]
+    env:
+      DOCKER_RUN_NAME: hive-amd64
+      PLATFORM: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+
+      - name: Setup debug Github Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Integration Test
+        id: integrationTest
+        run: |
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        with:
+          name: integrate test reports
+          path: |
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log

@@ -8,12 +8,44 @@
 import Link from 'next/link'
 import Image from 'next/image'
 
-import { Box, AppBar as MuiAppBar, Toolbar, Stack, Typography } from '@mui/material'
+import {
+  Box,
+  AppBar as MuiAppBar,
+  Toolbar,
+  Stack,
+  Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from '@mui/material'
 
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
+import { useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
+import { fetchMetalakes } from '@/lib/store/metalakes'
+
+import { useState, useEffect } from 'react'
 
 const AppBar = () => {
+  const searchParams = useSearchParams()
+  const metalake = searchParams.get('metalake')
+  const store = useAppSelector(state => state.metalakes)
+  const dispatch = useAppDispatch()
+  const [metalakes, setMetalakes] = useState([])
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!store.metalakes.length) {
+      dispatch(fetchMetalakes())
+    }
+    const metalakeItems = store.metalakes.map(i => i.name)
+    setMetalakes(metalakeItems)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.metalakes])
+
   return (
     <MuiAppBar
       elevation={6}
@@ -43,6 +75,31 @@ const AppBar = () => {
             </Link>
             <Box className={'app-bar-content-right twc-flex twc-items-center'}>
               <Stack direction='row' spacing={2} alignItems='center'>
+                {metalake ? (
+                  <FormControl fullWidth size='small'>
+                    <InputLabel id='select-metalake'>Metalake</InputLabel>
+                    <Select
+                      labelId='select-metalake'
+                      id='select-metalake'
+                      data-refer='select-metalake'
+                      value={metalake}
+                      label='Metalake'
+                    >
+                      {metalakes.map(item => {
+                        return (
+                          <MenuItem
+                            value={item}
+                            key={item}
+                            data-refer={'select-option-' + item}
+                            onClick={() => router.push('/metalakes?metalake=' + item)}
+                          >
+                            {item}
+                          </MenuItem>
+                        )
+                      })}
+                    </Select>
+                  </FormControl>
+                ) : null}
                 <VersionView />
                 <LogoutButton />
               </Stack>

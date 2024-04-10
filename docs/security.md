@@ -22,6 +22,7 @@ For the client side, users can enable `simple` mode by the following code:
 
 ```java
 GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
     .withSimpleAuth()
     .build();
 ```
@@ -47,6 +48,7 @@ DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder
     .build();
 
 GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
     .withOAuth(authDataProvider)
     .build();
 ```
@@ -73,6 +75,7 @@ KerberosTokenProvider provider = KerberosTokenProvider.builder()
         .build();        
 
 GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
     .withKerberosAuth(provider)
     .build();
 ```
@@ -278,7 +281,7 @@ import com.datastrato.gravitino.client.GravitinoVersion;
 public class Main {
     public static void main(String[] args) {
         String uri = "https://localhost:8433";
-        GravitinoClient client = GravitinoClient.builder(uri).build();
+        GravitinoClient client = GravitinoClient.builder(uri).withMetalake("metalake").build();
         GravitinoVersion gravitinoVersion = client.getVersion();
         System.out.println(gravitinoVersion);
     }

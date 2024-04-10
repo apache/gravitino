@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.metalake;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
@@ -12,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
+import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -104,6 +106,11 @@ public class MetalakeManager implements SupportsMetalakes {
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
+    if (Entity.SYSTEM_METALAKE_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException(
+          "Can't create a metalake with with reserved name `system`");
+    }
+
     BaseMetalake metalake =
         BaseMetalake.builder()
             .withId(uid)
@@ -121,7 +128,7 @@ public class MetalakeManager implements SupportsMetalakes {
     try {
       store.put(metalake, false /* overwritten */);
       return metalake;
-    } catch (EntityAlreadyExistsException e) {
+    } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
       throw new MetalakeAlreadyExistsException("Metalake %s already exists", ident);
     } catch (IOException ioe) {

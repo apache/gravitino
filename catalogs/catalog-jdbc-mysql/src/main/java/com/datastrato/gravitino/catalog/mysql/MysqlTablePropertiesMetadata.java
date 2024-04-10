@@ -105,7 +105,7 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   }
 
   @Override
-  protected Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
+  public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
     BidiMap<String, String> mysqlConfigToGravitino = GRAVITINO_CONFIG_TO_MYSQL.inverseBidiMap();
     return Collections.unmodifiableMap(
         new HashMap<String, String>() {

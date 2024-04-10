@@ -91,7 +91,7 @@ public class TestConfigEntry {
     ConfigEntry<String> testConf =
         new ConfigBuilder("gravitino.test.string")
             .alternatives(
-                Lists.newArrayList("gravitino.test.string.alt1", "gravitino.test.string.alt1"))
+                Lists.newArrayList("gravitino.test.string.alt1", "gravitino.test.string.alt2"))
             .stringConf()
             .createWithDefault("test");
 
@@ -101,7 +101,7 @@ public class TestConfigEntry {
     ConfigEntry<String> testConf1 =
         new ConfigBuilder("gravitino.test.string.no-exist")
             .alternatives(
-                Lists.newArrayList("gravitino.test.string.alt1", "gravitino.test.string.alt1"))
+                Lists.newArrayList("gravitino.test.string.alt1", "gravitino.test.string.alt2"))
             .stringConf()
             .createWithDefault("test");
 

@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import Box from '@mui/material/Box'
 import Tab from '@mui/material/Tab'
@@ -49,44 +49,60 @@ const CustomTabPanel = props => {
 }
 
 const TabsContent = () => {
+  let tableTitle = ''
+  const searchParams = useSearchParams()
+  const paramsSize = [...searchParams.keys()].length
+  const type = searchParams.get('type')
   const [tab, setTab] = useState('table')
+  const isNotNeedTableTab = type && type === 'fileset' && paramsSize === 5
 
   const handleChangeTab = (event, newValue) => {
     setTab(newValue)
   }
 
-  let tableTitle = ''
-  const searchParams = useSearchParams()
-  const paramsSize = [...searchParams.keys()].length
-
   switch (paramsSize) {
     case 1:
       tableTitle = 'Catalogs'
       break
-    case 2:
+    case 3:
       tableTitle = 'Schemas'
       break
-    case 3:
-      tableTitle = 'Tables'
-      break
     case 4:
+      tableTitle = type === 'fileset' ? 'Filesets' : 'Tables'
+      break
+    case 5:
       tableTitle = 'Columns'
       break
     default:
       break
   }
 
+  useEffect(() => {
+    if (isNotNeedTableTab) {
+      setTab('details')
+    } else {
+      setTab('table')
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   return (
     <TabContext value={tab}>
       <Box sx={{ px: 6, py: 2, borderBottom: 1, borderColor: 'divider' }}>
         <TabList onChange={handleChangeTab} aria-label='tabs'>
-          <CustomTab icon='mdi:list-box-outline' label={tableTitle} value='table' data-refer='tab-table' />
+          {!isNotNeedTableTab ? (
+            <CustomTab icon='mdi:list-box-outline' label={tableTitle} value='table' data-refer='tab-table' />
+          ) : null}
           <CustomTab icon='mdi:clipboard-text-outline' label='Details' value='details' data-refer='tab-details' />
         </TabList>
       </Box>
-      <CustomTabPanel value='table' data-refer='tab-table-panel'>
-        <TableView />
-      </CustomTabPanel>
+      {!isNotNeedTableTab ? (
+        <CustomTabPanel value='table' data-refer='tab-table-panel'>
+          <TableView />
+        </CustomTabPanel>
+      ) : null}
+
       <CustomTabPanel value='details' data-refer='tab-details-panel'>
         <DetailsView />
       </CustomTabPanel>

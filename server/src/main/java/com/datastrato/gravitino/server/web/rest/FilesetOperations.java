@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.FilesetCreateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdatesRequest;
@@ -42,12 +42,12 @@ public class FilesetOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(FilesetOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final FilesetOperationDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public FilesetOperations(CatalogOperationDispatcher dispatcher) {
+  public FilesetOperations(FilesetOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -67,7 +67,7 @@ public class FilesetOperations {
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
+                    LockType.READ,
                     () -> dispatcher.listFilesets(filesetNS));
             return Utils.ok(new EntityListResponse(idents));
           });
@@ -96,7 +96,7 @@ public class FilesetOperations {
 
             Fileset fileset =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createFileset(
@@ -162,7 +162,9 @@ public class FilesetOperations {
                     .toArray(FilesetChange[]::new);
             Fileset t =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.alterFileset(ident, changes));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.alterFileset(ident, changes));
             return Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
           });
 
@@ -188,7 +190,9 @@ public class FilesetOperations {
             NameIdentifier ident = NameIdentifier.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.dropFileset(ident));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.dropFileset(ident));
             if (!dropped) {
               LOG.warn("Failed to drop fileset {} under schema {}", fileset, schema);
             }

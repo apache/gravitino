@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -68,6 +69,15 @@ public abstract class TestJdbcAbstractIT {
 
     Assertions.assertEquals(databaseName, load.name());
     Assertions.assertEquals(comment, load.comment());
+
+    if (MapUtils.isNotEmpty(properties)) {
+      Map<String, String> loadProperties = load.properties();
+      properties.forEach(
+          (key, value) -> {
+            Assertions.assertTrue(loadProperties.containsKey(key));
+            Assertions.assertEquals(loadProperties.get(key), value);
+          });
+    }
   }
 
   protected static void testDropDatabase(String databaseName) {

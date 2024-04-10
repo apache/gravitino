@@ -7,6 +7,9 @@ package com.datastrato.gravitino.catalog.postgresql.converter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.ListType;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
 
@@ -21,12 +24,16 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
   static final String NUMERIC = "numeric";
   static final String BPCHAR = "bpchar";
   static final String BYTEA = "bytea";
+  @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
+  @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
   @Override
   public Type toGravitinoType(JdbcTypeBean typeBean) {
-    // TODO #947 Complex types are not considered for support in this issue, which will bring more
-    // testing needs
-    switch (typeBean.getTypeName().toLowerCase()) {
+    String typeName = typeBean.getTypeName().toLowerCase();
+    if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
+      return toGravitinoArrayType(typeName);
+    }
+    switch (typeName) {
       case BOOL:
         return Types.BooleanType.get();
       case INT_2:
@@ -100,9 +107,34 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       return BPCHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.BinaryType) {
       return BYTEA;
+    } else if (type instanceof Types.ListType) {
+      return fromGravitinoArrayType((ListType) type);
     }
     throw new IllegalArgumentException(
         String.format(
             "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
+  }
+
+  // PG doesn't support the multidimensional array internally. The current implementation does not
+  // enforce the declared number of dimensions either. Arrays of a particular element type are all
+  // considered to be of the same type, regardless of size or number of dimensions. So, declaring
+  // the array size or number of dimensions in CREATE TABLE is simply documentation; it does not
+  // affect run-time behavior.
+  // https://www.postgresql.org/docs/current/arrays.html#ARRAYS-DECLARATION
+  private String fromGravitinoArrayType(ListType listType) {
+    Type elementType = listType.elementType();
+    Preconditions.checkArgument(
+        !listType.elementNullable(), "PostgreSQL doesn't support element to nullable");
+    Preconditions.checkArgument(
+        !(elementType instanceof ListType),
+        "PostgreSQL doesn't support multidimensional list internally, please use one dimensional list");
+    String elementTypeString = fromGravitinoType(elementType);
+    return elementTypeString + ARRAY_TOKEN;
+  }
+
+  private ListType toGravitinoArrayType(String typeName) {
+    String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
+    JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
+    return ListType.of(toGravitinoType(bean), false);
   }
 }

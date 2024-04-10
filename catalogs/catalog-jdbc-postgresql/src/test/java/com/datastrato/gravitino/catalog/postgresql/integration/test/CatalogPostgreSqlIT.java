@@ -38,6 +38,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -208,6 +209,61 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Column.of("time", Types.TimeType.get(), "time"),
       Column.of("binary", Types.TimestampType.withoutTimeZone(), "binary")
     };
+  }
+
+  private Column[] columnsWithDefaultValue() {
+    return new Column[] {
+      Column.of(
+          "col_1",
+          Types.FloatType.get(),
+          "col_1_comment",
+          false,
+          false,
+          FunctionExpression.of("random")),
+      Column.of("col_2", Types.VarCharType.of(255), "col_2_comment", true, false, Literals.NULL),
+      Column.of("col_3", Types.StringType.get(), "col_3_comment", false, false, null),
+      Column.of(
+          "col_4",
+          Types.IntegerType.get(),
+          "col_4_comment",
+          true,
+          false,
+          Literals.integerLiteral(1000)),
+      Column.of(
+          "col_5",
+          Types.TimestampType.withoutTimeZone(),
+          "col_5_comment",
+          true,
+          false,
+          Literals.NULL)
+    };
+  }
+
+  @Test
+  void testCreateTableWithArrayType() {
+    String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column[] columns = new Column[] {col};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+
+    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertEquals(columns.length, createdTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(columns.length, loadTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], loadTable.columns()[i]);
+    }
   }
 
   @Test
@@ -748,6 +804,51 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testUpdateColumnDefaultValue() {
+    Column[] columns = columnsWithDefaultValue();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                table_comment,
+                createProperties());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()}, Literals.of("1.234", Types.FloatType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()}, Literals.of("world", Types.StringType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()}, Literals.of(2000, Types.IntegerType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()}, FunctionExpression.of("current_timestamp")));
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Assertions.assertEquals(
+        Literals.of("1.234", Types.FloatType.get()), table.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("hello", Types.VarCharType.of(255)), table.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("world", Types.StringType.get()), table.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of(2000, Types.IntegerType.get()), table.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        FunctionExpression.of("current_timestamp"), table.columns()[4].defaultValue());
+  }
+
+  @Test
   void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
@@ -1269,6 +1370,54 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier);
     col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+  }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.DateType.get(), "comment", true, false, null);
+    Column[] newColumns = new Column[] {col1, col2};
+    String tableName = "default_value_table";
+
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, newColumns[0].defaultValue());
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col3 =
+        Column.of("col_3", Types.LongType.get(), "id", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col3.name()},
+            col3.dataType(),
+            col3.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col3.nullable(),
+            col3.autoIncrement(),
+            col3.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    newColumns = new Column[] {col1, col2, col3};
     assertionsTableInfo(
         tableName,
         table_comment,

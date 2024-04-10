@@ -26,8 +26,11 @@ public interface Catalog extends Auditable {
     /** Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file */
     FILESET,
 
-    /** Catalog Type for Message Queue, like kafka://topic */
-    MESSAGING
+    /** Catalog Type for Message Queue, like Kafka://topic */
+    MESSAGING,
+
+    /** Catalog Type for test only. */
+    UNSUPPORTED
   }
 
   /**
