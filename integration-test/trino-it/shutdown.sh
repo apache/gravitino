@@ -5,6 +5,7 @@
 #
 cd "$(dirname "$0")"
 
+# change the hive container's logs directory permission
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
 

@@ -32,7 +32,8 @@ echo "The docker compose log is: $LOG_PATH"
 
 nohup docker compose logs -f  -t >> $LOG_PATH &
 
-max_attempts=0
+max_attempts=300
+attempts=0
 
 while true; do
     docker compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
@@ -45,18 +46,19 @@ while true; do
         exit 0
     fi
 
-    sleep 1
-
-    if [ "$max_attempts" -ge 600 ]; then 
-        echo "ERROR: Trino service did not start within the 600s time."
+    if [ "$attempts" -ge "$max_attempts" ]; then
+        echo "ERROR: Trino service did not start within the $max_attempts time."
         exit 1
     fi
-    ((count++))
+
+   ((attempts++))
+    sleep 1
 done
 
 
 echo "All docker compose service is now available."
 
+# change the hive container's logs directory permission
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
 
