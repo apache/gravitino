@@ -6,14 +6,18 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.VersionDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
+import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.RESTException;
@@ -27,6 +31,9 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
 
 public class TestGravitinoClient extends TestBase {
 
@@ -229,5 +236,87 @@ public class TestGravitinoClient extends TestBase {
         Assertions.assertThrows(IllegalArgumentException.class, () -> client.dropMetalake(id));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
+  }
+
+  @Test
+  public void testGetServerVersion() throws JsonProcessingException {
+    String version = "0.1.3";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+    GravitinoVersion gravitinoVersion = client.getServerVersion();
+
+    Assertions.assertEquals(version, gravitinoVersion.version());
+    Assertions.assertEquals(date, gravitinoVersion.compileDate());
+    Assertions.assertEquals(commitId, gravitinoVersion.gitCommit());
+  }
+
+  @Test
+  public void testGetClientVersion() {
+    GravitinoVersion version = client.clientVersion();
+
+    Assertions.assertEquals(Version.version, version.version());
+    Assertions.assertEquals(Version.compileDate, version.compileDate());
+    Assertions.assertEquals(Version.gitCommit, version.gitCommit());
+  }
+
+  @Test
+  public void testCheckVersionFailed() throws JsonProcessingException {
+    String version = "0.1.1";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is greater than server version
+    Assertions.assertThrows(GravitinoRuntimeException.class, () -> client.checkVersion());
+  }
+
+  @Test
+  public void testCheckVersionSuccess() throws JsonProcessingException {
+    VersionResponse resp =
+        new VersionResponse(
+            new VersionDTO(Version.version, Version.compileDate, Version.gitCommit));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is equal to server version
+    Assertions.assertDoesNotThrow(() -> client.checkVersion());
+
+    String version = "100.1.1-SNAPSHOT";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is less than server version
+    Assertions.assertDoesNotThrow(() -> client.checkVersion());
+  }
+
+  @Test
+  public void testUnusedDTOAttribute() throws JsonProcessingException {
+    VersionResponse resp =
+        new VersionResponse(
+            new VersionDTO(Version.version, Version.compileDate, Version.gitCommit));
+
+    HttpRequest mockRequest = HttpRequest.request("/api/version").withMethod(Method.GET.name());
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    String respJson = MAPPER.writeValueAsString(resp);
+
+    // add unused attribute for version DTO
+    respJson = respJson.replace("\"gitCommit\"", "\"unused_key\":\"unused_value\", \"gitCommit\"");
+    mockResponse = mockResponse.withBody(respJson);
+    mockServer.when(mockRequest, Times.exactly(1)).respond(mockResponse);
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          GravitinoVersion version = client.getServerVersion();
+          Assertions.assertEquals(Version.version, version.version());
+          Assertions.assertEquals(Version.compileDate, version.compileDate());
+          Assertions.assertEquals(Version.gitCommit, version.gitCommit());
+        });
   }
 }
