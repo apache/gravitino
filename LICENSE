@@ -260,6 +260,7 @@
    ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosServerUtils.java
 
    Apache Kafka
+   ./catalogs/catalog-kafka/src/test/resources/run
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
 
    Apache Submarine

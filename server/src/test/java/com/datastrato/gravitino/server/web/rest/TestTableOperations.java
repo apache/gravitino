@@ -23,6 +23,7 @@ import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
@@ -550,7 +551,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             TableChange.ColumnPosition.first(),
             false,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     Column[] columns =
         new Column[] {
           mockColumn("col3", Types.StringType.get(), false),
@@ -571,7 +573,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             TableChange.ColumnPosition.after("col2"),
             true,
-            false);
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),

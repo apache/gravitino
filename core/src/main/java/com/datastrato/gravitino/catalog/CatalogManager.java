@@ -15,6 +15,7 @@ import com.datastrato.gravitino.CatalogChange.SetProperty;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
@@ -29,6 +30,7 @@ import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -117,6 +119,16 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asTopics() == null) {
+              throw new UnsupportedOperationException("Catalog does not support topic operations");
+            }
+            return fn.apply(asTopics());
+          });
+    }
+
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
@@ -149,6 +161,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
+    }
+
+    private TopicCatalog asTopics() {
+      return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
     }
   }
 
@@ -272,7 +288,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
-    if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
@@ -478,7 +494,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity);
+      return createCatalogWrapper(entity.withNamespace(ident.namespace()));
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
@@ -663,7 +679,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       if (change instanceof CatalogChange.RenameCatalog) {
         CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
 
-        if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(
+        if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(
             ((CatalogChange.RenameCatalog) change).getNewName())) {
           throw new IllegalArgumentException(
               "Can't rename a catalog with with reserved name `system`");

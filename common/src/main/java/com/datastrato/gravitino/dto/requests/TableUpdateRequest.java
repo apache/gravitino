@@ -4,13 +4,18 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.json.JsonUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -42,6 +47,9 @@ import org.apache.commons.lang3.StringUtils;
   @JsonSubTypes.Type(
       value = TableUpdateRequest.RenameTableColumnRequest.class,
       name = "renameColumn"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateTableColumnDefaultValueRequest.class,
+      name = "updateColumnDefaultValue"),
   @JsonSubTypes.Type(
       value = TableUpdateRequest.UpdateTableColumnTypeRequest.class,
       name = "updateColumnType"),
@@ -293,9 +301,16 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty(value = "autoIncrement", defaultValue = "false")
     private final boolean autoIncrement;
 
+    @Getter
+    @JsonProperty("defaultValue")
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+    @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+    private final Expression defaultValue;
+
     /** Default constructor for Jackson deserialization. */
     public AddTableColumnRequest() {
-      this(null, null, null, null, true, false);
+      this(null, null, null, null, true, false, null);
     }
 
     /**
@@ -307,6 +322,7 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param position the position of the field to add, null for default position
      * @param nullable whether the field to add is nullable
      * @param autoIncrement whether the field to add is auto increment
+     * @param defaultValue whether the field has default value
      */
     public AddTableColumnRequest(
         String[] fieldName,
@@ -314,13 +330,15 @@ public interface TableUpdateRequest extends RESTRequest {
         String comment,
         TableChange.ColumnPosition position,
         boolean nullable,
-        boolean autoIncrement) {
+        boolean autoIncrement,
+        Expression defaultValue) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? TableChange.ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
       this.autoIncrement = autoIncrement;
+      this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
     }
 
     /**
@@ -333,7 +351,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     public AddTableColumnRequest(
         String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
-      this(fieldName, dataType, comment, position, true, false);
+      this(fieldName, dataType, comment, position, true, false, null);
     }
 
     /**
@@ -366,7 +384,8 @@ public interface TableUpdateRequest extends RESTRequest {
     /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldName, dataType, comment, position, nullable, autoIncrement);
+      return TableChange.addColumn(
+          fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
     }
   }
 
@@ -420,6 +439,61 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.renameColumn(oldFieldName, newFieldName);
+    }
+  }
+
+  /** Represents a request to update the default value of a column of a table. */
+  @EqualsAndHashCode
+  @ToString
+  class UpdateTableColumnDefaultValueRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("newDefaultValue")
+    @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+    @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+    private final Expression newDefaultValue;
+
+    /**
+     * Constructor for UpdateTableColumnDefaultValueRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newDefaultValue the new default value of the field
+     */
+    public UpdateTableColumnDefaultValueRequest(String[] fieldName, Expression newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateTableColumnDefaultValueRequest() {
+      this(null, null);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"newDefaultValue\" field is required and cannot be empty");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
     }
   }
 

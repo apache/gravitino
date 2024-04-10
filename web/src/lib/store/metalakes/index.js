@@ -6,6 +6,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
+import toast from 'react-hot-toast'
 
 import _ from 'lodash-es'
 
@@ -26,6 +27,7 @@ import {
 } from '@/lib/api/catalogs'
 import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
+import { getFilesetsApi, getFilesetDetailsApi } from '@/lib/api/filesets'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())
@@ -35,6 +37,8 @@ export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', as
   }
 
   const { metalakes } = res
+
+  metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
 
   return { metalakes }
 })
@@ -85,7 +89,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
     }
 
     const pathArr = extractPlaceholder(key)
-    const [metalake, catalog, schema, table] = pathArr
+    const [metalake, catalog, type, schema] = pathArr
 
     if (pathArr.length === 1) {
       const [err, res] = await to(getCatalogsApi({ metalake }))
@@ -94,22 +98,23 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { catalogs = [] } = res
 
-      result.data = identifiers.map(catalogItem => {
+      result.data = catalogs.map(catalogItem => {
         return {
           ...catalogItem,
           node: 'catalog',
-          id: `{{${metalake}}}{{${catalogItem.name}}}`,
-          key: `{{${metalake}}}{{${catalogItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name }).toString()}`,
+          id: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
+          key: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name, type: catalogItem.type }).toString()}`,
           name: catalogItem.name,
           title: catalogItem.name,
+          namespace: [metalake],
           schemas: [],
           children: []
         }
       })
-    } else if (pathArr.length === 2) {
+    } else if (pathArr.length === 3) {
       const [err, res] = await to(getSchemasApi({ metalake, catalog }))
 
       if (err || !res) {
@@ -122,16 +127,16 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         return {
           ...schemaItem,
           node: 'schema',
-          id: `{{${metalake}}}{{${catalog}}}{{${schemaItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${schemaItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, schema: schemaItem.name }).toString()}`,
+          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog, type, schema: schemaItem.name }).toString()}`,
           name: schemaItem.name,
           title: schemaItem.name,
           tables: [],
           children: []
         }
       })
-    } else if (pathArr.length === 3) {
+    } else if (pathArr.length === 4 && type !== 'fileset') {
       const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
       const { identifiers = [] } = res
@@ -144,14 +149,35 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         return {
           ...tableItem,
           node: 'table',
-          id: `{{${metalake}}}{{${catalog}}}{{${schema}}}{{${tableItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${schema}}}{{${tableItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, schema, table: tableItem.name }).toString()}`,
+          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog, type, schema, table: tableItem.name }).toString()}`,
           name: tableItem.name,
           title: tableItem.name,
           isLeaf: true,
           columns: [],
           children: []
+        }
+      })
+    } else if (pathArr.length === 4 && type === 'fileset') {
+      const [err, res] = await to(getFilesetsApi({ metalake, catalog, schema }))
+
+      const { identifiers = [] } = res
+
+      if (err || !res) {
+        throw new Error(err)
+      }
+
+      result.data = identifiers.map(filesetItem => {
+        return {
+          ...filesetItem,
+          node: 'fileset',
+          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog, type, schema, fileset: filesetItem.name }).toString()}`,
+          name: filesetItem.name,
+          title: filesetItem.name,
+          isLeaf: true
         }
       })
     }
@@ -188,17 +214,20 @@ export const fetchCatalogs = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { catalogs = [] } = res
 
-    const catalogs = identifiers.map(catalog => {
+    const catalogsData = catalogs.map(catalog => {
       return {
         ...catalog,
         node: 'catalog',
-        id: `{{${metalake}}}{{${catalog.name}}}`,
-        key: `{{${metalake}}}{{${catalog.name}}}`,
-        path: `?${new URLSearchParams({ metalake, catalog: catalog.name }).toString()}`,
+        id: `{{${metalake}}}{{${catalog.name}}}{{${catalog.type}}}`,
+        key: `{{${metalake}}}{{${catalog.name}}}{{${catalog.type}}}`,
+        path: `?${new URLSearchParams({ metalake, catalog: catalog.name, type: catalog.type }).toString()}`,
+        type: catalog.type,
+        provider: catalog.provider,
         name: catalog.name,
         title: catalog.name,
+        namespace: [metalake],
         schemas: [],
         children: []
       }
@@ -215,11 +244,12 @@ export const fetchCatalogs = createAsyncThunk(
                       ? schema.children.map(table => {
                           return {
                             ...table,
-                            id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}{{${table.name}}}`,
-                            key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}{{${table.name}}}`,
+                            id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}{{${schema.name}}}{{${table.name}}}`,
+                            key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}{{${schema.name}}}{{${table.name}}}`,
                             path: `?${new URLSearchParams({
                               metalake,
                               catalog: update.newCatalog.name,
+                              type: update.newCatalog.type,
                               schema: schema.name,
                               table: table.name
                             }).toString()}`
@@ -229,11 +259,12 @@ export const fetchCatalogs = createAsyncThunk(
 
                     return {
                       ...schema,
-                      id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}`,
-                      key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${schema.name}}}`,
+                      id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}{{${schema.name}}}`,
+                      key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}{{${schema.name}}}`,
                       path: `?${new URLSearchParams({
                         metalake,
                         catalog: update.newCatalog.name,
+                        type: update.newCatalog.type,
                         schema: schema.name
                       }).toString()}`,
                       tables: tables,
@@ -244,9 +275,15 @@ export const fetchCatalogs = createAsyncThunk(
 
               return {
                 ...catalog,
-                id: `{{${metalake}}}{{${update.newCatalog.name}}}`,
-                key: `{{${metalake}}}{{${update.newCatalog.name}}}`,
-                path: `?${new URLSearchParams({ metalake, catalog: update.newCatalog.name }).toString()}`,
+                id: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}`,
+                key: `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}`,
+                path: `?${new URLSearchParams({
+                  metalake,
+                  catalog: update.newCatalog.name,
+                  type: update.newCatalog.type
+                }).toString()}`,
+                type: update.newCatalog.type,
+                provider: update.newCatalog.provider,
                 name: update.newCatalog.name,
                 title: update.newCatalog.name,
                 schemas: schemas,
@@ -262,9 +299,9 @@ export const fetchCatalogs = createAsyncThunk(
           const expandedNodes = getState().metalakes.expandedNodes.map(node => {
             const [metalake, catalog, schema, table] = extractPlaceholder(node)
             if (catalog === update.catalog) {
-              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}${schema ? `{{${schema}}}` : ''}${
-                table ? `{{${table}}}` : ''
-              }`
+              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}${
+                schema ? `{{${schema}}}` : ''
+              }${table ? `{{${table}}}` : ''}`
 
               return updatedNode
             }
@@ -278,9 +315,9 @@ export const fetchCatalogs = createAsyncThunk(
           const loadedNodes = getState().metalakes.loadedNodes.map(node => {
             const [metalake, catalog, schema, table] = extractPlaceholder(node)
             if (catalog === update.catalog) {
-              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}${schema ? `{{${schema}}}` : ''}${
-                table ? `{{${table}}}` : ''
-              }`
+              const updatedNode = `{{${metalake}}}{{${update.newCatalog.name}}}{{${update.newCatalog.type}}}${
+                schema ? `{{${schema}}}` : ''
+              }${table ? `{{${table}}}` : ''}`
 
               return updatedNode
             }
@@ -293,14 +330,14 @@ export const fetchCatalogs = createAsyncThunk(
         }
       } else {
         const mergedTree = _.values(
-          _.merge(_.keyBy(getState().metalakes.metalakeTree, 'key'), _.keyBy(catalogs, 'key'))
+          _.merge(_.keyBy(catalogsData, 'key'), _.keyBy(getState().metalakes.metalakeTree, 'key'))
         )
         dispatch(setMetalakeTree(mergedTree))
       }
     }
 
     return {
-      catalogs,
+      catalogs: catalogsData,
       page,
       init
     }
@@ -335,16 +372,19 @@ export const createCatalog = createAsyncThunk(
     const catalogData = {
       ...catalogItem,
       node: 'catalog',
-      id: `{{${metalake}}}{{${catalogItem.name}}}`,
-      key: `{{${metalake}}}{{${catalogItem.name}}}`,
-      path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name }).toString()}`,
+      id: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
+      key: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name, type: catalogItem.type }).toString()}`,
+      type: catalogItem.type,
+      provider: catalogItem.provider,
       name: catalogItem.name,
       title: catalogItem.name,
+      namespace: [metalake],
       schemas: [],
       children: []
     }
 
-    dispatch(dispatch(fetchCatalogs({ metalake, init: true })))
+    dispatch(fetchCatalogs({ metalake, init: true }))
 
     dispatch(addCatalogToTree(catalogData))
 
@@ -367,7 +407,7 @@ export const updateCatalog = createAsyncThunk(
 
 export const deleteCatalog = createAsyncThunk(
   'appMetalakes/deleteCatalog',
-  async ({ metalake, catalog }, { dispatch }) => {
+  async ({ metalake, catalog, type }, { dispatch }) => {
     dispatch(setTableLoading(true))
     const [err, res] = await to(deleteCatalogApi({ metalake, catalog }))
     dispatch(setTableLoading(false))
@@ -378,7 +418,7 @@ export const deleteCatalog = createAsyncThunk(
 
     dispatch(fetchCatalogs({ metalake, catalog, page: 'metalakes', init: true }))
 
-    dispatch(removeCatalogFromTree(`{{${metalake}}}{{${catalog}}}`))
+    dispatch(removeCatalogFromTree(`{{${metalake}}}{{${catalog}}}{{${type}}}`))
 
     return res
   }
@@ -386,7 +426,7 @@ export const deleteCatalog = createAsyncThunk(
 
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
-  async ({ init, page, metalake, catalog }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, type }, { getState, dispatch }) => {
     if (init) {
       dispatch(setTableLoading(true))
     }
@@ -404,15 +444,15 @@ export const fetchSchemas = createAsyncThunk(
       const schemaItem = findInTree(
         getState().metalakes.metalakeTree,
         'key',
-        `{{${metalake}}}{{${catalog}}}{{${schema.name}}}`
+        `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema.name}}}`
       )
 
       return {
         ...schema,
         node: 'schema',
-        id: `{{${metalake}}}{{${catalog}}}{{${schema.name}}}`,
-        key: `{{${metalake}}}{{${catalog}}}{{${schema.name}}}`,
-        path: `?${new URLSearchParams({ metalake, catalog, schema: schema.name }).toString()}`,
+        id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema.name}}}`,
+        path: `?${new URLSearchParams({ metalake, catalog, type, schema: schema.name }).toString()}`,
         name: schema.name,
         title: schema.name,
         tables: schemaItem ? schemaItem.children : [],
@@ -420,10 +460,10 @@ export const fetchSchemas = createAsyncThunk(
       }
     })
 
-    if (init && getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}`)) {
+    if (init && getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${type}}}`)) {
       dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}`,
           data: schemas,
           tree: getState().metalakes.metalakeTree
         })
@@ -434,7 +474,7 @@ export const fetchSchemas = createAsyncThunk(
       dispatch(fetchCatalogs({ metalake }))
     }
 
-    dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}`]))
+    dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}{{${type}}}`]))
 
     return { schemas, page, init }
   }
@@ -475,9 +515,15 @@ export const fetchTables = createAsyncThunk(
       return {
         ...table,
         node: 'table',
-        id: `{{${metalake}}}{{${catalog}}}{{${schema}}}{{${table.name}}}`,
-        key: `{{${metalake}}}{{${catalog}}}{{${schema}}}{{${table.name}}}`,
-        path: `?${new URLSearchParams({ metalake, catalog, schema, table: table.name }).toString()}`,
+        id: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${table.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${table.name}}}`,
+        path: `?${new URLSearchParams({
+          metalake,
+          catalog,
+          type: 'relational',
+          schema,
+          table: table.name
+        }).toString()}`,
         name: table.name,
         title: table.name,
         isLeaf: true,
@@ -486,10 +532,13 @@ export const fetchTables = createAsyncThunk(
       }
     })
 
-    if (init && getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${schema}}}`)) {
+    if (
+      init &&
+      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
+    ) {
       dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}{{${schema}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`,
           data: tables,
           tree: getState().metalakes.metalakeTree
         })
@@ -503,8 +552,8 @@ export const fetchTables = createAsyncThunk(
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
-        `{{${metalake}}}{{${catalog}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
       ])
     )
 
@@ -536,12 +585,110 @@ export const getTableDetails = createAsyncThunk(
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
-        `{{${metalake}}}{{${catalog}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
       ])
     )
 
     return resTable
+  }
+)
+
+export const fetchFilesets = createAsyncThunk(
+  'appMetalakes/fetchFilesets',
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+    if (init) {
+      dispatch(setTableLoading(true))
+    }
+
+    const [err, res] = await to(getFilesetsApi({ metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (init && (err || !res)) {
+      dispatch(resetTableData())
+      throw new Error(err)
+    }
+
+    const { identifiers = [] } = res
+
+    const filesets = identifiers.map(fileset => {
+      return {
+        ...fileset,
+        node: 'fileset',
+        id: `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}{{${fileset.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}{{${fileset.name}}}`,
+        path: `?${new URLSearchParams({
+          metalake,
+          catalog,
+          type: 'fileset',
+          schema,
+          fileset: fileset.name
+        }).toString()}`,
+        name: fileset.name,
+        title: fileset.name,
+        isLeaf: true
+      }
+    })
+
+    if (
+      init &&
+      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`)
+    ) {
+      dispatch(
+        setIntoTreeNodes({
+          key: `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`,
+          data: filesets,
+          tree: getState().metalakes.metalakeTree
+        })
+      )
+    }
+
+    if (getState().metalakes.metalakeTree.length === 0) {
+      dispatch(fetchCatalogs({ metalake }))
+    }
+
+    dispatch(
+      setExpandedNodes([
+        `{{${metalake}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
+      ])
+    )
+
+    return { filesets, page, init }
+  }
+)
+
+export const getFilesetDetails = createAsyncThunk(
+  'appMetalakes/getFilesetDetails',
+  async ({ init, metalake, catalog, schema, fileset }, { getState, dispatch }) => {
+    dispatch(resetTableData())
+    if (init) {
+      dispatch(setTableLoading(true))
+    }
+    const [err, res] = await to(getFilesetDetailsApi({ metalake, catalog, schema, fileset }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      dispatch(resetTableData())
+      throw new Error(err)
+    }
+
+    const { fileset: resFileset } = res
+
+    if (getState().metalakes.metalakeTree.length === 0) {
+      dispatch(fetchCatalogs({ metalake }))
+    }
+
+    dispatch(
+      setExpandedNodes([
+        `{{${metalake}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
+      ])
+    )
+
+    return resFileset
   }
 )
 
@@ -555,6 +702,7 @@ export const appMetalakesSlice = createSlice({
     schemas: [],
     tables: [],
     columns: [],
+    filesets: [],
     metalakeTree: [],
     loadedNodes: [],
     selectedNodes: [],
@@ -605,6 +753,7 @@ export const appMetalakesSlice = createSlice({
       state.schemas = []
       state.tables = []
       state.columns = []
+      state.filesets = []
     },
     setTableLoading(state, action) {
       state.tableLoading = action.payload
@@ -617,7 +766,12 @@ export const appMetalakesSlice = createSlice({
       state.metalakeTree = updateTreeData(tree, key, data)
     },
     addCatalogToTree(state, action) {
-      state.metalakeTree.push(action.payload)
+      const catalogIndex = state.metalakeTree.findIndex(c => c.key === action.payload.key)
+      if (catalogIndex === -1) {
+        state.metalakeTree.push(action.payload)
+      } else {
+        state.metalakeTree.splice(catalogIndex, 1, action.payload)
+      }
     },
     removeCatalogFromTree(state, action) {
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
@@ -628,12 +782,27 @@ export const appMetalakesSlice = createSlice({
     builder.addCase(fetchMetalakes.fulfilled, (state, action) => {
       state.metalakes = action.payload.metalakes
     })
+    builder.addCase(fetchMetalakes.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
       const { key, data, tree } = action.payload
       state.metalakeTree = updateTreeData(tree, key, data)
     })
+    builder.addCase(setIntoTreeNodeWithFetch.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
     builder.addCase(getMetalakeDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
+    })
+    builder.addCase(getMetalakeDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(createCatalog.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(updateCatalog.rejected, (state, action) => {
+      toast.error(action.error.message)
     })
     builder.addCase(fetchCatalogs.fulfilled, (state, action) => {
       state.catalogs = action.payload.catalogs
@@ -646,8 +815,17 @@ export const appMetalakesSlice = createSlice({
         state.metalakeTree = action.payload.catalogs
       }
     })
+    builder.addCase(fetchCatalogs.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
     builder.addCase(getCatalogDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
+    })
+    builder.addCase(getCatalogDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(deleteCatalog.rejected, (state, action) => {
+      toast.error(action.error.message)
     })
     builder.addCase(fetchSchemas.fulfilled, (state, action) => {
       state.schemas = action.payload.schemas
@@ -655,8 +833,14 @@ export const appMetalakesSlice = createSlice({
         state.tableData = action.payload.schemas
       }
     })
+    builder.addCase(fetchSchemas.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
     builder.addCase(getSchemaDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
+    })
+    builder.addCase(getSchemaDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
     })
     builder.addCase(fetchTables.fulfilled, (state, action) => {
       state.tables = action.payload.tables
@@ -664,9 +848,31 @@ export const appMetalakesSlice = createSlice({
         state.tableData = action.payload.tables
       }
     })
+    builder.addCase(fetchTables.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
     builder.addCase(getTableDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
       state.tableData = action.payload.columns || []
+    })
+    builder.addCase(getTableDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(fetchFilesets.fulfilled, (state, action) => {
+      state.filesets = action.payload.filesets
+      if (action.payload.init) {
+        state.tableData = action.payload.filesets
+      }
+    })
+    builder.addCase(fetchFilesets.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(getFilesetDetails.fulfilled, (state, action) => {
+      state.activatedDetails = action.payload
+      state.tableData = []
+    })
+    builder.addCase(getFilesetDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
     })
   }
 })

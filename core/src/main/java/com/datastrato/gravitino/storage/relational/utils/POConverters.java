@@ -16,12 +16,14 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
@@ -533,6 +535,22 @@ public class POConverters {
     }
   }
 
+  public static TopicEntity fromTopicPO(TopicPO topicPO, Namespace namespace) {
+    try {
+      return TopicEntity.builder()
+          .withId(topicPO.getTopicId())
+          .withName(topicPO.getTopicName())
+          .withNamespace(namespace)
+          .withComment(topicPO.getComment())
+          .withProperties(JsonUtils.anyFieldMapper().readValue(topicPO.getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(topicPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
   /**
    * Convert list of {@link FilesetPO} to list of {@link FilesetEntity}
    *
@@ -545,5 +563,52 @@ public class POConverters {
     return filesetPOs.stream()
         .map(filesetPO -> POConverters.fromFilesetPO(filesetPO, namespace))
         .collect(Collectors.toList());
+  }
+
+  public static List<TopicEntity> fromTopicPOs(List<TopicPO> topicPOs, Namespace namespace) {
+    return topicPOs.stream()
+        .map(topicPO -> POConverters.fromTopicPO(topicPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  public static TopicPO initializeTopicPOWithVersion(
+      TopicEntity topicEntity, TopicPO.Builder builder) {
+    try {
+      return builder
+          .withTopicId(topicEntity.id())
+          .withTopicName(topicEntity.name())
+          .withComment(topicEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static TopicPO updateTopicPOWithVersion(TopicPO oldTopicPO, TopicEntity newEntity) {
+    Long lastVersion = oldTopicPO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return TopicPO.builder()
+          .withTopicId(oldTopicPO.getTopicId())
+          .withTopicName(newEntity.name())
+          .withMetalakeId(oldTopicPO.getMetalakeId())
+          .withCatalogId(oldTopicPO.getCatalogId())
+          .withSchemaId(oldTopicPO.getSchemaId())
+          .withComment(newEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
   }
 }

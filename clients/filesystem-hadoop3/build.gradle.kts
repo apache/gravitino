@@ -14,6 +14,9 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.caffeine)
 
+  testImplementation(project(":server-common"))
+  testImplementation(libs.awaitility)
+  testImplementation(libs.bundles.jwt)
   testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
