@@ -132,7 +132,7 @@ public class TestEventListenerManager {
                   EventListenerPlugin userListener =
                       ((EventListenerPluginWrapper) shareQueueListener).getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
-                  checkEvents(((DummyAsyncEventListener) userListener).getEvents());
+                  checkEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
                   return ((DummyAsyncEventListener) userListener).properties.get("name");
                 })
             .collect(Collectors.toSet());
