@@ -40,14 +40,17 @@ public class IcebergTableOps implements AutoCloseable {
 
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
+  private final String backendType;
+  private final String backendUri;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
-    String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
+    this.backendType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
+    this.backendUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
+    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(backendType)) {
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
       icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
-    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
+    catalog = IcebergCatalogUtil.loadCatalogBackend(backendType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
@@ -147,16 +150,29 @@ public class IcebergTableOps implements AutoCloseable {
       // JdbcCatalog need close.
       ((AutoCloseable) catalog).close();
 
-      // Does IcebergCatalog also use PG here?
-      closeMySQLCatalogResource();
+      // Because each catalog in Gravitino has its own classloader, after a catalog is longer used
+      // for a long time or dropped, the instance of classloader needs to be released. In order to
+      // let JVM GC remove the classloader, we need to release the resources of the classloader. The
+      // resources include the driver of the catalog backend and the
+      // AbandonedConnectionCleanupThread of MySQL. For me information about
+      // AbandonedConnectionCleanupThread, please refer to the corresponding java doc of MySQL
+      // driver.
+      if (backendUri.contains("mysql")) {
+        closeMySQLCatalogResource();
+      } else if (backendUri.contains("postgresql")) {
+        closePostgreSQLCatalogResource();
+      }
     }
 
-    // TODO(yuqi) add close for other catalog types such Hive catalog
+    if (backendType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
+      // TODO(yuqi) add close for other catalog types such Hive catalog
+    }
   }
 
   private void closeMySQLCatalogResource() {
     try {
-      // Close thread AbandonedConnectionCleanupThread
+      // Close thread AbandonedConnectionCleanupThread if we are using `com.mysql.cj.jdbc.Driver`,
+      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thead maybe not this one.
       Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
           .getMethod("uncheckedShutdown")
           .invoke(null);
@@ -164,14 +180,26 @@ public class IcebergTableOps implements AutoCloseable {
 
       // Unload the MySQL driver, only Unload the driver if it is loaded by
       // IsolatedClassLoader.
-      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
-      if (mysqlDriver.getClass().getClassLoader().getClass()
-          == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
-        DriverManager.deregisterDriver(mysqlDriver);
-        LOG.info("Driver {} has been deregistered...", mysqlDriver);
-      }
+      closeDriverLoadedByIsolatedClassLoader(backendUri);
     } catch (Exception e) {
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
     }
+  }
+
+  private void closeDriverLoadedByIsolatedClassLoader(String uri) {
+    try {
+      Driver driver = DriverManager.getDriver(uri);
+      if (driver.getClass().getClassLoader().getClass()
+          == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
+        DriverManager.deregisterDriver(driver);
+        LOG.info("Driver {} has been deregistered...", driver);
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to deregister driver", e);
+    }
+  }
+
+  private void closePostgreSQLCatalogResource() {
+    closeDriverLoadedByIsolatedClassLoader(backendUri);
   }
 }
