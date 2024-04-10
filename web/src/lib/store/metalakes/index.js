@@ -38,6 +38,8 @@ export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', as
 
   const { metalakes } = res
 
+  metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
+
   return { metalakes }
 })
 
@@ -221,6 +223,8 @@ export const fetchCatalogs = createAsyncThunk(
         id: `{{${metalake}}}{{${catalog.name}}}{{${catalog.type}}}`,
         key: `{{${metalake}}}{{${catalog.name}}}{{${catalog.type}}}`,
         path: `?${new URLSearchParams({ metalake, catalog: catalog.name, type: catalog.type }).toString()}`,
+        type: catalog.type,
+        provider: catalog.provider,
         name: catalog.name,
         title: catalog.name,
         namespace: [metalake],
@@ -278,6 +282,8 @@ export const fetchCatalogs = createAsyncThunk(
                   catalog: update.newCatalog.name,
                   type: update.newCatalog.type
                 }).toString()}`,
+                type: update.newCatalog.type,
+                provider: update.newCatalog.provider,
                 name: update.newCatalog.name,
                 title: update.newCatalog.name,
                 schemas: schemas,
@@ -369,6 +375,8 @@ export const createCatalog = createAsyncThunk(
       id: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
       key: `{{${metalake}}}{{${catalogItem.name}}}{{${catalogItem.type}}}`,
       path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name, type: catalogItem.type }).toString()}`,
+      type: catalogItem.type,
+      provider: catalogItem.provider,
       name: catalogItem.name,
       title: catalogItem.name,
       namespace: [metalake],

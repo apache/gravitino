@@ -43,6 +43,7 @@ docs/build
 dev/docker/tools/docker-connector
 
 include web/.gitignore
+include clients/client-python/.gitignore
 
 # node env
 .node

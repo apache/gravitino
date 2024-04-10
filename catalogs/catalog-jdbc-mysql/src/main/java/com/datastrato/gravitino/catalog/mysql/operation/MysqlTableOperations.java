@@ -305,6 +305,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -534,6 +540,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
+    // Append default value if available
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
+    }
+
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
@@ -627,6 +641,25 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
     return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+  }
+
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    JdbcColumn newColumn =
+        JdbcColumn.builder()
+            .withName(col)
+            .withType(column.dataType())
+            .withNullable(column.nullable())
+            .withComment(column.comment())
+            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
+            .build();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
   private String updateColumnTypeFieldDefinition(

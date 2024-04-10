@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
+import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionResponse;
@@ -26,6 +27,7 @@ import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -35,9 +37,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions")
 public class PartitionOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);
 
   private final TableOperationDispatcher dispatcher;
   @Context private HttpServletRequest httpRequest;
@@ -144,6 +149,47 @@ public class PartitionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.CREATE, "", table, e);
+    }
+  }
+
+  @DELETE
+  @Path("{partition}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-partition." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-partition", absolute = true)
+  public Response dropPartition(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("table") String table,
+      @PathParam("partition") String partition,
+      @QueryParam("purge") @DefaultValue("false") boolean purge) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
+                LockType.WRITE,
+                () -> {
+                  Table loadTable = dispatcher.loadTable(tableIdent);
+                  boolean dropped =
+                      purge
+                          ? loadTable.supportPartitions().purgePartition(partition)
+                          : loadTable.supportPartitions().dropPartition(partition);
+                  if (!dropped) {
+                    LOG.warn(
+                        "Failed to drop partition {} under table {} under schema {}",
+                        partition,
+                        table,
+                        schema);
+                  }
+                  return Utils.ok(new DropResponse(dropped));
+                });
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);
     }
   }
 }

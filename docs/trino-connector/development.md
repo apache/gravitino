@@ -13,7 +13,7 @@ This document is to guide users through the development of the Gravitino connect
 Before you start developing the Gravitino trino connector, you need to have the following prerequisites:
 
 1. You need to start the Gravitino server locally, for more information, please refer to the [start Gravitino server](../how-to-install.md)
-2. Create a catalog in the Gravitino server, for more information, please refer to the [Gravitino metadata management](../manage-metadata-using-gravitino.md). Assuming we have just created a MySQL catalog using the following command:
+2. Create a catalog in the Gravitino server, for more information, please refer to the [Gravitino metadata management](../manage-relational-metadata-using-gravitino.md). Assuming we have just created a MySQL catalog using the following command:
 
 ```curl
 curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes

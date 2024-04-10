@@ -42,7 +42,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -61,7 +61,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema operations
 
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations).
+see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -117,7 +117,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `uniontype`         | 0.2.0         |
 
 :::info
-Since 0.5.0, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type from the Hive catalog.
+Since 0.5.0, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type from the Hive catalog.
 :::
 
 ### Table properties
@@ -151,11 +151,11 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 
 ### Table operations
 
-Refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter operations
 
-Gravitino has already defined a unified set of [metadata operation interfaces](./manage-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update requests which enable you to change the struct of an existing table.
+Gravitino has already defined a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update requests which enable you to change the struct of an existing table.
 The following table lists the mapping relationship between Hive Alter operations and Gravitino table update requests.
 
 ##### Alter table
