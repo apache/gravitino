@@ -158,7 +158,7 @@ public class SparkTableInfo {
             });
     if (baseTable instanceof SparkIcebergTable) {
       SparkIcebergTable icebergTable = (SparkIcebergTable) baseTable;
-      SparkMetadataColumn[] sparkMetadataColumns =
+      sparkTableInfo.metadataColumns =
           Arrays.stream(icebergTable.metadataColumns())
               .map(
                   metadataColumn ->
@@ -167,7 +167,6 @@ public class SparkTableInfo {
                           metadataColumn.dataType(),
                           metadataColumn.isNullable()))
               .toArray(SparkMetadataColumn[]::new);
-      sparkTableInfo.metadataColumns = sparkMetadataColumns;
     }
     return sparkTableInfo;
   }
