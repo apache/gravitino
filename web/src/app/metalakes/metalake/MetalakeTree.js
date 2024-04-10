@@ -55,6 +55,8 @@ const MetalakeTree = props => {
           default:
             return 'bx:book'
         }
+      case 'messaging':
+        return 'skill-icons:kafka'
       case 'fileset':
       default:
         return 'bx:book'
