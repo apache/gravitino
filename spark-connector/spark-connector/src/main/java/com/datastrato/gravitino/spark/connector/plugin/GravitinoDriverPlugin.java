@@ -20,6 +20,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private GravitinoCatalogManager catalogManager;
   private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
-      new String[] {IcebergSparkSessionExtensions.class.getName()};
+      new String[] {
+        GravitinoIcebergSparkSessionExtensions.class.getName(),
+        IcebergSparkSessionExtensions.class.getName()
+      };
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {

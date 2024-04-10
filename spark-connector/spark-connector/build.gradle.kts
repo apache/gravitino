@@ -5,6 +5,7 @@
 plugins {
   `maven-publish`
   id("java")
+  id("scala")
   id("idea")
   alias(libs.plugins.shadow)
 }

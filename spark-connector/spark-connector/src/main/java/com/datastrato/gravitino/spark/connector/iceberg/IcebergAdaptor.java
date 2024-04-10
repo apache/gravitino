@@ -107,10 +107,8 @@ public class IcebergAdaptor implements GravitinoCatalogAdaptor {
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
-      org.apache.spark.sql.connector.catalog.Table sparkTable,
       PropertiesConverter propertiesConverter) {
-    return new SparkIcebergTable(
-        identifier, gravitinoTable, sparkCatalog, sparkTable, propertiesConverter);
+    return new SparkIcebergTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
   }
 
   @Override
