@@ -8,7 +8,6 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
-import com.datastrato.gravitino.shaded.com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -356,7 +355,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
-    List<Integer> ids = Lists.newArrayList();
+    List<Integer> ids = new ArrayList<>();
     for (int id = 0; id < 200; id++) {
       ids.add(id);
     }
@@ -395,7 +394,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
             .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
-    List<Integer> ids = Lists.newArrayList();
+    List<Integer> ids = new ArrayList<>();
     for (int id = 0; id < 7500; id++) {
       ids.add(id);
     }
