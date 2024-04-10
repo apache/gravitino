@@ -43,6 +43,7 @@ const AppBar = () => {
     }
     const metalakeItems = store.metalakes.map(i => i.name)
     setMetalakes(metalakeItems)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.metalakes])
 
   return (

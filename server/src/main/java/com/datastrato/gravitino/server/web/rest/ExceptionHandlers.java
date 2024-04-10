@@ -172,6 +172,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NonEmptySchemaException) {
         return Utils.nonEmpty(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, schema, catalog, e);
       }
@@ -278,9 +281,15 @@ public class ExceptionHandlers {
 
     private static String getUserErrorMsg(
         String user, String operation, String metalake, String reason) {
-      return String.format(
-          "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
-          user, operation, metalake, reason);
+      if (metalake == null) {
+        return String.format(
+            "Failed to operate metalake admin user %s operation [%s], reason [%s]",
+            user, operation, reason);
+      } else {
+        return String.format(
+            "Failed to operate user %s operation [%s] under metalake [%s], reason [%s]",
+            user, operation, metalake, reason);
+      }
     }
 
     @Override

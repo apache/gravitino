@@ -13,6 +13,28 @@ import lombok.Getter;
 /** This interface defines an entity within the Gravitino framework. */
 public interface Entity extends Serializable {
 
+  // The below constants are used for virtual metalakes, catalogs and schemas
+  // The system doesn't need to create them. The system uses these constants
+  // to organize the system information better.
+
+  /** The system reserved metalake name. */
+  String SYSTEM_METALAKE_RESERVED_NAME = "system";
+
+  /** The system reserved catalog name. */
+  String SYSTEM_CATALOG_RESERVED_NAME = "system";
+
+  /** The authorization catalog name in the system metalake. */
+  String AUTHORIZATION_CATALOG_NAME = "authorization";
+
+  /** The user schema name in the system catalog. */
+  String USER_SCHEMA_NAME = "user";
+
+  /** The group schema name in the system catalog. */
+  String GROUP_SCHEMA_NAME = "group";
+
+  /** The admin schema name in the authorization catalog of the system metalake. */
+  String ADMIN_SCHEMA_NAME = "admin";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {

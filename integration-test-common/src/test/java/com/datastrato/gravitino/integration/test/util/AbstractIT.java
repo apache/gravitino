@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
@@ -139,7 +140,11 @@ public class AbstractIT {
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
           FileUtils.readFileToString(
-              new File(gravitinoHome + "/core/src/main/resources/mysql/mysql_init.sql"), "UTF-8");
+              new File(
+                  gravitinoHome
+                      + String.format(
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
+              "UTF-8");
       String[] initMySQLBackendSqls = mysqlContent.split(";");
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
@@ -223,7 +228,7 @@ public class AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE) && miniGravitino != null) {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
@@ -272,11 +277,7 @@ public class AbstractIT {
     Assertions.assertEquals(tableComment, table.comment());
     Assertions.assertEquals(columns.size(), table.columns().length);
     for (int i = 0; i < columns.size(); i++) {
-      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
-      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
-      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
-      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
-      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
+      assertColumn(columns.get(i), table.columns()[i]);
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
