@@ -23,7 +23,6 @@ import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
-import java.util.Optional;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -79,12 +78,6 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
-
-            if (enableAuthorization) {
-              bind(Optional.of(gravitinoEnv.accessControlManager())).to(Optional.class).ranked(1);
-            } else {
-              bind(Optional.empty()).to(Optional.class).ranked(1);
-            }
 
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
