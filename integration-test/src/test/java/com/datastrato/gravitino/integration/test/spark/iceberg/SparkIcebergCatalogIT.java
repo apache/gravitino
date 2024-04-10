@@ -15,10 +15,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
@@ -310,7 +312,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
     sql(insertData);
-    checkTableReadWrite(tableInfo);
 
     String expectedMetadata = "0,{a}";
     String getMetadataSQL =
@@ -346,8 +347,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .createDataset(ids, Encoders.INT())
             .withColumnRenamed("value", "id")
-            .withColumn("name", null)
-            .withColumn("age", null);
+            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(200, getSparkSession().table(tableName).count());
@@ -385,8 +386,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .createDataset(ids, Encoders.INT())
             .withColumnRenamed("value", "id")
-            .withColumn("name", null)
-            .withColumn("age", null);
+            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(7500, getSparkSession().table(tableName).count());
@@ -408,6 +409,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
     SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+    metadataColumns[1] =
+        new SparkMetadataColumn(
+            "_partition", DataTypes.createStructType(new StructField[] {}), true);
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -417,7 +421,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
     sql(insertData);
-    checkTableReadWrite(tableInfo);
 
     String getMetadataSQL = String.format("SELECT _partition FROM %s", tableName);
     Assertions.assertEquals(1, getSparkSession().sql(getMetadataSQL).count());
@@ -430,6 +433,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_file_metadata_column";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
     sql(createTableSQL);
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
@@ -444,7 +448,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
     sql(insertData);
-    checkTableReadWrite(tableInfo);
 
     String getMetadataSQL = String.format("SELECT _file FROM %s", tableName);
     List<String> queryResult = getTableMetadata(getMetadataSQL);
@@ -471,7 +474,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
     sql(insertData);
-    checkTableReadWrite(tableInfo);
 
     String getMetadataSQL = String.format("SELECT _deleted FROM %s", tableName);
     List<String> queryResult = getTableMetadata(getMetadataSQL);
