@@ -33,6 +33,7 @@ import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -461,7 +462,23 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     catalogCache.invalidate(ident);
 
     try {
+      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProvider().equals("kafka")) {
+        // Kafka catalog needs to cascade drop the default schema
+        List<SchemaEntity> schemas =
+            store.list(
+                Namespace.ofSchema(ident.namespace().level(0), ident.name()),
+                SchemaEntity.class,
+                EntityType.SCHEMA);
+        // If there is only one schema, it must be the default schema, because we don't allow to
+        // drop the default schema.
+        if (schemas.size() == 1) {
+          return store.delete(ident, EntityType.CATALOG, true);
+        }
+      }
       return store.delete(ident, EntityType.CATALOG);
+    } catch (NoSuchEntityException e) {
+      return false;
     } catch (IOException ioe) {
       LOG.error("Failed to drop catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
