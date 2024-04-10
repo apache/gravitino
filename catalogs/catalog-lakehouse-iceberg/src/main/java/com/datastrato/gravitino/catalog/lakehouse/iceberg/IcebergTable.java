@@ -41,12 +41,6 @@ public class IcebergTable extends BaseTable {
    */
   public static final String PROP_LOCATION = "location";
 
-  /** A reserved property to specify the provider of the table. */
-  public static final String PROP_PROVIDER = "provider";
-
-  /** The default provider of the table. */
-  public static final String DEFAULT_ICEBERG_PROVIDER = "iceberg";
-
   public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
 
   private String location;
@@ -78,9 +72,6 @@ public class IcebergTable extends BaseTable {
   String transformDistribution(Distribution distribution) {
     switch (distribution.strategy()) {
       case HASH:
-        Preconditions.checkArgument(
-            ArrayUtils.isEmpty(distribution.expressions()),
-            "Iceberg's Distribution Mode.HASH does not support set expressions.");
         Preconditions.checkArgument(
             ArrayUtils.isNotEmpty(partitioning),
             "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty.");
@@ -185,10 +176,6 @@ public class IcebergTable extends BaseTable {
       icebergTable.sortOrders = sortOrders;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
-      }
-      String provider = icebergTable.properties.get(PROP_PROVIDER);
-      if (provider != null && !DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider)) {
-        throw new IllegalArgumentException("Unsupported format in USING: " + provider);
       }
       return icebergTable;
     }

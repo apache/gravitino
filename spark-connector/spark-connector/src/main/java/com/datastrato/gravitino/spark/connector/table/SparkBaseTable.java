@@ -84,10 +84,14 @@ public interface SparkBaseTable extends Table, SupportsRead, SupportsWrite {
 
   @Override
   default Map<String, String> properties() {
-    Map properties = new HashMap();
+    Map<String, String> properties = new HashMap<>();
     com.datastrato.gravitino.rel.Table gravitinoTable = getGravitinoTable();
     if (gravitinoTable.properties() != null) {
       properties.putAll(gravitinoTable.properties());
+    }
+
+    if (getSparkTable().properties() != null) {
+      properties.putAll(getSparkTable().properties());
     }
 
     properties = getPropertiesConverter().toSparkTableProperties(properties);
