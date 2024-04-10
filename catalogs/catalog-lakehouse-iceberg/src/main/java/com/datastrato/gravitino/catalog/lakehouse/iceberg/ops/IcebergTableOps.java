@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
 
-import static com.datastrato.gravitino.connector.CatalogOperations.MYSQL_CATALOG_CONNECTION_CLEAN_UP_THREAD;
-
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
@@ -159,7 +157,7 @@ public class IcebergTableOps implements AutoCloseable {
   private void closeMySQLCatalogResource() {
     try {
       // Close thread AbandonedConnectionCleanupThread
-      Class.forName(MYSQL_CATALOG_CONNECTION_CLEAN_UP_THREAD)
+      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
           .getMethod("uncheckedShutdown")
           .invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
