@@ -31,7 +31,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 @Getter
 public class SparkIcebergTable extends SparkTable
-    implements SparkBaseTable, SupportsRowLevelOperations, SupportsMetadataColumns {
+    implements SparkBaseTable, SupportsDelete, SupportsRowLevelOperations, SupportsMetadataColumns {
 
   private final Identifier identifier;
   private final com.datastrato.gravitino.rel.Table gravitinoTable;

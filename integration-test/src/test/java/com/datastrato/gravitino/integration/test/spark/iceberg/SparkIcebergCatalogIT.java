@@ -304,7 +304,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
+            .withColumns(getSimpleTableColumn())
             .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
   }
