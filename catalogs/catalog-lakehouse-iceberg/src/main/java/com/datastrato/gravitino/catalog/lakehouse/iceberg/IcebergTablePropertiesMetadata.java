@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
+import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
+
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
@@ -11,8 +14,6 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.TableProperties;
-
-import static com.datastrato.gravitino.connector.PropertyEntry.*;
 
 public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
