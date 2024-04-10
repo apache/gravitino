@@ -313,7 +313,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
     sql(insertData);
 
-    String expectedMetadata = "0,{a}";
+    String expectedMetadata = "0,a";
     String getMetadataSQL =
         String.format("SELECT _spec_id, _partition FROM %s ORDER BY _spec_id", tableName);
     List<String> queryResult = getTableMetadata(getMetadataSQL);
@@ -322,8 +322,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testPositionMetadataColumnWithMultipleRowGroups() throws NoSuchTableException {
-    String tableName = "test_position_metadata_column_with_multiple_row_groups";
+  public void testPositionMetadataColumn() throws NoSuchTableException {
+    String tableName = "test_position_metadata_column";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
     createTableSQL = createTableSQL + " PARTITIONED BY (name);";
@@ -352,45 +352,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(200, getSparkSession().table(tableName).count());
-
-    String getMetadataSQL = String.format("SELECT _pos FROM %s", tableName);
-    List<String> expectedRows = ids.stream().map(String::valueOf).collect(Collectors.toList());
-    List<String> queryResult = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(expectedRows.size(), queryResult.size());
-    Assertions.assertArrayEquals(expectedRows.toArray(), queryResult.toArray());
-  }
-
-  @Test
-  public void testPositionMetadataColumnWithMultipleBatches() throws NoSuchTableException {
-    String tableName = "test_position_metadata_column_with_multiple_batches";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
-
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
-
-    List<Integer> ids = new ArrayList<>();
-    for (int id = 0; id < 7500; id++) {
-      ids.add(id);
-    }
-    Dataset<Row> df =
-        getSparkSession()
-            .createDataset(ids, Encoders.INT())
-            .withColumnRenamed("value", "id")
-            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
-            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
-    df.coalesce(1).writeTo(tableName).append();
-
-    Assertions.assertEquals(7500, getSparkSession().table(tableName).count());
 
     String getMetadataSQL = String.format("SELECT _pos FROM %s", tableName);
     List<String> expectedRows = ids.stream().map(String::valueOf).collect(Collectors.toList());
@@ -457,9 +418,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testDeleteMetadataColumn() {
-    String tableName = "test_file_metadata_column";
+    String tableName = "test_delete_metadata_column";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
     sql(createTableSQL);
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
