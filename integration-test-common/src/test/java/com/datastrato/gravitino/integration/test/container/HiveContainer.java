@@ -73,6 +73,8 @@ public class HiveContainer extends BaseContainer {
       // Pack the jar files
       container.execInContainer("tar", "cf", hiveLogJarPath, HIVE_LOG_PATH);
       container.execInContainer("tar", "cf", HdfsLogJarPath, HDFS_LOG_PATH);
+      Container.ExecResult execResult = container.execInContainer("ps", "-ef");
+      LOG.info("Process in the Hive docker: " + execResult.getStdout());
 
       container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
       container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
