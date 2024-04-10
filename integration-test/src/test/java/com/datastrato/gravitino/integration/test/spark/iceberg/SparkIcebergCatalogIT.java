@@ -6,17 +6,16 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
-import java.util.ArrayList;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -43,9 +42,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   private void createIcebergV2SimpleTable(String tableName) {
     String createSql =
-            String.format(
-                    "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TBLPROPERTIES('format.version'='2')",
-                    tableName);
+        String.format(
+            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT) TBLPROPERTIES('format.version'='2')",
+            tableName);
     sql(createSql);
   }
 
@@ -276,7 +275,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String extensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
     Assertions.assertTrue(StringUtils.isNotBlank(extensions));
     Assertions.assertEquals(
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions", extensions);
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions", extensions);
   }
 
   @Test
@@ -288,11 +287,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo table = getTableInfo(tableName);
 
     List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-            new ArrayList<>(getSimpleTableColumn());
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
-            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
     realTableColumnInfos.addAll(simpleTableColumnInfos);
     checkTableColumns(tableName, realTableColumnInfos, table);
     checkTableReadAndUpdate(table);
@@ -307,11 +306,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo table = getTableInfo(tableName);
 
     List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-            new ArrayList<>(getSimpleTableColumn());
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
-            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
     realTableColumnInfos.addAll(simpleTableColumnInfos);
     checkTableColumns(tableName, realTableColumnInfos, table);
     checkTableRowLevelUpdate(table);
@@ -326,11 +325,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo table = getTableInfo(tableName);
 
     List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-            new ArrayList<>(getSimpleTableColumn());
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
-            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
     realTableColumnInfos.addAll(simpleTableColumnInfos);
     checkTableColumns(tableName, realTableColumnInfos, table);
     checkTableRowLevelDelete(table);
@@ -345,11 +344,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     SparkTableInfo table = getTableInfo(tableName);
 
     List<SparkTableInfo.SparkColumnInfo> simpleTableColumnInfos =
-            new ArrayList<>(getSimpleTableColumn());
+        new ArrayList<>(getSimpleTableColumn());
     simpleTableColumnInfos.remove(0);
     List<SparkTableInfo.SparkColumnInfo> realTableColumnInfos = new ArrayList<>();
     realTableColumnInfos.add(
-            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false));
     realTableColumnInfos.addAll(simpleTableColumnInfos);
     checkTableColumns(tableName, realTableColumnInfos, table);
     checkTableRowLevelInsert(table);
