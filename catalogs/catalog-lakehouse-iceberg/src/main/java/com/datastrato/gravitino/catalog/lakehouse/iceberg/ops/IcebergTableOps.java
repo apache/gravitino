@@ -41,14 +41,13 @@ public class IcebergTableOps implements AutoCloseable {
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
   private final String backendType;
-  private final String backendUri;
+  private String backendUri = null;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
     this.backendType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    this.backendUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(backendType)) {
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
-      icebergConfig.get(IcebergConfig.CATALOG_URI);
+      this.backendUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
     catalog = IcebergCatalogUtil.loadCatalogBackend(backendType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {
@@ -157,10 +156,12 @@ public class IcebergTableOps implements AutoCloseable {
       // AbandonedConnectionCleanupThread of MySQL. For me information about
       // AbandonedConnectionCleanupThread, please refer to the corresponding java doc of MySQL
       // driver.
-      if (backendUri.contains("mysql")) {
-        closeMySQLCatalogResource();
-      } else if (backendUri.contains("postgresql")) {
-        closePostgreSQLCatalogResource();
+      if (backendUri != null) {
+        if (backendUri.contains("mysql")) {
+          closeMySQLCatalogResource();
+        } else if (backendUri.contains("postgresql")) {
+          closePostgreSQLCatalogResource();
+        }
       }
     }
 
