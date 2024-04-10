@@ -22,6 +22,7 @@ import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public class PartitionOperations {
   private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);
 
-  private final TableOperationDispatcher dispatcher;
+  private final TableCatalog dispatcher;
   @Context private HttpServletRequest httpRequest;
 
   @Inject
