@@ -38,6 +38,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -236,6 +237,33 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           false,
           Literals.NULL)
     };
+  }
+
+  @Test
+  void testCreateTableWithArrayType() {
+    String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column[] columns = new Column[] {col};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+
+    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertEquals(columns.length, createdTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(columns.length, loadTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], loadTable.columns()[i]);
+    }
   }
 
   @Test
