@@ -4,9 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
-
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
@@ -15,10 +12,13 @@ import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.TableProperties;
 
+import static com.datastrato.gravitino.connector.PropertyEntry.*;
+
 public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
   public static final String CREATOR = "creator";
   public static final String LOCATION = "location";
+  public static final String PROVIDER = "provider";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
@@ -35,6 +35,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(CREATOR, "The table creator", false),
             stringImmutablePropertyEntry(
                 LOCATION, "Iceberg location for table storage", false, null, false, false),
+            stringImmutablePropertyEntry(PROVIDER, "The table provider", false, null, false, false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
                 "The snapshot represents the current state of the table",
