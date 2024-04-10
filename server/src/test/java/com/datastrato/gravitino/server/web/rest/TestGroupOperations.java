@@ -32,7 +32,6 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -49,7 +48,7 @@ import org.mockito.Mockito;
 
 public class TestGroupOperations extends JerseyTest {
 
-  private final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final AccessControlManager manager = mock(AccessControlManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -67,6 +66,7 @@ public class TestGroupOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setAccessControlManager(manager);
   }
 
   @Override
