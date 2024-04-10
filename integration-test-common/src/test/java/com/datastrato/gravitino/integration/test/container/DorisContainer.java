@@ -7,6 +7,7 @@ package com.datastrato.gravitino.integration.test.container;
 import static java.lang.String.format;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -29,6 +30,9 @@ public class DorisContainer extends BaseContainer {
   public static final String PASSWORD = "root";
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
+
+  private static final String DORIS_FE_PATH = "/opt/apache-doris/fe/log";
+  private static final String DORIS_BE_PATH = "/opt/apache-doris/be/log";
 
   public static Builder builder() {
     return new Builder();
@@ -54,9 +58,33 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   public void start() {
-    super.start();
-    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
-    Preconditions.check("Doris container password change failed!", changePassword());
+    try {
+      super.start();
+      Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
+      Preconditions.check("Doris container password change failed!", changePassword());
+    } finally {
+      copyDorisLog();
+    }
+  }
+
+  private void copyDorisLog() {
+    try {
+      // stop Doris container
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy doris log file to {}", destPath);
+
+      String feTarPath = "/doris-be.tar";
+      String beTarPath = "/doris-fe.tar";
+
+      // Pack the jar files
+      container.execInContainer("tar", "cf", feTarPath, DORIS_BE_PATH);
+      container.execInContainer("tar", "cf", beTarPath, DORIS_FE_PATH);
+
+      container.copyFileFromContainer(feTarPath, destPath + File.separator + "doris-be.tar");
+      container.copyFileFromContainer(beTarPath, destPath + File.separator + "doris-fe.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to copy container log to local", e);
+    }
   }
 
   @Override
