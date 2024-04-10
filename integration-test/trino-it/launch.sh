@@ -48,7 +48,7 @@ while true; do
     sleep 1
 
     if [ "$max_attempts" -ge 600 ]; then 
-        echo "ERROR: Trino service did not start within the specified time."
+        echo "ERROR: Trino service did not start within the 600s time."
         exit 1
     fi
     ((count++))
@@ -59,7 +59,4 @@ echo "All docker compose service is now available."
 
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
-ls -l ../build/trino-ci-container-log
-ls -l ../build/trino-ci-container-log/hive
-ls -l ../build/trino-ci-container-log/hdfs
 

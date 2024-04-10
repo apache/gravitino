@@ -74,7 +74,7 @@ public class TrinoITContainers implements AutoCloseable {
     String containerIpMapping = output.toString();
     if (containerIpMapping.isEmpty()) {
       throw new ContainerLaunchException(
-          "Failed to get the container status; the containers have not started");
+          "Failed to get the container status, the containers have not started");
     }
 
     try {
