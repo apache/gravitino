@@ -105,9 +105,10 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 | `VarChar`      | `Varchar`       |
 | `FixedChar`    | `Bpchar`        |
 | `Binary`       | `Bytea`         |
+| `List`         | `Array`         |
 
 :::info
-PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
