@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,6 +48,7 @@ public class SparkTableInfo {
   private Transform truncate;
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
+  private SparkMetadataColumn[] metadataColumns;
 
   public SparkTableInfo() {}
 
@@ -154,6 +156,19 @@ public class SparkTableInfo {
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
+    if (baseTable instanceof SparkIcebergTable) {
+      SparkIcebergTable icebergTable = (SparkIcebergTable) baseTable;
+      SparkMetadataColumn[] sparkMetadataColumns =
+          Arrays.stream(icebergTable.metadataColumns())
+              .map(
+                  metadataColumn ->
+                      new SparkMetadataColumn(
+                          metadataColumn.name(),
+                          metadataColumn.dataType(),
+                          metadataColumn.isNullable()))
+              .toArray(SparkMetadataColumn[]::new);
+      sparkTableInfo.metadataColumns = sparkMetadataColumns;
+    }
     return sparkTableInfo;
   }
 

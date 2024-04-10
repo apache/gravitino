@@ -39,6 +39,7 @@ public class SparkTableInfoChecker {
     MONTH,
     YEAR,
     TRUNCATE,
+    METADATACOLUMN,
     COMMENT,
     TABLE_PROPERTY,
   }
@@ -52,6 +53,12 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withColumns(List<SparkColumnInfo> columns) {
     this.expectedTableInfo.setColumns(columns);
     this.checkFields.add(CheckField.COLUMN);
+    return this;
+  }
+
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
+    this.expectedTableInfo.setMetadataColumns(metadataColumns);
+    this.checkFields.add(CheckField.METADATACOLUMN);
     return this;
   }
 
@@ -167,6 +174,10 @@ public class SparkTableInfoChecker {
                 case TRUNCATE:
                   Assertions.assertEquals(
                       expectedTableInfo.getTruncate(), realTableInfo.getTruncate());
+                  break;
+                case METADATACOLUMN:
+                  Assertions.assertEquals(
+                      expectedTableInfo.getMetadataColumns(), realTableInfo.getMetadataColumns());
                   break;
                 case COMMENT:
                   Assertions.assertEquals(
