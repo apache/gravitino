@@ -16,10 +16,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
-import org.apache.spark.sql.Column;
 import org.apache.iceberg.RowLevelOperationMode;
 import org.apache.iceberg.TableProperties;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
@@ -487,7 +487,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteDeleteInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_delete";
+    String tableName = "test_copy_on_write_delete_unpartitioned";
     createIcebergTableWithTabProperties(
         tableName,
         false,
@@ -500,7 +500,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteDeleteInPartitionedTable() {
-    String tableName = "test_copy_on_write_delete";
+    String tableName = "test_copy_on_write_delete_partitioned";
     createIcebergTableWithTabProperties(
         tableName,
         true,
@@ -513,7 +513,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadDeleteInUnPartitionedTable() {
-    String tableName = "test_merge_on_read_delete";
+    String tableName = "test_merge_on_read_delete_unpartitioned";
     createIcebergTableWithTabProperties(
         tableName,
         false,
@@ -529,7 +529,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadDeleteInPartitionedTable() {
-    String tableName = "test_merge_on_read_delete";
+    String tableName = "test_merge_on_read_delete_partitioned";
     createIcebergTableWithTabProperties(
         tableName,
         true,
@@ -545,7 +545,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteUpdateInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_update";
+    String tableName = "test_copy_on_write_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -559,7 +559,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteUpdateInPartitionedTable() {
-    String tableName = "test_copy_on_write_update";
+    String tableName = "test_copy_on_write_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -573,7 +573,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadUpdateInUnPartitionedTable() {
-    String tableName = "test_merge_on_read_update";
+    String tableName = "test_merge_on_read_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -590,7 +590,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadUpdateInPartitionedTable() {
-    String tableName = "test_merge_on_read_update";
+    String tableName = "test_merge_on_read_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -607,7 +607,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteMergeUpdateInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_update";
+    String tableName = "test_copy_on_write_merge_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -622,7 +622,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteMergeUpdateInPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_update";
+    String tableName = "test_copy_on_write_merge_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -637,7 +637,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadMergeUpdateInUnPartitionedTable() {
-    String tableName = "test_merge_on_read_merge_update";
+    String tableName = "test_merge_on_read_merge_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -654,7 +654,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadMergeUpdateInPartitionedTable() {
-    String tableName = "test_merge_on_read_merge_update";
+    String tableName = "test_merge_on_read_merge_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -671,7 +671,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteInMergeDeleteInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_delete";
+    String tableName = "test_copy_on_write_merge_delete_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -686,7 +686,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteInMergeDeleteInPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_delete";
+    String tableName = "test_copy_on_write_merge_delete_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -701,7 +701,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInMergeDeleteInUnPartitionedTable() {
-    String tableName = "test_merge_on_read_merge_delete";
+    String tableName = "test_merge_on_read_merge_delete_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -719,7 +719,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInMergeDeleteInPartitionedTable() {
-    String tableName = "test_merge_on_read_merge_delete";
+    String tableName = "test_merge_on_read_merge_delete_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -737,7 +737,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteInsertInMergeInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert";
+    String tableName = "test_copy_on_write_merge_insert_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -752,7 +752,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testCopyOnWriteInsertInMergeInPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert";
+    String tableName = "test_copy_on_write_merge_insert_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -767,7 +767,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInsertInMergeInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert";
+    String tableName = "test_copy_on_write_merge_insert_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
@@ -785,7 +785,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInsertInMergeInPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert";
+    String tableName = "test_copy_on_write_merge_insert_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
         tableName,
