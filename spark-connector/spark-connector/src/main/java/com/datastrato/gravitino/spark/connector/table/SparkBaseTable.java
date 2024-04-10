@@ -18,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsWrite;
@@ -41,34 +40,28 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * could implement more capabilities like SupportsPartitionManagement for Hive table, SupportsIndex
  * for JDBC table, SupportsRowLevelOperations for Iceberg table.
  */
-public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWrite {
-  private Identifier identifier;
-  private com.datastrato.gravitino.rel.Table gravitinoTable;
-  private TableCatalog sparkCatalog;
-  private Table lazySparkTable;
-  private PropertiesConverter propertiesConverter;
+public interface SparkBaseTable extends Table, SupportsRead, SupportsWrite {
 
-  public SparkBaseTable(
-      Identifier identifier,
-      com.datastrato.gravitino.rel.Table gravitinoTable,
-      TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
-    this.identifier = identifier;
-    this.gravitinoTable = gravitinoTable;
-    this.sparkCatalog = sparkCatalog;
-    this.propertiesConverter = propertiesConverter;
-  }
+  Identifier getIdentifier();
+
+  com.datastrato.gravitino.rel.Table getGravitinoTable();
+
+  TableCatalog getSparkCatalog();
+
+  Table getSparkTable();
+
+  PropertiesConverter getPropertiesConverter();
 
   @Override
-  public String name() {
-    return getNormalizedIdentifier(identifier, gravitinoTable.name());
+  default String name() {
+    return getNormalizedIdentifier(getIdentifier(), getGravitinoTable().name());
   }
 
   @Override
   @SuppressWarnings("deprecation")
-  public StructType schema() {
+  default StructType schema() {
     List<StructField> structs =
-        Arrays.stream(gravitinoTable.columns())
+        Arrays.stream(getGravitinoTable().columns())
             .map(
                 column -> {
                   String comment = column.comment();
@@ -90,13 +83,14 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   }
 
   @Override
-  public Map<String, String> properties() {
+  default Map<String, String> properties() {
     Map properties = new HashMap();
+    com.datastrato.gravitino.rel.Table gravitinoTable = getGravitinoTable();
     if (gravitinoTable.properties() != null) {
       properties.putAll(gravitinoTable.properties());
     }
 
-    properties = propertiesConverter.toSparkTableProperties(properties);
+    properties = getPropertiesConverter().toSparkTableProperties(properties);
 
     // Spark will retrieve comment from properties.
     String comment = gravitinoTable.comment();
@@ -107,22 +101,23 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   }
 
   @Override
-  public Set<TableCapability> capabilities() {
+  default Set<TableCapability> capabilities() {
     return getSparkTable().capabilities();
   }
 
   @Override
-  public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
+  default ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
     return ((SupportsRead) getSparkTable()).newScanBuilder(options);
   }
 
   @Override
-  public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
+  default WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
     return ((SupportsWrite) getSparkTable()).newWriteBuilder(info);
   }
 
   @Override
-  public Transform[] partitioning() {
+  default Transform[] partitioning() {
+    com.datastrato.gravitino.rel.Table gravitinoTable = getGravitinoTable();
     com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions =
         gravitinoTable.partitioning();
     Distribution distribution = gravitinoTable.distribution();
@@ -130,24 +125,13 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
     return SparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
   }
 
-  protected Table getSparkTable() {
-    if (lazySparkTable == null) {
-      try {
-        this.lazySparkTable = sparkCatalog.loadTable(identifier);
-      } catch (NoSuchTableException e) {
-        throw new RuntimeException(e);
-      }
-    }
-    return lazySparkTable;
-  }
-
-  protected boolean isCaseSensitive() {
+  default boolean isCaseSensitive() {
     return true;
   }
 
   // The underlying catalogs may not case-sensitive, to keep consistent with the action of SparkSQL,
   // we should return normalized identifiers.
-  private String getNormalizedIdentifier(Identifier tableIdentifier, String gravitinoTableName) {
+  default String getNormalizedIdentifier(Identifier tableIdentifier, String gravitinoTableName) {
     if (tableIdentifier.namespace().length == 0) {
       return gravitinoTableName;
     }

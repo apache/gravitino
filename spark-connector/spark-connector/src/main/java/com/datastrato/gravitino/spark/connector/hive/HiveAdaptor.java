@@ -32,8 +32,10 @@ public class HiveAdaptor implements GravitinoCatalogAdaptor {
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       PropertiesConverter propertiesConverter) {
-    return new SparkHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+    return new SparkHiveTable(
+        identifier, gravitinoTable, sparkCatalog, sparkTable, propertiesConverter);
   }
 
   @Override

@@ -32,6 +32,7 @@ public interface GravitinoCatalogAdaptor {
    * @param identifier Spark's table identifier
    * @param gravitinoTable Gravitino table to do DDL operations
    * @param sparkCatalog specific Spark catalog to do IO operations
+   * @param sparkTable specific Spark table to do IO operations
    * @param propertiesConverter transform properties between Gravitino and Spark
    * @return a specific Spark table
    */
@@ -39,6 +40,7 @@ public interface GravitinoCatalogAdaptor {
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       PropertiesConverter propertiesConverter);
 
   /**
