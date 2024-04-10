@@ -50,15 +50,26 @@ public abstract class GravitinoClientBase implements Closeable {
     ObjectMapper mapper = JsonUtils.objectMapper();
     mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
-    this.restClient =
-        HTTPClient.builder(Collections.emptyMap())
-            .uri(uri)
-            .withAuthDataProvider(authDataProvider)
-            .withObjectMapper(mapper)
-            .build();
-
     if (checkVersion) {
-      checkVersion();
+      this.restClient =
+          HTTPClient.builder(Collections.emptyMap())
+              .uri(uri)
+              .withAuthDataProvider(authDataProvider)
+              .withObjectMapper(mapper)
+              .withPreConnectHandle(
+                  (client) -> {
+                    checkVersion();
+                    return null;
+                  })
+              .build();
+    } else {
+
+      this.restClient =
+          HTTPClient.builder(Collections.emptyMap())
+              .uri(uri)
+              .withAuthDataProvider(authDataProvider)
+              .withObjectMapper(mapper)
+              .build();
     }
   }
 

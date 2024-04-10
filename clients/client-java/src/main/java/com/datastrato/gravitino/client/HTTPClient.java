@@ -37,6 +37,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
@@ -78,6 +79,7 @@ public class HTTPClient implements RESTClient {
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
   private final AuthDataProvider authDataProvider;
+  private volatile Function<HTTPClient, Void> beforeConnectHandle;
 
   /**
    * Constructs an instance of HTTPClient with the provided information.
@@ -86,12 +88,14 @@ public class HTTPClient implements RESTClient {
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
+   * @param beforeConnectHandle The function to be executed before connecting to the server.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
-      AuthDataProvider authDataProvider) {
+      AuthDataProvider authDataProvider,
+      Function<HTTPClient, Void> beforeConnectHandle) {
     this.uri = uri;
     this.mapper = objectMapper;
 
@@ -106,6 +110,7 @@ public class HTTPClient implements RESTClient {
 
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
+    this.beforeConnectHandle = beforeConnectHandle;
   }
 
   /**
@@ -314,6 +319,17 @@ public class HTTPClient implements RESTClient {
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
+
+    if (beforeConnectHandle != null) {
+      synchronized (this) {
+        if (beforeConnectHandle != null) {
+          Function<HTTPClient, Void> handle = beforeConnectHandle;
+          beforeConnectHandle = null;
+          handle.apply(this);
+        }
+      }
+    }
+
     if (path.startsWith("/")) {
       throw new RESTException(
           "Received a malformed path for a REST request: %s. Paths should not start with /", path);
@@ -655,6 +671,7 @@ public class HTTPClient implements RESTClient {
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
     private AuthDataProvider authDataProvider;
+    private Function<HTTPClient, Void> beforeConnectHandle;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -708,6 +725,17 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the preConnect handle for the HTTP client.
+     *
+     * @param beforeConnectHandle The handle run before connect to the server .
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withPreConnectHandle(Function<HTTPClient, Void> beforeConnectHandle) {
+      this.beforeConnectHandle = beforeConnectHandle;
+      return this;
+    }
+
+    /**
      * Sets the AuthDataProvider for the HTTP client.
      *
      * @param authDataProvider The authDataProvider providing the data used to authenticate.
@@ -725,7 +753,7 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider);
+      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandle);
     }
   }
 
