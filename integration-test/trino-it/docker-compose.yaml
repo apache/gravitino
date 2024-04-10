@@ -21,7 +21,7 @@ services:
       test: ["CMD", "/tmp/check-status.sh"]
       interval: 10s
       timeout: 60s
-      retries: 5
+      retries: 30
 
   postgresql:
     image: postgres:13
