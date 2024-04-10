@@ -8,6 +8,7 @@ import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import java.io.IOException;
 import java.util.Properties;
 
+/** Retrieve the version and build information from the building process */
 public class Version {
   public static final String version;
   public static final String compileDate;
