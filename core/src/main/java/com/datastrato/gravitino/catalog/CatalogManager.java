@@ -319,6 +319,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     .build())
             .build();
 
+    boolean createSuccess = false;
     try {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
@@ -326,9 +327,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
       }
 
-      // TODO: should avoid a race condition here
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       store.put(e, false /* overwrite */);
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      createSuccess = true;
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -339,6 +340,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
       throw new RuntimeException(e3);
+    } finally {
+      if (!createSuccess) {
+        try {
+          store.delete(ident, EntityType.CATALOG);
+        } catch (IOException e4) {
+          LOG.error("Failed to clean up catalog {}", ident, e4);
+        }
+      }
     }
   }
 
