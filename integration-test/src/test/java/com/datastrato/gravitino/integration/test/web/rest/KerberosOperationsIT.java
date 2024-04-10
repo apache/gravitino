@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.integration.test.web.rest;
 
-import static com.datastrato.gravitino.server.auth.KerberosConfig.KEYTAB;
-import static com.datastrato.gravitino.server.auth.KerberosConfig.PRINCIPAL;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYTAB;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.datastrato.gravitino.auth.AuthenticatorType;
@@ -15,7 +15,7 @@ import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
-import com.datastrato.gravitino.server.auth.KerberosConfig;
+import com.datastrato.gravitino.server.authentication.KerberosConfig;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
