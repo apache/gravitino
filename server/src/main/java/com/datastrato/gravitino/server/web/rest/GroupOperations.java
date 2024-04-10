@@ -6,14 +6,15 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
-import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -26,6 +27,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/groups")
 public class GroupOperations {
 
@@ -35,9 +37,11 @@ public class GroupOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  @Inject
-  public GroupOperations(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
+  public GroupOperations() {
+    // Because accessManager may be null when Gravitino doesn't enable authorization,
+    // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
+    // accessControlManager from GravitinoEnv instead of injection here.
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
   }
 
   @GET
