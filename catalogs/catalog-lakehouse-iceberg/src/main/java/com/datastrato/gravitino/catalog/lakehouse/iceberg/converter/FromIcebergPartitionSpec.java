@@ -77,8 +77,8 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   /**
    * Transform assembled into gravitino.
    *
-   * @param partitionSpec
-   * @param schema
+   * @param partitionSpec Iceberg partition spec.
+   * @param schema Iceberg schema.
    * @return array of transforms for partition fields.
    */
   public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
