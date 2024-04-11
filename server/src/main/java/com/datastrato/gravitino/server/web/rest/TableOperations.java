@@ -24,6 +24,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -41,6 +42,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.TableInterfaces
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables")
 public class TableOperations {
 

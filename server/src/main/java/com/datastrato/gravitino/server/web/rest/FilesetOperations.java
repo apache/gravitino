@@ -21,6 +21,7 @@ import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -37,6 +38,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.FilesetInterfaces
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets")
 public class FilesetOperations {
 

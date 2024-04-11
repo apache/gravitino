@@ -4,10 +4,7 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.*;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
@@ -16,8 +13,13 @@ import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.Executable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -29,10 +31,13 @@ import java.util.Map;
  */
 public class AccessControlManager {
 
+  private static final Logger LOG = LoggerFactory.getLogger(AccessControlManager.class);
+
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
   private final GrantManager grantManager;
+  private final GroupMappingServiceProvider groupMappingServiceProvider;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
 
@@ -41,6 +46,18 @@ public class AccessControlManager {
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator);
     this.grantManager = new GrantManager(store);
+
+    String userGroupsMappingClass = config.get(Configs.USER_GROUP_MAPPING);
+    if (userGroupsMappingClass != null) {
+      try {
+        groupMappingServiceProvider = (GroupMappingServiceProvider) Class.forName(userGroupsMappingClass).getDeclaredConstructor().newInstance();
+      } catch (Exception e) {
+        LOG.error("Failed to create and initialize group mapping service provider by name {}.", userGroupsMappingClass, e);
+        throw new RuntimeException("Failed to create and initialize group mapping service provider: " + userGroupsMappingClass, e);
+      }
+    } else {
+      groupMappingServiceProvider = null;
+    }
   }
 
   /**
@@ -244,6 +261,14 @@ public class AccessControlManager {
    */
   public boolean dropRole(String metalake, String role) {
     return doWithNonAdminLock(() -> roleManager.dropRole(metalake, role));
+  }
+
+  public Set<String> getGroupsByUser(String user) {
+    if (groupMappingServiceProvider == null) {
+      return Collections.emptySet();
+    }
+
+    return groupMappingServiceProvider.getGroups(user);
   }
 
   private <R, E extends Exception> R doWithNonAdminLock(Executable<R, E> executable) throws E {

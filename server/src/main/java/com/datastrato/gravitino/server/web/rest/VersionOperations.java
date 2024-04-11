@@ -9,6 +9,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.dto.VersionDTO;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import java.io.IOException;
 import java.util.Properties;
@@ -20,6 +21,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+@NameBindings.VersionInterfaces
 @Path("/version")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)

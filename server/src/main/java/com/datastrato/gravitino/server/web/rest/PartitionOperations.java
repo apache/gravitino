@@ -23,6 +23,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
 import javax.inject.Inject;
@@ -40,6 +41,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.PartitionInterfaces
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions")
 public class PartitionOperations {
   private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);

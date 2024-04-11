@@ -19,6 +19,9 @@ public interface Privilege {
   /** The name of this privilege. */
   enum Name {
     /** The privilege of load a catalog. */
-    LOAD_CATALOG
+    LOAD_CATALOG,
+    LIST_CATALOGS,
+    DROP_CATALOG,
+    CREATE_CATALOG
   }
 }

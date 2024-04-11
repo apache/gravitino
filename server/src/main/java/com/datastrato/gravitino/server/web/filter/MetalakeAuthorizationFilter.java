@@ -32,12 +32,8 @@ import javax.ws.rs.ext.Provider;
  */
 @Provider
 @NameBindings.MetalakeInterfaces
-public class MetalakeAuthorizationFilter implements ContainerRequestFilter {
+public class MetalakeAuthorizationFilter extends BaseMetalakeUserFilter {
 
-  @Context private HttpServletRequest httpRequest;
-
-  private AccessControlManager accessControlManager =
-      GravitinoEnv.getInstance().accessControlManager();
   private MetalakeManager metalakeManager = GravitinoEnv.getInstance().metalakesManager();
 
   @Override
@@ -46,6 +42,7 @@ public class MetalakeAuthorizationFilter implements ContainerRequestFilter {
         (Principal) httpRequest.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME);
 
     String method = requestContext.getMethod();
+    // For create a metalake operation
     if (HttpMethod.POST.equalsIgnoreCase(method)) {
       if (!accessControlManager.isMetalakeAdmin(principal.getName())) {
         requestContext.abortWith(
@@ -69,8 +66,9 @@ public class MetalakeAuthorizationFilter implements ContainerRequestFilter {
                     .loadMetalake(NameIdentifier.ofMetalake(metalake))
                     .auditInfo()
                     .creator();
+
             if (!principal.getName().equals(creator)
-                && !accessControlManager.isUserInMetalake(principal.getName(), metalake)) {
+                && !checkUserInMetalake(requestContext)) {
               requestContext.abortWith(
                   Response.status(
                           SC_FORBIDDEN, "Only the users in the metalake can load the metalake")
@@ -78,6 +76,7 @@ public class MetalakeAuthorizationFilter implements ContainerRequestFilter {
             }
           }
         } else {
+          // For alter or delete a metalake operation
           String creator =
               metalakeManager
                   .loadMetalake(NameIdentifier.ofMetalake(metalake))
@@ -99,18 +98,12 @@ public class MetalakeAuthorizationFilter implements ContainerRequestFilter {
     }
   }
 
-  @VisibleForTesting
-  void setAccessControlManager(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
-  }
+
 
   @VisibleForTesting
   void setMetalakeManager(MetalakeManager metalakeManager) {
     this.metalakeManager = metalakeManager;
   }
 
-  @VisibleForTesting
-  void setHttpRequest(HttpServletRequest httpRequest) {
-    this.httpRequest = httpRequest;
-  }
+
 }

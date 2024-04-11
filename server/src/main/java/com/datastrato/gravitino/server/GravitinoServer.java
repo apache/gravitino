@@ -20,8 +20,7 @@ import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
-import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
-import com.datastrato.gravitino.server.web.filter.MetalakeAuthorizationFilter;
+import com.datastrato.gravitino.server.web.filter.*;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
@@ -97,7 +96,7 @@ public class GravitinoServer extends ResourceConfig {
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
 
     if (enableAuthorization) {
-      register(MetalakeAuthorizationFilter.class);
+      register(VersionAuthorizationFilter.class);
     } else {
       register(AccessControlNotAllowedFilter.class);
     }
