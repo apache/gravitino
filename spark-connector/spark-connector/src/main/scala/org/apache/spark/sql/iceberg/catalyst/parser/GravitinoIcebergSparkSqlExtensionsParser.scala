@@ -31,7 +31,7 @@ import scala.collection.JavaConverters._
 import java.util.Locale
 import scala.util.Try
 
-// Reffered from v3.4/spark-extensions/src/main/scala/org/apache/spark/sql/catalyst/parser/extensions/IcebergSparkSqlExtensionsParser.scala
+// Referred from v3.4/spark-extensions/src/main/scala/org/apache/spark/sql/catalyst/parser/extensions/IcebergSparkSqlExtensionsParser.scala
 class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extends ParserInterface with ExtendedParser {
 
   import GravitinoIcebergSparkSqlExtensionsParser._
