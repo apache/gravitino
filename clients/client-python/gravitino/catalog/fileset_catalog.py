@@ -3,7 +3,6 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 import logging
-from dataclasses import dataclass
 from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
@@ -33,12 +32,6 @@ class FilesetCatalog(BaseSchemaCatalog):
     def __init__(self, name: str = None, type: Catalog.Type = Catalog.Type.UNSUPPORTED,
                  provider: str = None, comment: str = None, properties: Dict[str, str] = None,
                  audit: AuditDTO = None, rest_client: HTTPClient = None):
-
-        # assert rest_client is not None, "restClient must be set"
-        # assert name.strip(), "name must not be blank"
-        # assert type is not None, "type must not be null"
-        # assert name.strip(), "provider must not be blank"
-        # assert audit is not None, "audit must not be null"
 
         super().__init__(name, type, provider, comment, properties, audit, rest_client)
 
