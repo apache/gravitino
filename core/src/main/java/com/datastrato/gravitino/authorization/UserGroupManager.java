@@ -240,8 +240,26 @@ class UserGroupManager {
     }
   }
 
+
+
+  /**
+   * Judges whether the user is in the metalake.
+   *
+   * @param user The name of the User
+   * @param metalake The name of the Metalake
+   * @return true, if the user is in the metalake, otherwise false.
+   */
+  public boolean isUserInMetalake(String user, String metalake) {
+    try {
+      return store.exists(NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER);
+    } catch (IOException ioe) {
+      LOG.error("Checking user {} failed due to storage issues", user, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   private List<RoleEntity> removeInvalidRoles(
-      String metalake, List<String> roleNames, List<Long> roleIds) {
+          String metalake, List<String> roleNames, List<Long> roleIds) {
     List<RoleEntity> roleEntities = Lists.newArrayList();
     if (roleNames == null || roleNames.isEmpty()) {
       return roleEntities;

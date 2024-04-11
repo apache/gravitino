@@ -16,4 +16,44 @@ public class NameBindings {
   @Target({ElementType.TYPE, ElementType.METHOD})
   @Retention(RetentionPolicy.RUNTIME)
   public @interface AccessControlInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface CatalogInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface SchemaInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface TableInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface FilesetInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface TopicInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface PartitionInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface VersionInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface MetalakeInterfaces {}
 }

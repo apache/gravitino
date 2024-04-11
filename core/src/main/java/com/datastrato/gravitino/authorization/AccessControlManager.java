@@ -82,6 +82,17 @@ public class AccessControlManager {
   }
 
   /**
+   * Judges whether the user is in the metalake.
+   *
+   * @param user The name of the User
+   * @param metalake The name of the Metalake
+   * @return true, if the user is in the metalake, otherwise false.
+   */
+  public boolean isUserInMetalake(String user, String metalake) {
+    return doWithNonAdminLock(() -> userGroupManager.isUserInMetalake(user, metalake));
+  }
+
+  /**
    * Adds a new Group.
    *
    * @param metalake The Metalake of the Group.
