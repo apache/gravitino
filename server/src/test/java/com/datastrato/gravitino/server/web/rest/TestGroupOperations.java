@@ -48,7 +48,7 @@ import org.mockito.Mockito;
 
 public class TestGroupOperations extends JerseyTest {
 
-  private final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final AccessControlManager manager = mock(AccessControlManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -66,6 +66,7 @@ public class TestGroupOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setAccessControlManager(manager);
   }
 
   @Override
@@ -83,7 +84,6 @@ public class TestGroupOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(AccessControlManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

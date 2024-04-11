@@ -9,7 +9,7 @@ import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.server.ServerConfig;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
+import com.datastrato.gravitino.server.authentication.OAuthConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;

@@ -141,6 +141,7 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon
               icon={
@@ -161,6 +162,7 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:coin-stack' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
@@ -174,6 +176,7 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:table' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
@@ -187,6 +190,7 @@ const MetalakeTree = props => {
             onClick={e => handleClickIcon(e, nodeProps)}
             onMouseEnter={e => onMouseEnter(e, nodeProps)}
             onMouseLeave={e => onMouseLeave(e, nodeProps)}
+            data-refer={`tree-node-refresh-${nodeProps.data.key}`}
           >
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:file' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
@@ -200,7 +204,11 @@ const MetalakeTree = props => {
   const renderNode = nodeData => {
     if (nodeData.path) {
       return (
-        <Typography sx={{ color: theme => theme.palette.text.secondary }} data-refer='tree-node'>
+        <Typography
+          sx={{ color: theme => theme.palette.text.secondary }}
+          data-refer='tree-node'
+          data-refer-node={nodeData.key}
+        >
           {nodeData.title}
         </Typography>
       )
