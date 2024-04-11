@@ -14,7 +14,7 @@ import java.util.Map;
 class EventListenerConfig extends Config {
   static final ConfigEntry<String> LISTENER_NAMES =
       new ConfigBuilder(EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES)
-          .doc("Gravitino event listener names")
+          .doc("Gravitino event listener names, DOT is used to split multi names")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .createWithDefault("");

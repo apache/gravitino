@@ -19,7 +19,7 @@ import com.datastrato.gravitino.rel.Table;
  */
 @DeveloperApi
 public class CreateTableFailureEvent extends TableFailureEvent {
-  private TableInfo createTableRequest;
+  private final TableInfo createTableRequest;
 
   /**
    * Constructs a {@code CreateTableFailureEvent} instance, capturing detailed information about the

@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -51,7 +52,7 @@ public class EventListenerManager {
 
   public void init(Map<String, String> properties) {
     EventListenerConfig config = new EventListenerConfig(properties);
-    this.queueCapacity = config.get(EventListenerConfig.QUEUE_CAPACITY).intValue();
+    this.queueCapacity = config.get(EventListenerConfig.QUEUE_CAPACITY);
     this.dispatcherJoinSeconds = config.get(EventListenerConfig.DISPATCHER_JOIN_SECONDS);
 
     String eventListenerNames = config.get(EventListenerConfig.LISTENER_NAMES);
@@ -113,10 +114,10 @@ public class EventListenerManager {
                     return new EventListenerPluginWrapper(listenerName, listener);
                   }
                 })
-            .filter(listener -> listener != null)
+            .filter(Objects::nonNull)
             .collect(Collectors.toList());
 
-    if (sharedQueueListeners.size() > 0) {
+    if (!sharedQueueListeners.isEmpty()) {
       listeners.add(
           new AsyncQueueListener(
               sharedQueueListeners, "default", queueCapacity, dispatcherJoinSeconds));

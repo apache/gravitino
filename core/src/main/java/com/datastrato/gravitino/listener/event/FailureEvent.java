@@ -17,7 +17,7 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public abstract class FailureEvent extends Event {
-  private Exception exception;
+  private final Exception exception;
 
   /**
    * Constructs a new {@code FailureEvent} instance with the specified user, resource identifier,

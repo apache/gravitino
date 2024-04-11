@@ -34,7 +34,7 @@ public class EventBus {
 
   /**
    * Dispatches an event to all registered listeners. Each listener processes the event based on its
-   * implementation, which could be either synchronously or asynchronously.
+   * implementation, which could be either synchronous or asynchronous.
    *
    * @param event The event to be dispatched to all registered listeners.
    */

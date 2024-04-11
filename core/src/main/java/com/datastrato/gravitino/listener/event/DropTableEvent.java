@@ -16,7 +16,7 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class DropTableEvent extends TableEvent {
-  private boolean isExists;
+  private final boolean isExists;
 
   /**
    * Constructs a new {@code DropTableEvent} instance, encapsulating information about the outcome

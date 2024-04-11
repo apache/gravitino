@@ -15,8 +15,8 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public abstract class Event {
-  private String user;
-  private NameIdentifier identifier;
+  private final String user;
+  private final NameIdentifier identifier;
 
   /**
    * Constructs an Event instance with the specified user and resource identifier details.
@@ -30,9 +30,6 @@ public abstract class Event {
     this.user = user;
     this.identifier = identifier;
   }
-
-  // Private default constructor to prevent instantiation without required parameters.
-  private Event() {}
 
   /**
    * Retrieves the user associated with this event.

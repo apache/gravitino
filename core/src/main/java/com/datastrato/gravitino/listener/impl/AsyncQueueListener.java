@@ -104,7 +104,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
     stopped.compareAndSet(false, true);
     asyncProcessor.interrupt();
     try {
-      asyncProcessor.join(dispatcherJoinSeconds * 1000);
+      asyncProcessor.join(dispatcherJoinSeconds * 1000L);
     } catch (InterruptedException e) {
       LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
     }
@@ -117,10 +117,10 @@ public class AsyncQueueListener implements EventListenerPlugin {
   }
 
   private void processEvents() {
-    while (Thread.currentThread().isInterrupted() == false) {
+    while (!Thread.currentThread().isInterrupted()) {
       try {
         Event event = queue.take();
-        this.eventListeners.stream().forEach(listener -> listener.onPostEvent(event));
+        this.eventListeners.forEach(listener -> listener.onPostEvent(event));
       } catch (InterruptedException e) {
         LOG.warn("{} event dispatcher thread is interrupted.", asyncQueueListenerName);
         break;
