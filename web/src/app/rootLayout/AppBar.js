@@ -38,13 +38,13 @@ const AppBar = () => {
   const router = useRouter()
 
   useEffect(() => {
-    if (!store.metalakes.length) {
+    if (!store.metalakes.length && metalake) {
       dispatch(fetchMetalakes())
     }
     const metalakeItems = store.metalakes.map(i => i.name)
     setMetalakes(metalakeItems)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.metalakes])
+  }, [store.metalakes, metalake, dispatch])
 
   return (
     <MuiAppBar
