@@ -110,6 +110,17 @@ public class Utils {
         .build();
   }
 
+  public static Response forbidden(String message) {
+    return forbidden(message, null);
+  }
+
+  public static Response forbidden(String message, Throwable throwable) {
+    return Response.status(Response.Status.FORBIDDEN)
+        .entity(ErrorResponse.forbidden(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =

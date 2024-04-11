@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.dto.responses;
 
+import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -252,6 +253,31 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.UNSUPPORTED_OPERATION_CODE,
         UnsupportedOperationException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new forbidden error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse forbidden(String message) {
+    return forbidden(message, null);
+  }
+
+  /**
+   * Create a new forbidden error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse forbidden(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }
