@@ -25,8 +25,7 @@ public class TestCreateGravitinoConnector {
     QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin();
-    gravitinoPlugin.setGravitinoClient(gravitinoClient);
+    TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
     queryRunner.installPlugin(gravitinoPlugin);
 
     {

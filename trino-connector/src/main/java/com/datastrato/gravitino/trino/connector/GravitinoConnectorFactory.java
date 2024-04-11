@@ -70,8 +70,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
-          catalogConnectorManager.setGravitinoClient(clientProvider().get());
-          catalogConnectorManager.start();
+          catalogConnectorManager.start(clientProvider().get());
 
           new GravitinoSystemTableFactory(catalogConnectorManager);
 
@@ -96,12 +95,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (Strings.isNullOrEmpty(metalake)) {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
-      if (config.simplifyCatalogNames()) {
-        if (!catalogConnectorManager.getCatalogs().isEmpty()) {
-          throw new TrinoException(
-              GRAVITINO_MISSING_CONFIG,
-              "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
-        }
+      if (config.simplifyCatalogNames() && !catalogConnectorManager.getCatalogs().isEmpty()) {
+        throw new TrinoException(
+            GRAVITINO_MISSING_CONFIG,
+            "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
       }
       catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
