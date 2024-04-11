@@ -119,7 +119,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public Table createTable(
       Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties)
-      throws NoSuchNamespaceException, TableAlreadyExistsException {
+      throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
     com.datastrato.gravitino.rel.Column[] gravitinoColumns =

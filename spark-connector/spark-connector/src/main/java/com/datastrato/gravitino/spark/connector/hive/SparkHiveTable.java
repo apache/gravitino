@@ -13,17 +13,16 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 /** May support more capabilities like partition management. */
 public class SparkHiveTable extends SparkBaseTable {
-
   public SparkHiveTable(
       Identifier identifier,
       Table gravitinoTable,
-      TableCatalog sparkHiveCatalog,
+      TableCatalog sparkCatalog,
       PropertiesConverter propertiesConverter) {
-    super(identifier, gravitinoTable, sparkHiveCatalog, propertiesConverter);
+    super(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
   }
 
   @Override
-  public boolean isCaseSensitive() {
+  protected boolean isCaseSensitive() {
     return false;
   }
 }
