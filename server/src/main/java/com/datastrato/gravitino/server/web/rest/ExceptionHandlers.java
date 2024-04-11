@@ -239,6 +239,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NoSuchMetalakeException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, metalake, parent, e);
       }

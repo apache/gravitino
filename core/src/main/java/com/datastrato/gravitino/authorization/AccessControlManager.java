@@ -157,4 +157,15 @@ public class AccessControlManager {
   public boolean isMetalakeAdmin(String user) {
     return adminManager.isMetalakeAdmin(user);
   }
+
+  /**
+   * Judges whether the user is in the metalake.
+   *
+   * @param user The name of the User
+   * @param metalake The name of the Metalake
+   * @return true, if the user is in the metalake, otherwise false.
+   */
+  public boolean isUserInMetalake(String user, String metalake) {
+    return userGroupManager.isUserInMetalake(user, metalake);
+  }
 }

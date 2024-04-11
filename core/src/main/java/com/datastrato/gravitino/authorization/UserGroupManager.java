@@ -212,6 +212,22 @@ public class UserGroupManager {
     }
   }
 
+  /**
+   * Judges whether the user is in the metalake.
+   *
+   * @param user The name of the User
+   * @param metalake The name of the Metalake
+   * @return true, if the user is in the metalake, otherwise false.
+   */
+  public boolean isUserInMetalake(String user, String metalake) {
+    try {
+      return store.exists(ofUser(metalake, user), Entity.EntityType.USER);
+    } catch (IOException ioe) {
+      LOG.error("Checking user {} failed due to storage issues", user, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   private NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);

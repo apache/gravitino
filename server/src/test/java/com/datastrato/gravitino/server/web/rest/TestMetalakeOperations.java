@@ -10,11 +10,14 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.MetalakeChange;
+import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -24,6 +27,7 @@ import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
+import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -52,6 +56,8 @@ import org.mockito.Mockito;
 
 public class TestMetalakeOperations extends JerseyTest {
 
+  private static final AccessControlManager accessControlManager = mock(AccessControlManager.class);
+
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
     public HttpServletRequest get() {
@@ -70,6 +76,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
   }
 
   @Override
@@ -100,7 +107,8 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info =
+        AuditInfo.builder().withCreator(AuthConstants.ANONYMOUS_USER).withCreateTime(now).build();
     BaseMetalake metalake =
         BaseMetalake.builder()
             .withName(metalakeName)
@@ -109,6 +117,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(true);
     when(metalakeManager.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
 
     Response resp =
@@ -127,6 +136,19 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(2, metalakes.length);
     Assertions.assertEquals(metalakeName, metalakes[0].name());
     Assertions.assertEquals(metalakeName, metalakes[1].name());
+
+    // Test with ForbiddenException
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(false);
+    resp =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -146,6 +168,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(true);
 
     Response resp =
         target("/metalakes")
@@ -176,6 +199,20 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
     Assertions.assertEquals(
         IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+
+    // Test with ForbiddenException
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(false);
+    Response resp2 =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResponse2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse2.getType());
   }
 
   @Test
@@ -183,7 +220,8 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info =
+        AuditInfo.builder().withCreator(AuthConstants.ANONYMOUS_USER).withCreateTime(now).build();
     BaseMetalake metalake =
         BaseMetalake.builder()
             .withName(metalakeName)
@@ -251,6 +289,32 @@ public class TestMetalakeOperations extends JerseyTest {
         errorResponse1
             .getMessage()
             .contains("Failed to operate object [" + metalakeName + "] operation [LOAD]"));
+
+    // Test with forbiddenException
+    info = AuditInfo.builder().withCreator("test").withCreateTime(now).build();
+    metalake =
+        BaseMetalake.builder()
+            .withName(metalakeName)
+            .withId(id)
+            .withAuditInfo(info)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    reset(metalakeManager);
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
+    when(accessControlManager.isUserInMetalake(any(), any())).thenReturn(false);
+
+    Response resp3 =
+        target("/metalakes/" + metalakeName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse3.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse3.getType());
   }
 
   @Test
@@ -258,7 +322,8 @@ public class TestMetalakeOperations extends JerseyTest {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
-    AuditInfo info = AuditInfo.builder().withCreator("gravitino").withCreateTime(now).build();
+    AuditInfo info =
+        AuditInfo.builder().withCreator(AuthConstants.ANONYMOUS_USER).withCreateTime(now).build();
     BaseMetalake metalake =
         BaseMetalake.builder()
             .withName(metalakeName)
@@ -275,7 +340,10 @@ public class TestMetalakeOperations extends JerseyTest {
     updateRequests.stream()
         .map(MetalakeUpdateRequest::metalakeChange)
         .toArray(MetalakeChange[]::new);
+
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(true);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
 
@@ -327,11 +395,45 @@ public class TestMetalakeOperations extends JerseyTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+
+    // Test with ForbiddenException
+    info = AuditInfo.builder().withCreator("test").withCreateTime(now).build();
+    metalake =
+        BaseMetalake.builder()
+            .withName(metalakeName)
+            .withId(id)
+            .withAuditInfo(info)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    reset(metalakeManager);
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
+    Response resp3 =
+        target("/metalakes/" + metalakeName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse3.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse3.getType());
   }
 
   @Test
   public void testDropMetalake() {
     when(metalakeManager.dropMetalake(any())).thenReturn(true);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
+    when(accessControlManager.isMetalakeAdmin(any())).thenReturn(true);
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreator(AuthConstants.ANONYMOUS_USER)
+            .withCreateTime(Instant.now())
+            .build();
+    when(metalake.auditInfo()).thenReturn(auditInfo);
+
     Response resp =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -362,5 +464,23 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(
         errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
+
+    // Test with ForbiddenException
+
+    reset(metalakeManager);
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
+    auditInfo = AuditInfo.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    when(metalake.auditInfo()).thenReturn(auditInfo);
+    Response resp2 =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResponse2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse2.getType());
   }
 }
