@@ -10,6 +10,8 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.SchemaEventDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TableEventDispatcher;
@@ -41,7 +43,7 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
-  private SchemaOperationDispatcher schemaOperationDispatcher;
+  private SchemaDispatcher schemaDispatcher;
 
   private TableDispatcher tableDispatcher;
 
@@ -129,8 +131,9 @@ public class GravitinoEnv {
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.schemaOperationDispatcher =
+    SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
@@ -186,12 +189,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaDispatcher associated with the Gravitino environment.
    *
-   * @return The SchemaOperationDispatcher instance.
+   * @return The SchemaDispatcher instance.
    */
-  public SchemaOperationDispatcher schemaOperationDispatcher() {
-    return schemaOperationDispatcher;
+  public SchemaDispatcher schemaDispatcher() {
+    return schemaDispatcher;
   }
 
   /**
