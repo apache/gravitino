@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.listener.info;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -22,19 +23,20 @@ import javax.annotation.Nullable;
  * TableInfo exposes table information for event listener, it's supposed to be read only. Most of
  * the fields are shallow copied internally not deep copies for performance.
  */
+@DeveloperApi
 public final class TableInfo {
-  private String name;
-  private Column[] columns;
-  @Nullable private String comment;
-  private Map<String, String> properties;
-  private Transform[] partitions;
-  private Distribution distribution;
-  private SortOrder[] sortOrders;
-  private Index[] indexes;
-  @Nullable private Audit auditInfo;
+  private final String name;
+  private final Column[] columns;
+  @Nullable private final String comment;
+  private final Map<String, String> properties;
+  private final Transform[] partitions;
+  private final Distribution distribution;
+  private final SortOrder[] sortOrders;
+  private final Index[] indexes;
+  @Nullable private final Audit auditInfo;
 
   public TableInfo(Table table) {
-    new TableInfo(
+    this(
         table.name(),
         table.columns(),
         table.comment(),
