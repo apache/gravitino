@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.server;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
@@ -12,13 +13,14 @@ import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
-import com.datastrato.gravitino.server.auth.ServerAuthenticator;
+import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
 import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
+import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
@@ -69,12 +71,14 @@ public class GravitinoServer extends ResourceConfig {
 
   private void initializeRestApi() {
     packages("com.datastrato.gravitino.server.web.rest");
+    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {
           @Override
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
+
             bind(gravitinoEnv.schemaOperationDispatcher())
                 .to(SchemaOperationDispatcher.class)
                 .ranked(1);
@@ -84,9 +88,16 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.filesetOperationDispatcher())
                 .to(FilesetOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.topicOperationDispatcher())
+                .to(com.datastrato.gravitino.catalog.TopicOperationDispatcher.class)
+                .ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
+
+    if (!enableAuthorization) {
+      register(AccessControlNotAllowedFilter.class);
+    }
 
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
@@ -100,6 +111,7 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
+
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }

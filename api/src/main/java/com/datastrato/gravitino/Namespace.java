@@ -106,6 +106,18 @@ public class Namespace {
   }
 
   /**
+   * Create a namespace for topic.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for topic
+   */
+  public static Namespace ofTopic(String metalake, String catalog, String schema) {
+    return of(metalake, catalog, schema);
+  }
+
+  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
@@ -167,6 +179,19 @@ public class Namespace {
     check(
         namespace != null && namespace.length() == 3,
         "Fileset namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given topic namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The topic namespace
+   */
+  public static void checkTopic(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Topic namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 

@@ -32,11 +32,11 @@ public class ContainerSuite implements Closeable {
   private static final String NETWORK_NAME = "gravitino-ci-network";
 
   private static Network network = null;
-  private static HiveContainer hiveContainer;
-  private static TrinoContainer trinoContainer;
-  private static TrinoITContainers trinoITContainers;
-
-  private static DorisContainer dorisContainer;
+  private static volatile HiveContainer hiveContainer;
+  private static volatile TrinoContainer trinoContainer;
+  private static volatile TrinoITContainers trinoITContainers;
+  private static volatile KafkaContainer kafkaContainer;
+  private static volatile DorisContainer dorisContainer;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -71,20 +71,24 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer() {
-    if (hiveContainer != null) {
-      return;
+    if (hiveContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "datastrato")
+                          .build())
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveContainer = container;
+        }
+      }
     }
-    // Start Hive container
-    HiveContainer.Builder hiveBuilder =
-        HiveContainer.builder()
-            .withHostName("gravitino-ci-hive")
-            .withEnvVars(
-                ImmutableMap.<String, String>builder()
-                    .put("HADOOP_USER_NAME", "datastrato")
-                    .build())
-            .withNetwork(network);
-    hiveContainer = closer.register(hiveBuilder.build());
-    hiveContainer.start();
   }
 
   public void startTrinoContainer(
@@ -92,48 +96,79 @@ public class ContainerSuite implements Closeable {
       String trinoConnectorLibDir,
       int gravitinoServerPort,
       String metalakeName) {
-    if (trinoContainer != null) {
-      return;
+    if (trinoContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (trinoContainer == null) {
+          // Start Trino container
+          String hiveContainerIp = hiveContainer.getContainerIpAddress();
+          TrinoContainer.Builder trinoBuilder =
+              TrinoContainer.builder()
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "datastrato")
+                          .put("GRAVITINO_HOST_IP", "host.docker.internal")
+                          .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
+                          .put("GRAVITINO_METALAKE_NAME", metalakeName)
+                          .build())
+                  .withNetwork(getNetwork())
+                  .withExtraHosts(
+                      ImmutableMap.<String, String>builder()
+                          .put("host.docker.internal", "host-gateway")
+                          .put(HiveContainer.HOST_NAME, hiveContainerIp)
+                          .build())
+                  .withFilesToMount(
+                      ImmutableMap.<String, String>builder()
+                          .put(
+                              TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR,
+                              trinoConnectorLibDir)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
+                  .withTrinoConfDir(trinoConfDir)
+                  .withMetalakeName(metalakeName)
+                  .withHiveContainerIP(hiveContainerIp);
+
+          TrinoContainer container = closer.register(trinoBuilder.build());
+          container.start();
+          trinoContainer = container;
+        }
+      }
     }
-
-    // Start Trino container
-    String hiveContainerIp = hiveContainer.getContainerIpAddress();
-    TrinoContainer.Builder trinoBuilder =
-        TrinoContainer.builder()
-            .withEnvVars(
-                ImmutableMap.<String, String>builder()
-                    .put("HADOOP_USER_NAME", "root")
-                    .put("GRAVITINO_HOST_IP", "host.docker.internal")
-                    .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
-                    .put("GRAVITINO_METALAKE_NAME", metalakeName)
-                    .build())
-            .withNetwork(getNetwork())
-            .withExtraHosts(
-                ImmutableMap.<String, String>builder()
-                    .put("host.docker.internal", "host-gateway")
-                    .build())
-            .withFilesToMount(
-                ImmutableMap.<String, String>builder()
-                    .put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir)
-                    .build())
-            .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
-            .withTrinoConfDir(trinoConfDir)
-            .withMetalakeName(metalakeName)
-            .withHiveContainerIP(hiveContainerIp);
-
-    trinoContainer = closer.register(trinoBuilder.build());
-    trinoContainer.start();
   }
 
   public void startDorisContainer() {
-    if (dorisContainer != null) {
-      return;
+    if (dorisContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (dorisContainer == null) {
+          // Start Doris container
+          DorisContainer.Builder dorisBuilder =
+              DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
+          DorisContainer container = closer.register(dorisBuilder.build());
+          container.start();
+          dorisContainer = container;
+        }
+      }
     }
-    // Start Doris container
-    DorisContainer.Builder dorisBuilder =
-        DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
-    dorisContainer = closer.register(dorisBuilder.build());
-    dorisContainer.start();
+  }
+
+  public void startKafkaContainer() {
+    if (kafkaContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (kafkaContainer == null) {
+          KafkaContainer container = closer.register(KafkaContainer.builder().build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start Kafka container", e);
+            throw new RuntimeException("Failed to start Kafka container", e);
+          }
+          kafkaContainer = container;
+        }
+      }
+    }
+  }
+
+  public KafkaContainer getKafkaContainer() {
+    return kafkaContainer;
   }
 
   public TrinoContainer getTrinoContainer() {

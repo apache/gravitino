@@ -14,7 +14,12 @@ const Footer = props => {
         <Box className={'twc-flex twc-flex-wrap twc-items-center twc-justify-between'}>
           <Typography className='twc-mr-2'>
             {`© 2023 `}
-            <Link className={'twc-no-underline twc-text-primary-main'} target='_blank' href='https://datastrato.ai/'>
+            <Link
+              className={'twc-no-underline twc-text-primary-main'}
+              target='_blank'
+              href='https://datastrato.ai/'
+              data-refer='footer-link-datastrato'
+            >
               Datastrato
             </Link>
           </Typography>
@@ -23,6 +28,7 @@ const Footer = props => {
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
               href='https://github.com/datastrato/gravitino/blob/main/LICENSE'
+              data-refer='footer-link-license'
             >
               License
             </Link>
@@ -30,6 +36,7 @@ const Footer = props => {
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
               href='https://datastrato.ai/docs/'
+              data-refer='footer-link-docs'
             >
               Documentation
             </Link>
@@ -37,6 +44,7 @@ const Footer = props => {
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
               href='https://github.com/datastrato/gravitino/issues'
+              data-refer='footer-link-support'
             >
               Support
             </Link>

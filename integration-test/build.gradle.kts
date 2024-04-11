@@ -29,8 +29,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector")) {
-    exclude("org.apache.iceberg")
+  testImplementation(project(":spark-connector:spark-connector")) {
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
@@ -136,10 +135,10 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    val skipWebITs = project.hasProperty("skipWebITs")
     if (skipWebITs) {
       exclude("**/integration/test/web/ui/**")
     }
@@ -154,7 +153,7 @@ tasks.test {
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.9")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
 
       copy {

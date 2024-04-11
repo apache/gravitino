@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -200,6 +201,41 @@ public class CatalogMysqlIT extends AbstractIT {
     Column col3 = Column.of(MYSQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
 
     return new Column[] {col1, col2, col3};
+  }
+
+  private Column[] createColumnsWithDefaultValue() {
+    return new Column[] {
+      Column.of(
+          MYSQL_COL_NAME1,
+          Types.FloatType.get(),
+          "col_1_comment",
+          false,
+          false,
+          Literals.of("1.23", Types.FloatType.get())),
+      Column.of(
+          MYSQL_COL_NAME2,
+          Types.TimestampType.withoutTimeZone(),
+          "col_2_comment",
+          false,
+          false,
+          FunctionExpression.of("current_timestamp")),
+      Column.of(
+          MYSQL_COL_NAME3, Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL),
+      Column.of(
+          MYSQL_COL_NAME4,
+          Types.IntegerType.get(),
+          "col_4_comment",
+          false,
+          false,
+          Literals.of("1000", Types.IntegerType.get())),
+      Column.of(
+          MYSQL_COL_NAME5,
+          Types.DecimalType.of(3, 2),
+          "col_5_comment",
+          true,
+          false,
+          Literals.of("1.23", Types.DecimalType.of(3, 2)))
+    };
   }
 
   private Map<String, String> createProperties() {
@@ -464,6 +500,7 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  date_col_2 date,\n"
             + "  date_col_3 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),\n"
             + "  date_col_4 date DEFAULT (CURRENT_DATE),\n"
+            + "  date_col_5 date DEFAULT '2024-04-01',\n"
             + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
             + "  timestamp_col_2 timestamp default 19830905,\n"
             + "  decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
@@ -517,6 +554,10 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "date_col_4":
           Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
+          break;
+        case "date_col_5":
+          Assertions.assertEquals(
+              Literals.of("2024-04-01", Types.DateType.get()), column.defaultValue());
           break;
         case "timestamp_col_1":
           Assertions.assertEquals(
@@ -660,6 +701,52 @@ public class CatalogMysqlIT extends AbstractIT {
         () -> {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
+  }
+
+  @Test
+  void testUpdateColumnDefaultValue() {
+    Column[] columns = createColumnsWithDefaultValue();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                null,
+                ImmutableMap.of());
+
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()}, FunctionExpression.of("current_timestamp")),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Assertions.assertEquals(
+        Literals.of("1.2345", Types.FloatType.get()), table.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        FunctionExpression.of("current_timestamp"), table.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("hello", Types.VarCharType.of(255)), table.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("2000", Types.IntegerType.get()), table.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("2.34", Types.DecimalType.of(3, 2)), table.columns()[4].defaultValue());
   }
 
   @Test
@@ -945,7 +1032,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     RuntimeException exception =
         Assertions.assertThrowsExactly(
-            RuntimeException.class,
+            UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(identer, "comment", null));
     Assertions.assertTrue(
         exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));
@@ -1389,5 +1476,52 @@ public class CatalogMysqlIT extends AbstractIT {
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
     assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+  }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", true, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "comment", true, false, null);
+    String tableName = "default_value_table";
+    Column[] newColumns = new Column[] {col1, col2, col3};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col4 =
+        Column.of("col_4", Types.LongType.get(), "col4", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    newColumns = new Column[] {col1, col2, col3, col4};
+
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
   }
 }

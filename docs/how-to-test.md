@@ -158,7 +158,7 @@ This mode is closer to the actual environment, but more complex to debug. To deb
   * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
   * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 
-## Test failure
+## Test failure and test log
 
 If a test fails, you can retrieve valuable information from the logs and test reports. Test reports are in the `./build/reports` directory. The integration test logs are in the `./integrate-test/build` directory. In deploy mode, Gravitino server logs are in the `./distribution/package/logs/` directory. 
 
@@ -175,3 +175,6 @@ In the event of a test failure within the GitHub workflow, the system generates 
 3. Look for the Artifacts item on the summary page and download the archive from there.
 
    ![summary page Image](assets/test-fail-summary.png)
+
+4. You can also add the tag `upload log` to your PR to upload the logs to the PR page. in this case, no matter the CI pipeline status, the logs will be uploaded to the PR page.
+   ![upload log](assets/upload-log-tag.png)

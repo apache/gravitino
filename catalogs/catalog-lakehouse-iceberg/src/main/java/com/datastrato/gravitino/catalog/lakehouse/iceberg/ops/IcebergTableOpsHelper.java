@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.AddColumn;
 import com.datastrato.gravitino.rel.TableChange.After;
@@ -21,6 +22,7 @@ import com.datastrato.gravitino.rel.TableChange.UpdateColumnComment;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnType;
 import com.datastrato.gravitino.rel.TableChange.UpdateComment;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -191,6 +193,9 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
+    validateColumnDefaultValue(
+        String.join(".", addColumn.fieldName()), addColumn.getDefaultValue());
+
     if (addColumn.isAutoIncrement()) {
       throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
     }
@@ -254,12 +259,22 @@ public class IcebergTableOpsHelper {
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        throw new IllegalArgumentException("Iceberg doesn't support update column default value");
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
       }
     }
     icebergUpdateSchema.commit();
+  }
+
+  public static void validateColumnDefaultValue(String fieldName, Expression defaultValue) {
+    // Iceberg column default value is WIP, see
+    // https://github.com/apache/iceberg/pull/4525
+    Preconditions.checkArgument(
+        defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET),
+        "Iceberg does not support column default value. Illegal column: " + fieldName);
   }
 
   public IcebergTableChange buildIcebergTableChanges(
@@ -332,8 +347,8 @@ public class IcebergTableOpsHelper {
    * Gravitino only supports tables managed with a single level hierarchy, such as
    * `{namespace}.{table}`, so we need to perform truncation here.
    *
-   * @param namespace
-   * @param name
+   * @param namespace The Gravitino name space
+   * @param name The table name
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(

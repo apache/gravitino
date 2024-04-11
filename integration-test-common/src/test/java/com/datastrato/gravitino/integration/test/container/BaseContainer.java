@@ -48,7 +48,7 @@ public abstract class BaseContainer implements AutoCloseable {
   // Network of the container
   private final Optional<Network> network;
 
-  private final GenericContainer<?> container;
+  protected final GenericContainer<?> container;
 
   protected BaseContainer(
       String image,
@@ -104,6 +104,10 @@ public abstract class BaseContainer implements AutoCloseable {
   // This method is used to get the expose port number of the container.
   public Integer getMappedPort(int exposedPort) {
     return container.getMappedPort(exposedPort);
+  }
+
+  public GenericContainer<?> getContainer() {
+    return container;
   }
 
   // This method is used to get the IP address of the container.
