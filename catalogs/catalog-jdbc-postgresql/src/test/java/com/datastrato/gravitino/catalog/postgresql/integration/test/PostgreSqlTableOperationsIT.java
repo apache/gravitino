@@ -336,6 +336,12 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
             .withType(Types.BinaryType.get())
             .withNullable(false)
             .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_16")
+            .withType(Types.ListType.of(Types.IntegerType.get(), false))
+            .withNullable(true)
+            .build());
 
     // create table
     TABLE_OPERATIONS.create(
