@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.end
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
+import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getTransactionId;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity.EntityType;
@@ -43,6 +44,7 @@ public final class KvGarbageCollector implements Closeable {
   private final KvBackend kvBackend;
   private final Config config;
   private final EntityKeyEncoder<byte[]> entityKeyEncoder;
+  private long frequencyInMinutes;
 
   private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
@@ -69,8 +71,9 @@ public final class KvGarbageCollector implements Closeable {
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
-    long frequency = Math.max(dateTimeLineMinute / 10, 10);
-    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
+    this.frequencyInMinutes = Math.max(dateTimeLineMinute / 10, 10);
+    garbageCollectorPool.scheduleAtFixedRate(
+        this::collectAndClean, 5, frequencyInMinutes, TimeUnit.MINUTES);
   }
 
   @VisibleForTesting
@@ -98,6 +101,16 @@ public final class KvGarbageCollector implements Closeable {
                 .predicate(
                     (k, v) -> {
                       byte[] transactionId = getBinaryTransactionId(k);
+
+                      // Only remove the uncommitted data that were written frequencyInMinutes
+                      // minutes ago.
+                      // It may have concurrency issues with TransactionalKvBackendImpl#commit.
+                      long writeTime = getTransactionId(transactionId) >> 18;
+                      if (writeTime
+                          < (System.currentTimeMillis() - frequencyInMinutes * 60 * 1000)) {
+                        return false;
+                      }
+
                       return kvBackend.get(generateCommitKey(transactionId)) == null;
                     })
                 .limit(10000) /* Each time we only collect 10000 entities at most*/
@@ -209,7 +222,7 @@ public final class KvGarbageCollector implements Closeable {
 
       // All keys in this transaction have been deleted, we can remove the commit mark.
       if (keysDeletedCount == keysInTheTransaction.size()) {
-        long timestamp = TransactionalKvBackendImpl.getTransactionId(transactionId) >> 18;
+        long timestamp = getTransactionId(transactionId) >> 18;
         LOG.info(
             "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
             Bytes.wrap(kv.getKey()),
@@ -261,7 +274,7 @@ public final class KvGarbageCollector implements Closeable {
       LOG.warn("Unable to decode key: {}", Bytes.wrap(key), e);
       return LogHelper.NONE;
     }
-    long timestamp = TransactionalKvBackendImpl.getTransactionId(timestampArray) >> 18;
+    long timestamp = getTransactionId(timestampArray) >> 18;
     String ts = DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT);
 
     return new LogHelper(entityTypePair.getKey(), entityTypePair.getValue(), timestamp, ts);
