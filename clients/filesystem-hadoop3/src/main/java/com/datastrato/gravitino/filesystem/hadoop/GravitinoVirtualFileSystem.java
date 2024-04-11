@@ -278,7 +278,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       FileStatus fileStatus, String actualPrefix, String virtualPrefix) {
     String filePath = fileStatus.getPath().toString();
     Preconditions.checkArgument(
-        !filePath.startsWith(actualPrefix),
+        filePath.startsWith(actualPrefix),
         "Path %s doesn't start with prefix \"%s\".",
         filePath,
         actualPrefix);
