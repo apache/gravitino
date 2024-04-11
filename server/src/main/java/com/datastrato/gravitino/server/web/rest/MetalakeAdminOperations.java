@@ -8,6 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
@@ -55,7 +56,8 @@ public class MetalakeAdminOperations {
               Utils.ok(
                   new UserResponse(
                       DTOConverters.toDTO(
-                          accessControlManager.addMetalakeAdmin(request.getName())))));
+                          AuthorizationUtils.doWithLock(
+                              () -> accessControlManager.addMetalakeAdmin(request.getName()))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.ADD, request.getName(), null, e);
     }
@@ -71,7 +73,8 @@ public class MetalakeAdminOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean removed = accessControlManager.removeMetalakeAdmin(user);
+            boolean removed =
+                AuthorizationUtils.doWithLock(() -> accessControlManager.removeMetalakeAdmin(user));
             if (!removed) {
               LOG.warn("Failed to remove metalake admin user {}", user);
             }

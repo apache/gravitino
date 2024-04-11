@@ -28,6 +28,9 @@ public class ErrorConstants {
   /** Error codes for unsupported operation. */
   public static final int UNSUPPORTED_OPERATION_CODE = 1006;
 
+  /** Error codes for forbidden operation. */
+  public static final int FORBIDDEN_CODE = 1007;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

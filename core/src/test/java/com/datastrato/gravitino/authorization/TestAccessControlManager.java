@@ -8,6 +8,9 @@ import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.UserPrincipal;
+import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -18,6 +21,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -48,7 +52,8 @@ public class TestAccessControlManager {
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
-    config.set(SERVICE_ADMINS, Lists.newArrayList("admin1", "admin2"));
+    config.set(
+        SERVICE_ADMINS, Lists.newArrayList(AuthConstants.ANONYMOUS_USER, "admin1", "admin2"));
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
@@ -186,6 +191,13 @@ public class TestAccessControlManager {
     Assertions.assertEquals("test", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
     Assertions.assertTrue(accessControlManager.isMetalakeAdmin("test"));
+
+    // Test with ForbiddenException
+    Assertions.assertThrows(
+        ForbiddenException.class,
+        () ->
+            PrincipalUtils.doAs(
+                new UserPrincipal("user2"), () -> accessControlManager.addMetalakeAdmin("test")));
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(

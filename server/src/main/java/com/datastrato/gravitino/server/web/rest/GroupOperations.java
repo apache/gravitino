@@ -7,14 +7,22 @@ package com.datastrato.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.exceptions.ForbiddenException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
+import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.PrincipalUtils;
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -34,14 +42,17 @@ public class GroupOperations {
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
   private final AccessControlManager accessControlManager;
+  private final MetalakeManager metalakeManager;
 
   @Context private HttpServletRequest httpRequest;
 
-  public GroupOperations() {
+  @Inject
+  public GroupOperations(MetalakeManager metalakeManager) {
     // Because accessManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
+    this.metalakeManager = metalakeManager;
   }
 
   @GET
@@ -54,10 +65,22 @@ public class GroupOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(accessControlManager.getGroup(metalake, group)))));
+          () -> {
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalake);
+            return TreeLockUtils.doWithTreeLock(
+                identifier,
+                LockType.READ,
+                () ->
+                    AuthorizationUtils.doWithLock(
+                        () -> {
+                          checkPermission(identifier);
+
+                          return Utils.ok(
+                              new GroupResponse(
+                                  DTOConverters.toDTO(
+                                      accessControlManager.getGroup(metalake, group))));
+                        }));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.GET, group, metalake, e);
     }
@@ -71,11 +94,23 @@ public class GroupOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addGroup(metalake, request.getName())))));
+          () -> {
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalake);
+            return TreeLockUtils.doWithTreeLock(
+                identifier,
+                LockType.READ,
+                () ->
+                    AuthorizationUtils.doWithLock(
+                        () -> {
+                          checkPermission(identifier);
+
+                          return Utils.ok(
+                              new GroupResponse(
+                                  DTOConverters.toDTO(
+                                      accessControlManager.addGroup(metalake, request.getName()))));
+                        }));
+          });
+
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -93,14 +128,43 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean removed = accessControlManager.removeGroup(metalake, group);
-            if (!removed) {
-              LOG.warn("Failed to remove group {} under metalake {}", group, metalake);
-            }
-            return Utils.ok(new RemoveResponse(removed));
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalake);
+            return TreeLockUtils.doWithTreeLock(
+                identifier,
+                LockType.READ,
+                () ->
+                    AuthorizationUtils.doWithLock(
+                        () -> {
+                          checkPermission(identifier);
+
+                          boolean removed = accessControlManager.removeGroup(metalake, group);
+                          if (!removed) {
+                            LOG.warn(
+                                "Failed to remove group {} under metalake {}", group, metalake);
+                          }
+                          return Utils.ok(new RemoveResponse(removed));
+                        }));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, metalake, e);
+    }
+  }
+
+  // Only metalake admins can manage access control of his metalake.
+  // Gravitino prefers adopting a cautious style not to expose `getUser` to non-admin users.
+  private void checkPermission(NameIdentifier identifier) {
+    String currentUser = PrincipalUtils.getCurrentPrincipal().getName();
+    if (!accessControlManager.isMetalakeAdmin(currentUser)) {
+      throw new ForbiddenException(
+          "%s is not a metalake admin, only metalake admins can manage groups", currentUser);
+    }
+
+    String creator = metalakeManager.loadMetalake(identifier).auditInfo().creator();
+    if (!currentUser.equals(creator)) {
+      throw new ForbiddenException(
+          "%s is not the creator of the metalake,"
+              + "only the creator can manage groups of the metalake",
+          currentUser);
     }
   }
 }
