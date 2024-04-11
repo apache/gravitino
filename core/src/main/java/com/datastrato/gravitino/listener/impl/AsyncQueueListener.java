@@ -67,23 +67,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
       return;
     }
 
-    long currentDropEvents = dropEventCounters.incrementAndGet();
-    long lastDropEvents = lastDropEventCounters.get();
-    // dropEvents may less than zero in such conditions:
-    // 1. Thread A increment dropEventCounters
-    // 2. Thread B increment dropEventCounters and update lastDropEventCounters
-    // 3. Thread A get lastDropEventCounters
-    long dropEvents = currentDropEvents - lastDropEvents;
-    if (dropEvents > 0 && Instant.now().isAfter(lastRecordDropEventTime.plusSeconds(60))) {
-      if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
-        LOG.warn(
-            "{} drop {} events since {}",
-            asyncQueueListenerName,
-            dropEvents,
-            lastRecordDropEventTime);
-        lastRecordDropEventTime = Instant.now();
-      }
-    }
+    logDropEventsIfNecessary();
   }
 
   @Override
@@ -134,6 +118,26 @@ public class AsyncQueueListener implements EventListenerPlugin {
           "{} drop {} events since dispatch thread is interrupted",
           asyncQueueListenerName,
           queue.size());
+    }
+  }
+
+  private void logDropEventsIfNecessary() {
+    long currentDropEvents = dropEventCounters.incrementAndGet();
+    long lastDropEvents = lastDropEventCounters.get();
+    // dropEvents may less than zero in such conditions:
+    // 1. Thread A increment dropEventCounters
+    // 2. Thread B increment dropEventCounters and update lastDropEventCounters
+    // 3. Thread A get lastDropEventCounters
+    long dropEvents = currentDropEvents - lastDropEvents;
+    if (dropEvents > 0 && Instant.now().isAfter(lastRecordDropEventTime.plusSeconds(60))) {
+      if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
+        LOG.warn(
+            "{} drop {} events since {}",
+            asyncQueueListenerName,
+            dropEvents,
+            lastRecordDropEventTime);
+        lastRecordDropEventTime = Instant.now();
+      }
     }
   }
 }
