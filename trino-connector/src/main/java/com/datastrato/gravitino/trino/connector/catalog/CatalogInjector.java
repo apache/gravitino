@@ -127,18 +127,34 @@ public class CatalogInjector {
       }
 
       // 3. Retrieve the catalogManager object.
-      MetadataProvider metadataProvider = context.getMetadataProvider();
+      Object catalogManager = null;
 
-      Object metadata = getFiledObject(metadataProvider, "metadata");
-      Object metadataManager = metadata;
-      if (isClassObject(metadata, "TracingMetadata")) {
-        metadataManager = getFiledObject(metadata, "delegate");
+      try {
+        // Try to retrieve catalogManager from static filed of
+        // "io.trino.server.Server.trinoCatalogManager"
+        // If the Trino is build with the patch
+        // https://github.com/datastrato/Trino/commit/93b91791f9148c1885c5fac4d59cd5960feec685
+        Class serverClass = getClass(context.getClass().getClassLoader(), "io.trino.server.Server");
+        Field trinoCatalogManagerField = serverClass.getDeclaredField("trinoCatalogManager");
+        trinoCatalogManagerField.setAccessible(true);
+        catalogManager = trinoCatalogManagerField.get(null);
+      } catch (NoSuchFieldException e) {
       }
-      Preconditions.checkNotNull(metadataManager, "metadataManager should not be null");
 
-      Object transactionManager = getFiledObject(metadataManager, "transactionManager");
-      Object catalogManager = getFiledObject(transactionManager, "catalogManager");
-      Preconditions.checkNotNull(catalogManager, "catalogManager should not be null");
+      if (catalogManager == null) {
+        MetadataProvider metadataProvider = context.getMetadataProvider();
+
+        Object metadata = getFiledObject(metadataProvider, "metadata");
+        Object metadataManager = metadata;
+        if (isClassObject(metadata, "TracingMetadata")) {
+          metadataManager = getFiledObject(metadata, "delegate");
+        }
+        Preconditions.checkNotNull(metadataManager, "metadataManager should not be null");
+
+        Object transactionManager = getFiledObject(metadataManager, "transactionManager");
+        catalogManager = getFiledObject(transactionManager, "catalogManager");
+        Preconditions.checkNotNull(catalogManager, "catalogManager should not be null");
+      }
 
       // 4. Get createCatalog function in catalogFactory
       Object catalogFactory = getFiledObject(catalogManager, "catalogFactory");
