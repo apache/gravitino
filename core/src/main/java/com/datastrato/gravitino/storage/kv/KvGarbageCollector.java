@@ -107,7 +107,7 @@ public final class KvGarbageCollector implements Closeable {
                       // It may have concurrency issues with TransactionalKvBackendImpl#commit.
                       long writeTime = getTransactionId(transactionId) >> 18;
                       if (writeTime
-                          < (System.currentTimeMillis() - frequencyInMinutes * 60 * 1000)) {
+                          < (System.currentTimeMillis() - frequencyInMinutes * 60 * 1000 * 2)) {
                         return false;
                       }
 
