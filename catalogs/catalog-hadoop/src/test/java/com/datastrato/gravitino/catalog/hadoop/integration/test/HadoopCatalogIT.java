@@ -280,13 +280,8 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertFalse(
         hdfs.exists(new Path(storageLocation)), "storage location should not exists");
 
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
     // drop fileset
@@ -312,13 +307,12 @@ public class HadoopCatalogIT extends AbstractIT {
     String filesetName = "test_drop_external_fileset";
     String storageLocation = storageLocation(filesetName);
 
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.EXTERNAL,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
+    createFileset(
+        filesetName,
+        "comment",
+        Fileset.Type.EXTERNAL,
+        storageLocation,
+        ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
     // drop fileset

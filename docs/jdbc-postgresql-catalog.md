@@ -28,7 +28,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports [column default value](./manage-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment). 
+- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Catalog properties
 
@@ -57,7 +57,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalog-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -74,7 +74,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Schema operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schema-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -83,7 +83,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Supports index.
-- Support [column default value](./manage-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-metadata-using-gravitino.md#table-column-auto-increment).
+- Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
 #### Table column types
@@ -105,10 +105,11 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 | `VarChar`      | `Varchar`       |
 | `FixedChar`    | `Bpchar`        |
 | `Binary`       | `Bytea`         |
+| `List`         | `Array`         |
 
 :::info
-PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
 #### Table column auto-increment
@@ -158,7 +159,7 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#table-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
@@ -172,6 +173,7 @@ Supports operations:
 - `UpdateColumnType`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `UpdateColumnDefaultValue`
 
 :::info
 You can't submit the `RenameTable` operation at the same time as other operations.

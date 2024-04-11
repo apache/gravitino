@@ -122,7 +122,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterNonExistantMetalake() {
+  public void testAlterNonExistentMetalake() {
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
     client.createMetalake(
@@ -140,9 +140,8 @@ public class MetalakeIT extends AbstractIT {
 
   @Test
   public void testCreateMetalake() {
-    GravitinoMetalake metaLakeA =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
+    client.createMetalake(
+        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
     assertEquals(metalakeNameA, metalake.name());
     assertEquals("metalake A comment", metalake.comment());

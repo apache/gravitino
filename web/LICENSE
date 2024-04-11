@@ -211,7 +211,7 @@
    MIT license.
 
    Vben
-   ./web/lib/utils/axios
-   ./web/types/axios.d.ts
-   ./web/lib/enums/httpEnum.ts
-   ./web/lib/utils/index.js (parts of)
+   ./src/lib/utils/axios
+   ./src/types/axios.d.ts
+   ./src/lib/enums/httpEnum.ts
+   ./src/lib/utils/index.js (parts of)

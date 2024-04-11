@@ -12,10 +12,14 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -28,11 +32,13 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  protected FileSystem hdfs;
   private final String metalakeName = "test";
 
   private SparkSession sparkSession;
-  private String hiveMetastoreUri;
-  private String gravitinoUri;
+  private String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  private String gravitinoUri = "http://127.0.0.1:8090";
+  private String warehouse;
 
   protected abstract String getCatalogName();
 
@@ -47,6 +53,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   @BeforeAll
   void startUp() {
     initHiveEnv();
+    initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
     initSparkEnv();
@@ -58,6 +65,13 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   @AfterAll
   void stop() {
+    if (hdfs != null) {
+      try {
+        hdfs.close();
+      } catch (IOException e) {
+        LOG.warn("Close HDFS filesystem failed,", e);
+      }
+    }
     if (sparkSession != null) {
       sparkSession.close();
     }
@@ -67,8 +81,18 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
-
+    switch (getProvider()) {
+      case "hive":
+        properties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
+        break;
+      case "lakehouse-iceberg":
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND, "hive");
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
+        properties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported provider: " + getProvider());
+    }
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, getCatalogName()),
         Catalog.Type.RELATIONAL,
@@ -90,6 +114,27 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
+    warehouse =
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+  }
+
+  private void initHdfsFileSystem() {
+    Configuration conf = new Configuration();
+    conf.set(
+        "fs.defaultFS",
+        String.format(
+            "hdfs://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    try {
+      hdfs = FileSystem.get(conf);
+    } catch (IOException e) {
+      LOG.error("Create HDFS filesystem failed", e);
+      throw new RuntimeException(e);
+    }
   }
 
   private void initSparkEnv() {
@@ -100,12 +145,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config("spark.plugins", GravitinoSparkPlugin.class.getName())
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
-            .config(
-                "spark.sql.warehouse.dir",
-                String.format(
-                    "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainer().getContainerIpAddress(),
-                    HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("hive.exec.dynamic.partition.mode", "nonstrict")
+            .config("spark.sql.warehouse.dir", warehouse)
             .enableHiveSupport()
             .getOrCreate();
   }

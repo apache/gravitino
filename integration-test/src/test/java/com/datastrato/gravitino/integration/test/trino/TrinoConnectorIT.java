@@ -7,11 +7,6 @@ package com.datastrato.gravitino.integration.test.trino;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoContainer;
@@ -434,15 +429,18 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(Strategy.HASH, distribution.strategy());
     Assertions.assertEquals(50, distribution.number());
     Assertions.assertEquals(
-        "id", ((FieldReferenceDTO) ((DistributionDTO) distribution).args()[0]).fieldName()[0]);
+        "id", ((NamedReference.FieldReference) distribution.expressions()[0]).fieldName()[0]);
 
     Assertions.assertEquals(1, table.partitioning().length);
-    Transform partitioning = table.partitioning()[0];
-    Assertions.assertEquals("name", ((IdentityPartitioningDTO) partitioning).fieldName()[0]);
+    Transform transform = table.partitioning()[0];
+    Assertions.assertEquals(Transforms.NAME_OF_IDENTITY, transform.name());
+    Assertions.assertInstanceOf(Transforms.IdentityTransform.class, transform);
+    Assertions.assertEquals("name", ((Transforms.IdentityTransform) transform).fieldName()[0]);
 
     Assertions.assertEquals(1, table.sortOrder().length);
-    SortOrderDTO sortOrder = (SortOrderDTO) table.sortOrder()[0];
-    Assertions.assertEquals("name", ((FieldReferenceDTO) sortOrder.sortTerm()).fieldName()[0]);
+    SortOrder sortOrder = table.sortOrder()[0];
+    Assertions.assertEquals(
+        "name", ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0]);
   }
 
   @Test
@@ -465,17 +463,15 @@ public class TrinoConnectorIT extends AbstractIT {
                         containerSuite.getHiveContainer().getContainerIpAddress(),
                         HiveContainer.HIVE_METASTORE_PORT))
                 .build());
-    Schema schema =
-        catalog
-            .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                "Created by gravitino client",
-                ImmutableMap.<String, String>builder()
-                    .put(
-                        "location",
-                        "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
-                    .build());
+
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder()
+                .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
+                .build());
 
     String sql =
         String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
@@ -1000,9 +996,10 @@ public class TrinoConnectorIT extends AbstractIT {
                 NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
 
     Arrays.stream(table.partitioning())
-        .anyMatch(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0].equals("name"));
+        .anyMatch(p -> ((Transform.SingleFieldTransform) p).fieldName()[0].equals("name"));
     Arrays.stream(table.sortOrder())
-        .anyMatch(p -> ((FieldReferenceDTO) p.expression()).fieldName()[0].equals("id"));
+        .anyMatch(
+            p -> ((NamedReference.FieldReference) p.expression()).fieldName()[0].equals("id"));
   }
 
   @Test

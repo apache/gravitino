@@ -23,13 +23,13 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":clients:filesystem-hadoop3"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector")) {
-    exclude("org.apache.iceberg")
+  testImplementation(project(":spark-connector:spark-connector")) {
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
@@ -138,8 +138,14 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    val skipWebITs = project.hasProperty("skipWebITs")
+    if (skipWebITs) {
+      exclude("**/integration/test/web/ui/**")
+    }
+
     dependsOn(":trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar", ":catalogs:catalog-jdbc-doris:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
@@ -147,7 +153,7 @@ tasks.test {
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.9")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
 
       copy {
@@ -191,7 +197,6 @@ tasks.clean {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
   mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {

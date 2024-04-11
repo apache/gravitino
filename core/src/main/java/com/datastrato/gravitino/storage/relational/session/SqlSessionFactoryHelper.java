@@ -13,6 +13,7 @@ import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -84,6 +85,7 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(TableMetaMapper.class);
     configuration.addMapper(FilesetMetaMapper.class);
     configuration.addMapper(FilesetVersionMapper.class);
+    configuration.addMapper(TopicMetaMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

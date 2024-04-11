@@ -11,6 +11,7 @@ import java.net.URL;
 import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.logging.log4j.util.Strings;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -86,12 +87,17 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     System.setProperty(
         "webdriver.chrome.driver", ITUtils.joinPath(downLoadDir, chromeDriverBinName));
     ChromeOptions chromeOptions = new ChromeOptions();
+
+    // Display the web interface during testing
+    if (Strings.isEmpty(System.getenv("DISPLAY_WEBPAGE_IN_TESTING"))) {
+      chromeOptions.addArguments("--headless");
+    }
+
     if (SystemUtils.IS_OS_MAC_OSX) {
       chromeOptions.setBinary(
           ITUtils.joinPath(downLoadDir, chromeBinName, "Contents", "MacOS", "Chromium"));
     } else {
       chromeOptions.setBinary(ITUtils.joinPath(downLoadDir, chromeBinName));
-      chromeOptions.addArguments("--headless");
     }
 
     return new ChromeDriver(chromeOptions);
