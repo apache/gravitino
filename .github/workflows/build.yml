@@ -12,10 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  packages: read
-  contents: read
-  pull-requests: write
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   changes:
@@ -104,7 +100,7 @@ jobs:
           echo "paths=$paths" >> "$GITHUB_OUTPUT"
       - name: Jacoco Report to PR
         id: jacoco
-        uses: madrapps/jacoco-report@v1.6.1
+        uses: yijhenlin/jacoco-report@summary_mode
         with:
           paths: ${{ steps.jacoco-paths.outputs.paths }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -112,6 +108,7 @@ jobs:
           min-coverage-changed-files: 60
           title: 'Code Coverage Report'
           debug-mode: false
+          summary-mode: true
           update-comment: true
           pass-emoji: ':green_circle:'
           fail-emoji: ':red_circle:'
