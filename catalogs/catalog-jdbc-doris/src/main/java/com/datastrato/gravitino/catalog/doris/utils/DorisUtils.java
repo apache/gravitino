@@ -32,7 +32,7 @@ public final class DorisUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s{0,}=\\s{0,}\"(.*)\",?";
+    final String sProperties = "\"(.*)\"\\s*=\"(.*)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
