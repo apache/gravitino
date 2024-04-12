@@ -20,10 +20,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-it")
 public class DorisTableOperationsIT extends TestDorisAbstractIT {
@@ -48,16 +50,6 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("replication_allocation", "tag.location.default: 1");
     return properties;
-  }
-
-  private static void waitForDorisOperation() {
-    // TODO: use a better way to wait for the operation to complete
-    // see: https://doris.apache.org/docs/1.2/advanced/alter-table/schema-change/
-    try {
-      Thread.sleep(2000);
-    } catch (InterruptedException e) {
-      // do nothing
-    }
   }
 
   @Test
@@ -133,10 +125,6 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         tableName,
         TableChange.updateColumnType(new String[] {col_3.name()}, VARCHAR_1024));
 
-    waitForDorisOperation();
-
-    load = TABLE_OPERATIONS.load(databaseName, tableName);
-
     // After modifying the type, check it
     columns.clear();
     col_3 =
@@ -148,7 +136,19 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
 
     String colNewComment = "new_comment";
     // update column comment
@@ -177,9 +177,6 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         tableName,
         TableChange.addColumn(new String[] {"col_4"}, VARCHAR_255, "txt4", true));
 
-    waitForDorisOperation();
-    load = TABLE_OPERATIONS.load(databaseName, tableName);
-
     columns.clear();
     JdbcColumn col_4 =
         JdbcColumn.builder().withName("col_4").withType(VARCHAR_255).withComment("txt4").build();
@@ -187,7 +184,18 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_2);
     columns.add(col_3);
     columns.add(col_4);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
 
     // change column position
     TABLE_OPERATIONS.alterTable(
@@ -195,15 +203,24 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         tableName,
         TableChange.updateColumnPosition(
             new String[] {"col_3"}, TableChange.ColumnPosition.after("col_4")));
-    waitForDorisOperation();
-    load = TABLE_OPERATIONS.load(databaseName, tableName);
 
     columns.clear();
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_4);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    Awaitility.await()
+        .atMost(5, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
   }
 
   @Test
