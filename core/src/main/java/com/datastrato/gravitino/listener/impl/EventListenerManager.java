@@ -38,7 +38,7 @@ public class EventListenerManager {
   private static final Logger LOG = LoggerFactory.getLogger(EventListenerManager.class);
   public static final String GRAVITINO_EVENT_LISTENER_PREFIX = "gravitino.eventListener.";
   static final String GRAVITINO_EVENT_LISTENER_NAMES = "names";
-  @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_CLASSNAME = "className";
+  @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_CLASS = "class";
   static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
   static final String GRAVITINO_EVENT_LISTENER_DISPATCHER_JOIN_SECONDS = "dispatcherJoinSeconds";
   private static final Splitter splitter = Splitter.on(",");
@@ -126,7 +126,7 @@ public class EventListenerManager {
   private EventListenerPlugin loadUserEventListenerPlugin(
       String listenerName, Map<String, String> config) {
     LOG.info("EventListener:{}, config:{}.", listenerName, config);
-    String className = config.get(GRAVITINO_EVENT_LISTENER_CLASSNAME);
+    String className = config.get(GRAVITINO_EVENT_LISTENER_CLASS);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(className),
         String.format(
@@ -134,7 +134,7 @@ public class EventListenerManager {
             listenerName,
             GRAVITINO_EVENT_LISTENER_PREFIX,
             listenerName,
-            GRAVITINO_EVENT_LISTENER_CLASSNAME));
+            GRAVITINO_EVENT_LISTENER_CLASS));
 
     try {
       EventListenerPlugin listenerPlugin =

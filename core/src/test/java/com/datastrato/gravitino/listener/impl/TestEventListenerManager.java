@@ -196,12 +196,12 @@ public class TestEventListenerManager {
         EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", async1, async2));
 
     config.put(
-        async1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        async1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyAsyncIsolatedEventListener.class.getName());
     config.put(async1 + ".name", async1);
 
     config.put(
-        async2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        async2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyAsyncIsolatedEventListener.class.getName());
     config.put(async2 + ".name", async2);
 
@@ -215,12 +215,12 @@ public class TestEventListenerManager {
         EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", async1, async2));
 
     config.put(
-        async1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        async1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyAsyncEventListener.class.getName());
     config.put(async1 + ".name", async1);
 
     config.put(
-        async2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        async2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyAsyncEventListener.class.getName());
     config.put(async2 + ".name", async2);
 
@@ -233,12 +233,12 @@ public class TestEventListenerManager {
     config.put(EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", sync1, sync2));
 
     config.put(
-        sync1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        sync1 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyEventListener.class.getName());
     config.put(sync1 + ".name", sync1);
 
     config.put(
-        sync2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASSNAME,
+        sync2 + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
         DummyEventListener.class.getName());
     config.put(sync2 + ".name", sync2);
 
