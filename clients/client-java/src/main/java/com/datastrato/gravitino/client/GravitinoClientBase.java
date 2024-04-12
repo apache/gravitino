@@ -73,6 +73,11 @@ public abstract class GravitinoClientBase implements Closeable {
     }
   }
 
+  /**
+   * Check the compatibility of the client with the target server.
+   *
+   * @throws GravitinoRuntimeException If the client version is greater than the server version.
+   */
   public void checkVersion() {
     GravitinoVersion serverVersion = getServerVersion();
     GravitinoVersion clientVersion = clientVersion();
@@ -83,6 +88,11 @@ public abstract class GravitinoClientBase implements Closeable {
     }
   }
 
+  /**
+   * Retrieves the version of the Gravitino client.
+   *
+   * @return A GravitinoVersion instance representing the version of the Gravitino client.
+   */
   public GravitinoVersion clientVersion() {
     VersionDTO versionDTO = new VersionDTO(Version.version, Version.compileDate, Version.gitCommit);
     return new GravitinoVersion(versionDTO);

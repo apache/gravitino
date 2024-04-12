@@ -18,6 +18,12 @@ public class GravitinoVersion extends VersionDTO {
     super(versionDTO.version(), versionDTO.compileDate(), versionDTO.gitCommit());
   }
 
+  /**
+   * Check if the version is greater than the other version.
+   *
+   * @param other The other version to compare.
+   * @return true if the version is greater than the other version.
+   */
   public boolean greaterThan(GravitinoVersion other) {
     int left[] = getVersionNumber();
     int right[] = other.getVersionNumber();
