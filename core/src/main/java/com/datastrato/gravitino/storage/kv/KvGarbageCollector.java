@@ -50,7 +50,8 @@ public final class KvGarbageCollector implements Closeable {
 
   // Keep the last collect commit id to avoid collecting the same data multiple times, the first
   // time the commit is 1 (minimum), and assuming we have collocated the data with transaction id
-  // [1, 100], then the second time we collect the data, the commit id will be 100 and so on.
+  // [1, 100], then the second time we collect the data, the starting commit id will be 100 and so
+  // on.
   private byte[] commitIdHasBeenCollected;
 
   private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
