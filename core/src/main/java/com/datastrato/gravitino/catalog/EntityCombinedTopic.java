@@ -49,7 +49,7 @@ public class EntityCombinedTopic implements Topic {
 
   @Override
   public String comment() {
-    return topic.comment();
+    return topicEntity == null ? topic.comment() : topicEntity.comment();
   }
 
   @Override

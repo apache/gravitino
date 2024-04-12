@@ -54,7 +54,7 @@ const TabsContent = () => {
   const paramsSize = [...searchParams.keys()].length
   const type = searchParams.get('type')
   const [tab, setTab] = useState('table')
-  const isNotNeedTableTab = type && type === 'fileset' && paramsSize === 5
+  const isNotNeedTableTab = type && ['fileset', 'messaging'].includes(type) && paramsSize === 5
 
   const handleChangeTab = (event, newValue) => {
     setTab(newValue)
@@ -68,7 +68,16 @@ const TabsContent = () => {
       tableTitle = 'Schemas'
       break
     case 4:
-      tableTitle = type === 'fileset' ? 'Filesets' : 'Tables'
+      switch (type) {
+        case 'fileset':
+          tableTitle = 'Filesets'
+          break
+        case 'messaging':
+          tableTitle = 'Topics'
+          break
+        default:
+          tableTitle = 'Tables'
+      }
       break
     case 5:
       tableTitle = 'Columns'

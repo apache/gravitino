@@ -6,18 +6,15 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
-import com.datastrato.gravitino.lock.LockType;
-import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
-import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -30,6 +27,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/groups")
 public class GroupOperations {
 
@@ -39,9 +37,11 @@ public class GroupOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  @Inject
-  public GroupOperations(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
+  public GroupOperations() {
+    // Because accessManager may be null when Gravitino doesn't enable authorization,
+    // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
+    // accessControlManager from GravitinoEnv instead of injection here.
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
   }
 
   @GET
@@ -52,17 +52,12 @@ public class GroupOperations {
   public Response getGroup(
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
-      NameIdentifier ident = ofGroup(metalake, group);
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new GroupResponse(
-                      DTOConverters.toDTO(
-                          TreeLockUtils.doWithTreeLock(
-                              ident,
-                              LockType.READ,
-                              () -> accessControlManager.getGroup(metalake, group))))));
+                      DTOConverters.toDTO(accessControlManager.getGroup(metalake, group)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.GET, group, metalake, e);
     }
@@ -74,17 +69,13 @@ public class GroupOperations {
   @ResponseMetered(name = "add-group", absolute = true)
   public Response addGroup(@PathParam("metalake") String metalake, GroupAddRequest request) {
     try {
-      NameIdentifier ident = ofGroup(metalake, request.getName());
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new GroupResponse(
                       DTOConverters.toDTO(
-                          TreeLockUtils.doWithTreeLock(
-                              ident,
-                              LockType.WRITE,
-                              () -> accessControlManager.addGroup(metalake, request.getName()))))));
+                          accessControlManager.addGroup(metalake, request.getName())))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -102,10 +93,7 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = ofGroup(metalake, group);
-            boolean removed =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> accessControlManager.removeGroup(metalake, group));
+            boolean removed = accessControlManager.removeGroup(metalake, group);
             if (!removed) {
               LOG.warn("Failed to remove group {} under metalake {}", group, metalake);
             }
@@ -114,10 +102,5 @@ public class GroupOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, metalake, e);
     }
-  }
-
-  private NameIdentifier ofGroup(String metalake, String group) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 }
