@@ -72,8 +72,8 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       Awaitility.await()
           .atMost(30, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.SECONDS).until(
-              () -> !catalogConnectorManager.getCatalogs().isEmpty());
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
     } catch (Exception e) {
       throw new RuntimeException("Create query runner failed", e);
     }

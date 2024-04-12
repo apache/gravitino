@@ -95,7 +95,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (Strings.isNullOrEmpty(metalake)) {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
-      if (config.simplifyCatalogNames() && !catalogConnectorManager.getCatalogs().isEmpty()) {
+      if (config.simplifyCatalogNames() && catalogConnectorManager.getCatalogs().size() > 1) {
         throw new TrinoException(
             GRAVITINO_MISSING_CONFIG,
             "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");

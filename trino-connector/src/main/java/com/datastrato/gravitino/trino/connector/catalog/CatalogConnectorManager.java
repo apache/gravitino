@@ -95,7 +95,7 @@ public class CatalogConnectorManager {
     if (client == null) {
       this.gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
     } else {
-        this.gravitinoClient = client;
+      this.gravitinoClient = client;
     }
 
     // Schedule a task to load catalog from gravitino server.
@@ -216,7 +216,7 @@ public class CatalogConnectorManager {
   }
 
   public CatalogConnectorContext getCatalogConnector(String catalogName) {
-   return catalogConnectors.get(catalogName);
+    return catalogConnectors.get(catalogName);
   }
 
   public List<GravitinoCatalog> getCatalogs() {
@@ -361,7 +361,7 @@ public class CatalogConnectorManager {
   }
 
   public void addMetalake(String metalake) {
-    if (config.simplifyCatalogNames() && !usedMetalakes.isEmpty())
+    if (config.simplifyCatalogNames() && usedMetalakes.size() > 1)
       throw new TrinoException(
           GRAVITINO_MISSING_CONFIG,
           "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
