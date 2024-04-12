@@ -3,11 +3,11 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.listener.event;
+package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.listener.info.TableInfo;
+import com.datastrato.gravitino.listener.api.info.TableInfo;
 import com.datastrato.gravitino.rel.Table;
 
 /**

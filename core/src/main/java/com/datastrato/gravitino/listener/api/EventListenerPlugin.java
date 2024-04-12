@@ -3,10 +3,10 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.listener;
+package com.datastrato.gravitino.listener.api;
 
 import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.listener.event.Event;
+import com.datastrato.gravitino.listener.api.event.Event;
 import java.util.Map;
 
 /**

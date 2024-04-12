@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.listener.impl;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;

@@ -3,14 +3,14 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.listener.event;
+package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an abstract base class for events related to table operations. This class extends
- * {@link com.datastrato.gravitino.listener.event.Event} to provide a more specific context
+ * {@link Event} to provide a more specific context
  * involving operations on tables, such as creation, deletion, or modification. It captures
  * essential information including the user performing the operation and the identifier of the table
  * being operated on.
