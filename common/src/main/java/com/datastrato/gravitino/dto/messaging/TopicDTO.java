@@ -9,6 +9,7 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.messaging.Topic;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
 /** Represents a topic DTO (Data Transfer Object). */
@@ -67,6 +68,26 @@ public class TopicDTO implements Topic {
   @Override
   public Audit auditInfo() {
     return audit;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Topic)) {
+      return false;
+    }
+    TopicDTO topicDTO = (TopicDTO) o;
+    return Objects.equals(name, topicDTO.name)
+        && Objects.equals(comment, topicDTO.comment)
+        && Objects.equals(properties, topicDTO.properties)
+        && Objects.equals(audit, topicDTO.audit);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name, comment, properties, audit);
   }
 
   /** A builder for constructing a Topic DTO. */

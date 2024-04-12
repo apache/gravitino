@@ -8,7 +8,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
-import com.datastrato.gravitino.server.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.authentication.AuthenticationFilter;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;

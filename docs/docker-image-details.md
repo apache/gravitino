@@ -82,6 +82,10 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.10
+  - Remove SSH service from the startup script.
+  - Use `hadoop-daemon.sh` to start HDFS services.
+
 - gravitino-ci-hive:0.1.9
   - Remove cache after installing packages.
 
@@ -165,6 +169,9 @@ Changelog
 You can use this image to test Apache Doris.
 
 Changelog
+
+- gravitino-ci-doris:0.1.2
+    - Add a check for the status of Doris BE, add retry for adding BE nodes.
 
 - gravitino-ci-doris:0.1.1
     - Optimize `start.sh`, add disk space check before starting Doris, exit when FE or BE start failed, add log to stdout

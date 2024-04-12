@@ -21,8 +21,6 @@ import lombok.ToString;
 @ToString
 public class UserEntity implements User, Entity, Auditable, HasIdentifier {
 
-  public static final String USER_SCHEMA_NAME = "user";
-
   public static final Field ID =
       Field.required("id", Long.class, " The unique id of the user entity.");
 

@@ -18,6 +18,7 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 public class TestDorisAbstractIT extends TestJdbcAbstractIT {
@@ -40,6 +41,15 @@ public class TestDorisAbstractIT extends TestJdbcAbstractIT {
         new DorisTypeConverter(),
         new DorisColumnDefaultValueConverter(),
         Collections.emptyMap());
+  }
+
+  // Overwrite the stop method to close the data source and stop the container
+  @AfterAll
+  public static void stop() {
+    DataSourceUtils.closeDataSource(DATA_SOURCE);
+    if (null != CONTAINER) {
+      CONTAINER.stop();
+    }
   }
 
   private static Map<String, String> getDorisCatalogProperties() {

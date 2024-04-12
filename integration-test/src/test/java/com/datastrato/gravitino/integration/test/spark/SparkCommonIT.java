@@ -64,6 +64,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         "INSERT OVERWRITE %s PARTITION (%s) VALUES (%s)", tableName, partitionString, values);
   }
 
+  protected static String getDeleteSql(String tableName, String condition) {
+    return String.format("DELETE FROM %s where %s", tableName, condition);
+  }
+
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
@@ -666,6 +670,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     }
   }
 
+  protected void deleteDirIfExists(String path) {
+    try {
+      Path dir = new Path(path);
+      if (hdfs.exists(dir)) {
+        hdfs.delete(dir, true);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   void testTableOptions() {
     String tableName = "options_table";
@@ -773,7 +788,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     sql(createTableSql);
   }
 
-  private void checkTableColumns(
+  protected void checkTableColumns(
       String tableName, List<SparkColumnInfo> columns, SparkTableInfo tableInfo) {
     SparkTableInfoChecker.create()
         .withName(tableName)

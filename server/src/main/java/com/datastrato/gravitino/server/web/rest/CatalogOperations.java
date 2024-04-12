@@ -67,7 +67,7 @@ public class CatalogOperations {
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             return TreeLockUtils.doWithTreeLock(
                 NameIdentifier.of(metalake),
-                LockType.WRITE,
+                LockType.READ,
                 () -> {
                   if (verbose) {
                     Catalog[] catalogs = manager.listCatalogsInfo(catalogNS);
@@ -95,7 +95,7 @@ public class CatalogOperations {
             NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
             Catalog catalog =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.ofMetalake(metalake),
                     LockType.WRITE,
                     () ->
                         manager.createCatalog(
@@ -149,7 +149,9 @@ public class CatalogOperations {
                     .toArray(CatalogChange[]::new);
             Catalog catalog =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> manager.alterCatalog(ident, changes));
+                    NameIdentifier.ofMetalake(metalakeName),
+                    LockType.WRITE,
+                    () -> manager.alterCatalog(ident, changes));
             return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
           });
 
@@ -171,7 +173,9 @@ public class CatalogOperations {
             NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> manager.dropCatalog(ident));
+                    NameIdentifier.ofMetalake(metalakeName),
+                    LockType.WRITE,
+                    () -> manager.dropCatalog(ident));
             if (!dropped) {
               LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
             }

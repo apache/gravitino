@@ -83,6 +83,17 @@ public class GravitinoEnv {
   }
 
   /**
+   * This method is used for testing purposes only to set the access manager for test in package
+   * `com.datastrato.gravitino.server.web.rest`.
+   *
+   * @param accessControlManager The access control manager to be set.
+   */
+  @VisibleForTesting
+  public void setAccessControlManager(AccessControlManager accessControlManager) {
+    this.accessControlManager = accessControlManager;
+  }
+
+  /**
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
@@ -116,7 +127,12 @@ public class GravitinoEnv {
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     // Create and initialize access control related modules
-    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(

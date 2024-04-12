@@ -71,6 +71,9 @@ public abstract class OperationDispatcher {
       if (ex.isInstance(throwable)) {
         throw ex.cast(throwable);
       }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
       throw new RuntimeException(throwable);
     }
   }
