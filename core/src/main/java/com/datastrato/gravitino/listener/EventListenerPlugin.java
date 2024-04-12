@@ -19,15 +19,28 @@ import java.util.Map;
  */
 @DeveloperApi
 public interface EventListenerPlugin {
-
   /**
-   * Enumerates the operational modes for event processing, supporting both synchronous and
-   * asynchronous approaches.
+   * Defines the operational modes for event processing within an event listener, catering to both
+   * synchronous and asynchronous processing strategies. Each mode determines how events are
+   * handled, balancing between immediacy and resource efficiency.
+   *
+   * <ul>
+   *   <li>{@code SYNC} - Events are processed synchronously, immediately after the associated
+   *       operation completes. While this approach ensures prompt handling of events, it may block
+   *       the main process if the event listener requires significant time to process an event.
+   *   <li>{@code ASYNC_ISOLATED} - Events are handled asynchronously with each listener possessing
+   *       its own distinct event-processing queue. This mode allows for customized and isolated
+   *       event processing but may increase resource consumption due to the necessity of a
+   *       dedicated event dispatcher for each listener.
+   *   <li>{@code ASYNC_SHARED} - In this mode, event listeners share a common event-processing
+   *       queue, processing events asynchronously. This approach enhances resource efficiency by
+   *       utilizing a shared dispatcher for handling events across multiple listeners.
+   * </ul>
    */
   enum Mode {
-    SYNC, // Synchronous event processing mode.
-    ASYNC_ISOLATED, // Asynchronous event processing with isolated handling.
-    ASYNC_SHARED // Asynchronous event processing with shared handling.
+    SYNC,
+    ASYNC_ISOLATED,
+    ASYNC_SHARED
   }
 
   /**
