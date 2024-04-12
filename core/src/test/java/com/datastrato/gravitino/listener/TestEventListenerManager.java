@@ -6,10 +6,6 @@
 package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.listener.AsyncQueueListener;
-import com.datastrato.gravitino.listener.EventBus;
-import com.datastrato.gravitino.listener.EventListenerManager;
-import com.datastrato.gravitino.listener.EventListenerPluginWrapper;
 import com.datastrato.gravitino.listener.api.EventListenerPlugin;
 import com.datastrato.gravitino.listener.api.event.Event;
 import com.google.common.collect.ImmutableSet;
