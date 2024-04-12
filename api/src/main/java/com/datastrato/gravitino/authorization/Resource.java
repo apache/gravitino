@@ -15,7 +15,17 @@ import com.datastrato.gravitino.annotation.Evolving;
 @Evolving
 public interface Resource {
 
+  /**
+   * The parent resource. If the resource doesn't have parent, this method will return null.
+   *
+   * @return The parent resource.
+   */
   Resource parent();
 
+  /**
+   * The name of th resource.
+   *
+   * @return The name of the resource.
+   */
   String name();
 }
