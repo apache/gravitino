@@ -4,19 +4,17 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.NameIdentifier;
-
 import java.util.Objects;
 
 /** The helper class for {@link Resource}. */
 public class Resources {
 
-    /**
-     * Create the {@link Resource} with the given names.
-     *
-     * @param names The names of the resource
-     * @return The created {@link Resource}
-     */
+  /**
+   * Create the {@link Resource} with the given names.
+   *
+   * @param names The names of the resource
+   * @return The created {@link Resource}
+   */
   public static Resource of(String... names) {
     if (names != null) {
       throw new IllegalArgumentException("Cannot create a Resource with null names");
