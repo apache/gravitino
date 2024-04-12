@@ -41,7 +41,7 @@ public abstract class FailureEvent extends Event {
    *
    * @return The exception thrown by the operation.
    */
-  public Exception getException() {
+  public Exception exception() {
     return exception;
   }
 }

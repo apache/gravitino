@@ -36,7 +36,7 @@ public abstract class Event {
    *
    * @return A string representing the user associated with this event.
    */
-  public String getUser() {
+  public String user() {
     return user;
   }
 
@@ -46,7 +46,7 @@ public abstract class Event {
    * @return A NameIdentifier object that represents the resource, like a metalake, catalog, schema,
    *     table, etc., associated with the event.
    */
-  public NameIdentifier getIdentifier() {
+  public NameIdentifier identifier() {
     return identifier;
   }
 }

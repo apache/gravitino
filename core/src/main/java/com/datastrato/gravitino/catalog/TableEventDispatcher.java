@@ -33,8 +33,8 @@ import java.util.Map;
  * monitoring of table operations.
  */
 public class TableEventDispatcher implements TableDispatcher {
-  private EventBus eventBus;
-  private TableDispatcher dispatcher;
+  private final EventBus eventBus;
+  private final TableDispatcher dispatcher;
 
   /**
    * Constructs a TableEventDispatcher with a specified EventBus and TableCatalog.

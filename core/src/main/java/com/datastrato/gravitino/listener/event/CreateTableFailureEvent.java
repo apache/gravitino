@@ -18,7 +18,7 @@ import com.datastrato.gravitino.rel.Table;
  * for the failure.
  */
 @DeveloperApi
-public class CreateTableFailureEvent extends TableFailureEvent {
+public final class CreateTableFailureEvent extends TableFailureEvent {
   private final TableInfo createTableRequest;
 
   /**
@@ -49,7 +49,7 @@ public class CreateTableFailureEvent extends TableFailureEvent {
    * @return The {@link Table} instance representing the request information for the failed table
    *     creation attempt.
    */
-  public TableInfo getCreateTableRequest() {
+  public TableInfo createTableRequest() {
     return createTableRequest;
   }
 }

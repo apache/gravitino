@@ -20,7 +20,7 @@ import com.datastrato.gravitino.listener.info.TableInfo;
  * system, and acquiring insights into the final configuration and state of a newly created table.
  */
 @DeveloperApi
-public class CreateTableEvent extends TableEvent {
+public final class CreateTableEvent extends TableEvent {
   private final TableInfo createdTableInfo;
 
   /**
@@ -51,7 +51,7 @@ public class CreateTableEvent extends TableEvent {
    * @return A {@link TableInfo} instance encapsulating the comprehensive details of the newly
    *     created table, highlighting its configuration and any default settings applied.
    */
-  public TableInfo getCreatedTableInfo() {
+  public TableInfo createdTableInfo() {
     return createdTableInfo;
   }
 }

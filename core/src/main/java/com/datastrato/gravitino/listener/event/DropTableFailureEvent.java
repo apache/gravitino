@@ -17,7 +17,7 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
  * diagnostic processes.
  */
 @DeveloperApi
-public class DropTableFailureEvent extends TableFailureEvent {
+public final class DropTableFailureEvent extends TableFailureEvent {
   /**
    * Constructs a new {@code DropTableFailureEvent} instance, capturing detailed information about
    * the failed attempt to drop a table.

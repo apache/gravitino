@@ -15,7 +15,7 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
  * information about the table and the user who initiated the drop operation.
  */
 @DeveloperApi
-public class DropTableEvent extends TableEvent {
+public final class DropTableEvent extends TableEvent {
   private final boolean isExists;
 
   /**
