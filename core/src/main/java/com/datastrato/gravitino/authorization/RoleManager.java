@@ -68,8 +68,8 @@ class RoleManager {
             .withId(idGenerator.nextId())
             .withName(role)
             .withProperties(properties)
-            .withPrivilegeEntityIdentifier(privilegeEntityIdentifier)
-            .withPrivilegeEntityType(privilegeEntityType)
+            .withResourceIdentifier(privilegeEntityIdentifier)
+            .withResourceEntityType(privilegeEntityType)
             .withPrivileges(privileges)
             .withNamespace(
                 Namespace.of(

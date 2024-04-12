@@ -11,7 +11,10 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
+import com.datastrato.gravitino.authorization.Resource;
+import com.datastrato.gravitino.authorization.Resources;
 import com.datastrato.gravitino.authorization.Role;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
@@ -32,17 +35,15 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field PRIVILEGE_ENTITY_IDENTIFIER =
+  public static final Field RESOURCE_IDENTIFIER =
       Field.required(
-          "privilege_entity_identifier",
+          "resource_identifier",
           NameIdentifier.class,
-          "The privilege entity identifier of the role entity.");
+          "The resource identifier of the role entity.");
 
-  public static final Field PRIVILEGE_ENTITY_TYPE =
+  public static final Field RESOURCE_TYPE =
       Field.required(
-          "privilege_entity_type",
-          EntityType.class,
-          "The privilege entity type of the role entity.");
+          "resource_entity_type", EntityType.class, "The resource type of the role entity.");
 
   public static final Field PRIVILEGES =
       Field.required("privileges", List.class, "The privileges of the role entity.");
@@ -51,9 +52,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
-  private NameIdentifier privilegeEntityIdentifier;
+  private NameIdentifier resourceIdentifier;
 
-  private EntityType privilegeEntityType;
+  private EntityType resourceType;
   private List<Privilege> privileges;
   private Namespace namespace;
 
@@ -74,7 +75,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The properties of the group. Note, this method will return null if the properties are not set.
+   * The properties of the role. Note, this method will return null if the properties are not set.
    *
    * @return The properties of the role.
    */
@@ -84,24 +85,21 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The resource entity which is contained by the role. For example: If the entity is a table, the
+   * The name of the role contains one resource. For example: If the resource is a table, the
    * identifier may be `catalog1.schema1.table1`.
    *
-   * @return The resource entity which is contained by the role.
+   * @return The resource of the role.
    */
   @Override
-  public String resourceName() {
-    if (privilegeEntityIdentifier.hasNamespace()) {
-      String[] levels = privilegeEntityIdentifier.namespace().levels();
-      StringBuilder identBuilder = new StringBuilder();
-      for (int i = 1; i < levels.length; i++) {
-        identBuilder.append(levels[i]).append(".");
-      }
-      identBuilder.append(privilegeEntityIdentifier.name());
-      return identBuilder.toString();
-    } else {
-      return privilegeEntityIdentifier.name();
+  public Resource resource() {
+    List<String> names = Lists.newArrayList();
+    String[] levels = resourceIdentifier.namespace().levels();
+    for (int i = 1; i < levels.length; i++) {
+      names.add(levels[i]);
     }
+    names.add(resourceIdentifier.name());
+
+    return Resources.of(names.toArray(new String[0]));
   }
 
   /**
@@ -110,17 +108,18 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    *
    * @return The privilege entity type of the role.
    */
-  public String privilegeEntityType() {
-    return privilegeEntityType.toString();
+  public String resourceType() {
+    return resourceType.toString();
   }
 
-  public NameIdentifier privilegeEntityIdentifier() {
-    return privilegeEntityIdentifier;
+  public NameIdentifier resourceEntityIdentifier() {
+    return resourceIdentifier;
   }
 
   /**
-   * The privileges of the role. All privileges belong to one entity. For example: If the entity is
-   * a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc.
+   * The privileges of the role. All privileges belong to one resource. For example: If the resource
+   * is a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a schema has the
+   * privilege of `LOAD TABLE`. It means the role can all tables of the schema.
    *
    * @return The privileges of the role.
    */
@@ -141,8 +140,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(PRIVILEGE_ENTITY_IDENTIFIER, privilegeEntityIdentifier);
-    fields.put(PRIVILEGE_ENTITY_TYPE, privilegeEntityType);
+    fields.put(RESOURCE_IDENTIFIER, resourceIdentifier);
+    fields.put(RESOURCE_TYPE, resourceType);
     fields.put(PRIVILEGES, privileges);
 
     return Collections.unmodifiableMap(fields);
@@ -178,21 +177,15 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(privilegeEntityIdentifier, that.privilegeEntityIdentifier)
-        && Objects.equals(privilegeEntityType, that.privilegeEntityType)
+        && Objects.equals(resourceIdentifier, that.resourceIdentifier)
+        && Objects.equals(resourceType, that.resourceType)
         && Objects.equals(privileges, that.privileges);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        id,
-        name,
-        properties,
-        auditInfo,
-        privilegeEntityIdentifier,
-        privilegeEntityType,
-        privileges);
+        id, name, properties, auditInfo, resourceIdentifier, resourceType, privileges);
   }
 
   /**
@@ -261,24 +254,24 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the privilege entity identifier of the role entity.
+     * Sets the resource identifier of the role entity.
      *
-     * @param entity The privilege entity of the role entity.
+     * @param resource The resource identifier of the role entity.
      * @return The builder instance.
      */
-    public Builder withPrivilegeEntityIdentifier(NameIdentifier entity) {
-      roleEntity.privilegeEntityIdentifier = entity;
+    public Builder withResourceIdentifier(NameIdentifier resource) {
+      roleEntity.resourceIdentifier = resource;
       return this;
     }
 
     /**
-     * Sets the privilege entity type of the role entity.
+     * Sets the resource type of the role entity.
      *
-     * @param type The privilege entity type of the role entity.
+     * @param type The resource type of the role entity.
      * @return The builder instance.
      */
-    public Builder withPrivilegeEntityType(EntityType type) {
-      roleEntity.privilegeEntityType = type;
+    public Builder withResourceEntityType(EntityType type) {
+      roleEntity.resourceType = type;
       return this;
     }
 
