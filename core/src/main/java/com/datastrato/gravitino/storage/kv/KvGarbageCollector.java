@@ -46,7 +46,7 @@ public final class KvGarbageCollector implements Closeable {
   private final EntityKeyEncoder<byte[]> entityKeyEncoder;
   private static final byte[] LAST_COLLECT_COMMIT_ID_KEY =
       Bytes.concat(
-          new byte[] {0x1D, 0x00, 0x00}, "last_collect_commit_id".getBytes(StandardCharsets.UTF_8));
+          new byte[] {0x1D, 0x00, 0x03}, "last_collect_commit_id".getBytes(StandardCharsets.UTF_8));
 
   // Keep the last collect commit id to avoid collecting the same data multiple times, the first
   // time the commit is 1 (minimum), and assuming we have collocated the data with transaction id
