@@ -150,7 +150,7 @@ public class IcebergTableOps implements AutoCloseable {
       ((AutoCloseable) catalog).close();
     }
 
-    // Because each catalog in Gravitino has its own classloader, after a catalog is longer used
+    // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
     // for a long time or dropped, the instance of classloader needs to be released. In order to
     // let JVM GC remove the classloader, we need to release the resources of the classloader. The
     // resources include the driver of the catalog backend and the
