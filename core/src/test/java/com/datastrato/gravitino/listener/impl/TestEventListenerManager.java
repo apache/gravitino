@@ -7,7 +7,6 @@ package com.datastrato.gravitino.listener.impl;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.listener.EventListenerPlugin;
-import com.datastrato.gravitino.listener.SupportsAsync;
 import com.datastrato.gravitino.listener.event.Event;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
@@ -47,9 +46,14 @@ public class TestEventListenerManager {
     public void onPostEvent(Event event) {
       this.events.add(event);
     }
+
+    @Override
+    public Mode mode() {
+      return Mode.SYNC;
+    }
   }
 
-  static class DummyAsyncEventListener extends DummyEventListener implements SupportsAsync {
+  static class DummyAsyncEventListener extends DummyEventListener {
     List<Event> tryGetEvents() {
       Instant waitTime = Instant.now().plusSeconds(20);
       while (getEvents().size() == 0 && Instant.now().isBefore(waitTime)) {
@@ -61,12 +65,17 @@ public class TestEventListenerManager {
       }
       return getEvents();
     }
+
+    @Override
+    public Mode mode() {
+      return Mode.ASYNC_SHARED;
+    }
   }
 
   static class DummyAsyncIsolatedEventListener extends DummyAsyncEventListener {
     @Override
-    public Mode asyncMode() {
-      return Mode.ISOLATED;
+    public Mode mode() {
+      return Mode.ASYNC_ISOLATED;
     }
   }
 

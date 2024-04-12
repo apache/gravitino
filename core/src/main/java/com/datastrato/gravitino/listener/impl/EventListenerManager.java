@@ -6,8 +6,6 @@
 package com.datastrato.gravitino.listener.impl;
 
 import com.datastrato.gravitino.listener.EventListenerPlugin;
-import com.datastrato.gravitino.listener.SupportsAsync;
-import com.datastrato.gravitino.listener.SupportsAsync.Mode;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -97,21 +95,21 @@ public class EventListenerManager {
                 entrySet -> {
                   String listenerName = entrySet.getKey();
                   EventListenerPlugin listener = entrySet.getValue();
-                  if (listener instanceof SupportsAsync) {
-                    SupportsAsync asyncListener = (SupportsAsync) listener;
-                    if (Mode.SHARED.equals(asyncListener.asyncMode())) {
-                      sharedQueueListeners.add(
-                          new EventListenerPluginWrapper(listenerName, listener));
-                      return null;
-                    } else {
+                  switch (listener.mode()) {
+                    case SYNC:
+                      return new EventListenerPluginWrapper(listenerName, listener);
+                    case ASYNC_ISOLATED:
                       return new AsyncQueueListener(
                           ImmutableList.of(new EventListenerPluginWrapper(listenerName, listener)),
                           listenerName,
                           queueCapacity,
                           dispatcherJoinSeconds);
-                    }
-                  } else {
-                    return new EventListenerPluginWrapper(listenerName, listener);
+                    case ASYNC_SHARED:
+                      sharedQueueListeners.add(
+                          new EventListenerPluginWrapper(listenerName, listener));
+                      return null;
+                    default:
+                      throw new RuntimeException("Unexpected listener mode:" + listener.mode());
                   }
                 })
             .filter(Objects::nonNull)

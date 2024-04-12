@@ -10,62 +10,84 @@ import com.datastrato.gravitino.listener.event.Event;
 import java.util.Map;
 
 /**
- * An interface for event listeners that manage the state of a plugin and process events.
- * Implementers of this interface are responsible for initializing, starting, and stopping the
- * plugin, as well as processing events that occur after operations have been completed.
+ * Defines an interface for event listeners that manage the lifecycle and state of a plugin,
+ * including its initialization, starting, and stopping processes, as well as the handling of events
+ * occurring after various operations have been executed.
  *
- * <p>This interface is designed to be flexible, supporting both synchronous and asynchronous event
- * processing through the optional implementation of the {@link SupportsAsync} interface.
+ * <p>This interface is intended for developers who implement plugins within a system, providing a
+ * structured approach to managing plugin operations and event processing.
  */
 @DeveloperApi
 public interface EventListenerPlugin {
+
   /**
-   * Initializes the plugin using the provided properties. This initialization step may involve the
-   * creation of resources necessary for the plugin's operation.
+   * Enumerates the operational modes for event processing, supporting both synchronous and
+   * asynchronous approaches.
+   */
+  enum Mode {
+    SYNC, // Synchronous event processing mode.
+    ASYNC_ISOLATED, // Asynchronous event processing with isolated handling.
+    ASYNC_SHARED // Asynchronous event processing with shared handling.
+  }
+
+  /**
+   * Initializes the plugin with the given set of properties. This phase may involve setting up
+   * necessary resources for the plugin's functionality.
    *
-   * <p>If an exception is thrown during initialization,
+   * <p>Failure during this phase will prevent the server from starting, highlighting a critical
+   * setup issue with the plugin.
    *
-   * @param properties A map of properties used to initialize the plugin.
-   * @throws RuntimeException the Gravitino server will fail to start, indicating a critical failure
-   *     in setting up the plugin.
+   * @param properties A map of properties used for initializing the plugin.
+   * @throws RuntimeException Indicates a critical failure in plugin setup, preventing server
+   *     startup.
    */
   void init(Map<String, String> properties) throws RuntimeException;
 
   /**
-   * Starts the plugin. This method should be called after {@link #init(Map)} has successfully
-   * completed.
+   * Starts the plugin, transitioning it to a ready state. This method is invoked after successful
+   * initialization.
    *
-   * @throws RuntimeException the Gravitino server will not start, indicating that the plugin failed
-   *     to enter a ready state.
+   * <p>A failure to start indicates an inability for the plugin to enter its operational state,
+   * which will prevent the server from starting.
+   *
+   * @throws RuntimeException Indicates a failure to start the plugin, blocking the server's launch.
    */
   void start() throws RuntimeException;
 
   /**
-   * Stops the plugin and releases any resources that were allocated during the operation of the
-   * plugin.
+   * Stops the plugin, releasing any resources that were allocated during its operation. This method
+   * aims to ensure a clean termination, mitigating potential resource leaks or incomplete
+   * shutdowns.
    *
-   * @throws RuntimeException The Gravitino server is not affected if an exception is thrown during
-   *     the stop process. However, resource leaks or other issues may arise from an incomplete stop
-   *     procedure.
+   * <p>While the server's operation is unaffected by exceptions thrown during this process, failing
+   * to properly stop may lead to resource management issues.
+   *
+   * @throws RuntimeException Indicates issues during the stopping process, potentially leading to
+   *     resource leaks.
    */
   void stop() throws RuntimeException;
 
   /**
-   * Processes events generated after an operation has finished. This method's invocation behavior
-   * depends on whether the listener implements the {@link SupportsAsync} interface.
+   * Handles events generated after the completion of an operation. Implementers are responsible for
+   * processing these events, which may involve additional logic to respond to the operation
+   * outcomes.
    *
-   * <p>If the {@link SupportsAsync} interface is not implemented, {@code onPostEvent} will be
-   * invoked in the same thread that completed the operation. If {@link SupportsAsync} is
-   * implemented, {@code onPostEvent} will be invoked in a separate thread, allowing for
-   * asynchronous processing.
+   * <p>This method provides a hook for post-operation event processing, allowing plugins to react
+   * or adapt based on the event details.
    *
-   * <p>For synchronous listeners, this method may be invoked concurrently by multiple threads,
-   * necessitating thread-safe implementations. Asynchronous listeners, on the other hand, will have
-   * events processed in a background thread dedicated to event handling.
-   *
-   * @param event The event to be processed. This includes all events generated by the Gravitino
-   *     system, and the plugin should filter and process the events relevant to its operation.
-   * @throws RuntimeException The exception will be ignored.
+   * @param event The event to be processed.
+   * @throws RuntimeException Indicates issues encountered during event processing.
    */
   void onPostEvent(Event event) throws RuntimeException;
+
+  /**
+   * Specifies the default operational mode for event processing by the plugin. The default
+   * implementation is synchronous, but implementers can override this to utilize asynchronous
+   * processing modes.
+   *
+   * @return The operational {@link Mode} of the plugin for event processing.
+   */
+  default Mode mode() {
+    return Mode.SYNC;
+  }
 }
