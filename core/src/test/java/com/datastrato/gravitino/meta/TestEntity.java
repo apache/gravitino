@@ -268,7 +268,7 @@ public class TestEntity {
             .withName(roleName)
             .withAuditInfo(auditInfo)
             .withResourceIdentifier(NameIdentifier.of(metalakeName, catalogName))
-            .withResourceEntityType(Entity.EntityType.CATALOG)
+            .withResourceType(Entity.EntityType.CATALOG)
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(map)
             .build();
@@ -290,7 +290,7 @@ public class TestEntity {
             .withName(roleName)
             .withAuditInfo(auditInfo)
             .withResourceIdentifier(NameIdentifier.of(metalakeName, catalogName))
-            .withResourceEntityType(Entity.EntityType.CATALOG)
+            .withResourceType(Entity.EntityType.CATALOG)
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());

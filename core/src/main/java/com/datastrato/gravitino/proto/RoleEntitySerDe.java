@@ -29,8 +29,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 roleEntity.privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .setPrivilegeEntityIdentifier(roleEntity.resourceEntityIdentifier().toString())
-            .setPrivilegeEntityType(roleEntity.resourceType());
+            .setResourceIdentifier(roleEntity.resourceEntityIdentifier().toString())
+            .setResourceType(roleEntity.resourceType());
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
       builder.putAllProperties(roleEntity.properties());
@@ -55,8 +55,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 role.getPrivilegesList().stream()
                     .map(Privileges::fromString)
                     .collect(Collectors.toList()))
-            .withResourceIdentifier(NameIdentifier.parse(role.getPrivilegeEntityIdentifier()))
-            .withResourceEntityType(Entity.EntityType.valueOf(role.getPrivilegeEntityType()))
+            .withResourceIdentifier(NameIdentifier.parse(role.getResourceIdentifier()))
+            .withResourceType(Entity.EntityType.valueOf(role.getResourceType()))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo()));
 
     if (!role.getPropertiesMap().isEmpty()) {

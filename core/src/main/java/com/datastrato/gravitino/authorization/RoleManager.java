@@ -69,7 +69,7 @@ class RoleManager {
             .withName(role)
             .withProperties(properties)
             .withResourceIdentifier(privilegeEntityIdentifier)
-            .withResourceEntityType(privilegeEntityType)
+            .withResourceType(privilegeEntityType)
             .withPrivileges(privileges)
             .withNamespace(
                 Namespace.of(

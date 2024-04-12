@@ -270,7 +270,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @param type The resource type of the role entity.
      * @return The builder instance.
      */
-    public Builder withResourceEntityType(EntityType type) {
+    public Builder withResourceType(EntityType type) {
       roleEntity.resourceType = type;
       return this;
     }

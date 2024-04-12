@@ -1182,7 +1182,7 @@ public class TestEntityStorage {
         .withName(name)
         .withAuditInfo(auditInfo)
         .withResourceIdentifier(NameIdentifier.of(metalake))
-        .withResourceEntityType(Entity.EntityType.METALAKE)
+        .withResourceType(Entity.EntityType.METALAKE)
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();
