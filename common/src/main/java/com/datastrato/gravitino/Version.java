@@ -10,8 +10,11 @@ import java.util.Properties;
 
 /** Retrieve the version and build information from the building process */
 public class Version {
+  /** build version */
   public static final String version;
+  /** build time */
   public static final String compileDate;
+  /** build commit id */
   public static final String gitCommit;
 
   static {
