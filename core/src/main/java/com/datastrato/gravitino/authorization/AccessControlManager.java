@@ -27,7 +27,7 @@ import java.util.Map;
  * mainly: First, the metalake can be renamed by users. It's hard to maintain a map with metalake as
  * the key. Second, the lock will be couped with life cycle of the metalake.
  */
-public class AccessControlManager {
+public class AccessControlManager implements SupportsUserOperation, SupportsGroupOperation {
 
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
@@ -41,78 +41,26 @@ public class AccessControlManager {
     this.roleManager = new RoleManager(store, idGenerator);
   }
 
-  /**
-   * Adds a new User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param name The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    return doWithNonAdminLock(() -> userGroupManager.addUser(metalake, name));
+  public User addUser(String metalake, String user) throws UserAlreadyExistsException {
+    return doWithNonAdminLock(() -> userGroupManager.addUser(metalake, user));
   }
 
-  /**
-   * Removes a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
   public boolean removeUser(String metalake, String user) {
     return doWithNonAdminLock(() -> userGroupManager.removeUser(metalake, user));
   }
 
-  /**
-   * Gets a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @return The getting User instance.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException If getting the User encounters storage issues.
-   */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     return doWithNonAdminLock(() -> userGroupManager.getUser(metalake, user));
   }
 
-  /**
-   * Adds a new Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group The name of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     return doWithNonAdminLock(() -> userGroupManager.addGroup(metalake, group));
   }
 
-  /**
-   * Removes a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the Group encounters storage issues.
-   */
   public boolean removeGroup(String metalake, String group) {
     return doWithNonAdminLock(() -> userGroupManager.removeGroup(metalake, group));
   }
 
-  /**
-   * Gets a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return The getting Group instance.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException If getting the Group encounters storage issues.
-   */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
     return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
   }

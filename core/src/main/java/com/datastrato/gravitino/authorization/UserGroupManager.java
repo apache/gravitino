@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * metalake and the user or group. Metalake is like a concept of the organization. `AddUser` or
  * `AddGroup` means that a role or user enters an organization.
  */
-class UserGroupManager {
+class UserGroupManager implements SupportsUserOperation, SupportsGroupOperation {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
   private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
@@ -48,22 +48,13 @@ class UserGroupManager {
     this.idGenerator = idGenerator;
   }
 
-  /**
-   * Adds a new User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param name The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+  public User addUser(String metalake, String user) throws UserAlreadyExistsException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
-              .withName(name)
+              .withName(user)
               .withNamespace(
                   Namespace.of(
                       metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
@@ -77,24 +68,16 @@ class UserGroupManager {
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
-      LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
+      LOG.warn("User {} in the metalake {} already exists", user, metalake, e);
       throw new UserAlreadyExistsException(
-          "User %s in the metalake %s already exists", name, metalake);
+          "User %s in the metalake %s already exists", user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Adding user {} failed in the metalake {} due to storage issues", name, metalake, ioe);
+          "Adding user {} failed in the metalake {} due to storage issues", user, metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
-  /**
-   * Removes a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user THe name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
   public boolean removeUser(String metalake, String user) {
 
     try {
@@ -107,15 +90,6 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @return The getting User instance.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException If getting the User encounters storage issues.
-   */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
@@ -129,15 +103,6 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Adds a new Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group The name of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
@@ -168,14 +133,6 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Removes a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the Group encounters storage issues.
-   */
   public boolean removeGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
@@ -190,15 +147,6 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return The getting Group instance.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException If getting the Group encounters storage issues.
-   */
   public Group getGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
