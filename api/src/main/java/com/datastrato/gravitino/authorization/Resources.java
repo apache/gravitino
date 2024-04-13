@@ -60,8 +60,8 @@ public class Resources {
 
   private static class ResourceImpl implements Resource {
 
-    private Resource parent;
-    private String name;
+    private final Resource parent;
+    private final String name;
 
     ResourceImpl(Resource parent, String name) {
       this.parent = parent;
