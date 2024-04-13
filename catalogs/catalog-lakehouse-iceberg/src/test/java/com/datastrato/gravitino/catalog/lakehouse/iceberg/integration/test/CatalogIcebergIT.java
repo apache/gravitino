@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -1049,6 +1050,109 @@ public class CatalogIcebergIT extends AbstractIT {
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Iceberg's Distribution Mode.RANGE not support set expressions."));
+  }
+
+  @Test
+  void testIcebergTablePropertiesWhenCreate() {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertFalse(createdTable.properties().containsKey(DEFAULT_FILE_FORMAT));
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
+
+    properties.put(DEFAULT_FILE_FORMAT, "iceberg");
+    createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertFalse(createdTable.properties().containsKey(DEFAULT_FILE_FORMAT));
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
+
+    properties.put(DEFAULT_FILE_FORMAT, "parquet");
+    createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals("parquet", createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("parquet", loadTable.properties().get(DEFAULT_FILE_FORMAT));
+
+    properties.put(DEFAULT_FILE_FORMAT, "orc");
+    createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals("orc", createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("orc", loadTable.properties().get(DEFAULT_FILE_FORMAT));
+
+    properties.put(DEFAULT_FILE_FORMAT, "avro");
+    createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals("avro", createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("avro", loadTable.properties().get(DEFAULT_FILE_FORMAT));
+
+    properties.put(DEFAULT_FILE_FORMAT, "text");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                columns,
+                table_comment,
+                properties,
+                partitioning,
+                distribution,
+                sortOrders));
   }
 
   protected static void assertionsTableInfo(
