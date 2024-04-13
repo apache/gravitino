@@ -5,9 +5,7 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
@@ -166,8 +164,7 @@ public class AccessControlManager {
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
    * @param properties The properties of the Role.
-   * @param privilegeEntityIdentifier The privilege entity identifier of the Role.
-   * @param privilegeEntityType The privilege entity type of the Role.
+   * @param resource The resource of the Role.
    * @param privileges The privileges of the Role.
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same identifier already exists.
@@ -177,19 +174,11 @@ public class AccessControlManager {
       String metalake,
       String role,
       Map<String, String> properties,
-      NameIdentifier privilegeEntityIdentifier,
-      Entity.EntityType privilegeEntityType,
+      Resource resource,
       List<Privilege> privileges)
       throws RoleAlreadyExistsException {
     return doWithNonAdminLock(
-        () ->
-            roleManager.createRole(
-                metalake,
-                role,
-                properties,
-                privilegeEntityIdentifier,
-                privilegeEntityType,
-                privileges));
+        () -> roleManager.createRole(metalake, role, properties, resource, privileges));
   }
 
   /**

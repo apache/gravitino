@@ -292,7 +292,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
-    if (Entity.RESOURCE_CATALOG_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
     }
 

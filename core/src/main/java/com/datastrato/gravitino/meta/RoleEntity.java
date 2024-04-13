@@ -8,13 +8,10 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Resource;
-import com.datastrato.gravitino.authorization.Resources;
 import com.datastrato.gravitino.authorization.Role;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
@@ -35,15 +32,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field RESOURCE_IDENTIFIER =
-      Field.required(
-          "resource_identifier",
-          NameIdentifier.class,
-          "The resource identifier of the role entity.");
-
-  public static final Field RESOURCE_TYPE =
-      Field.required(
-          "resource_entity_type", EntityType.class, "The resource type of the role entity.");
+  public static final Field RESOURCE =
+      Field.required("resource", Resource.class, "The resource of the role entity.");
 
   public static final Field PRIVILEGES =
       Field.required("privileges", List.class, "The privileges of the role entity.");
@@ -52,11 +42,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
-  private NameIdentifier resourceIdentifier;
-
-  private EntityType resourceType;
   private List<Privilege> privileges;
   private Namespace namespace;
+  private Resource resource;
 
   /**
    * The name of the role.
@@ -99,28 +87,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     // types.
     // So one type of them can't be the resource at least if there are the two same identifier
     // entities .
-    List<String> names = Lists.newArrayList();
-    String[] levels = resourceIdentifier.namespace().levels();
-    for (int i = 1; i < levels.length; i++) {
-      names.add(levels[i]);
-    }
-    names.add(resourceIdentifier.name());
-
-    return Resources.of(names.toArray(new String[0]));
-  }
-
-  /**
-   * The privilege entity type of the role. For example: If the entity is a table, the type will be
-   * TABLE.
-   *
-   * @return The privilege entity type of the role.
-   */
-  public String resourceType() {
-    return resourceType.toString();
-  }
-
-  public NameIdentifier resourceEntityIdentifier() {
-    return resourceIdentifier;
+    return resource;
   }
 
   /**
@@ -147,8 +114,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(RESOURCE_IDENTIFIER, resourceIdentifier);
-    fields.put(RESOURCE_TYPE, resourceType);
+    fields.put(RESOURCE, resource);
     fields.put(PRIVILEGES, privileges);
 
     return Collections.unmodifiableMap(fields);
@@ -184,15 +150,13 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(resourceIdentifier, that.resourceIdentifier)
-        && Objects.equals(resourceType, that.resourceType)
+        && Objects.equals(resource, that.resource)
         && Objects.equals(privileges, that.privileges);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        id, name, properties, auditInfo, resourceIdentifier, resourceType, privileges);
+    return Objects.hash(id, name, properties, auditInfo, resource, privileges);
   }
 
   /**
@@ -261,24 +225,13 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the resource identifier of the role entity.
+     * Sets the resource of the role entity.
      *
-     * @param resource The resource identifier of the role entity.
+     * @param resource The resource of the role entity.
      * @return The builder instance.
      */
-    public Builder withResourceIdentifier(NameIdentifier resource) {
-      roleEntity.resourceIdentifier = resource;
-      return this;
-    }
-
-    /**
-     * Sets the resource type of the role entity.
-     *
-     * @param type The resource type of the role entity.
-     * @return The builder instance.
-     */
-    public Builder withResourceType(EntityType type) {
-      roleEntity.resourceType = type;
+    public Builder withResource(Resource resource) {
+      roleEntity.resource = resource;
       return this;
     }
 

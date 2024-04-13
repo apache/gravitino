@@ -28,6 +28,7 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.Resources;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -1181,8 +1182,7 @@ public class TestEntityStorage {
                 metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withResourceIdentifier(NameIdentifier.of(metalake))
-        .withResourceType(Entity.EntityType.METALAKE)
+        .withResource(Resources.of("catalog"))
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();

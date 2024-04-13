@@ -5,10 +5,9 @@
 package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.Resources;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -267,8 +266,7 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withResourceIdentifier(NameIdentifier.of(metalakeName, catalogName))
-            .withResourceType(Entity.EntityType.CATALOG)
+            .withResource(Resources.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(map)
             .build();
@@ -280,17 +278,14 @@ public class TestEntity {
     Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
     Assertions.assertEquals(
         Lists.newArrayList(Privileges.LoadCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
-    Assertions.assertEquals(Entity.EntityType.CATALOG, fields.get(RoleEntity.RESOURCE_TYPE));
-    Assertions.assertEquals(
-        NameIdentifier.of(metalakeName, catalogName), fields.get(RoleEntity.RESOURCE_IDENTIFIER));
+    Assertions.assertEquals(Resources.of(catalogName), fields.get(RoleEntity.RESOURCE));
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withResourceIdentifier(NameIdentifier.of(metalakeName, catalogName))
-            .withResourceType(Entity.EntityType.CATALOG)
+            .withResource(Resources.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());

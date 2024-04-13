@@ -7,9 +7,7 @@ package com.datastrato.gravitino.authorization;
 import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -221,12 +219,7 @@ public class TestAccessControlManager {
 
     Role role =
         accessControlManager.createRole(
-            "metalake",
-            "create",
-            props,
-            NameIdentifier.of("test"),
-            Entity.EntityType.METALAKE,
-            Lists.newArrayList());
+            "metalake", "create", props, Resources.ofAllCatalogs(), Lists.newArrayList());
     Assertions.assertEquals("create", role.name());
     testProperties(props, role.properties());
 
@@ -235,12 +228,7 @@ public class TestAccessControlManager {
         RoleAlreadyExistsException.class,
         () ->
             accessControlManager.createRole(
-                "metalake",
-                "create",
-                props,
-                NameIdentifier.of("test"),
-                Entity.EntityType.METALAKE,
-                Lists.newArrayList()));
+                "metalake", "create", props, Resources.ofAllCatalogs(), Lists.newArrayList()));
   }
 
   @Test
@@ -248,12 +236,7 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake",
-        "loadRole",
-        props,
-        NameIdentifier.of("test"),
-        Entity.EntityType.METALAKE,
-        Lists.newArrayList());
+        "metalake", "loadRole", props, Resources.ofAllCatalogs(), Lists.newArrayList());
     Role role = accessControlManager.loadRole("metalake", "loadRole");
     Assertions.assertEquals("loadRole", role.name());
     testProperties(props, role.properties());
@@ -271,12 +254,7 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake",
-        "testDrop",
-        props,
-        NameIdentifier.of("test"),
-        Entity.EntityType.METALAKE,
-        Lists.newArrayList());
+        "metalake", "testDrop", props, Resources.ofAllCatalogs(), Lists.newArrayList());
 
     // Test drop role
     boolean dropped = accessControlManager.dropRole("metalake", "testDrop");
