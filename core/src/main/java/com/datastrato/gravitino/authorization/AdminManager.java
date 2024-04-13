@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * metalake or drops its metalake. The metalake admin will be responsible for managing the access
  * control. AdminManager operates underlying store using the lock because kv storage needs the lock.
  */
-class AdminManager {
+class AdminManager implements SupportsAdminManagement {
 
   private static final Logger LOG = LoggerFactory.getLogger(AdminManager.class);
 
@@ -44,14 +44,7 @@ class AdminManager {
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
 
-  /**
-   * Adds a new metalake admin.
-   *
-   * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
+  @Override
   public User addMetalakeAdmin(String user) {
 
     UserEntity userEntity =
@@ -72,7 +65,7 @@ class AdminManager {
             .build();
     try {
       store.put(userEntity, false /* overwritten */);
-      return userEntity;
+      return true;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("User {} in the metalake admin already exists", user, e);
       throw new UserAlreadyExistsException("User %s in the metalake admin already exists", user);
@@ -82,13 +75,7 @@ class AdminManager {
     }
   }
 
-  /**
-   * Removes a metalake admin.
-   *
-   * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
+  @Override
   public boolean removeMetalakeAdmin(String user) {
     try {
       return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);

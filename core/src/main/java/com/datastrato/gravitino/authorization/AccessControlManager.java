@@ -27,7 +27,7 @@ import java.util.Map;
  * mainly: First, the metalake can be renamed by users. It's hard to maintain a map with metalake as
  * the key. Second, the lock will be couped with life cycle of the metalake.
  */
-public class AccessControlManager implements SupportsUserOperation, SupportsGroupOperation {
+public class AccessControlManager implements SupportsUserOperation, SupportsGroupOperation, SupportsAdminManagement, SupportsRoleManagement {
 
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
@@ -65,25 +65,11 @@ public class AccessControlManager implements SupportsUserOperation, SupportsGrou
     return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
   }
 
-  /**
-   * Adds a new metalake admin.
-   *
-   * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
   public User addMetalakeAdmin(String user) {
     return doWithAdminLock(() -> adminManager.addMetalakeAdmin(user));
   }
 
-  /**
-   * Removes a metalake admin.
-   *
-   * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
+
   public boolean removeMetalakeAdmin(String user) {
     return doWithAdminLock(() -> adminManager.removeMetalakeAdmin(user));
   }
@@ -108,19 +94,6 @@ public class AccessControlManager implements SupportsUserOperation, SupportsGrou
     return doWithAdminLock(() -> adminManager.isMetalakeAdmin(user));
   }
 
-  /**
-   * Creates a new Role.
-   *
-   * @param metalake The Metalake of the Role.
-   * @param role The name of the Role.
-   * @param properties The properties of the Role.
-   * @param privilegeEntityIdentifier The privilege entity identifier of the Role.
-   * @param privilegeEntityType The privilege entity type of the Role.
-   * @param privileges The privileges of the Role.
-   * @return The created Role instance.
-   * @throws RoleAlreadyExistsException If a Role with the same identifier already exists.
-   * @throws RuntimeException If creating the Role encounters storage issues.
-   */
   public Role createRole(
       String metalake,
       String role,
@@ -140,27 +113,10 @@ public class AccessControlManager implements SupportsUserOperation, SupportsGrou
                 privileges));
   }
 
-  /**
-   * Loads a Role.
-   *
-   * @param metalake The Metalake of the Role.
-   * @param role The name of the Role.
-   * @return The loading Role instance.
-   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
-   * @throws RuntimeException If loading the Role encounters storage issues.
-   */
   public Role loadRole(String metalake, String role) throws NoSuchRoleException {
     return doWithNonAdminLock(() -> roleManager.loadRole(metalake, role));
   }
 
-  /**
-   * Drops a Role.
-   *
-   * @param metalake The Metalake of the Role.
-   * @param role The name of the Role.
-   * @return `true` if the Role was successfully dropped, `false` otherwise.
-   * @throws RuntimeException If dropping the User encounters storage issues.
-   */
   public boolean dropRole(String metalake, String role) {
     return doWithNonAdminLock(() -> roleManager.dropRole(metalake, role));
   }
