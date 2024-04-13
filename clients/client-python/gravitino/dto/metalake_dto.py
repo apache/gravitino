@@ -26,13 +26,6 @@ class MetalakeDTO(DataClassJsonMixin):
     audit: AuditDTO = None
     """The audit information of the Metalake DTO."""
 
-    def __init__(self, name: str = None, comment: str = None, properties: Dict[str, str] = None,
-                 audit: AuditDTO = None):
-        self.name = name
-        self.comment = comment
-        self.properties = properties
-        self.audit = audit
-
     def equals(self, other):
         if self == other:
             return True
