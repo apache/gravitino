@@ -92,6 +92,10 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    */
   @Override
   public Resource resource() {
+    // The resource is a special kind of entities. The resource identifier must be unique.
+    // Gravitino assumes that the names of the entities may be the same if they have different
+    // types.
+    // So one of them can't be the resource at least.
     List<String> names = Lists.newArrayList();
     String[] levels = resourceIdentifier.namespace().levels();
     for (int i = 1; i < levels.length; i++) {
