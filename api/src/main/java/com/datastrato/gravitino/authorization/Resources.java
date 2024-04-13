@@ -17,17 +17,26 @@ public class Resources {
    */
   public static Resource of(String... names) {
     if (names == null) {
-      throw new IllegalArgumentException("Cannot create a Resource with null names");
+      throw new IllegalArgumentException("Cannot create a resource with null names");
     }
 
     if (names.length == 0) {
-      throw new IllegalArgumentException("Cannot create a Resource with no names");
+      throw new IllegalArgumentException("Cannot create a resource with no names");
     }
 
     Resource parent = null;
     for (String name : names) {
       if (name == null) {
-        throw new IllegalArgumentException("Cannot create a Resource with null name");
+        throw new IllegalArgumentException("Cannot create a resource with null name");
+      }
+
+      if (name.equals("*")) {
+        throw new IllegalArgumentException(
+            "Cannot create a resource with `*` name. If you want to use a resource which represents all catalogs,"
+                + " you use the method `ofAllCatalogs`. If you want to use a resource which represents all entities,"
+                + " you can use its parent entity, For example,"
+                + " if you want to have read table privileges of all tables of `catalog1.schema1`,"
+                + " you can use add `read table` privilege for `catalog1.schema1` directly");
       }
 
       parent = new ResourceImpl(parent, name);
