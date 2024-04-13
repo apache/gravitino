@@ -1085,6 +1085,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
 
+    tableCatalog.dropTable(tableIdentifier);
     properties.put(DEFAULT_FILE_FORMAT, "iceberg");
     createdTable =
         tableCatalog.createTable(
@@ -1099,6 +1100,7 @@ public class CatalogIcebergIT extends AbstractIT {
     loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
 
+    tableCatalog.dropTable(tableIdentifier);
     properties.put(DEFAULT_FILE_FORMAT, "parquet");
     createdTable =
         tableCatalog.createTable(
@@ -1113,6 +1115,7 @@ public class CatalogIcebergIT extends AbstractIT {
     loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals("parquet", loadTable.properties().get(DEFAULT_FILE_FORMAT));
 
+    tableCatalog.dropTable(tableIdentifier);
     properties.put(DEFAULT_FILE_FORMAT, "orc");
     createdTable =
         tableCatalog.createTable(
@@ -1127,6 +1130,7 @@ public class CatalogIcebergIT extends AbstractIT {
     loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals("orc", loadTable.properties().get(DEFAULT_FILE_FORMAT));
 
+    tableCatalog.dropTable(tableIdentifier);
     properties.put(DEFAULT_FILE_FORMAT, "avro");
     createdTable =
         tableCatalog.createTable(
@@ -1141,6 +1145,7 @@ public class CatalogIcebergIT extends AbstractIT {
     loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals("avro", loadTable.properties().get(DEFAULT_FILE_FORMAT));
 
+    tableCatalog.dropTable(tableIdentifier);
     properties.put(DEFAULT_FILE_FORMAT, "text");
     Assertions.assertThrows(
         IllegalArgumentException.class,
