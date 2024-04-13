@@ -23,6 +23,9 @@ public interface Entity extends Serializable {
   /** The system reserved catalog name. */
   String SYSTEM_CATALOG_RESERVED_NAME = "system";
 
+  /** The resource reserved catalog name. */
+  String RESOURCE_CATALOG_RESERVED_NAME = "*";
+
   /** The authorization catalog name in the system metalake. */
   String AUTHORIZATION_CATALOG_NAME = "authorization";
 

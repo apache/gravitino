@@ -16,16 +16,20 @@ public class Resources {
    * @return The created {@link Resource}
    */
   public static Resource of(String... names) {
-    if (names != null) {
+    if (names == null) {
       throw new IllegalArgumentException("Cannot create a Resource with null names");
     }
 
-    if (names.length > 0) {
+    if (names.length == 0) {
       throw new IllegalArgumentException("Cannot create a Resource with no names");
     }
 
-    Resource parent = ROOT;
+    Resource parent = null;
     for (String name : names) {
+      if (name == null) {
+        throw new IllegalArgumentException("Cannot create a Resource with null name");
+      }
+
       parent = new ResourceImpl(parent, name);
     }
 
@@ -33,17 +37,17 @@ public class Resources {
   }
 
   /**
-   * Gravitino organized resources by tree structure. Root resource is a special resource. All
-   * catalogs is its children node. You can give the root resource `LOAD CATALOG`, `CREATE CATALOG`,
-   * etc. It means that you can load any catalog and create any which doesn't exist.
+   * All catalogs is a special resource .You can give the resource the privileges `LOAD CATALOG`,
+   * `CREATE CATALOG`, etc. It means that you can load any catalog and create any which doesn't
+   * exist.
    *
    * @return The created {@link Resource}
    */
-  public static Resource ofRoot() {
-    return ROOT;
+  public static Resource ofAllCatalogs() {
+    return ALL_CATALOGS;
   }
 
-  private static final Resource ROOT = new ResourceImpl(null, null);
+  private static final Resource ALL_CATALOGS = new ResourceImpl(null, null);
 
   private static class ResourceImpl implements Resource {
 
@@ -74,8 +78,10 @@ public class Resources {
     public String toString() {
       if (parent != null) {
         return parent + "." + name;
-      } else {
+      } else if (name != null) {
         return name;
+      } else {
+        return "*";
       }
     }
 
