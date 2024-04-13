@@ -24,7 +24,7 @@ public class Resources {
       throw new IllegalArgumentException("Cannot create a Resource with no names");
     }
 
-    Resource parent = null;
+    Resource parent = ROOT;
     for (String name : names) {
       parent = new ResourceImpl(parent, name);
     }
