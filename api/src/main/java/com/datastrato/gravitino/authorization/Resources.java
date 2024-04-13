@@ -40,8 +40,10 @@ public class Resources {
    * @return The created {@link Resource}
    */
   public static Resource ofRoot() {
-    return new ResourceImpl(null, null);
+    return ROOT;
   }
+
+  private static final Resource ROOT = new ResourceImpl(null, null);
 
   private static class ResourceImpl implements Resource {
 
