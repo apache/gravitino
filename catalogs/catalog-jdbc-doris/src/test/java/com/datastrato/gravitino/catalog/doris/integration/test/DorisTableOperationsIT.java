@@ -12,10 +12,13 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -225,7 +228,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   @Test
   public void testCreateAllTypeTable() {
-    String tableName = GravitinoITUtils.genRandomName("type_table");
+    String tableName = GravitinoITUtils.genRandomName("all_type_table");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(JdbcColumn.builder().withName("col_1").withType(Types.IntegerType.get()).build());
@@ -259,5 +262,52 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
+  }
+
+  @Test
+  public void testCreateNotSupportTypeTable() {
+    String tableName = RandomNameUtils.genRandomName("unspport_type_table");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    List<Type> notSupportType =
+        Arrays.asList(
+            Types.FixedType.of(10),
+            Types.IntervalDayType.get(),
+            Types.IntervalYearType.get(),
+            Types.UUIDType.get(),
+            Types.ListType.of(Types.DateType.get(), true),
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
+            Types.UnionType.of(Types.IntegerType.get()),
+            Types.StructType.of(
+                Types.StructType.Field.notNullField("col_1", Types.IntegerType.get())));
+
+    for (Type type : notSupportType) {
+      columns.clear();
+      columns.add(JdbcColumn.builder().withName("col_1").withType(Types.IntegerType.get()).build());
+      columns.add(
+          JdbcColumn.builder().withName("col_2").withType(type).withNullable(false).build());
+
+      JdbcColumn[] jdbcCols = columns.toArray(new JdbcColumn[0]);
+      IllegalArgumentException illegalArgumentException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> {
+                TABLE_OPERATIONS.create(
+                    databaseName,
+                    tableName,
+                    jdbcCols,
+                    tableComment,
+                    createProperties(),
+                    null,
+                    Distributions.hash(32, NamedReference.field("col_1")),
+                    Indexes.EMPTY_INDEXES);
+              });
+      Assertions.assertTrue(
+          illegalArgumentException
+              .getMessage()
+              .contains(
+                  String.format(
+                      "Couldn't convert Gravitino type %s to Doris type", type.simpleString())));
+    }
   }
 }

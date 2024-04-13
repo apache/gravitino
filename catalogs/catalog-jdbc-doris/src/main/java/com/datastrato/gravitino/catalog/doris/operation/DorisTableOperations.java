@@ -284,7 +284,8 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return String.format("TRUNCATE TABLE `%s`", tableName);
+    throw new UnsupportedOperationException(
+        "Doris does not support purge table in Gravitino, please use drop table");
   }
 
   @Override

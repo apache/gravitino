@@ -86,13 +86,19 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
     } else if (type instanceof Types.TimestampType) {
       return DATETIME;
     } else if (type instanceof Types.VarCharType) {
+      int length = ((Types.VarCharType) type).length();
+      if (length < 1 || length > 65533) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Type %s is invalid, length should be between 1 and 65533", type.simpleString()));
+      }
       return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";
     } else if (type instanceof Types.FixedCharType) {
       int length = ((Types.FixedCharType) type).length();
       if (length < 1 || length > 255) {
         throw new IllegalArgumentException(
             String.format(
-                "Type %s is invalid, length should be between 1 and 255", type.toString()));
+                "Type %s is invalid, length should be between 1 and 255", type.simpleString()));
       }
 
       return CHAR + "(" + ((Types.FixedCharType) type).length() + ")";
@@ -100,6 +106,6 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
       return STRING;
     }
     throw new IllegalArgumentException(
-        String.format("Couldn't convert Gravitino type %s to Doris type", type.toString()));
+        String.format("Couldn't convert Gravitino type %s to Doris type", type.simpleString()));
   }
 }
