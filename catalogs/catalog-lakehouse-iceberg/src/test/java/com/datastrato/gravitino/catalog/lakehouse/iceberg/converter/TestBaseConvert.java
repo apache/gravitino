@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -101,6 +102,13 @@ public class TestBaseConvert {
   protected static SortOrder createFunctionSortOrder(String name, String colName) {
     return SortOrders.of(
         FunctionExpression.of(name, field(colName)),
+        RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+        RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
+  }
+
+  protected static SortOrder createFunctionSortOrder(String name, int width, String colName) {
+    return SortOrders.of(
+        FunctionExpression.of(name, Literals.integerLiteral(width), field(colName)),
         RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
         RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }

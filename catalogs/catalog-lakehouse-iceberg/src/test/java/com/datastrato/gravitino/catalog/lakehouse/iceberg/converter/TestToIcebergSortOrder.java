@@ -29,6 +29,8 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
     sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("hour", "col_7"));
     sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("month", "col_8"));
     sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("year", "col_9"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("bucket", 10, "col_10"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("truncate", 2, "col_11"));
 
     Types.NestedField[] nestedFields =
         createNestedField("col_1", "col_2", "col_3", "col_4", "col_5");
@@ -40,6 +42,10 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         ArrayUtils.add(nestedFields, createNestedField(8, "col_8", Types.DateType.get()));
     nestedFields =
         ArrayUtils.add(nestedFields, createNestedField(9, "col_9", Types.DateType.get()));
+    nestedFields =
+        ArrayUtils.add(nestedFields, createNestedField(10, "col_10", Types.IntegerType.get()));
+    nestedFields =
+        ArrayUtils.add(nestedFields, createNestedField(11, "col_11", Types.StringType.get()));
     Schema schema = new Schema(nestedFields);
     org.apache.iceberg.SortOrder icebergSortOrder =
         ToIcebergSortOrder.toSortOrder(schema, sortOrders);
@@ -61,7 +67,9 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
       if (colName.equals("col_6")
           || colName.equals("col_7")
           || colName.equals("col_8")
-          || colName.equals("col_9")) {
+          || colName.equals("col_9")
+          || colName.equals("col_10")
+          || colName.equals("col_11")) {
         Assertions.assertFalse(sortField.transform().isIdentity());
       } else {
         Assertions.assertTrue(sortField.transform().isIdentity());
