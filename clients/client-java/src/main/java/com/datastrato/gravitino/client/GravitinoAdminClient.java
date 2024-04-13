@@ -8,14 +8,10 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
-import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
-import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
-import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
-import com.datastrato.gravitino.dto.responses.MetalakeResponse;
-import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.SupportsGroupOperation;
+import com.datastrato.gravitino.authorization.SupportsUserOperation;
+import com.datastrato.gravitino.authorization.User;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,9 +27,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
-public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
+public class GravitinoAdminClient extends GravitinoClientBase
+    implements SupportsMetalakes, SupportsUserOperation, SupportsGroupOperation {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
+  private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
+  private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -153,6 +152,154 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       LOG.warn("Failed to drop metadata {}", ident, e);
       return false;
     }
+  }
+
+  /**
+   * Adds a new User.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  @Override
+  public User addUser(String metalake, String user) throws UserAlreadyExistsException {
+    UserAddRequest req = new UserAddRequest(user);
+    req.validate();
+
+    UserResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_USERS_PATH, metalake, ""),
+            req,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Removes a User.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @return `true` if the User was successfully removed, `false` otherwise.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  @Override
+  public boolean removeUser(String metalake, String user) {
+    try {
+      RemoveResponse resp =
+          restClient.delete(
+              String.format(API_METALAKES_USERS_PATH, metalake, user),
+              RemoveResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.userErrorHandler());
+      resp.validate();
+      return resp.removed();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to remove user {} from metalake {}", user, metalake, e);
+      return false;
+    }
+  }
+
+  /**
+   * Gets a User.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given identifier does not exist.
+   * @throws RuntimeException If getting the User encounters storage issues.
+   */
+  @Override
+  public User getUser(String metalake, String user) throws NoSuchUserException {
+    UserResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_USERS_PATH, metalake, user),
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Adds a new Group.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param group The name of the Group.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  @Override
+  public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+    GroupAddRequest req = new GroupAddRequest(group);
+    req.validate();
+
+    GroupResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_GROUPS_PATH, metalake, ""),
+            req,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
+  }
+
+  /**
+   * Removes a Group.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param group THe name of the Group.
+   * @return `true` if the Group was successfully removed, `false` otherwise.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  @Override
+  public boolean removeGroup(String metalake, String group) {
+    try {
+      RemoveResponse resp =
+          restClient.delete(
+              String.format(API_METALAKES_GROUPS_PATH, metalake, group),
+              RemoveResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.groupErrorHandler());
+      resp.validate();
+      return resp.removed();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to remove group {} from metalake {}", group, metalake, e);
+      return false;
+    }
+  }
+
+  /**
+   * Gets a Group.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param group THe name of the Group.
+   * @return The getting Group instance.
+   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  @Override
+  public Group getGroup(String metalake, String group) throws NoSuchGroupException {
+    GroupResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, metalake, group),
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
   }
 
   /**
