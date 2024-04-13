@@ -32,6 +32,17 @@ public class Resources {
     return parent;
   }
 
+  /**
+   * Gravitino organized resources by tree structure. Root resource is a special resource. All
+   * catalogs is its children node. You can give the root resource `LOAD CATALOG`, `CREATE CATALOG`,
+   * etc. It means that you can load any catalog and create any which doesn't exist.
+   *
+   * @return The created {@link Resource}
+   */
+  public static Resource ofRoot() {
+    return new ResourceImpl(null, null);
+  }
+
   private static class ResourceImpl implements Resource {
 
     private Resource parent;
