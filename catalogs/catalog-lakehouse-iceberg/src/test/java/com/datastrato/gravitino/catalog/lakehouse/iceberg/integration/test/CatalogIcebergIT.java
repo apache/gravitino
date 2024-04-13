@@ -31,6 +31,7 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -1049,6 +1050,76 @@ public class CatalogIcebergIT extends AbstractIT {
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Iceberg's Distribution Mode.RANGE not support set expressions."));
+  }
+
+  @Test
+  public void testTableSortOrder() {
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST),
+          SortOrders.of(
+              FunctionExpression.of(
+                  "bucket", Literals.integerLiteral(10), NamedReference.field(ICEBERG_COL_NAME1)),
+              SortDirection.ASCENDING,
+              NullOrdering.NULLS_LAST),
+          SortOrders.of(
+              FunctionExpression.of(
+                  "truncate", Literals.integerLiteral(2), NamedReference.field(ICEBERG_COL_NAME3)),
+              SortDirection.ASCENDING,
+              NullOrdering.NULLS_LAST),
+        };
+    final String[] sortOrderString =
+        new String[] {
+          "iceberg_col_name2 desc nulls_first",
+          "bucket(10, iceberg_col_name1) asc nulls_last",
+          "truncate(2, iceberg_col_name3) asc nulls_last"
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    // Create a data table for Distributions.NONE
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    // check table
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        distribution,
+        sortOrders,
+        partitioning,
+        loadTable);
+
+    SortOrder[] loadedSortOrders = loadTable.sortOrder();
+    Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
+    for (int i = 0; i < sortOrders.length; i++) {
+      Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
+      Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
+      Assertions.assertEquals(sortOrderString[i], loadedSortOrders[i].toString());
+    }
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
   }
 
   protected static void assertionsTableInfo(
