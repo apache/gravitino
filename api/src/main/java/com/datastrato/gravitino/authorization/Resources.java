@@ -57,7 +57,7 @@ public class Resources {
     return ALL_CATALOGS;
   }
 
-  private static final Resource ALL_CATALOGS = new ResourceImpl(null, null);
+  private static final Resource ALL_CATALOGS = new ResourceImpl(null, "*");
 
   private static class ResourceImpl implements Resource {
 
@@ -88,10 +88,8 @@ public class Resources {
     public String toString() {
       if (parent != null) {
         return parent + "." + name;
-      } else if (name != null) {
-        return name;
       } else {
-        return "*";
+        return name;
       }
     }
 
