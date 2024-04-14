@@ -23,6 +23,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -33,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -47,16 +49,14 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    String showTablesQuery = "SHOW TABLES";
+    final List<String> names = Lists.newArrayList();
 
     try (Connection connection = getConnection(databaseName);
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(showTablesQuery)) {
-
-      List<String> names = new ArrayList<>();
-      while (resultSet.next()) {
-        String tableName = resultSet.getString(1);
-        names.add(tableName);
+        ResultSet tables = getTables(connection)) {
+      while (tables.next()) {
+        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+          names.add(tables.getString("TABLE_NAME"));
+        }
       }
       LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
       return names;
