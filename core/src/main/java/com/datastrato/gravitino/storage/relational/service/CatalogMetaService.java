@@ -112,7 +112,7 @@ public class CatalogMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, catalogEntity.nameIdentifier().toString());
       throw re;
     }
@@ -147,7 +147,7 @@ public class CatalogMetaService {
                       POConverters.updateCatalogPOWithVersion(oldCatalogPO, newEntity, metalakeId),
                       oldCatalogPO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
       throw re;
     }

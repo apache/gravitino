@@ -4,15 +4,16 @@
 # This software is licensed under the Apache License version 2.
 #
 
-# start ssh
-service ssh start
-ssh-keyscan localhost > /root/.ssh/known_hosts
-ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
-
 # start hdfs
-${HADOOP_HOME}/sbin/start-dfs.sh
+echo "Starting HDFS..."
+echo "Starting NameNode..."
+${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
+
+echo "Starting DataNode..."
+${HADOOP_HOME}/sbin/hadoop-daemon.sh start datanode
 
 # start mysql and create databases/users for hive
+echo "Starting MySQL..."
 chown -R mysql:mysql /var/lib/mysql
 usermod -d /var/lib/mysql/ mysql
 service mysql start
@@ -28,6 +29,7 @@ echo """
 """ | mysql --user=root --password=${MYSQL_PWD}
 
 # start hive
+echo "Starting Hive..."
 ${HIVE_HOME}/bin/schematool -initSchema -dbType mysql
 ${HIVE_HOME}/bin/hive --service hiveserver2 > /dev/null 2>&1 &
 ${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &

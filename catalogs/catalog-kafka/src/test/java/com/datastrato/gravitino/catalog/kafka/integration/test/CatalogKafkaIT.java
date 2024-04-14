@@ -10,9 +10,11 @@ import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadat
 import static com.datastrato.gravitino.integration.test.container.KafkaContainer.DEFAULT_BROKER_PORT;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
@@ -29,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -67,7 +70,7 @@ public class CatalogKafkaIT extends AbstractIT {
   private static AdminClient adminClient;
 
   @BeforeAll
-  public static void startUp() {
+  public static void startUp() throws ExecutionException, InterruptedException {
     CONTAINER_SUITE.startKafkaContainer();
     kafkaBootstrapServers =
         String.format(
@@ -75,13 +78,24 @@ public class CatalogKafkaIT extends AbstractIT {
             CONTAINER_SUITE.getKafkaContainer().getContainerIpAddress(), DEFAULT_BROKER_PORT);
     adminClient = AdminClient.create(ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
 
+    // create topics for testing
+    adminClient
+        .createTopics(
+            ImmutableList.of(
+                new NewTopic("topic1", 1, (short) 1),
+                new NewTopic("topic2", 1, (short) 1),
+                new NewTopic("topic3", 1, (short) 1)))
+        .all()
+        .get();
+
     createMetalake();
-    createCatalog();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+    catalog = createCatalog(CATALOG_NAME, "Kafka catalog for IT", properties);
   }
 
   @AfterAll
   public static void shutdown() {
-    // todo: add drop catalog after it's supported
     client.dropMetalake(NameIdentifier.of(METALAKE_NAME));
     if (adminClient != null) {
       adminClient.close();
@@ -92,6 +106,43 @@ public class CatalogKafkaIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
+  }
+
+  @Test
+  public void testCatalog() throws ExecutionException, InterruptedException {
+    // test create catalog
+    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    String comment = "test catalog";
+    Map<String, String> properties =
+        ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, "key1", "value1");
+    Catalog createdCatalog = createCatalog(catalogName, comment, properties);
+    Assertions.assertEquals(catalogName, createdCatalog.name());
+    Assertions.assertEquals(comment, createdCatalog.comment());
+    Assertions.assertEquals(properties, createdCatalog.properties());
+
+    // test load catalog
+    Catalog loadedCatalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    Assertions.assertEquals(createdCatalog, loadedCatalog);
+
+    // test alter catalog
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            NameIdentifier.of(METALAKE_NAME, catalogName),
+            CatalogChange.updateComment("new comment"),
+            CatalogChange.removeProperty("key1"));
+    Assertions.assertEquals("new comment", alteredCatalog.comment());
+    Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
+
+    // test drop catalog
+    boolean dropped = metalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    Assertions.assertTrue(dropped);
+    Exception exception =
+        Assertions.assertThrows(
+            NoSuchCatalogException.class,
+            () -> metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName)));
+    Assertions.assertTrue(exception.getMessage().contains(catalogName));
+    // assert topic exists in Kafka after catalog dropped
+    Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
   }
 
   @Test
@@ -181,8 +232,9 @@ public class CatalogKafkaIT extends AbstractIT {
         catalog
             .asTopicCatalog()
             .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
-    Assertions.assertEquals(1, topics.length);
-    Assertions.assertEquals(topicName, topics[0].name());
+    Assertions.assertTrue(topics.length > 0);
+    Assertions.assertTrue(
+        ImmutableList.copyOf(topics).stream().anyMatch(topic -> topic.name().equals(topicName)));
   }
 
   @Test
@@ -353,15 +405,14 @@ public class CatalogKafkaIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put(BOOTSTRAP_SERVERS, kafkaBootstrapServers);
+  private static Catalog createCatalog(
+      String catalogName, String comment, Map<String, String> properties) {
     metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
+        NameIdentifier.of(METALAKE_NAME, catalogName),
         Catalog.Type.MESSAGING,
         PROVIDER,
-        "comment",
+        comment,
         properties);
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    return metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
   }
 }
