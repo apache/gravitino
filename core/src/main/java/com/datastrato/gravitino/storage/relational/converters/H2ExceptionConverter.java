@@ -9,7 +9,10 @@ import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import java.sql.SQLException;
 
-/** Exception converter to Gravitino exception for H2. */
+/**
+ * Exception converter to Gravitino exception for H2. The definition of error codes can be found in
+ * the document: <a href="https://h2database.com/javadoc/org/h2/api/ErrorCode.html"></a>
+ */
 public class H2ExceptionConverter implements SQLExceptionConverter {
 
   @SuppressWarnings("FormatStringAnnotation")
