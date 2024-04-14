@@ -41,3 +41,22 @@ dependencies {
   testImplementation("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+sourceSets {
+  main {
+    scala {
+      setSrcDirs(listOf("src/main/scala", "src/main/java"))
+    }
+    java {
+      setSrcDirs(emptyList<String>())
+    }
+  }
+  test {
+    scala {
+      setSrcDirs(listOf("src/test/scala", "src/test/java"))
+    }
+    java {
+      setSrcDirs(emptyList<String>())
+    }
+  }
+}
