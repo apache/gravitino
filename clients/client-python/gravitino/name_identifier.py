@@ -13,62 +13,73 @@ class NameIdentifier:
     schema.
     """
 
-    DOT = '.'
+    DOT: str = '.'
+
+    _namespace: Namespace = None
+    _name: str = None
 
     def __init__(self, namespace: Namespace, name: str):
-        self.namespace = namespace
-        self.name = name
+        self._namespace = namespace
+        self._name = name
 
-    def NameIdentifier(self, namespace, name):
-        self.check(namespace is not None, "Cannot create a NameIdentifier with null namespace")
-        self.check(name is not None and name != "", "Cannot create a NameIdentifier with null or empty name")
+    def namespace(self):
+        return self._namespace
 
-        self.namespace = namespace
-        self.name = name
+    def name(self):
+        return self._name
 
     @staticmethod
     def of(*names: str) -> 'NameIdentifier':
-        """Create the NameIdentifier with the given {@link Namespace} and name.
+        """Create the NameIdentifier with the given levels of names.
+
+        Args:
+            names The names of the identifier
+
+        Returns:
+            The created NameIdentifier
+        """
+
+        NameIdentifier.check(names is not None, "Cannot create a NameIdentifier with null names")
+        NameIdentifier.check(len(names) > 0, "Cannot create a NameIdentifier with no names")
+
+        return NameIdentifier(Namespace.of(*names[:-1]), names[-1])
+
+    @staticmethod
+    def of_namespace(namespace: Namespace, name: str) -> 'NameIdentifier':
+        """Create the NameIdentifier with the given Namespace and name.
 
         Args:
             namespace: The namespace of the identifier
             name: The name of the identifier
 
-        Return:
+        Returns:
             The created NameIdentifier
-        """
-        NameIdentifier.check(names is not None, "Cannot create a NameIdentifier with null names")
-        NameIdentifier.check(len(names) != 0, "Cannot create a NameIdentifier with no names")
-
-        return NameIdentifier(Namespace.of(names[:-1]), names[-1])
-
-    @staticmethod
-    def of_namespace(namespace: Namespace, name: str) -> 'NameIdentifier':
-        """Create the metalake NameIdentifier with the given name.
-
-        Args:
-            metalake: The metalake name
-
-        Return:
-            The created metalake NameIdentifier
         """
         return NameIdentifier(namespace, name)
 
     @staticmethod
     def of_metalake(metalake: str) -> 'NameIdentifier':
+        """Create the metalake NameIdentifier with the given name.
+
+        Args:
+            metalake: The metalake name
+
+        Returns:
+            The created metalake NameIdentifier
+        """
+        return NameIdentifier.of(metalake)
+
+    @staticmethod
+    def of_catalog(metalake: str, catalog: str) -> 'NameIdentifier':
         """Create the catalog NameIdentifier with the given metalake and catalog name.
 
         Args:
             metalake: The metalake name
             catalog: The catalog name
 
-        Return:
+        Returns:
             The created catalog NameIdentifier
         """
-        return NameIdentifier.of(metalake)
-
-    @staticmethod
-    def of_catalog(metalake: str, catalog: str) -> 'NameIdentifier':
         return NameIdentifier.of(metalake, catalog)
 
     @staticmethod
@@ -80,7 +91,7 @@ class NameIdentifier:
             catalog: The catalog name
             schema: The schema name
 
-        Return:
+        Returns:
             The created schema NameIdentifier
         """
         return NameIdentifier.of(metalake, catalog, schema)
@@ -95,7 +106,7 @@ class NameIdentifier:
             schema: The schema name
             table: The table name
 
-        Return:
+        Returns:
             The created table NameIdentifier
         """
         return NameIdentifier.of(metalake, catalog, schema, table)
@@ -110,7 +121,7 @@ class NameIdentifier:
             schema: The schema name
             fileset: The fileset name
 
-        Return:
+        Returns:
             The created fileset NameIdentifier
         """
         return NameIdentifier.of(metalake, catalog, schema, fileset)
@@ -126,7 +137,7 @@ class NameIdentifier:
             schema: The schema name
             topic: The topic name
 
-        Return:
+        Returns:
             The created topic NameIdentifier
         """
         return NameIdentifier.of(metalake, catalog, schema, topic)
@@ -140,7 +151,7 @@ class NameIdentifier:
             ident: The metalake NameIdentifier to check.
         """
         NameIdentifier.check(ident is not None, "Metalake identifier must not be null")
-        Namespace.check_metalake(ident.namespace)
+        Namespace.check_metalake(ident.namespace())
 
     @staticmethod
     def check_catalog(ident: 'NameIdentifier') -> None:
@@ -150,8 +161,8 @@ class NameIdentifier:
         Args:
             ident: The catalog NameIdentifier to check.
         """
-        NameIdentifier.check(ident is None, "Catalog identifier must not be null")
-        Namespace.check_catalog(ident.namespace)
+        NameIdentifier.check(ident is not None, "Catalog identifier must not be null")
+        Namespace.check_catalog(ident.namespace())
 
     @staticmethod
     def check_schema(ident: 'NameIdentifier') -> None:
@@ -162,7 +173,7 @@ class NameIdentifier:
             ident: The schema NameIdentifier to check.
         """
         NameIdentifier.check(ident is not None, "Schema identifier must not be null")
-        Namespace.check_schema(ident.namespace)
+        Namespace.check_schema(ident.namespace())
 
     @staticmethod
     def check_table(ident: 'NameIdentifier') -> None:
@@ -173,7 +184,7 @@ class NameIdentifier:
             ident: The table NameIdentifier to check.
         """
         NameIdentifier.check(ident is not None, "Table identifier must not be null")
-        Namespace.check_table(ident.namespace)
+        Namespace.check_table(ident.namespace())
 
     @staticmethod
     def check_fileset(ident: 'NameIdentifier') -> None:
@@ -184,7 +195,7 @@ class NameIdentifier:
             ident: The fileset NameIdentifier to check.
         """
         NameIdentifier.check(ident is not None, "Fileset identifier must not be null")
-        Namespace.check_fileset(ident.namespace)
+        Namespace.check_fileset(ident.namespace())
 
     @staticmethod
     def check_topic(ident: 'NameIdentifier') -> None:
@@ -195,7 +206,7 @@ class NameIdentifier:
             ident: The topic NameIdentifier to check.
         """
         NameIdentifier.check(ident is not None, "Topic identifier must not be null")
-        Namespace.check_topic(ident.namespace)
+        Namespace.check_topic(ident.namespace())
 
     @staticmethod
     def parse(identifier: str) -> 'NameIdentifier':
@@ -204,7 +215,7 @@ class NameIdentifier:
         Args:
             identifier: The identifier string
 
-        Return:
+        Returns:
             The created NameIdentifier
         """
         NameIdentifier.check(identifier is not None and identifier != '', "Cannot parse a null or empty identifier")
@@ -215,15 +226,15 @@ class NameIdentifier:
     def has_namespace(self):
         """Check if the NameIdentifier has a namespace.
 
-        Return:
+        Returns:
             True if the NameIdentifier has a namespace, false otherwise.
         """
-        return not self.namespace.is_empty()
+        return not self.namespace().is_empty()
 
     def get_namespace(self):
         """Get the namespace of the NameIdentifier.
 
-        Return:
+        Returns:
             The namespace of the NameIdentifier.
         """
         return self.namespace
@@ -231,7 +242,7 @@ class NameIdentifier:
     def get_name(self):
         """Get the name of the NameIdentifier.
 
-        Return:
+        Returns:
             The name of the NameIdentifier.
         """
         return self.name

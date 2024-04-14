@@ -122,7 +122,7 @@ public class FilesetMetaService {
                     }
                   }));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
       throw re;
     }
@@ -177,7 +177,7 @@ public class FilesetMetaService {
                 mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
       }
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
       throw re;
     }
