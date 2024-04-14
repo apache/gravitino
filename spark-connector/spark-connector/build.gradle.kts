@@ -62,6 +62,5 @@ sourceSets {
 }
 
 tasks.withType(ScalaCompile::class.java).configureEach {
-  targetCompatibility = ""
   scalaCompileOptions.additionalParameters = listOf("-target:jvm-1.8")
 }
