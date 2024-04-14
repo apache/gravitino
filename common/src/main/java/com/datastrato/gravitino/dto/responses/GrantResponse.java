@@ -15,22 +15,22 @@ import lombok.ToString;
 public class GrantResponse extends BaseResponse {
 
   @JsonProperty("granted")
-  private final boolean added;
+  private final boolean granted;
 
   /**
    * Constructor for GrantResponse.
    *
-   * @param added Whether the remove operation was successful.
+   * @param granted Whether the remove operation was successful.
    */
-  public GrantResponse(boolean added) {
+  public GrantResponse(boolean granted) {
     super(0);
-    this.added = added;
+    this.granted = granted;
   }
 
   /** Default constructor for GrantResponse (used by Jackson deserializer). */
   public GrantResponse() {
     super();
-    this.added = false;
+    this.granted = false;
   }
 
   /**
@@ -38,7 +38,7 @@ public class GrantResponse extends BaseResponse {
    *
    * @return True if the grant operation was successful, otherwise false.
    */
-  public boolean added() {
-    return added;
+  public boolean granted() {
+    return granted;
   }
 }

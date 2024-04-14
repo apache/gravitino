@@ -15,7 +15,7 @@ import static org.mockito.Mockito.when;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.dto.requests.RoleAddRequest;
+import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.GrantResponse;
@@ -40,7 +40,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGrantOperations extends JerseyTest {
+public class TestPermissionOperations extends JerseyTest {
 
   private final AccessControlManager manager = mock(AccessControlManager.class);
 
@@ -72,7 +72,7 @@ public class TestGrantOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(GrantOperations.class);
+    resourceConfig.register(PermissionOperations.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -89,10 +89,10 @@ public class TestGrantOperations extends JerseyTest {
   public void testAddRoleToUser() {
     when(manager.addRoleToUser(any(), any(), any())).thenReturn(true);
 
-    RoleAddRequest request = new RoleAddRequest("role1");
+    RoleGrantRequest request = new RoleGrantRequest("role1");
 
     Response resp =
-        target("/metalakes/metalake1/grants/users/user/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -102,14 +102,14 @@ public class TestGrantOperations extends JerseyTest {
 
     GrantResponse grantResponse = resp.readEntity(GrantResponse.class);
     Assertions.assertEquals(0, grantResponse.getCode());
-    Assertions.assertTrue(grantResponse.added());
+    Assertions.assertTrue(grantResponse.granted());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
         .addRoleToUser(any(), any(), any());
     Response resp1 =
-        target("/metalakes/metalake1/grants/users/user/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -124,7 +124,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test to throw NoSuchUserException
     doThrow(new NoSuchUserException("mock error")).when(manager).addRoleToUser(any(), any(), any());
     resp1 =
-        target("/metalakes/metalake1/grants/users/user/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -139,7 +139,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test to throw NoSuchRoleException
     doThrow(new NoSuchRoleException("mock error")).when(manager).addRoleToUser(any(), any(), any());
     resp1 =
-        target("/metalakes/metalake1/grants/users/user/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -154,7 +154,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).addRoleToUser(any(), any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/grants/users/user/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -171,10 +171,10 @@ public class TestGrantOperations extends JerseyTest {
   public void testAddRoleToGroup() {
     when(manager.addRoleToGroup(any(), any(), any())).thenReturn(true);
 
-    RoleAddRequest request = new RoleAddRequest("role1");
+    RoleGrantRequest request = new RoleGrantRequest("role1");
 
     Response resp =
-        target("/metalakes/metalake1/grants/groups/group/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -184,14 +184,14 @@ public class TestGrantOperations extends JerseyTest {
 
     GrantResponse grantResponse = resp.readEntity(GrantResponse.class);
     Assertions.assertEquals(0, grantResponse.getCode());
-    Assertions.assertTrue(grantResponse.added());
+    Assertions.assertTrue(grantResponse.granted());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
         .addRoleToGroup(any(), any(), any());
     Response resp1 =
-        target("/metalakes/metalake1/grants/groups/group/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -208,7 +208,7 @@ public class TestGrantOperations extends JerseyTest {
         .when(manager)
         .addRoleToGroup(any(), any(), any());
     resp1 =
-        target("/metalakes/metalake1/grants/groups/group/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -225,7 +225,7 @@ public class TestGrantOperations extends JerseyTest {
         .when(manager)
         .addRoleToGroup(any(), any(), any());
     resp1 =
-        target("/metalakes/metalake1/grants/groups/group/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -240,7 +240,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).addRoleToGroup(any(), any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/grants/groups/group/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
@@ -258,7 +258,7 @@ public class TestGrantOperations extends JerseyTest {
     when(manager.removeRoleFromUser(any(), any(), any())).thenReturn(true);
 
     Response resp =
-        target("/metalakes/metalake1/grants/users/user1/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -271,7 +271,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test when failed to remove role
     when(manager.removeRoleFromUser(any(), any(), any())).thenReturn(false);
     Response resp2 =
-        target("/metalakes/metalake1/grants/users/user1/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -285,7 +285,7 @@ public class TestGrantOperations extends JerseyTest {
         .when(manager)
         .removeRoleFromUser(any(), any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/grants/users/user1/roles/role1")
+        target("/metalakes/metalake1/permissions/users/user1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -303,7 +303,7 @@ public class TestGrantOperations extends JerseyTest {
     when(manager.removeRoleFromGroup(any(), any(), any())).thenReturn(true);
 
     Response resp =
-        target("/metalakes/metalake1/grants/groups/group1/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -316,7 +316,7 @@ public class TestGrantOperations extends JerseyTest {
     // Test when failed to remove role
     when(manager.removeRoleFromGroup(any(), any(), any())).thenReturn(false);
     Response resp2 =
-        target("/metalakes/metalake1/grants/groups/group1/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();
@@ -330,7 +330,7 @@ public class TestGrantOperations extends JerseyTest {
         .when(manager)
         .removeRoleFromGroup(any(), any(), any());
     Response resp3 =
-        target("/metalakes/metalake1/grants/groups/group1/roles/role1")
+        target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .delete();

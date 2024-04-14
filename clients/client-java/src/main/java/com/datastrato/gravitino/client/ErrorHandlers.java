@@ -13,15 +13,19 @@ import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
+import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RESTException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
@@ -121,6 +125,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> topicErrorHandler() {
     return TopicErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to grant operations.
+   *
+   * @return A Consumer representing the grant error handler.
+   */
+  public static Consumer<ErrorResponse> grantErrorHandler() {
+    return GrantErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -449,6 +462,45 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Topic operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class GrantErrorHandler extends RestErrorHandler {
+
+    private static final GrantErrorHandler INSTANCE = new GrantErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
+            throw new NoSuchUserException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchGroupException.class.getSimpleName())) {
+            throw new NoSuchGroupException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
+            throw new NoSuchRoleException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new RoleAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

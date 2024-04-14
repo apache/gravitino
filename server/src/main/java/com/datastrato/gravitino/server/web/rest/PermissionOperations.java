@@ -7,7 +7,7 @@ package com.datastrato.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.dto.requests.RoleAddRequest;
+import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
 import com.datastrato.gravitino.dto.responses.GrantResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.metrics.MetricNames;
@@ -22,27 +22,27 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 
-@Path("/metalakes/{metalake}/grants")
-public class GrantOperations {
+@Path("/metalakes/{metalake}/permissions")
+public class PermissionOperations {
 
   private final AccessControlManager accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public GrantOperations(AccessControlManager accessControlManager) {
+  public PermissionOperations(AccessControlManager accessControlManager) {
     this.accessControlManager = accessControlManager;
   }
 
   @POST
-  @Path("users/{user}/roles/{role}")
+  @Path("users/{user}/roles/")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-role-to-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-role-to-user", absolute = true)
   public Response addRoleToUser(
       @PathParam("metalake") String metalake,
       @PathParam("user") String user,
-      RoleAddRequest request) {
+      RoleGrantRequest request) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -57,14 +57,14 @@ public class GrantOperations {
   }
 
   @POST
-  @Path("groups/{group}/roles/{role}")
+  @Path("groups/{group}/roles/")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-role-to-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-role-to-group", absolute = true)
   public Response addRoleToGroup(
       @PathParam("metalake") String metalake,
       @PathParam("group") String group,
-      RoleAddRequest request) {
+      RoleGrantRequest request) {
     try {
       return Utils.doAs(
           httpRequest,

@@ -20,7 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 @ToString
 @Builder
 @Jacksonized
-public class RoleAddRequest implements RESTRequest {
+public class RoleGrantRequest implements RESTRequest {
   @JsonProperty("roleName")
   private final String roleName;
 
@@ -29,12 +29,12 @@ public class RoleAddRequest implements RESTRequest {
    *
    * @param roleName The roleName for the RoleAddRequest.
    */
-  public RoleAddRequest(String roleName) {
+  public RoleGrantRequest(String roleName) {
     this.roleName = roleName;
   }
 
   /** Default constructor for RoleAddRequest. */
-  public RoleAddRequest() {
+  public RoleGrantRequest() {
     this(null);
   }
 

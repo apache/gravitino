@@ -8,12 +8,16 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
+import com.datastrato.gravitino.authorization.SupportsGrantsManagement;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
+import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.GrantResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
+import com.datastrato.gravitino.dto.responses.RevokeResponse;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.base.Preconditions;
@@ -31,9 +35,14 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
-public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
+public class GravitinoAdminClient extends GravitinoClientBase
+    implements SupportsMetalakes, SupportsGrantsManagement {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
+  private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
+  private static final String PERMISSION_USER_PATH = "users/%s/roles/%s";
+  private static final String PERMISSION_GROUP_PATH = "groups/%s/roles/%s";
+  private static final String BLANK_PLACE_HOLDER = "";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -151,6 +160,63 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     } catch (Exception e) {
       LOG.warn("Failed to drop metadata {}", ident, e);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean grantRoleToUser(String metalake, String role, String user) {
+    return grantInternal(metalake, PERMISSION_USER_PATH, role, user);
+  }
+
+  @Override
+  public boolean grantRoleToGroup(String metalake, String role, String group) {
+    return grantInternal(metalake, PERMISSION_GROUP_PATH, role, group);
+  }
+
+  @Override
+  public boolean revokeRoleFromUser(String metalake, String role, String user) {
+    return revokeInternal(metalake, PERMISSION_USER_PATH, role, user);
+  }
+
+  @Override
+  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
+    return revokeInternal(metalake, PERMISSION_GROUP_PATH, role, group);
+  }
+
+  private boolean grantInternal(String metalake, String path, String role, String name) {
+    try {
+      RoleGrantRequest request = new RoleGrantRequest(role);
+
+      GrantResponse resp =
+          restClient.post(
+              String.format(
+                  API_PERMISSION_PATH, metalake, String.format(path, name, BLANK_PLACE_HOLDER)),
+              request,
+              GrantResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.grantErrorHandler());
+      resp.validate();
+      return resp.granted();
+    } catch (Exception e) {
+      LOG.warn("Failed to revoke role {} from {}", role, name, e);
+      return false;
+    }
+  }
+
+  private boolean revokeInternal(String metalake, String pattern, String role, String name) {
+    try {
+      RevokeResponse resp =
+          restClient.delete(
+              String.format(API_PERMISSION_PATH, metalake, String.format(pattern, name, role)),
+              RevokeResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.grantErrorHandler());
+      resp.validate();
+      return resp.removed();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to grant role {} from {}", role, name, e);
       return false;
     }
   }
