@@ -127,15 +127,6 @@ public class ErrorHandlers {
     return TopicErrorHandler.INSTANCE;
   }
 
-  /**
-   * Creates an error handler specific to grant operations.
-   *
-   * @return A Consumer representing the grant error handler.
-   */
-  public static Consumer<ErrorResponse> grantErrorHandler() {
-    return GrantErrorHandler.INSTANCE;
-  }
-
   private ErrorHandlers() {}
 
   /**
@@ -462,45 +453,6 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
-
-        case ErrorConstants.INTERNAL_ERROR_CODE:
-          throw new RuntimeException(errorMessage);
-
-        default:
-          super.accept(errorResponse);
-      }
-    }
-  }
-
-  /** Error handler specific to Topic operations. */
-  @SuppressWarnings("FormatStringAnnotation")
-  private static class GrantErrorHandler extends RestErrorHandler {
-
-    private static final GrantErrorHandler INSTANCE = new GrantErrorHandler();
-
-    @Override
-    public void accept(ErrorResponse errorResponse) {
-      String errorMessage = formatErrorMessage(errorResponse);
-
-      switch (errorResponse.getCode()) {
-        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(errorMessage);
-
-        case ErrorConstants.NOT_FOUND_CODE:
-          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
-            throw new NoSuchMetalakeException(errorMessage);
-          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
-            throw new NoSuchUserException(errorMessage);
-          } else if (errorResponse.getType().equals(NoSuchGroupException.class.getSimpleName())) {
-            throw new NoSuchGroupException(errorMessage);
-          } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
-            throw new NoSuchRoleException(errorMessage);
-          } else {
-            throw new NotFoundException(errorMessage);
-          }
-
-        case ErrorConstants.ALREADY_EXISTS_CODE:
-          throw new RoleAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
