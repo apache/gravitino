@@ -66,8 +66,6 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -166,15 +164,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       if (shouldCloseClassLoader) {
         classLoader.close();
       }
-    }
-
-    @AllArgsConstructor
-    @Getter
-    @EqualsAndHashCode
-    static class IsolatedClassloaderIdentifier {
-      private final String provider;
-      private final boolean usePackage;
-      private final String packageValue;
     }
 
     private SupportsSchemas asSchemas() {
