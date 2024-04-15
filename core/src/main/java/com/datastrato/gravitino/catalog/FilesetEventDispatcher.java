@@ -27,6 +27,12 @@ import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 
+/**
+ * {@code FilesetEventDispatcher} is a decorator for {@link FilesetDispatcher} that not only
+ * delegates fileset operations to the underlying catalog dispatcher but also dispatches
+ * corresponding events to an {@link EventBus} after each operation is completed. This allows for
+ * event-driven workflows or monitoring of fileset operations.
+ */
 public class FilesetEventDispatcher implements FilesetDispatcher {
   private final EventBus eventBus;
   private final FilesetDispatcher dispatcher;
