@@ -65,7 +65,7 @@ public class TopicOperations {
             NameIdentifier[] topics =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
+                    LockType.READ,
                     () -> dispatcher.listTopics(topicNS));
             return Utils.ok(new EntityListResponse(topics));
           });
@@ -99,7 +99,7 @@ public class TopicOperations {
 
             Topic topic =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createTopic(
@@ -166,7 +166,9 @@ public class TopicOperations {
 
             Topic t =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.alterTopic(ident, changes));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.alterTopic(ident, changes));
             return Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
           });
     } catch (Exception e) {
@@ -192,7 +194,9 @@ public class TopicOperations {
             NameIdentifier ident = NameIdentifier.ofTopic(metalake, catalog, schema, topic);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.dropTopic(ident));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.dropTopic(ident));
 
             if (!dropped) {
               LOG.warn("Failed to drop topic {} under schema {}", topic, schema);

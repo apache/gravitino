@@ -33,6 +33,7 @@ import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -343,6 +344,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     .build())
             .build();
 
+    boolean createSuccess = false;
     try {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
@@ -350,9 +352,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
       }
 
-      // TODO: should avoid a race condition here
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e, null));
       store.put(e, false /* overwrite */);
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e, null));
+      createSuccess = true;
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -363,6 +365,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
       throw new RuntimeException(e3);
+    } finally {
+      if (!createSuccess) {
+        try {
+          store.delete(ident, EntityType.CATALOG);
+        } catch (IOException e4) {
+          LOG.error("Failed to clean up catalog {}", ident, e4);
+        }
+      }
     }
   }
 
@@ -497,7 +507,23 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     catalogCache.invalidate(ident);
 
     try {
+      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProvider().equals("kafka")) {
+        // Kafka catalog needs to cascade drop the default schema
+        List<SchemaEntity> schemas =
+            store.list(
+                Namespace.ofSchema(ident.namespace().level(0), ident.name()),
+                SchemaEntity.class,
+                EntityType.SCHEMA);
+        // If there is only one schema, it must be the default schema, because we don't allow to
+        // drop the default schema.
+        if (schemas.size() == 1) {
+          return store.delete(ident, EntityType.CATALOG, true);
+        }
+      }
       return store.delete(ident, EntityType.CATALOG);
+    } catch (NoSuchEntityException e) {
+      return false;
     } catch (IOException ioe) {
       LOG.error("Failed to drop catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
@@ -530,7 +556,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity, null);
+      return createCatalogWrapper(entity.withNamespace(ident.namespace()), null);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);

@@ -25,11 +25,11 @@ import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,19 +55,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    try (Connection connection = getConnection(databaseName)) {
-      try (Statement statement = connection.createStatement()) {
-        String showTablesQuery = "SHOW TABLES";
-        ResultSet resultSet = statement.executeQuery(showTablesQuery);
-        List<String> names = new ArrayList<>();
-        while (resultSet.next()) {
-          String tableName = resultSet.getString(1);
-          names.add(tableName);
+    final List<String> names = Lists.newArrayList();
+
+    try (Connection connection = getConnection(databaseName);
+        ResultSet tables = getTables(connection)) {
+      while (tables.next()) {
+        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+          names.add(tables.getString("TABLE_NAME"));
         }
-        LOG.info(
-            "Finished listing tables size {} for database name {} ", names.size(), databaseName);
-        return names;
       }
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      return names;
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
