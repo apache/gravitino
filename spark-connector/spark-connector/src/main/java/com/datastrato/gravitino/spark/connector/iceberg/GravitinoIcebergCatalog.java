@@ -3,13 +3,11 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.connector.catalog;
+package com.datastrato.gravitino.spark.connector.iceberg;
 
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
-import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
-import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConverter;
-import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
+import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
@@ -31,7 +29,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoIcebergCatalog extends BaseCatalog {
 
   @Override
-  TableCatalog createAndInitSparkCatalog(
+  protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Preconditions.checkArgument(
         properties != null, "Iceberg Catalog properties should not be null");
@@ -63,7 +61,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
   }
 
   @Override
-  SparkBaseTable createSparkTable(
+  protected SparkBaseTable createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
@@ -72,7 +70,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
   }
 
   @Override
-  PropertiesConverter getPropertiesConverter() {
+  protected PropertiesConverter getPropertiesConverter() {
     return new IcebergPropertiesConverter();
   }
 

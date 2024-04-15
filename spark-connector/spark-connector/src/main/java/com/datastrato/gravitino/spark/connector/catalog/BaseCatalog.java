@@ -83,7 +83,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    * @param properties catalog properties from Gravitino
    * @return a specific Spark catalog
    */
-  abstract TableCatalog createAndInitSparkCatalog(
+  protected abstract TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties);
 
   /**
@@ -96,7 +96,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    * @param propertiesConverter transform properties between Gravitino and Spark
    * @return a specific Spark table
    */
-  abstract SparkBaseTable createSparkTable(
+  protected abstract SparkBaseTable createSparkTable(
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       TableCatalog sparkCatalog,
@@ -107,7 +107,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    *
    * @return an PropertiesConverter
    */
-  abstract PropertiesConverter getPropertiesConverter();
+  protected abstract PropertiesConverter getPropertiesConverter();
 
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {

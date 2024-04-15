@@ -3,13 +3,12 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.spark.connector.catalog;
+package com.datastrato.gravitino.spark.connector.hive;
 
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
-import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConverter;
-import com.datastrato.gravitino.spark.connector.hive.SparkHiveTable;
+import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
@@ -23,7 +22,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoHiveCatalog extends BaseCatalog {
 
   @Override
-  TableCatalog createAndInitSparkCatalog(
+  protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Hive Catalog properties should not be null");
     String metastoreUri = properties.get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
@@ -42,7 +41,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
-  SparkBaseTable createSparkTable(
+  protected SparkBaseTable createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
@@ -51,7 +50,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
-  PropertiesConverter getPropertiesConverter() {
+  protected PropertiesConverter getPropertiesConverter() {
     return new HivePropertiesConverter();
   }
 }
