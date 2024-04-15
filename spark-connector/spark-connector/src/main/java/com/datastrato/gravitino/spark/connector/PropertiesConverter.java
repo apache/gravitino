@@ -11,5 +11,6 @@ import java.util.Map;
 public interface PropertiesConverter {
   Map<String, String> toGravitinoTableProperties(Map<String, String> properties);
 
-  Map<String, String> toSparkTableProperties(Map<String, String> properties);
+  Map<String, String> toSparkTableProperties(
+      Map<String, String> gravitinoProperties, Map<String, String> sparkProperties);
 }

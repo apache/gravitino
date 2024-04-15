@@ -9,6 +9,7 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -100,8 +101,17 @@ public class HivePropertiesConverter implements PropertiesConverter {
   }
 
   @Override
-  public Map<String, String> toSparkTableProperties(Map<String, String> properties) {
-    Map<String, String> sparkTableProperties = toOptionProperties(properties);
+  public Map<String, String> toSparkTableProperties(
+      Map<String, String> gravitinoProperties, Map<String, String> sparkProperties) {
+    Map<String, String> sparkTableProperties;
+    if (gravitinoProperties != null) {
+      sparkTableProperties = toOptionProperties(gravitinoProperties);
+    } else {
+      sparkTableProperties = new HashMap<>();
+    }
+    if (sparkProperties != null) {
+      sparkTableProperties.putAll(sparkProperties);
+    }
     String hiveTableType =
         sparkTableProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE);
 

@@ -12,7 +12,6 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -91,12 +90,10 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
 
   @Override
   public Map<String, String> properties() {
-    Map properties = new HashMap();
-    if (gravitinoTable.properties() != null) {
-      properties.putAll(gravitinoTable.properties());
-    }
-
-    properties = propertiesConverter.toSparkTableProperties(properties);
+    Map<String, String> properties;
+    properties =
+        propertiesConverter.toSparkTableProperties(
+            gravitinoTable.properties(), getSparkTable().properties());
 
     // Spark will retrieve comment from properties.
     String comment = gravitinoTable.comment();

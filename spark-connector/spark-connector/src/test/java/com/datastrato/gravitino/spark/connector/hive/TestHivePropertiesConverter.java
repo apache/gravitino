@@ -70,10 +70,8 @@ public class TestHivePropertiesConverter {
     hiveProperties =
         hivePropertiesConverter.toSparkTableProperties(
             ImmutableMap.of(
-                HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a",
-                "a",
-                "b",
-                "b"));
+                HivePropertiesConstants.GRAVITINO_HIVE_SERDE_PARAMETER_PREFIX + "a", "a", "b", "b"),
+            ImmutableMap.of());
     Assertions.assertEquals(
         ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "a", "b", "b"), hiveProperties);
   }
@@ -91,7 +89,8 @@ public class TestHivePropertiesConverter {
         hivePropertiesConverter.toSparkTableProperties(
             ImmutableMap.of(
                 HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
-                HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE));
+                HivePropertiesConstants.GRAVITINO_HIVE_EXTERNAL_TABLE),
+            ImmutableMap.of());
     Assertions.assertEquals(
         ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_EXTERNAL, "true"), hiveProperties);
   }
@@ -108,7 +107,8 @@ public class TestHivePropertiesConverter {
 
     hiveProperties =
         hivePropertiesConverter.toSparkTableProperties(
-            ImmutableMap.of(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION, location));
+            ImmutableMap.of(HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION, location),
+            ImmutableMap.of());
     Assertions.assertEquals(
         ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_LOCATION, location), hiveProperties);
   }

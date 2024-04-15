@@ -36,5 +36,9 @@ public class IcebergPropertiesConstants {
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
 
+  public static final String GRAVITINO_ID_KEY = "gravitino.identifier";
+  public static final String GRAVITINO_ICEBERG_FILE_FORMAT = "format";
+  public static final String GRAVITINO_ICEBERG_FORMAT_VERSION = "format-version";
+
   private IcebergPropertiesConstants() {}
 }
