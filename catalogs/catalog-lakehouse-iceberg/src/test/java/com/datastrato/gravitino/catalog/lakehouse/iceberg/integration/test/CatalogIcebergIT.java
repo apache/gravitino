@@ -1116,7 +1116,11 @@ public class CatalogIcebergIT extends AbstractIT {
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
       Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
-      Assertions.assertEquals(sortOrderString[i], loadedSortOrders[i].toString());
+      Assertions.assertEquals(
+          sortOrderString[i],
+          String.format(
+              "%s %s %s",
+              sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
     }
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
