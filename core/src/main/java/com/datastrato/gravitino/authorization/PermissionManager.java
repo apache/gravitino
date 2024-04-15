@@ -29,8 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * PermissionManager is used for managing the logic the granting and revoking roles. Role is used for
- * manging permissions. GrantManager will filter the invalid roles, too.
+ * PermissionManager is used for managing the logic the granting and revoking roles. Role is used
+ * for manging permissions. GrantManager will filter the invalid roles, too.
  */
 class PermissionManager {
   private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
