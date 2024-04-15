@@ -73,8 +73,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The name of the role contains one resource. For example: If the resource is a table, the
-   * identifier may be `catalog1.schema1.table1`.
+   * The resource represents a special kind of entity with a unique identifier. All resources are
+   * organized by tree structure. For example: If the resource is a table, the identifier may be
+   * `catalog1.schema1.table1`.
    *
    * @return The resource of the role.
    */
