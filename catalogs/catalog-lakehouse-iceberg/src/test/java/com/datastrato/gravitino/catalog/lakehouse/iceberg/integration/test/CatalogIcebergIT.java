@@ -4,6 +4,12 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.DEFAULT_ICEBERG_PROVIDER;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_AVRO_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_ORC_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_PARQUET_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.PROP_PROVIDER;
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -1049,6 +1055,104 @@ public class CatalogIcebergIT extends AbstractIT {
         StringUtils.contains(
             illegalArgumentException.getMessage(),
             "Iceberg's Distribution Mode.RANGE not support set expressions."));
+  }
+
+  @Test
+  void testIcebergTablePropertiesWhenCreate() {
+    String[] providers =
+        new String[] {
+          null,
+          DEFAULT_ICEBERG_PROVIDER,
+          ICEBERG_PARQUET_FILE_FORMAT,
+          ICEBERG_ORC_FILE_FORMAT,
+          ICEBERG_AVRO_FILE_FORMAT
+        };
+
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Arrays.stream(providers)
+        .forEach(
+            provider -> {
+              if (provider != null) {
+                properties.put(PROP_PROVIDER, provider);
+              }
+              if (DEFAULT_ICEBERG_PROVIDER.equals(provider)) {
+                provider = null;
+              }
+              checkIcebergTableFileFormat(
+                  tableCatalog,
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  distribution,
+                  sortOrders,
+                  provider);
+              tableCatalog.dropTable(tableIdentifier);
+            });
+
+    properties.put(PROP_PROVIDER, "text");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                columns,
+                table_comment,
+                properties,
+                partitioning,
+                distribution,
+                sortOrders));
+
+    properties.put(PROP_PROVIDER, ICEBERG_PARQUET_FILE_FORMAT);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.setProperty(PROP_PROVIDER, ICEBERG_ORC_FILE_FORMAT)));
+  }
+
+  private static void checkIcebergTableFileFormat(
+      TableCatalog tableCatalog,
+      NameIdentifier tableIdentifier,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      String expectedFileFormat) {
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier, columns, comment, properties, partitioning, distribution, sortOrders);
+    Assertions.assertEquals(expectedFileFormat, createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(expectedFileFormat, loadTable.properties().get(DEFAULT_FILE_FORMAT));
   }
 
   protected static void assertionsTableInfo(
