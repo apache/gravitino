@@ -6,7 +6,7 @@ package com.datastrato.gravitino.server;
 
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.CatalogManager;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
@@ -77,7 +77,7 @@ public class GravitinoServer extends ResourceConfig {
           @Override
           protected void configure() {
             bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
-            bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
+            bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
 
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
