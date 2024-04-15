@@ -1182,7 +1182,7 @@ public class TestEntityStorage {
                 metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .securableObject(SecurableObjects.of("catalog"))
+        .withSecurableObject(SecurableObjects.of("catalog"))
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();

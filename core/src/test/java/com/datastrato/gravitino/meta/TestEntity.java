@@ -266,7 +266,7 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .securableObject(SecurableObjects.of(catalogName))
+            .withSecurableObject(SecurableObjects.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(map)
             .build();
@@ -286,7 +286,7 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .securableObject(SecurableObjects.of(catalogName))
+            .withSecurableObject(SecurableObjects.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
