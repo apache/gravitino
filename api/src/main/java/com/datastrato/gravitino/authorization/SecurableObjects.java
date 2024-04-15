@@ -47,6 +47,70 @@ public class SecurableObjects {
   }
 
   /**
+   * Create the catalog {@link SecurableObject} with the given catalog name.
+   *
+   * @param catalog The catalog name
+   * @return The created catalog {@link SecurableObject}
+   */
+  public static SecurableObject ofCatalog(String catalog) {
+    return of(catalog);
+  }
+
+  /**
+   * Create the schema {@link SecurableObject} with the given securable catalog object and schema
+   * name.
+   *
+   * @param catalog The securable catalog object
+   * @param schema The schema name
+   * @return The created schema {@link SecurableObject}
+   */
+  public static SecurableObject ofSchema(SecurableObject catalog, String schema) {
+    checkCatalog(catalog);
+
+    return of(catalog.name(), schema);
+  }
+
+  /**
+   * Create the table {@link SecurableObject} with the given securable schema object and table name.
+   *
+   * @param schema The securable schema object
+   * @param table The table name
+   * @return The created table {@link SecurableObject}
+   */
+  public static SecurableObject ofTable(SecurableObject schema, String table) {
+    checkSchema(schema);
+
+    return of(schema.parent().name(), schema.name(), table);
+  }
+
+  /**
+   * Create the topic {@link SecurableObject} with the given securable schema object and topic name.
+   *
+   * @param schema The securable schema object
+   * @param topic The topic name
+   * @return The created topic {@link SecurableObject}
+   */
+  public static SecurableObject ofTopic(SecurableObject schema, String topic) {
+    checkSchema(schema);
+
+    return of(schema.parent().name(), schema.name(), topic);
+  }
+
+  /**
+   * Create the table {@link SecurableObject} with the given securable schema object and fileset
+   * name.
+   *
+   * @param schema The securable schema object
+   * @param fileset The fileset name
+   * @return The created fileset {@link SecurableObject}
+   */
+  public static SecurableObject ofFileset(SecurableObject schema, String fileset) {
+    checkSchema(schema);
+
+    return of(schema.parent().name(), schema.name(), fileset);
+  }
+
+  /**
    * All catalogs is a special securable object .You can give the securable object the privileges
    * `LOAD CATALOG`, `CREATE CATALOG`, etc. It means that you can load any catalog and create any
    * which doesn't exist.
@@ -55,6 +119,24 @@ public class SecurableObjects {
    */
   public static SecurableObject ofAllCatalogs() {
     return ALL_CATALOGS;
+  }
+
+  private static void checkSchema(SecurableObject schema) {
+    if (schema == null) {
+      throw new IllegalArgumentException("Securable schema object can't be null");
+    }
+    checkCatalog(schema.parent());
+  }
+
+  private static void checkCatalog(SecurableObject catalog) {
+    if (catalog == null) {
+      throw new IllegalArgumentException("Securable catalog object can't be null");
+    }
+
+    if (catalog.parent() != null) {
+      throw new IllegalArgumentException(
+          String.format("The parent of securable catalog object %s must be null", catalog.name()));
+    }
   }
 
   private static final SecurableObject ALL_CATALOGS = new SecurableObjectImpl(null, "*");
