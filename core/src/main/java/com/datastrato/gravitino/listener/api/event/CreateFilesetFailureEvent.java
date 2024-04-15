@@ -6,9 +6,11 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 
 /** Represents an event triggered upon the unsuccessful attempt to create a fileset. */
+@DeveloperApi
 public final class CreateFilesetFailureEvent extends FilesetFailureEvent {
   private final FilesetInfo createFilesetRequest;
 

@@ -6,10 +6,12 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to drop a fileset from the system fails.
  */
+@DeveloperApi
 public final class DropFilesetFailureEvent extends FilesetFailureEvent {
   /**
    * Constructs a new {@code DropFilesetFailureEvent}.

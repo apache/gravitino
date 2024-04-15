@@ -6,12 +6,14 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.file.FilesetChange;
 
 /**
  * Represents an event that is generated when an attempt to alter a fileset fails due to an
  * exception.
  */
+@DeveloperApi
 public final class AlterFilesetFailureEvent extends FilesetFailureEvent {
   private final FilesetChange[] filesetChanges;
 

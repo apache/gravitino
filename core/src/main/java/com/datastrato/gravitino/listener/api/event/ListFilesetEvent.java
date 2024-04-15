@@ -7,10 +7,12 @@ package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is triggered upon the successful listing of filesets within a system.
  */
+@DeveloperApi
 public final class ListFilesetEvent extends FilesetEvent {
   private final Namespace namespace;
   /**

@@ -23,7 +23,7 @@ public abstract class FilesetFailureEvent extends FailureEvent {
    * fileset operation.
    *
    * @param user The user associated with the failed fileset operation.
-   * @param identifier The identifier of the table that was involved in the failed operation.
+   * @param identifier The identifier of the fileset that was involved in the failed operation.
    * @param exception The exception that was thrown during the fileset operation, indicating the
    *     cause of the failure.
    */

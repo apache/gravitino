@@ -7,10 +7,12 @@ package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is triggered when an attempt to list filesets within a namespace fails.
  */
+@DeveloperApi
 public final class ListFilesetFailureEvent extends FilesetFailureEvent {
   private final Namespace namespace;
 

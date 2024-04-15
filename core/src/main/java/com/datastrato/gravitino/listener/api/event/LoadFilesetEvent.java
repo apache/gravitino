@@ -25,9 +25,9 @@ public final class LoadFilesetEvent extends FilesetEvent {
     this.loadedFilesetInfo = loadedFilesetInfo;
   }
 
-
   /**
-   * Retrieves the state of the fileset as it was made available to the user after successful loading.
+   * Retrieves the state of the fileset as it was made available to the user after successful
+   * loading.
    *
    * @return A {@link FilesetInfo} instance encapsulating the details of the fileset as loaded.
    */

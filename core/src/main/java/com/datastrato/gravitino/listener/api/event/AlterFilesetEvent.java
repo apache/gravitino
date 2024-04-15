@@ -6,10 +6,12 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 
 /** Represents an event that occurs when a fileset is altered. */
+@DeveloperApi
 public final class AlterFilesetEvent extends FilesetEvent {
   private final FilesetInfo updatedFilesetInfo;
   private final FilesetChange[] filesetChanges;

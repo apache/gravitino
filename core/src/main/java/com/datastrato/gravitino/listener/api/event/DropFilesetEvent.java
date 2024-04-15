@@ -6,8 +6,10 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that occurs when a fileset is dropped from the system. */
+@DeveloperApi
 public final class DropFilesetEvent extends FilesetEvent {
   private final boolean isExists;
 
