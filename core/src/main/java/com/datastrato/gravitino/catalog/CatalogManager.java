@@ -23,7 +23,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
-import com.datastrato.gravitino.catalog.CatalogManager.CatalogWrapper.IsolatedClassloaderIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -82,18 +81,21 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
-  // Map to store the isolated class loaders for each catalog provider, each provider may have
-  // multiple isolated class loaders with different package values.
-  // Note: Unless you are assured that the class loader is not used anymore, you should not remove
-  // the class loader from the map and close the class loader.
-  @VisibleForTesting
-  static final Map<IsolatedClassloaderIdentifier, IsolatedClassLoader> CLASS_LOADER_MAP =
-      Maps.newConcurrentMap();
-
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
     private BaseCatalog catalog;
-    private IsolatedClassLoader classLoader;
+    @Getter private IsolatedClassLoader classLoader;
+
+    /**
+     * Whether the class loader should be closed when the catalog is closed. This is set to true by
+     * default, in some cases, the class loader should not be closed when the catalog is closed,
+     * such a catalog is renamed and the class loader is reused.
+     */
+    private boolean shouldCloseClassLoader = true;
+
+    public void setShouldCloseClassLoader(boolean shouldCloseClassLoader) {
+      this.shouldCloseClassLoader = shouldCloseClassLoader;
+    }
 
     public CatalogWrapper(BaseCatalog catalog, IsolatedClassLoader classLoader) {
       this.catalog = catalog;
@@ -158,6 +160,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             });
       } catch (Exception e) {
         LOG.warn("Failed to close catalog", e);
+      }
+
+      if (shouldCloseClassLoader) {
+        classLoader.close();
       }
     }
 
@@ -345,7 +351,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       }
 
       // TODO: should avoid a race condition here
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e, null));
       store.put(e, false /* overwrite */);
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
@@ -416,7 +422,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new RuntimeException(e);
     }
 
-    catalogCache.invalidate(ident);
     try {
       CatalogEntity updatedCatalog =
           store.update(
@@ -450,10 +455,22 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
                 return newCatalogBuilder.build();
               });
-      return catalogCache.get(
-              updatedCatalog.nameIdentifier(), id -> createCatalogWrapper(updatedCatalog))
-          .catalog;
 
+      catalogWrapper.setShouldCloseClassLoader(false);
+      catalogCache.invalidate(ident);
+
+      try {
+        CatalogWrapper updateCatalogWrapper =
+            catalogCache.get(
+                updatedCatalog.nameIdentifier(),
+                id -> createCatalogWrapper(updatedCatalog, catalogWrapper.classLoader));
+        return updateCatalogWrapper.catalog;
+      } catch (Exception e) {
+        // If we failed to create the new catalog wrapper, we should close the class loader
+        // manually.
+        catalogWrapper.classLoader.close();
+        throw e;
+      }
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
@@ -513,7 +530,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity);
+      return createCatalogWrapper(entity, null);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
@@ -525,27 +542,26 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
-  private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
+  private CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity, IsolatedClassLoader reusedClassLoader) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    IsolatedClassLoader classLoader =
-        CLASS_LOADER_MAP.computeIfAbsent(
-            new IsolatedClassloaderIdentifier(
-                provider,
-                config.get(Configs.CATALOG_LOAD_ISOLATED),
-                conf.get(Catalog.PROPERTY_PACKAGE)),
-            k -> {
-              if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-                String pkgPath = buildPkgPath(conf, provider);
-                String confPath = buildConfPath(conf, provider);
-                return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
-              } else {
-                // This will use the current class loader, it is mainly used for test.
-                return new IsolatedClassLoader(
-                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-              }
-            });
+    IsolatedClassLoader classLoader;
+    if (reusedClassLoader != null) {
+      classLoader = reusedClassLoader;
+    } else {
+      if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+        String pkgPath = buildPkgPath(conf, provider);
+        String confPath = buildConfPath(conf, provider);
+        classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+      } else {
+        // This will use the current class loader, it is mainly used for test.
+        classLoader =
+            new IsolatedClassLoader(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+      }
+    }
 
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);

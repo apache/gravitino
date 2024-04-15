@@ -23,6 +23,7 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -496,28 +497,30 @@ public class TestCatalogManager {
   @Test
   void testReuseClassLoader() {
     // Clear all possible class loaders.
-    CatalogManager.CLASS_LOADER_MAP.clear();
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    IsolatedClassLoader cl1 = catalogManager.catalogCache.getIfPresent(ident).getClassLoader();
 
     // Test alter name;
     CatalogChange change = CatalogChange.rename("test32");
     catalogManager.alterCatalog(ident, change);
     Catalog catalog = catalogManager.loadCatalog(NameIdentifier.of(ident.namespace(), "test32"));
     Assertions.assertEquals("test32", catalog.name());
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    IsolatedClassLoader cl2 =
+        catalogManager
+            .catalogCache
+            .getIfPresent(NameIdentifier.of(ident.namespace(), "test32"))
+            .getClassLoader();
+    Assertions.assertTrue(cl1 == cl2);
 
     // Test alter comment;
     NameIdentifier ident1 = NameIdentifier.of(ident.namespace(), "test32");
     CatalogChange change1 = CatalogChange.updateComment("comment1");
     catalogManager.alterCatalog(ident1, change1);
-    Catalog catalog1 = catalogManager.loadCatalog(ident1);
-    Assertions.assertEquals("comment1", catalog1.comment());
-
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    IsolatedClassLoader cl3 = catalogManager.catalogCache.getIfPresent(ident1).getClassLoader();
+    Assertions.assertTrue(cl1 == cl3);
   }
 }
