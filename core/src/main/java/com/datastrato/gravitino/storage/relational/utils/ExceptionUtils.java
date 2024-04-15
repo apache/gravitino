@@ -5,22 +5,17 @@
 package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
-import java.sql.SQLIntegrityConstraintViolationException;
+import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
+import java.sql.SQLException;
 
 public class ExceptionUtils {
   private ExceptionUtils() {}
 
-  public static void checkSQLConstraintException(
+  public static void checkSQLException(
       RuntimeException re, Entity.EntityType type, String entityName) {
-    if (re.getCause() != null
-        && re.getCause() instanceof SQLIntegrityConstraintViolationException) {
-      // TODO We should make more fine-grained exception judgments
-      //  Usually throwing `SQLIntegrityConstraintViolationException` means that
-      //  SQL violates the constraints of `primary key` and `unique key`.
-      //  We simply think that the entity already exists at this time.
-      throw new EntityAlreadyExistsException(
-          String.format("%s entity: %s already exists", type.name(), entityName));
+    if (re.getCause() instanceof SQLException) {
+      throw SQLExceptionConverterFactory.getConverter()
+          .toGravitinoException((SQLException) re.getCause(), type, entityName);
     }
   }
 }

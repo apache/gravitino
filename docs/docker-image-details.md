@@ -82,6 +82,10 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.10
+  - Remove SSH service from the startup script.
+  - Use `hadoop-daemon.sh` to start HDFS services.
+
 - gravitino-ci-hive:0.1.9
   - Remove cache after installing packages.
 
@@ -166,11 +170,21 @@ You can use this image to test Apache Doris.
 
 Changelog
 
+- gravitino-ci-doris:0.1.3
+  - To adapt to the CI framework, don't exit container when start failed, logs are no longer printed to stdout. 
+  - Add `report_disk_state_interval_seconds` config to decrease report interval.
+
+- gravitino-ci-doris:0.1.2
+  - Add a check for the status of Doris BE, add retry for adding BE nodes.
+
+- gravitino-ci-doris:0.1.1
+  - Optimize `start.sh`, add disk space check before starting Doris, exit when FE or BE start failed, add log to stdout
+
 - gravitino-ci-doris:0.1.0
-    - Docker image `datastrato/gravitino-ci-doris:0.1.0`
-    - Start Doris BE & FE in one container
-    - Please set table properties `"replication_num" = "1"` when creating a table in Doris, because the default replication number is 3, but the Doris container only has one BE.
-    - Username: `root`, Password: N/A (password is empty)
-    - Expose ports:
-        - `8030` Doris FE HTTP port
-        - `9030` Doris FE MySQL server port
+  - Docker image `datastrato/gravitino-ci-doris:0.1.0`
+  - Start Doris BE & FE in one container
+  - Please set table properties `"replication_num" = "1"` when creating a table in Doris, because the default replication number is 3, but the Doris container only has one BE.
+  - Username: `root`, Password: N/A (password is empty)
+  - Expose ports:
+    - `8030` Doris FE HTTP port
+    - `9030` Doris FE MySQL server port

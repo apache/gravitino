@@ -481,6 +481,21 @@ public class TestIcebergTable {
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());
 
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.StringType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.alterTable(
+                    NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
+                    withDefaultValue));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support column default value"),
+        "The exception message is: " + exception.getMessage());
+
     // test delete column change
     icebergCatalog
         .asTableCatalog()

@@ -809,6 +809,118 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(2, count);
   }
 
+  @Test
+  public void testDropPartition() throws TException, InterruptedException, IOException {
+    Table createdTable = preparePartitionedTable();
+
+    // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field1 = new String[] {"hive_col_name2"};
+    String[] field2 = new String[] {"hive_col_name3"};
+    Literal<?> literal1 = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
+    Literal<?> literal2 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity =
+        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
+    IdentityPartition partitionAdded =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
+    Assertions.assertEquals(
+        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+
+    // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name());
+    Assertions.assertTrue(dropRes1);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded.name())));
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, createdTable.name()));
+    Path partitionDirectory = new Path(hiveTab.getSd().getLocation() + identity.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory), "The partition directory should not exist");
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field3 = new String[] {"hive_col_name2"};
+    String[] field4 = new String[] {"hive_col_name3"};
+    Literal<?> literal3 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal4 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity1 =
+        Partitions.identity(new String[][] {field3, field4}, new Literal<?>[] {literal3, literal4});
+    IdentityPartition partitionAdded1 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity1);
+
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
+    Assertions.assertEquals(
+        partitionAdded1.values()[0].value().toString(), partitionGot1.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded1.values()[1].value().toString(), partitionGot1.getValues().get(1));
+    Assertions.assertEquals(partitionAdded1.properties(), partitionGot1.getParameters());
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test3"
+    String[] field5 = new String[] {"hive_col_name2"};
+    String[] field6 = new String[] {"hive_col_name3"};
+    Literal<?> literal5 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal6 = Literals.stringLiteral("gravitino_it_test3");
+    Partition identity2 =
+        Partitions.identity(new String[][] {field5, field6}, new Literal<?>[] {literal5, literal6});
+    IdentityPartition partitionAdded2 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity2);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
+    Assertions.assertEquals(
+        partitionAdded2.values()[0].value().toString(), partitionGot2.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded2.values()[1].value().toString(), partitionGot2.getValues().get(1));
+    Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.getParameters());
+
+    // test drop partition "hive_col_name2=2024-01-02"
+    boolean dropRes2 = createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02");
+    Assertions.assertTrue(dropRes2);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded1.name())));
+    Path partitionDirectory1 = new Path(hiveTab.getSd().getLocation() + identity1.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory1), "The partition directory should not exist");
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded2.name())));
+    Path partitionDirectory2 = new Path(hiveTab.getSd().getLocation() + identity2.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory2), "The partition directory should not exist");
+
+    // test no-exist partition with ifExist=false
+    Assertions.assertFalse(createdTable.supportPartitions().dropPartition(partitionAdded.name()));
+  }
+
+  @Test
+  public void testPurgePartition()
+      throws InterruptedException, UnsupportedOperationException, TException {
+    Table createdTable = preparePartitionedTable();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> createdTable.supportPartitions().purgePartition("testPartition"));
+  }
+
   private Table preparePartitionedTable() throws TException, InterruptedException {
     Column[] columns = createColumns();
 
@@ -970,6 +1082,21 @@ public class CatalogHiveIT extends AbstractIT {
               tableCatalog.alterTable(id, updateType);
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
+
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
 
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");

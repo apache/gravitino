@@ -5,4 +5,13 @@
 #
 cd "$(dirname "$0")"
 
-docker-compose down
+# change the hive container's logs directory permission
+docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
+docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
+
+# for trace file permission
+ls -l ../build/trino-ci-container-log
+ls -l ../build/trino-ci-container-log/hive
+ls -l ../build/trino-ci-container-log/hdfs
+
+docker compose down

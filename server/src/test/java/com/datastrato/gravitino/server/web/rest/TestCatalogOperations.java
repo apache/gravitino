@@ -22,6 +22,7 @@ import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdatesRequest;
+import com.datastrato.gravitino.dto.responses.CatalogListResponse;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
@@ -125,6 +126,57 @@ public class TestCatalogOperations extends JerseyTest {
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogs(any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testListCatalogsInfo() {
+    TestCatalog catalog1 = buildCatalog("metalake1", "catalog1");
+    TestCatalog catalog2 = buildCatalog("metalake1", "catalog2");
+
+    when(manager.listCatalogsInfo(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    CatalogListResponse catalogResponse = resp.readEntity(CatalogListResponse.class);
+    Assertions.assertEquals(0, catalogResponse.getCode());
+
+    CatalogDTO[] catalogDTOs = catalogResponse.getCatalogs();
+    Assertions.assertEquals(2, catalogDTOs.length);
+
+    CatalogDTO catalogDTO1 = catalogDTOs[0];
+    Assertions.assertEquals("catalog1", catalogDTO1.name());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO1.type());
+    Assertions.assertEquals("comment", catalogDTO1.comment());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO1.properties());
+
+    CatalogDTO catalogDTO2 = catalogDTOs[1];
+    Assertions.assertEquals("catalog2", catalogDTO2.name());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO2.type());
+    Assertions.assertEquals("comment", catalogDTO2.comment());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO2.properties());
+
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogsInfo(any());
+    Response resp1 =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();

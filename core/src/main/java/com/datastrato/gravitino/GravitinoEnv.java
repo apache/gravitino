@@ -4,9 +4,17 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TableEventDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.listener.EventBus;
+import com.datastrato.gravitino.listener.EventListenerManager;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
@@ -31,9 +39,17 @@ public class GravitinoEnv {
 
   private CatalogManager catalogManager;
 
-  private CatalogOperationDispatcher catalogOperationDispatcher;
+  private SchemaOperationDispatcher schemaOperationDispatcher;
+
+  private TableDispatcher tableDispatcher;
+
+  private FilesetOperationDispatcher filesetOperationDispatcher;
+
+  private TopicOperationDispatcher topicOperationDispatcher;
 
   private MetalakeManager metalakeManager;
+
+  private AccessControlManager accessControlManager;
 
   private IdGenerator idGenerator;
 
@@ -42,6 +58,7 @@ public class GravitinoEnv {
   private MetricsSystem metricsSystem;
 
   private LockManager lockManager;
+  private EventListenerManager eventListenerManager;
 
   private GravitinoEnv() {}
 
@@ -71,6 +88,17 @@ public class GravitinoEnv {
   }
 
   /**
+   * This method is used for testing purposes only to set the access manager for test in package
+   * `com.datastrato.gravitino.server.web.rest`.
+   *
+   * @param accessControlManager The access control manager to be set.
+   */
+  @VisibleForTesting
+  public void setAccessControlManager(AccessControlManager accessControlManager) {
+    this.accessControlManager = accessControlManager;
+  }
+
+  /**
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
@@ -89,13 +117,33 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    this.eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+    EventBus eventBus = eventListenerManager.createEventBus();
+
     // Create and initialize metalake related modules
     this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.catalogOperationDispatcher =
-        new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TableOperationDispatcher tableOperationDispatcher =
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
+    this.filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    // Create and initialize access control related modules
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
@@ -135,12 +183,39 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogOperationDispatcher instance.
+   * @return The SchemaOperationDispatcher instance.
    */
-  public CatalogOperationDispatcher catalogOperationDispatcher() {
-    return catalogOperationDispatcher;
+  public SchemaOperationDispatcher schemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
+
+  /**
+   * Get the TableDispatcher associated with the Gravitino environment.
+   *
+   * @return The TableDispatcher instance.
+   */
+  public TableDispatcher tableDispatcher() {
+    return tableDispatcher;
+  }
+
+  /**
+   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The FilesetOperationDispatcher instance.
+   */
+  public FilesetOperationDispatcher filesetOperationDispatcher() {
+    return filesetOperationDispatcher;
+  }
+
+  /**
+   * Get the TopicOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The TopicOperationDispatcher instance.
+   */
+  public TopicOperationDispatcher topicOperationDispatcher() {
+    return topicOperationDispatcher;
   }
 
   /**
@@ -174,9 +249,19 @@ public class GravitinoEnv {
     return lockManager;
   }
 
+  /**
+   * Get the AccessControlManager associated with the Gravitino environment.
+   *
+   * @return The AccessControlManager instance.
+   */
+  public AccessControlManager accessControlManager() {
+    return accessControlManager;
+  }
+
   public void start() {
     auxServiceManager.serviceStart();
     metricsSystem.start();
+    eventListenerManager.start();
   }
 
   /** Shutdown the Gravitino environment. */
@@ -205,6 +290,10 @@ public class GravitinoEnv {
 
     if (metricsSystem != null) {
       metricsSystem.close();
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
     }
 
     LOG.info("Gravitino Environment is shut down.");

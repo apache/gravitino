@@ -14,8 +14,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.TestEntityStore;
-import com.datastrato.gravitino.TestEntityStore.InMemoryEntityStore;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -23,6 +21,9 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -64,7 +65,7 @@ public class TestCatalogManager {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
-    entityStore = new TestEntityStore.InMemoryEntityStore();
+    entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
@@ -359,6 +360,39 @@ public class TestCatalogManager {
   }
 
   @Test
+  public void testListCatalogsInfo() {
+    NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
+    NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
+    Map<String, String> props = ImmutableMap.of("provider", "test");
+
+    catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
+
+    Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
+    Assertions.assertEquals(2, catalogs.length);
+    for (Catalog catalog : catalogs) {
+      Assertions.assertTrue(
+          catalog.name().equals("catalog_rel") || catalog.name().equals("catalog_file"));
+      Assertions.assertEquals("comment", catalog.comment());
+      testProperties(props, catalog.properties());
+
+      if (catalog.name().equals("catalog_rel")) {
+        Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
+      } else {
+        Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
+      }
+    }
+
+    // Test list under non-existed metalake
+    NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
+    Namespace namespace = ident2.namespace();
+    Throwable exception =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> catalogManager.listCatalogsInfo(namespace));
+    Assertions.assertTrue(exception.getMessage().contains("Metalake metalake1 does not exist"));
+  }
+
+  @Test
   public void testLoadCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
     Map<String, String> props = ImmutableMap.of("provider", "test");
@@ -462,29 +496,37 @@ public class TestCatalogManager {
 
   @Test
   void testReuseClassLoader() {
+
+    CatalogManager customCatalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator());
     // Clear all possible class loaders.
-    CatalogManager.CLASS_LOADER_MAP.clear();
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    customCatalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    IsolatedClassLoader cl1 =
+        customCatalogManager.catalogCache.getIfPresent(ident).getClassLoader();
 
     // Test alter name;
     CatalogChange change = CatalogChange.rename("test32");
-    catalogManager.alterCatalog(ident, change);
-    Catalog catalog = catalogManager.loadCatalog(NameIdentifier.of(ident.namespace(), "test32"));
+    customCatalogManager.alterCatalog(ident, change);
+    Catalog catalog =
+        customCatalogManager.loadCatalog(NameIdentifier.of(ident.namespace(), "test32"));
     Assertions.assertEquals("test32", catalog.name());
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    IsolatedClassLoader cl2 =
+        customCatalogManager
+            .catalogCache
+            .getIfPresent(NameIdentifier.of(ident.namespace(), "test32"))
+            .getClassLoader();
+    Assertions.assertTrue(cl1 == cl2);
 
     // Test alter comment;
     NameIdentifier ident1 = NameIdentifier.of(ident.namespace(), "test32");
     CatalogChange change1 = CatalogChange.updateComment("comment1");
-    catalogManager.alterCatalog(ident1, change1);
-    Catalog catalog1 = catalogManager.loadCatalog(ident1);
-    Assertions.assertEquals("comment1", catalog1.comment());
-
-    Assertions.assertEquals(1, CatalogManager.CLASS_LOADER_MAP.size());
+    customCatalogManager.alterCatalog(ident1, change1);
+    IsolatedClassLoader cl3 =
+        customCatalogManager.catalogCache.getIfPresent(ident1).getClassLoader();
+    Assertions.assertTrue(cl1 == cl3);
   }
 }

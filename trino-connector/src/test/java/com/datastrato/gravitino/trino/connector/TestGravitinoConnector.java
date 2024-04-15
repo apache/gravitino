@@ -22,26 +22,18 @@ import io.trino.testing.QueryRunner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
-import org.testng.annotations.BeforeMethod;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
 @Parameters({"-Xmx4G"})
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestGravitinoConnector.class);
-
   GravitinoMockServer server;
-
-  @BeforeMethod
-  public void reloadCatalog() {
-    server.reloadCatalogs();
-  }
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
@@ -54,8 +46,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       // queryRunner = LocalQueryRunner.builder(session).build();
       queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
-      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin();
-      gravitinoPlugin.setGravitinoClient(gravitinoClient);
+      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
       queryRunner.installPlugin(new MemoryPlugin());
 
@@ -77,21 +68,14 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();
-      catalogConnectorManager.setGravitinoClient(gravitinoClient);
       server.setCatalogConnectorManager(catalogConnectorManager);
       // Wait for the catalog to be created. Wait for at least 30 seconds.
-      int max_tries = 35;
-      while (catalogConnectorManager.getCatalogs().isEmpty() && max_tries > 0) {
-        Thread.sleep(1000);
-        max_tries--;
-      }
-
-      if (max_tries == 0) {
-        throw new RuntimeException("Failed to create catalog in about 35 seconds...");
-      }
-
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Create query runner failed", e);
     }
     return queryRunner;
   }

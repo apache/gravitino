@@ -33,13 +33,13 @@ public abstract class Config {
   private final ConcurrentMap<String, String> configMap;
 
   private final Map<String, DeprecatedConfig> deprecatedConfigMap;
-  // Constant Array to hold all deprecated configurations
+  // Constant Array to hold all deprecated configuration keys, when a configuration is deprecated,
+  // we should add it here.
   private final DeprecatedConfig[] deprecatedConfigs = {
-    // Example deprecated configuration
-    //    new DeprecatedConfig(
-    //        "gravitino.test.string",
-    //        "1.0",
-    //        "Please use gravitino.test.string1 instead."),
+    new DeprecatedConfig(
+        "gravitino.entity.store.kv.deleteAfterTimeMs",
+        "0.5.0",
+        "Please use gravitino.entity.store.deleteAfterTimeMs instead."),
   };
 
   /**
@@ -240,7 +240,7 @@ public abstract class Config {
   }
 
   /** The DeprecatedConfig class represents a configuration entry that has been deprecated. */
-  private class DeprecatedConfig {
+  private static class DeprecatedConfig {
     private final String key;
     private final String version;
     private final String deprecationMessage;

@@ -16,6 +16,8 @@ import com.datastrato.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import java.util.Map;
 
 /** Implementation of a Mysql catalog in Gravitino. */
 public class MysqlCatalog extends JdbcCatalog {
@@ -26,12 +28,24 @@ public class MysqlCatalog extends JdbcCatalog {
   }
 
   @Override
+  protected CatalogOperations newOps(Map<String, String> config) {
+    JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
+    return new MySQLCatalogOperations(
+        createExceptionConverter(),
+        jdbcTypeConverter,
+        createJdbcDatabaseOperations(),
+        createJdbcTableOperations(),
+        createJdbcTablePropertiesMetadata(),
+        createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
   protected JdbcExceptionConverter createExceptionConverter() {
     return new MysqlExceptionConverter();
   }
 
   @Override
-  protected JdbcTypeConverter createJdbcTypeConverter() {
+  protected JdbcTypeConverter<String> createJdbcTypeConverter() {
     return new MysqlTypeConverter();
   }
 

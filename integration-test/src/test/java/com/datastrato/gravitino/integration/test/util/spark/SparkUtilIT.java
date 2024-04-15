@@ -131,11 +131,19 @@ public abstract class SparkUtilIT extends AbstractIT {
     }
   }
 
+  protected void createTableAsSelect(String tableName, String newName) {
+    sql(String.format("CREATE TABLE %s AS SELECT * FROM %s", newName, tableName));
+  }
+
+  protected void insertTableAsSelect(String tableName, String newName) {
+    sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
+  }
+
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
 
-  private List<Object[]> rowsToJava(List<Row> rows) {
+  protected List<Object[]> rowsToJava(List<Row> rows) {
     return rows.stream().map(this::toJava).collect(Collectors.toList());
   }
 

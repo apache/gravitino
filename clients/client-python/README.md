@@ -5,9 +5,27 @@
 
 # Quick Start
 
-1. Install dependency
+1. Install current library in your local machine. 
     ```bash
-    pip install -r requirements.txt
+    pip install -e .
     ```
 
-2. After the packages is installed, you can simply run `pytest` in any directory inside gravitino/
+# Development Environment
+
+1. Install dependency
+    ```bash
+    pip install -e '.[dev]'
+    ```
+   
+2. Run tests
+    ```bash
+    cd gravitino
+    ./gradlew :clients:client-python:test
+    ```
+
+3. Run integration tests
+    ```bash
+    cd gravitino
+    ./gradlew compileDistribution -x test
+    ./gradlew :clients:client-python:integrationTest
+    ```

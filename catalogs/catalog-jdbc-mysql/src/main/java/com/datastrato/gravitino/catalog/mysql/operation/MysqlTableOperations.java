@@ -25,11 +25,11 @@ import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,19 +55,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    try (Connection connection = getConnection(databaseName)) {
-      try (Statement statement = connection.createStatement()) {
-        String showTablesQuery = "SHOW TABLES";
-        ResultSet resultSet = statement.executeQuery(showTablesQuery);
-        List<String> names = new ArrayList<>();
-        while (resultSet.next()) {
-          String tableName = resultSet.getString(1);
-          names.add(tableName);
+    final List<String> names = Lists.newArrayList();
+
+    try (Connection connection = getConnection(databaseName);
+        ResultSet tables = getTables(connection)) {
+      while (tables.next()) {
+        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+          names.add(tables.getString("TABLE_NAME"));
         }
-        LOG.info(
-            "Finished listing tables size {} for database name {} ", names.size(), databaseName);
-        return names;
       }
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      return names;
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
@@ -305,6 +303,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadTable));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -534,6 +538,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
+    // Append default value if available
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
+    }
+
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
@@ -627,6 +639,25 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
     return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+  }
+
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    JdbcColumn newColumn =
+        JdbcColumn.builder()
+            .withName(col)
+            .withType(column.dataType())
+            .withNullable(column.nullable())
+            .withComment(column.comment())
+            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
+            .build();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
   private String updateColumnTypeFieldDefinition(

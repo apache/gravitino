@@ -11,5 +11,7 @@ public enum OperationType {
   ALTER,
   DROP,
   /** This is a special operation type that is used to get a partition from a table. */
-  GET
+  GET,
+  ADD,
+  REMOVE
 }

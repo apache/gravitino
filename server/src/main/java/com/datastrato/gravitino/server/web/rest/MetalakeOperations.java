@@ -66,7 +66,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             BaseMetalake[] metalakes =
-                TreeLockUtils.doWithRootTreeLock(LockType.WRITE, manager::listMetalakes);
+                TreeLockUtils.doWithRootTreeLock(LockType.READ, manager::listMetalakes);
             MetalakeDTO[] metalakeDTOS =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             return Utils.ok(new MetalakeListResponse(metalakeDTOS));
@@ -90,8 +90,7 @@ public class MetalakeOperations {
             request.validate();
             NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
             BaseMetalake metalake =
-                TreeLockUtils.doWithTreeLock(
-                    ident,
+                TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE,
                     () ->
                         manager.createMetalake(
@@ -144,8 +143,8 @@ public class MetalakeOperations {
                     .map(MetalakeUpdateRequest::metalakeChange)
                     .toArray(MetalakeChange[]::new);
             BaseMetalake updatedMetalake =
-                TreeLockUtils.doWithTreeLock(
-                    identifier, LockType.WRITE, () -> manager.alterMetalake(identifier, changes));
+                TreeLockUtils.doWithRootTreeLock(
+                    LockType.WRITE, () -> manager.alterMetalake(identifier, changes));
             return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
           });
 
@@ -166,8 +165,8 @@ public class MetalakeOperations {
           () -> {
             NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
             boolean dropped =
-                TreeLockUtils.doWithTreeLock(
-                    identifier, LockType.WRITE, () -> manager.dropMetalake(identifier));
+                TreeLockUtils.doWithRootTreeLock(
+                    LockType.WRITE, () -> manager.dropMetalake(identifier));
             if (!dropped) {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }

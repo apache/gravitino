@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import io.trino.spi.TrinoException;
+import java.time.Instant;
 import java.util.Map;
 import org.apache.logging.log4j.util.Strings;
 
@@ -17,10 +18,12 @@ public class GravitinoCatalog {
 
   private final String metalake;
   private final Catalog catalog;
+  private final boolean usingSimpleName;
 
-  public GravitinoCatalog(String metalake, Catalog catalog) {
+  public GravitinoCatalog(String metalake, Catalog catalog, boolean usingSimpleName) {
     this.metalake = metalake;
     this.catalog = catalog;
+    this.usingSimpleName = usingSimpleName;
   }
 
   public String getProvider() {
@@ -32,7 +35,7 @@ public class GravitinoCatalog {
   }
 
   public String getFullName() {
-    return metalake + "." + catalog.name();
+    return usingSimpleName ? catalog.name() : metalake + "." + catalog.name();
   }
 
   public NameIdentifier geNameIdentifier() {
@@ -53,5 +56,10 @@ public class GravitinoCatalog {
 
   public Map<String, String> getProperties() {
     return catalog.properties();
+  }
+
+  public Instant getLastModifiedTime() {
+    Instant time = catalog.auditInfo().lastModifiedTime();
+    return time == null ? catalog.auditInfo().createTime() : time;
   }
 }

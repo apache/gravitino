@@ -24,16 +24,21 @@ const MetalakePath = props => {
   const routeParams = {
     metalake: searchParams.get('metalake'),
     catalog: searchParams.get('catalog'),
+    type: searchParams.get('type'),
     schema: searchParams.get('schema'),
-    table: searchParams.get('table')
+    table: searchParams.get('table'),
+    fileset: searchParams.get('fileset'),
+    topic: searchParams.get('topic')
   }
 
-  const { metalake, catalog, schema, table } = routeParams
+  const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
 
   const metalakeUrl = `?metalake=${metalake}`
-  const catalogUrl = `?metalake=${metalake}&catalog=${catalog}`
-  const schemaUrl = `?metalake=${metalake}&catalog=${catalog}&schema=${schema}`
-  const tableUrl = `?metalake=${metalake}&catalog=${catalog}&schema=${schema}&table=${table}`
+  const catalogUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}`
+  const schemaUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}`
+  const tableUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&table=${table}`
+  const filesetUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&fileset=${fileset}`
+  const topicUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&topic=${topic}`
 
   const handleClick = (event, path) => {
     path === `?${searchParams.toString()}` && event.preventDefault()
@@ -71,7 +76,7 @@ const MetalakePath = props => {
             underline='hover'
           >
             <Icon icon='bx:book' fontSize={20} />
-            <Text>{catalog}</Text>
+            <Text data-refer={`nav-to-catalog-${catalog}`}>{catalog}</Text>
           </MUILink>
         </Tooltip>
       )}
@@ -79,7 +84,7 @@ const MetalakePath = props => {
         <Tooltip title={schema} placement='top'>
           <MUILink component={Link} href={schemaUrl} onClick={event => handleClick(event, schemaUrl)} underline='hover'>
             <Icon icon='bx:coin-stack' fontSize={20} />
-            <Text>{schema}</Text>
+            <Text data-refer={`nav-to-schema-${schema}`}>{schema}</Text>
           </MUILink>
         </Tooltip>
       )}
@@ -87,7 +92,28 @@ const MetalakePath = props => {
         <Tooltip title={table} placement='top'>
           <MUILink component={Link} href={tableUrl} onClick={event => handleClick(event, tableUrl)} underline='hover'>
             <Icon icon='bx:table' fontSize={20} />
-            <Text>{table}</Text>
+            <Text data-refer={`nav-to-table-${table}`}>{table}</Text>
+          </MUILink>
+        </Tooltip>
+      )}
+      {fileset && (
+        <Tooltip title={fileset} placement='top'>
+          <MUILink
+            component={Link}
+            href={filesetUrl}
+            onClick={event => handleClick(event, filesetUrl)}
+            underline='hover'
+          >
+            <Icon icon='bx:file' fontSize={20} />
+            <Text>{fileset}</Text>
+          </MUILink>
+        </Tooltip>
+      )}
+      {topic && (
+        <Tooltip title={topic} placement='top'>
+          <MUILink component={Link} href={topicUrl} onClick={event => handleClick(event, topicUrl)} underline='hover'>
+            <Icon icon='bx:file' fontSize={20} />
+            <Text>{topic}</Text>
           </MUILink>
         </Tooltip>
       )}
