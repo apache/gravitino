@@ -7,6 +7,8 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
@@ -43,7 +45,7 @@ public class GravitinoEnv {
 
   private TableDispatcher tableDispatcher;
 
-  private FilesetOperationDispatcher filesetOperationDispatcher;
+  private FilesetDispatcher filesetDispatcher;
 
   private TopicOperationDispatcher topicOperationDispatcher;
 
@@ -132,8 +134,9 @@ public class GravitinoEnv {
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
-    this.filesetOperationDispatcher =
+    FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetOperationDispatcher);
     this.topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
 
@@ -201,12 +204,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   * Get the FilesetDispatcher associated with the Gravitino environment.
    *
-   * @return The FilesetOperationDispatcher instance.
+   * @return The FilesetDispatcher instance.
    */
-  public FilesetOperationDispatcher filesetOperationDispatcher() {
-    return filesetOperationDispatcher;
+  public FilesetDispatcher filesetDispatcher() {
+    return filesetDispatcher;
   }
 
   /**
