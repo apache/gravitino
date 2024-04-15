@@ -59,7 +59,9 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     try {
       Fileset fileset = dispatcher.loadFileset(ident);
-      eventBus.dispatchEvent(new LoadFilesetEvent(PrincipalUtils.getCurrentUserName(), ident));
+      eventBus.dispatchEvent(
+          new LoadFilesetEvent(
+              PrincipalUtils.getCurrentUserName(), ident, new FilesetInfo(fileset)));
       return fileset;
     } catch (Exception e) {
       eventBus.dispatchEvent(
