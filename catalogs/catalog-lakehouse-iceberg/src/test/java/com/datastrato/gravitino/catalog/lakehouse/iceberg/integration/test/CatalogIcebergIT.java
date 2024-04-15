@@ -1093,7 +1093,7 @@ public class CatalogIcebergIT extends AbstractIT {
               if (DEFAULT_ICEBERG_PROVIDER.equals(provider)) {
                 provider = null;
               }
-              assertionsTableProperties(
+              checkIcebergTableFileFormat(
                   tableCatalog,
                   tableIdentifier,
                   columns,
@@ -1120,7 +1120,7 @@ public class CatalogIcebergIT extends AbstractIT {
                 sortOrders));
   }
 
-  private static void assertionsTableProperties(
+  private static void checkIcebergTableFileFormat(
       TableCatalog tableCatalog,
       NameIdentifier tableIdentifier,
       Column[] columns,
