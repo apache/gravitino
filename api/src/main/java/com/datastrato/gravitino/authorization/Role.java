@@ -41,7 +41,7 @@ public interface Role extends Auditable {
   List<Privilege> privileges();
 
   /**
-   * The name of the role contains one resource. For example: If the resource is a table, the
+   * One role contains one resource. For example: If the resource is a table, the
    * identifier may be `catalog1.schema1.table1`.
    *
    * @return The resource of the role.
