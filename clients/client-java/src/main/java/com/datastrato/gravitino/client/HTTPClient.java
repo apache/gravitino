@@ -325,7 +325,13 @@ public class HTTPClient implements RESTClient {
         if (beforeConnectHandle != null) {
           Function<HTTPClient, Void> handle = beforeConnectHandle;
           beforeConnectHandle = null;
-          handle.apply(this);
+          try {
+            handle.apply(this);
+          } catch (Exception e) {
+            // process until it succeeds
+            beforeConnectHandle = handle;
+            throw e;
+          }
         }
       }
     }
