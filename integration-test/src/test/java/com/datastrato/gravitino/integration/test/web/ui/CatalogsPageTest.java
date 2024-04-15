@@ -227,6 +227,23 @@ public class CatalogsPageTest extends AbstractWebIT {
             Collections.emptyMap());
   }
 
+  /**
+   * Drops a Kafka topic from the specified Metalake, Catalog, and Schema.
+   *
+   * @param metalakeName The name of the Metalake where the topic resides.
+   * @param catalogName The name of the Catalog that contains the topic.
+   * @param schemaName The name of the Schema under which the topic exists.
+   * @param topicName The name of the Kafka topic to be dropped.
+   */
+  void dropTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
+    Catalog catalog_kafka =
+        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    catalog_kafka
+        .asTopicCatalog()
+        .dropTopic(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));
+  }
+
   @AfterAll
   public static void after() {
     try {
@@ -738,6 +755,8 @@ public class CatalogsPageTest extends AbstractWebIT {
             "key", "replication-factor", "replication-factor", true));
     Assertions.assertTrue(
         catalogsPage.verifyShowPropertiesItemInList("value", "replication-factor", "1", true));
+    // 10. delete topic of kafka catalog
+    dropTopic(METALAKE_NAME, KAFKA_CATALOG_NAME, SCHEMA_NAME, TOPIC_NAME);
   }
 
   @Test
