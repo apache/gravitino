@@ -26,7 +26,7 @@ public final class ListFilesetFailureEvent extends FilesetFailureEvent {
    *     an indicator of the issues that caused the failure.
    */
   public ListFilesetFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.toString()), exception);
+    super(user, NameIdentifier.of(namespace.levels()), exception);
     this.namespace = namespace;
   }
 
