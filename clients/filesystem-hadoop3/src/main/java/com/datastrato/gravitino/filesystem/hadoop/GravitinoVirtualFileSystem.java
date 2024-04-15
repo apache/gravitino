@@ -52,7 +52,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Cache<NameIdentifier, Pair<Fileset, FileSystem>> filesetCache;
   private ScheduledThreadPoolExecutor scheduler;
 
-  // The pattern is used to match gvfs path. The scheme prefix (gvfs://) is optional.
+  // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
   // The following path can be match:
   //     gvfs://fileset/fileset_catalog/fileset_schema/fileset1/file.txt
   //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
