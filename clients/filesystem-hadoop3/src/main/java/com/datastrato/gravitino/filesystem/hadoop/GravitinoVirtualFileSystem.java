@@ -118,7 +118,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             .removalListener(
                 (key, value, cause) -> {
                   try {
-                    Pair<Fileset, FileSystem> pair = ((Pair<Fileset, FileSystem>) value);
+                    Pair<Fileset, FileSystem> pair = (Pair<Fileset, FileSystem>) value;
                     if (pair != null && pair.getRight() != null) pair.getRight().close();
                   } catch (IOException e) {
                     Logger.error("Cannot close the file system for fileset: {}", key, e);
@@ -360,7 +360,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
-  public Path getWorkingDirectory() {
+  public synchronized Path getWorkingDirectory() {
     return this.workingDirectory;
   }
 
