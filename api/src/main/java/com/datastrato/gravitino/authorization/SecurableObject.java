@@ -6,6 +6,8 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.annotation.Evolving;
 
+import javax.annotation.Nullable;
+
 /**
  * The securable object is the entity which access can be granted. Unless allowed by a grant, access
  * is denied. Gravitino organizes the securable objects using tree structure. The securable object
@@ -22,6 +24,7 @@ public interface SecurableObject {
    *
    * @return The parent securable object.
    */
+  @Nullable
   SecurableObject parent();
 
   /**
