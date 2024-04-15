@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestAccessControlManagerForGrants {
+public class TestAccessControlManagerForPermissions {
 
   private static AccessControlManager accessControlManager;
 
