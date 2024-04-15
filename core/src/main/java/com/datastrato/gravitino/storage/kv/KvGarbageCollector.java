@@ -52,7 +52,7 @@ public final class KvGarbageCollector implements Closeable {
   // time the commit is 1 (minimum), and assuming we have collocated the data with transaction id
   // [1, 100], then the second time we collect the data, the starting commit id will be 100 and so
   // on.
-  private byte[] commitIdHasBeenCollected;
+  byte[] commitIdHasBeenCollected;
   private long frequencyInMinutes;
 
   private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
@@ -153,13 +153,13 @@ public final class KvGarbageCollector implements Closeable {
       commitIdHasBeenCollected = endOfTransactionId();
     }
 
+    long lastGCId = getTransactionId(getBinaryTransactionId(commitIdHasBeenCollected));
     LOG.info(
-        "Start to remove data which is older than {}, commitIdHasBeenCollected: {}, commit_id: {}",
+        "Start to collect data which is modified between '{}({})' and '{}({})'",
+        lastGCId,
+        lastGCId == 1 ? lastGCId : DateFormatUtils.format(lastGCId >> 18, TIME_STAMP_FORMAT),
         transactionIdToDelete,
-        commitIdHasBeenCollected,
-        DateFormatUtils.format(
-            getTransactionId(getBinaryTransactionId(commitIdHasBeenCollected)) >> 18,
-            TIME_STAMP_FORMAT));
+        DateFormatUtils.format(deleteTimeLine, TIME_STAMP_FORMAT));
 
     // Get all commit marks
     // TODO(yuqi), Use multi-thread to scan the data in case of the data is too large.
