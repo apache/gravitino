@@ -496,21 +496,26 @@ public class TestCatalogManager {
 
   @Test
   void testReuseClassLoader() {
+
+    CatalogManager customCatalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator());
     // Clear all possible class loaders.
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
-    IsolatedClassLoader cl1 = catalogManager.catalogCache.getIfPresent(ident).getClassLoader();
+    customCatalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    IsolatedClassLoader cl1 =
+        customCatalogManager.catalogCache.getIfPresent(ident).getClassLoader();
 
     // Test alter name;
     CatalogChange change = CatalogChange.rename("test32");
-    catalogManager.alterCatalog(ident, change);
-    Catalog catalog = catalogManager.loadCatalog(NameIdentifier.of(ident.namespace(), "test32"));
+    customCatalogManager.alterCatalog(ident, change);
+    Catalog catalog =
+        customCatalogManager.loadCatalog(NameIdentifier.of(ident.namespace(), "test32"));
     Assertions.assertEquals("test32", catalog.name());
     IsolatedClassLoader cl2 =
-        catalogManager
+        customCatalogManager
             .catalogCache
             .getIfPresent(NameIdentifier.of(ident.namespace(), "test32"))
             .getClassLoader();
@@ -519,8 +524,9 @@ public class TestCatalogManager {
     // Test alter comment;
     NameIdentifier ident1 = NameIdentifier.of(ident.namespace(), "test32");
     CatalogChange change1 = CatalogChange.updateComment("comment1");
-    catalogManager.alterCatalog(ident1, change1);
-    IsolatedClassLoader cl3 = catalogManager.catalogCache.getIfPresent(ident1).getClassLoader();
+    customCatalogManager.alterCatalog(ident1, change1);
+    IsolatedClassLoader cl3 =
+        customCatalogManager.catalogCache.getIfPresent(ident1).getClassLoader();
     Assertions.assertTrue(cl1 == cl3);
   }
 }
