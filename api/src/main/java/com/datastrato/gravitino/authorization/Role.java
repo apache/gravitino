@@ -11,8 +11,8 @@ import java.util.Map;
 
 /**
  * The interface of a role. The role is the entity which has kinds of privileges. One role can have
- * multiple privileges of one resource. Gravitino chooses to bind one securable object to one role
- * to avoid granting too many privileges to one role.
+ * multiple privileges of one securable object. Gravitino chooses to bind one securable object to
+ * one role to avoid granting too many privileges to one role.
  */
 @Evolving
 public interface Role extends Auditable {

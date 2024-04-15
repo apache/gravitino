@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.annotation.Evolving;
-
 import javax.annotation.Nullable;
 
 /**

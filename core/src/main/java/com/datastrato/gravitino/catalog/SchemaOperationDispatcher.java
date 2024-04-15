@@ -75,7 +75,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Su
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a schema with with reserved name `*`");
     }
 

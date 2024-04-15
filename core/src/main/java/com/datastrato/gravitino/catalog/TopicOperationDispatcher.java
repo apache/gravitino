@@ -118,7 +118,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a topic with with reserved name `*`");
     }
 

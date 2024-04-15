@@ -101,7 +101,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a fileset with with reserved name `*`");
     }
 

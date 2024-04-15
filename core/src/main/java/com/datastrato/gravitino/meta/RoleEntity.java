@@ -95,9 +95,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The privileges of the role. All privileges belong to one resource. For example: If the resource
-   * is a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a schema has the
-   * privilege of `LOAD TABLE`. It means the role can all tables of the schema.
+   * The privileges of the role. All privileges belong to one securable object. For example: If the
+   * securable object is a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a
+   * schema has the privilege of `LOAD TABLE`. It means the role can all tables of the schema.
    *
    * @return The privileges of the role.
    */

@@ -128,7 +128,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
-    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(partition.name())) {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(partition.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved partition `*`");
     }
 

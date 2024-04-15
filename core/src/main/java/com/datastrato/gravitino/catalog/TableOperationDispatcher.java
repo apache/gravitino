@@ -135,7 +135,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    if (Entity.RESOURCE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a table with with reserved name `*`");
     }
 
