@@ -24,12 +24,13 @@ import java.util.Arrays;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
@@ -50,6 +51,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, Pair<Fileset, FileSystem>> filesetCache;
   private ScheduledThreadPoolExecutor scheduler;
+
+  // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
+  // The following path can be match:
+  //     gvfs://fileset/fileset_catalog/fileset_schema/fileset1/file.txt
+  //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
+  private static final Pattern IDENTIFIER_PATTERN =
+      Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:[/[^/]+]*)$");
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -214,39 +222,33 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         authType);
   }
 
-  private String concatVirtualPrefix(NameIdentifier identifier) {
-    return GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX
-        + identifier.namespace().level(1)
-        + "/"
-        + identifier.namespace().level(2)
-        + "/"
-        + identifier.name();
+  private String getVirtualLocation(NameIdentifier identifier, boolean withScheme) {
+    return String.format(
+        "%s/%s/%s/%s",
+        withScheme ? GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX : "",
+        identifier.namespace().level(1),
+        identifier.namespace().level(2),
+        identifier.name());
   }
 
   private Path getActualPathByIdentifier(
       NameIdentifier identifier, Pair<Fileset, FileSystem> filesetPair, Path path) {
     String virtualPath = path.toString();
-    if (!virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)) {
-      throw new InvalidPathException(
-          String.format(
-              "Path %s doesn't start with the scheme \"%s\".",
-              virtualPath, GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX));
-    }
+    boolean withScheme =
+        virtualPath.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
+    String virtualLocation = getVirtualLocation(identifier, withScheme);
+    String storageLocation = filesetPair.getLeft().storageLocation();
     try {
       if (checkMountsSingleFile(filesetPair)) {
-        String virtualPrefix = concatVirtualPrefix(identifier);
         Preconditions.checkArgument(
-            virtualPath.equals(virtualPrefix),
+            virtualPath.equals(virtualLocation),
             "Path: %s should be same with the virtual prefix: %s, because the fileset only mounts a single file.",
             virtualPath,
-            virtualPrefix);
+            virtualLocation);
 
-        return new Path(filesetPair.getLeft().storageLocation());
+        return new Path(storageLocation);
       } else {
-        return new Path(
-            virtualPath.replaceFirst(
-                concatVirtualPrefix(identifier),
-                new Path(filesetPair.getLeft().storageLocation()).toString()));
+        return new Path(virtualPath.replaceFirst(virtualLocation, storageLocation));
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -275,37 +277,32 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private FileStatus convertFileStatusPathPrefix(
       FileStatus fileStatus, String actualPrefix, String virtualPrefix) {
     String filePath = fileStatus.getPath().toString();
-    if (!filePath.startsWith(actualPrefix)) {
-      throw new InvalidPathException(
-          String.format("Path %s doesn't start with prefix \"%s\".", filePath, actualPrefix));
-    }
+    Preconditions.checkArgument(
+        filePath.startsWith(actualPrefix),
+        "Path %s doesn't start with prefix \"%s\".",
+        filePath,
+        actualPrefix);
     Path path = new Path(filePath.replaceFirst(actualPrefix, virtualPrefix));
     fileStatus.setPath(path);
 
     return fileStatus;
   }
 
-  private NameIdentifier extractIdentifier(URI virtualUri) {
+  @VisibleForTesting
+  NameIdentifier extractIdentifier(URI virtualUri) {
+    String virtualPath = virtualUri.toString();
     Preconditions.checkArgument(
-        virtualUri
-            .toString()
-            .startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX),
-        "Path %s doesn't start with scheme prefix \"%s\".",
-        virtualUri,
-        GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX);
+        StringUtils.isNotBlank(virtualPath),
+        "Uri which need be extracted cannot be null or empty.");
 
-    if (StringUtils.isBlank(virtualUri.toString())) {
-      throw new InvalidPathException("Uri which need be extracted cannot be null or empty.");
-    }
-
-    // remove first '/' symbol with empty string
-    String[] reservedDirs =
-        Arrays.stream(virtualUri.getPath().replaceFirst("/", "").split("/")).toArray(String[]::new);
+    Matcher matcher = IDENTIFIER_PATTERN.matcher(virtualPath);
     Preconditions.checkArgument(
-        reservedDirs.length >= 3, "URI %s doesn't contains valid identifier", virtualUri);
+        matcher.matches() && matcher.groupCount() == 3,
+        "URI %s doesn't contains valid identifier",
+        virtualPath);
 
     return NameIdentifier.ofFileset(
-        metalakeName, reservedDirs[0], reservedDirs[1], reservedDirs[2]);
+        metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));
   }
 
   private FilesetContext getFilesetContext(Path virtualPath) {
@@ -449,7 +446,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return convertFileStatusPathPrefix(
         fileStatus,
         context.getFileset().storageLocation(),
-        concatVirtualPrefix(context.getIdentifier()));
+        getVirtualLocation(context.getIdentifier(), true));
   }
 
   @Override
@@ -462,7 +459,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 convertFileStatusPathPrefix(
                     fileStatus,
                     new Path(context.getFileset().storageLocation()).toString(),
-                    concatVirtualPrefix(context.getIdentifier())))
+                    getVirtualLocation(context.getIdentifier(), true)))
         .toArray(FileStatus[]::new);
   }
 
