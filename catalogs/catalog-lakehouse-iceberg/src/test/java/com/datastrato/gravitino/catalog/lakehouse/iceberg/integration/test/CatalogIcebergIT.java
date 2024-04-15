@@ -1089,7 +1089,9 @@ public class CatalogIcebergIT extends AbstractIT {
     Arrays.stream(providers)
         .forEach(
             provider -> {
-              properties.put(PROP_PROVIDER, provider);
+              if (provider != null) {
+                properties.put(PROP_PROVIDER, provider);
+              }
               if (DEFAULT_ICEBERG_PROVIDER.equals(provider)) {
                 provider = null;
               }
