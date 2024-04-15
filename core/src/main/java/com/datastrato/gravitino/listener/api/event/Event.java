@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
 public abstract class Event {
   private final String user;
   @Nullable private final NameIdentifier identifier;
-  private long eventTime;
+  private final long eventTime;
 
   /**
    * Constructs an Event instance with the specified user and resource identifier details.
