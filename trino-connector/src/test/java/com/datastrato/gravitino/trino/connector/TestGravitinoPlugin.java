@@ -14,15 +14,15 @@ public class TestGravitinoPlugin extends GravitinoPlugin {
 
   private GravitinoAdminClient gravitinoClient;
 
+  public TestGravitinoPlugin(GravitinoAdminClient gravitinoClient) {
+    this.gravitinoClient = gravitinoClient;
+  }
+
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
     factory = new TestGravitinoConnectorFactory();
     factory.setGravitinoClient(gravitinoClient);
     return ImmutableList.of(factory);
-  }
-
-  public void setGravitinoClient(GravitinoAdminClient client) {
-    this.gravitinoClient = client;
   }
 
   public CatalogConnectorManager getCatalogConnectorManager() {

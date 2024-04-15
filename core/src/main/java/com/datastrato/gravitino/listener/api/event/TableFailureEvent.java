@@ -24,11 +24,8 @@ public abstract class TableFailureEvent extends FailureEvent {
    * Constructs a new {@code TableFailureEvent} instance, capturing information about the failed
    * table operation.
    *
-   * @param user The user associated with the failed table operation. This information helps in
-   *     auditing and understanding the context of the operation that resulted in a failure.
-   * @param identifier The identifier of the table that was involved in the failed operation. This
-   *     provides a clear reference to the specific table that the operation was attempting to
-   *     modify or interact with.
+   * @param user The user associated with the failed table operation.
+   * @param identifier The identifier of the table that was involved in the failed operation.
    * @param exception The exception that was thrown during the table operation, indicating the cause
    *     of the failure.
    */

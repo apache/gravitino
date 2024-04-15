@@ -23,8 +23,7 @@ public abstract class FailureEvent extends Event {
    * Constructs a new {@code FailureEvent} instance with the specified user, resource identifier,
    * and the exception that was thrown.
    *
-   * @param user The user associated with the operation that resulted in a failure. This information
-   *     is important for auditing and understanding the context of the failure.
+   * @param user The user associated with the operation that resulted in a failure.
    * @param identifier The identifier of the resource involved in the operation that failed. This
    *     provides a clear reference to what was being acted upon when the exception occurred.
    * @param exception The exception that was thrown during the operation. This is the primary piece
