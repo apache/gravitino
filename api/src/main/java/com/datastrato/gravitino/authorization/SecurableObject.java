@@ -12,7 +12,11 @@ import javax.annotation.Nullable;
  * is denied. Gravitino organizes the securable objects using tree structure. The securable object
  * may be a catalog, a table or a schema, etc. For example, `catalog1.schema1.table1` represents a
  * table named `table1`. It's in the schema named `schema1`. The schema is in the catalog named
- * `catalog1`.
+ * `catalog1`. Similarly, `catalog1.schema1.topic1` can represent a topic.
+ * `catalog1.schema1.fileset1` can represent a fileset. `*` represents all the catalogs.If you want
+ * to use an another securable object which represents all entities," you can use its parent entity,
+ * For example if you want to have read table privileges of all tables of `catalog1.schema1`, " you
+ * can use add `read table` privilege for `catalog1.schema1` directly
  */
 @Evolving
 public interface SecurableObject {
