@@ -538,7 +538,7 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
-    "ROADMAP",
+    "ROADMAP.md",
     "clients/client-python/.pytest_cache/*"
   )
 
@@ -706,7 +706,7 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-messaging-kafka:copyLibAndConfig"
+      "catalogs:catalog-kafka:copyLibAndConfig"
     )
   }
 

@@ -85,6 +85,9 @@ jobs:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
+      - name: Test publish to local
+        run: ./gradlew publishToMavenLocal -x test -PjdkVersion=${{ matrix.java-version }}
+
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
 

@@ -80,8 +80,8 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
+        if : ${{ matrix.test-mode == 'deploy' }}
         run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
@@ -106,6 +106,8 @@ jobs:
             build/reports
             integration-test/build/*.log
             integration-test/build/*.tar
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log

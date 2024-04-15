@@ -91,7 +91,7 @@ public class MetalakeMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, baseMetalake.nameIdentifier().toString());
       throw re;
     }
@@ -126,7 +126,7 @@ public class MetalakeMetaService {
               MetalakeMetaMapper.class,
               mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
       throw re;
     }

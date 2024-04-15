@@ -26,6 +26,7 @@ import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,6 +150,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         TopicEntity.builder()
             .withId(fromProperties(topic.properties()).id())
             .withName(ident.name())
+            .withComment(comment)
             .withNamespace(ident.namespace())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -188,7 +190,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     validateAlterProperties(ident, HasPropertyMetadata::topicPropertiesMetadata, changes);
 
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Topic tempAlteredTable =
+    Topic tempAlteredTopic =
         doWithCatalog(
             catalogIdent,
             c -> c.doWithTopicOps(t -> t.alterTopic(ident, changes)),
@@ -202,7 +204,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             c ->
                 c.doWithTopicOps(
                     t ->
-                        t.loadTopic(NameIdentifier.of(ident.namespace(), tempAlteredTable.name()))),
+                        t.loadTopic(NameIdentifier.of(ident.namespace(), tempAlteredTopic.name()))),
             NoSuchTopicException.class);
 
     TopicEntity updatedTopicEntity =
@@ -218,6 +220,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                             .withId(topicEntity.id())
                             .withName(topicEntity.name())
                             .withNamespace(ident.namespace())
+                            .withComment(
+                                StringUtils.isBlank(tempAlteredTopic.comment())
+                                    ? topicEntity.comment()
+                                    : tempAlteredTopic.comment())
                             .withAuditInfo(
                                 AuditInfo.builder()
                                     .withCreator(topicEntity.auditInfo().creator())

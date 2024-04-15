@@ -34,8 +34,8 @@ public class ContainerSuite implements Closeable {
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
   private static volatile TrinoContainer trinoContainer;
-  private static TrinoITContainers trinoITContainers;
-
+  private static volatile TrinoITContainers trinoITContainers;
+  private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
@@ -105,7 +105,7 @@ public class ContainerSuite implements Closeable {
               TrinoContainer.builder()
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "root")
+                          .put("HADOOP_USER_NAME", "datastrato")
                           .put("GRAVITINO_HOST_IP", "host.docker.internal")
                           .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
                           .put("GRAVITINO_METALAKE_NAME", metalakeName)
@@ -148,6 +148,27 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startKafkaContainer() {
+    if (kafkaContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (kafkaContainer == null) {
+          KafkaContainer container = closer.register(KafkaContainer.builder().build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start Kafka container", e);
+            throw new RuntimeException("Failed to start Kafka container", e);
+          }
+          kafkaContainer = container;
+        }
+      }
+    }
+  }
+
+  public KafkaContainer getKafkaContainer() {
+    return kafkaContainer;
   }
 
   public TrinoContainer getTrinoContainer() {
