@@ -29,15 +29,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * GrantManager is used for managing the logic the granting and revoking roles. Role is used for
+ * PermissionManager is used for managing the logic the granting and revoking roles. Role is used for
  * manging permissions. GrantManager will filter the invalid roles, too.
  */
-class GrantManager {
-  private static final Logger LOG = LoggerFactory.getLogger(GrantManager.class);
+class PermissionManager {
+  private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
 
   private final EntityStore store;
 
-  GrantManager(EntityStore store) {
+  PermissionManager(EntityStore store) {
     this.store = store;
   }
 

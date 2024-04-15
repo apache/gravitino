@@ -30,7 +30,7 @@ public class AccessControlManager {
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
-  private final GrantManager grantManager;
+  private final PermissionManager permissionManager;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
 
@@ -38,7 +38,7 @@ public class AccessControlManager {
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator);
-    this.grantManager = new GrantManager(store);
+    this.permissionManager = new PermissionManager(store);
   }
 
   /**
@@ -118,19 +118,19 @@ public class AccessControlManager {
   }
 
   public boolean grantRoleToUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> grantManager.grantRoleToUser(metalake, role, user));
+    return doWithNonAdminLock(() -> permissionManager.grantRoleToUser(metalake, role, user));
   }
 
   public boolean grantRoleToGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> grantManager.grantRoleToGroup(metalake, role, group));
+    return doWithNonAdminLock(() -> permissionManager.grantRoleToGroup(metalake, role, group));
   }
 
   public boolean revokeRoleFromGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> grantManager.revokeRoleFromGroup(metalake, role, group));
+    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromGroup(metalake, role, group));
   }
 
   public boolean revokeRoleFromUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> grantManager.revokeRoleFromUser(metalake, role, user));
+    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromUser(metalake, role, user));
   }
 
   /**
