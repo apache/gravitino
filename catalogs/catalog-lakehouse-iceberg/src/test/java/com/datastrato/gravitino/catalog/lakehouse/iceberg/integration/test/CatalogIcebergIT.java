@@ -4,6 +4,12 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.DEFAULT_ICEBERG_PROVIDER;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_AVRO_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_ORC_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_PARQUET_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.PROP_PROVIDER;
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -31,6 +37,7 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -1053,7 +1060,17 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testTableSortOrder() {
+  void testIcebergTablePropertiesWhenCreate() {
+    String[] providers =
+        new String[] {
+          null,
+          DEFAULT_ICEBERG_PROVIDER,
+          ICEBERG_PARQUET_FILE_FORMAT,
+          ICEBERG_ORC_FILE_FORMAT,
+          ICEBERG_AVRO_FILE_FORMAT
+        };
+
+    // Create table from Gravitino API
     Column[] columns = createColumns();
 
     NameIdentifier tableIdentifier =
@@ -1065,30 +1082,48 @@ public class CatalogIcebergIT extends AbstractIT {
           SortOrders.of(
               NamedReference.field(ICEBERG_COL_NAME2),
               SortDirection.DESCENDING,
-              NullOrdering.NULLS_FIRST),
-          SortOrders.of(
-              FunctionExpression.of(
-                  "bucket", Literals.integerLiteral(10), NamedReference.field(ICEBERG_COL_NAME1)),
-              SortDirection.ASCENDING,
-              NullOrdering.NULLS_LAST),
-          SortOrders.of(
-              FunctionExpression.of(
-                  "truncate", Literals.integerLiteral(2), NamedReference.field(ICEBERG_COL_NAME3)),
-              SortDirection.ASCENDING,
-              NullOrdering.NULLS_LAST),
-        };
-    final String[] sortOrderString =
-        new String[] {
-          "iceberg_col_name2 desc nulls_first",
-          "bucket(10, iceberg_col_name1) asc nulls_last",
-          "truncate(2, iceberg_col_name3) asc nulls_last"
+              NullOrdering.NULLS_FIRST)
         };
 
     Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
-
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    // Create a data table for Distributions.NONE
+    Arrays.stream(providers)
+        .forEach(
+            provider -> {
+              if (provider != null) {
+                properties.put(PROP_PROVIDER, provider);
+              }
+              if (DEFAULT_ICEBERG_PROVIDER.equals(provider)) {
+                provider = null;
+              }
+              checkIcebergTableFileFormat(
+                  tableCatalog,
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  distribution,
+                  sortOrders,
+                  provider);
+              tableCatalog.dropTable(tableIdentifier);
+            });
+
+    properties.put(PROP_PROVIDER, "text");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                columns,
+                table_comment,
+                properties,
+                partitioning,
+                distribution,
+                sortOrders));
+
+    properties.put(PROP_PROVIDER, ICEBERG_PARQUET_FILE_FORMAT);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -1097,34 +1132,104 @@ public class CatalogIcebergIT extends AbstractIT {
         partitioning,
         distribution,
         sortOrders);
-
-    Table loadTable = tableCatalog.loadTable(tableIdentifier);
-
-    // check table
-    assertionsTableInfo(
-        tableName,
-        table_comment,
-        Arrays.asList(columns),
-        properties,
-        distribution,
-        sortOrders,
-        partitioning,
-        loadTable);
-
-    SortOrder[] loadedSortOrders = loadTable.sortOrder();
-    Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
-    for (int i = 0; i < sortOrders.length; i++) {
-      Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
-      Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
-      Assertions.assertEquals(
-          sortOrderString[i],
-          String.format(
-              "%s %s %s",
-              sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
-    }
-
-    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.setProperty(PROP_PROVIDER, ICEBERG_ORC_FILE_FORMAT)));
   }
+
+  private static void checkIcebergTableFileFormat(
+      TableCatalog tableCatalog,
+      NameIdentifier tableIdentifier,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      String expectedFileFormat) {
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier, columns, comment, properties, partitioning, distribution, sortOrders);
+    Assertions.assertEquals(expectedFileFormat, createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(expectedFileFormat, loadTable.properties().get(DEFAULT_FILE_FORMAT));
+  }
+
+    @Test
+    public void testTableSortOrder() {
+        Column[] columns = createColumns();
+
+        NameIdentifier tableIdentifier =
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+        Distribution distribution = Distributions.NONE;
+
+        final SortOrder[] sortOrders =
+                new SortOrder[] {
+                        SortOrders.of(
+                                NamedReference.field(ICEBERG_COL_NAME2),
+                                SortDirection.DESCENDING,
+                                NullOrdering.NULLS_FIRST),
+                        SortOrders.of(
+                                FunctionExpression.of(
+                                        "bucket", Literals.integerLiteral(10), NamedReference.field(ICEBERG_COL_NAME1)),
+                                SortDirection.ASCENDING,
+                                NullOrdering.NULLS_LAST),
+                        SortOrders.of(
+                                FunctionExpression.of(
+                                        "truncate", Literals.integerLiteral(2), NamedReference.field(ICEBERG_COL_NAME3)),
+                                SortDirection.ASCENDING,
+                                NullOrdering.NULLS_LAST),
+                };
+        final String[] sortOrderString =
+                new String[] {
+                        "iceberg_col_name2 desc nulls_first",
+                        "bucket(10, iceberg_col_name1) asc nulls_last",
+                        "truncate(2, iceberg_col_name3) asc nulls_last"
+                };
+
+        Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+
+        Map<String, String> properties = createProperties();
+        TableCatalog tableCatalog = catalog.asTableCatalog();
+        // Create a data table for Distributions.NONE
+        tableCatalog.createTable(
+                tableIdentifier,
+                columns,
+                table_comment,
+                properties,
+                partitioning,
+                distribution,
+                sortOrders);
+
+        Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+        // check table
+        assertionsTableInfo(
+                tableName,
+                table_comment,
+                Arrays.asList(columns),
+                properties,
+                distribution,
+                sortOrders,
+                partitioning,
+                loadTable);
+
+        SortOrder[] loadedSortOrders = loadTable.sortOrder();
+        Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
+        for (int i = 0; i < sortOrders.length; i++) {
+            Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
+            Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
+            Assertions.assertEquals(
+                    sortOrderString[i],
+                    String.format(
+                            "%s %s %s",
+                            sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
+        }
+
+        Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+    }
 
   protected static void assertionsTableInfo(
       String tableName,
