@@ -1156,82 +1156,81 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(expectedFileFormat, loadTable.properties().get(DEFAULT_FILE_FORMAT));
   }
 
+  @Test
+  public void testTableSortOrder() {
+    Column[] columns = createColumns();
 
-    @Test
-    public void testTableSortOrder() {
-        Column[] columns = createColumns();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
 
-        NameIdentifier tableIdentifier =
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-        Distribution distribution = Distributions.NONE;
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST),
+          SortOrders.of(
+              FunctionExpression.of(
+                  "bucket", Literals.integerLiteral(10), NamedReference.field(ICEBERG_COL_NAME1)),
+              SortDirection.ASCENDING,
+              NullOrdering.NULLS_LAST),
+          SortOrders.of(
+              FunctionExpression.of(
+                  "truncate", Literals.integerLiteral(2), NamedReference.field(ICEBERG_COL_NAME3)),
+              SortDirection.ASCENDING,
+              NullOrdering.NULLS_LAST),
+        };
+    final String[] sortOrderString =
+        new String[] {
+          "iceberg_col_name2 desc nulls_first",
+          "bucket(10, iceberg_col_name1) asc nulls_last",
+          "truncate(2, iceberg_col_name3) asc nulls_last"
+        };
 
-        final SortOrder[] sortOrders =
-                new SortOrder[] {
-                        SortOrders.of(
-                                NamedReference.field(ICEBERG_COL_NAME2),
-                                SortDirection.DESCENDING,
-                                NullOrdering.NULLS_FIRST),
-                        SortOrders.of(
-                                FunctionExpression.of(
-                                        "bucket", Literals.integerLiteral(10), NamedReference.field(ICEBERG_COL_NAME1)),
-                                SortDirection.ASCENDING,
-                                NullOrdering.NULLS_LAST),
-                        SortOrders.of(
-                                FunctionExpression.of(
-                                        "truncate", Literals.integerLiteral(2), NamedReference.field(ICEBERG_COL_NAME3)),
-                                SortDirection.ASCENDING,
-                                NullOrdering.NULLS_LAST),
-                };
-        final String[] sortOrderString =
-                new String[] {
-                        "iceberg_col_name2 desc nulls_first",
-                        "bucket(10, iceberg_col_name1) asc nulls_last",
-                        "truncate(2, iceberg_col_name3) asc nulls_last"
-                };
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
 
-        Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    // Create a data table for Distributions.NONE
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
 
-        Map<String, String> properties = createProperties();
-        TableCatalog tableCatalog = catalog.asTableCatalog();
-        // Create a data table for Distributions.NONE
-        tableCatalog.createTable(
-                tableIdentifier,
-                columns,
-                table_comment,
-                properties,
-                partitioning,
-                distribution,
-                sortOrders);
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
 
-        Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    // check table
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        distribution,
+        sortOrders,
+        partitioning,
+        loadTable);
 
-        // check table
-        assertionsTableInfo(
-                tableName,
-                table_comment,
-                Arrays.asList(columns),
-                properties,
-                distribution,
-                sortOrders,
-                partitioning,
-                loadTable);
-
-        SortOrder[] loadedSortOrders = loadTable.sortOrder();
-        Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
-        for (int i = 0; i < sortOrders.length; i++) {
-            Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
-            Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
-            Assertions.assertEquals(
-                    sortOrderString[i],
-                    String.format(
-                            "%s %s %s",
-                            sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
-        }
-
-        Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+    SortOrder[] loadedSortOrders = loadTable.sortOrder();
+    Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
+    for (int i = 0; i < sortOrders.length; i++) {
+      Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
+      Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
+      Assertions.assertEquals(
+          sortOrderString[i],
+          String.format(
+              "%s %s %s",
+              sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
     }
 
-    protected static void assertionsTableInfo(
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+  }
+
+  protected static void assertionsTableInfo(
       String tableName,
       String tableComment,
       List<Column> columns,
