@@ -42,7 +42,7 @@ import org.mockito.Mockito;
 
 public class TestPermissionOperations extends JerseyTest {
 
-  private final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final AccessControlManager manager = mock(AccessControlManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -60,6 +60,7 @@ public class TestPermissionOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setAccessControlManager(manager);
   }
 
   @Override
@@ -77,7 +78,6 @@ public class TestPermissionOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(AccessControlManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -86,8 +86,8 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddRoleToUser() {
-    when(manager.addRoleToUser(any(), any(), any())).thenReturn(true);
+  public void testGrantRoleToUser() {
+    when(manager.grantRoleToUser(any(), any(), any())).thenReturn(true);
 
     RoleGrantRequest request = new RoleGrantRequest("role1");
 
@@ -107,7 +107,7 @@ public class TestPermissionOperations extends JerseyTest {
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .addRoleToUser(any(), any(), any());
+        .grantRoleToUser(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -122,7 +122,9 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchUserException
-    doThrow(new NoSuchUserException("mock error")).when(manager).addRoleToUser(any(), any(), any());
+    doThrow(new NoSuchUserException("mock error"))
+        .when(manager)
+        .grantRoleToUser(any(), any(), any());
     resp1 =
         target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -137,7 +139,9 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error")).when(manager).addRoleToUser(any(), any(), any());
+    doThrow(new NoSuchRoleException("mock error"))
+        .when(manager)
+        .grantRoleToUser(any(), any(), any());
     resp1 =
         target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -152,7 +156,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addRoleToUser(any(), any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).grantRoleToUser(any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/users/user/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -168,8 +172,8 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddRoleToGroup() {
-    when(manager.addRoleToGroup(any(), any(), any())).thenReturn(true);
+  public void testGrantRoleToGroup() {
+    when(manager.grantRoleToGroup(any(), any(), any())).thenReturn(true);
 
     RoleGrantRequest request = new RoleGrantRequest("role1");
 
@@ -189,7 +193,7 @@ public class TestPermissionOperations extends JerseyTest {
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .addRoleToGroup(any(), any(), any());
+        .grantRoleToGroup(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -206,7 +210,7 @@ public class TestPermissionOperations extends JerseyTest {
     // Test to throw NoSuchUserException
     doThrow(new NoSuchUserException("mock error"))
         .when(manager)
-        .addRoleToGroup(any(), any(), any());
+        .grantRoleToGroup(any(), any(), any());
     resp1 =
         target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -223,7 +227,7 @@ public class TestPermissionOperations extends JerseyTest {
     // Test to throw NoSuchRoleException
     doThrow(new NoSuchRoleException("mock error"))
         .when(manager)
-        .addRoleToGroup(any(), any(), any());
+        .grantRoleToGroup(any(), any(), any());
     resp1 =
         target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -238,7 +242,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addRoleToGroup(any(), any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).grantRoleToGroup(any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/groups/group/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -254,8 +258,8 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveFromUser() {
-    when(manager.removeRoleFromUser(any(), any(), any())).thenReturn(true);
+  public void testRevokeFromUser() {
+    when(manager.revokeRoleFromUser(any(), any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/permissions/users/user1/roles/role1")
@@ -269,7 +273,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertTrue(removeResponse.removed());
 
     // Test when failed to remove role
-    when(manager.removeRoleFromUser(any(), any(), any())).thenReturn(false);
+    when(manager.revokeRoleFromUser(any(), any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/permissions/users/user1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -283,7 +287,7 @@ public class TestPermissionOperations extends JerseyTest {
 
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .removeRoleFromUser(any(), any(), any());
+        .revokeRoleFromUser(any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/users/user1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -299,8 +303,8 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveRoleFromGroup() {
-    when(manager.removeRoleFromGroup(any(), any(), any())).thenReturn(true);
+  public void testRevokeRoleFromGroup() {
+    when(manager.revokeRoleFromGroup(any(), any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
@@ -314,7 +318,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertTrue(removeResponse.removed());
 
     // Test when failed to remove role
-    when(manager.removeRoleFromGroup(any(), any(), any())).thenReturn(false);
+    when(manager.revokeRoleFromGroup(any(), any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -328,7 +332,7 @@ public class TestPermissionOperations extends JerseyTest {
 
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .removeRoleFromGroup(any(), any(), any());
+        .revokeRoleFromGroup(any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/groups/group1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)

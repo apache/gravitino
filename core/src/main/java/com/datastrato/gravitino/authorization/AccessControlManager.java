@@ -117,20 +117,20 @@ public class AccessControlManager {
     return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
   }
 
-  public boolean addRoleToUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> grantManager.addRoleToUser(metalake, role, user));
+  public boolean grantRoleToUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> grantManager.grantRoleToUser(metalake, role, user));
   }
 
-  public boolean addRoleToGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> grantManager.addRoleToGroup(metalake, role, group));
+  public boolean grantRoleToGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> grantManager.grantRoleToGroup(metalake, role, group));
   }
 
-  public synchronized boolean removeRoleFromGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> grantManager.removeRoleFromGroup(metalake, role, group));
+  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> grantManager.revokeRoleFromGroup(metalake, role, group));
   }
 
-  public synchronized boolean removeRoleFromUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> grantManager.removeRoleFromUser(metalake, role, user));
+  public boolean revokeRoleFromUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> grantManager.revokeRoleFromUser(metalake, role, user));
   }
 
   /**

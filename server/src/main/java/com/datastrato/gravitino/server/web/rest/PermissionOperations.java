@@ -49,7 +49,8 @@ public class PermissionOperations {
           () ->
               Utils.ok(
                   new GrantResponse(
-                      accessControlManager.addRoleToUser(metalake, request.getRoleName(), user))));
+                      accessControlManager.grantRoleToUser(
+                          metalake, request.getRoleName(), user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGrantException(
           OperationType.REMOVE, request.getRoleName(), user, e);
@@ -71,7 +72,7 @@ public class PermissionOperations {
           () ->
               Utils.ok(
                   new GrantResponse(
-                      accessControlManager.addRoleToGroup(
+                      accessControlManager.grantRoleToGroup(
                           metalake, request.getRoleName(), group))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGrantException(
@@ -94,7 +95,7 @@ public class PermissionOperations {
           () ->
               Utils.ok(
                   new RemoveResponse(
-                      accessControlManager.removeRoleFromUser(metalake, role, user))));
+                      accessControlManager.revokeRoleFromUser(metalake, role, user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGrantException(OperationType.REMOVE, role, user, e);
     }
@@ -115,7 +116,7 @@ public class PermissionOperations {
           () ->
               Utils.ok(
                   new RemoveResponse(
-                      accessControlManager.removeRoleFromGroup(metalake, role, group))));
+                      accessControlManager.revokeRoleFromGroup(metalake, role, group))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGrantException(OperationType.REMOVE, role, group, e);
     }

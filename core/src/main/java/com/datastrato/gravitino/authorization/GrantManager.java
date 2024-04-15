@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * GrantManager is used for managing the logic the granting and revoking roles. Role is used for
+ * manging permissions. GrantManager will filter the invalid roles, too.
+ */
 class GrantManager {
   private static final Logger LOG = LoggerFactory.getLogger(GrantManager.class);
 
@@ -37,7 +41,7 @@ class GrantManager {
     this.store = store;
   }
 
-  public boolean addRoleToUser(String metalake, String role, String user) {
+  public boolean grantRoleToUser(String metalake, String role, String user) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
 
@@ -86,7 +90,7 @@ class GrantManager {
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Adding role {} from  user {} failed in the metalake {} due to storage issues",
+          "Granting role {} from  user {} failed in the metalake {} due to storage issues",
           role,
           user,
           metalake,
@@ -95,7 +99,7 @@ class GrantManager {
     }
   }
 
-  public boolean addRoleToGroup(String metalake, String role, String group) {
+  public boolean grantRoleToGroup(String metalake, String role, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
 
@@ -145,7 +149,7 @@ class GrantManager {
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Adding role {} from  group {} failed in the metalake {} due to storage issues",
+          "Revoking role {} from  group {} failed in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -154,7 +158,7 @@ class GrantManager {
     }
   }
 
-  public boolean removeRoleFromGroup(String metalake, String role, String group) {
+  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
 
@@ -206,7 +210,7 @@ class GrantManager {
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Removing role {} from  group {} failed in the metalake {} due to storage issues",
+          "Revoking role {} from  group {} failed in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -215,7 +219,7 @@ class GrantManager {
     }
   }
 
-  public boolean removeRoleFromUser(String metalake, String role, String user) {
+  public boolean revokeRoleFromUser(String metalake, String role, String user) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
 
@@ -263,7 +267,7 @@ class GrantManager {
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Removing role {} from  user {} failed in the metalake {} due to storage issues",
+          "Revoking role {} from  user {} failed in the metalake {} due to storage issues",
           role,
           user,
           metalake,
