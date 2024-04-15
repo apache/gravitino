@@ -8,14 +8,10 @@ package com.datastrato.gravitino.listener.api.event;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.listener.api.info.TableInfo;
-import com.datastrato.gravitino.rel.Table;
 
 /**
  * Represents an event that is generated when an attempt to create a table fails due to an
- * exception. This class extends {@link TableFailureEvent} to specifically address failure scenarios
- * encountered during the table creation process. It encapsulates both the exception that caused the
- * failure and the original request details for the table creation, providing comprehensive context
- * for the failure.
+ * exception.
  */
 @DeveloperApi
 public final class CreateTableFailureEvent extends TableFailureEvent {
@@ -25,10 +21,8 @@ public final class CreateTableFailureEvent extends TableFailureEvent {
    * Constructs a {@code CreateTableFailureEvent} instance, capturing detailed information about the
    * failed table creation attempt.
    *
-   * @param user The user who initiated the table creation operation. This information is essential
-   *     for auditing and diagnosing the cause of the failure.
-   * @param identifier The identifier of the table that was attempted to be created. This helps in
-   *     pinpointing the specific table related to the failure.
+   * @param user The user who initiated the table creation operation.
+   * @param identifier The identifier of the table that was attempted to be created.
    * @param exception The exception that was thrown during the table creation operation, providing
    *     insight into what went wrong.
    * @param createTableRequest The original request information used to attempt to create the table.
@@ -42,12 +36,10 @@ public final class CreateTableFailureEvent extends TableFailureEvent {
   }
 
   /**
-   * Retrieves the original request information for the attempted table creation. This information
-   * can be valuable for understanding the configuration and expectations that led to the failure,
-   * facilitating analysis and potential corrective actions.
+   * Retrieves the original request information for the attempted table creation.
    *
-   * @return The {@link Table} instance representing the request information for the failed table
-   *     creation attempt.
+   * @return The {@link TableInfo} instance representing the request information for the failed
+   *     table creation attempt.
    */
   public TableInfo createTableRequest() {
     return createTableRequest;
