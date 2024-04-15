@@ -293,6 +293,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
+    }
+
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
     Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
