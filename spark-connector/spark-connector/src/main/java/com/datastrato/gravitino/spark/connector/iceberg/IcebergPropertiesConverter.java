@@ -22,8 +22,8 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
       Map<String, String> gravitinoProperties, Map<String, String> sparkProperties) {
     Map<String, String> sparkTableProperties = new HashMap<>();
     if (gravitinoProperties != null) {
-      gravitinoProperties.remove(IcebergPropertiesConstants.GRAVITINO_ID_KEY);
       sparkTableProperties.putAll(gravitinoProperties);
+      sparkTableProperties.remove(IcebergPropertiesConstants.GRAVITINO_ID_KEY);
     }
     if (sparkProperties != null) {
       if (sparkProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FILE_FORMAT)) {
