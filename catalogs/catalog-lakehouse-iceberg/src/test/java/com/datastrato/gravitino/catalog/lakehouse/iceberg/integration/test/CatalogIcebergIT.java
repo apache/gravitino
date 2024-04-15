@@ -4,6 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.DEFAULT_ICEBERG_PROVIDER;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_AVRO_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_ORC_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_PARQUET_FILE_FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.PROP_PROVIDER;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -1054,6 +1059,15 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testIcebergTablePropertiesWhenCreate() {
+    String[] providers =
+        new String[] {
+          null,
+          DEFAULT_ICEBERG_PROVIDER,
+          ICEBERG_PARQUET_FILE_FORMAT,
+          ICEBERG_ORC_FILE_FORMAT,
+          ICEBERG_AVRO_FILE_FORMAT
+        };
+
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
@@ -1072,81 +1086,27 @@ public class CatalogIcebergIT extends AbstractIT {
     Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertFalse(createdTable.properties().containsKey(DEFAULT_FILE_FORMAT));
-    Table loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
+    Arrays.stream(providers)
+        .forEach(
+            provider -> {
+              properties.put(PROP_PROVIDER, provider);
+              if (DEFAULT_ICEBERG_PROVIDER.equals(provider)) {
+                provider = null;
+              }
+              assertionsTableProperties(
+                  tableCatalog,
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  distribution,
+                  sortOrders,
+                  provider);
+              tableCatalog.dropTable(tableIdentifier);
+            });
 
-    tableCatalog.dropTable(tableIdentifier);
-    properties.put("provider", "iceberg");
-    createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertFalse(createdTable.properties().containsKey(DEFAULT_FILE_FORMAT));
-    loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertFalse(loadTable.properties().containsKey(DEFAULT_FILE_FORMAT));
-
-    tableCatalog.dropTable(tableIdentifier);
-    properties.put("provider", "parquet");
-    createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals("parquet", createdTable.properties().get(DEFAULT_FILE_FORMAT));
-    loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertEquals("parquet", loadTable.properties().get(DEFAULT_FILE_FORMAT));
-
-    tableCatalog.dropTable(tableIdentifier);
-    properties.put("provider", "orc");
-    createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals("orc", createdTable.properties().get(DEFAULT_FILE_FORMAT));
-    loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertEquals("orc", loadTable.properties().get(DEFAULT_FILE_FORMAT));
-
-    tableCatalog.dropTable(tableIdentifier);
-    properties.put("provider", "avro");
-    createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals("avro", createdTable.properties().get(DEFAULT_FILE_FORMAT));
-    loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertEquals("avro", loadTable.properties().get(DEFAULT_FILE_FORMAT));
-
-    tableCatalog.dropTable(tableIdentifier);
-    properties.put("provider", "text");
+    properties.put(PROP_PROVIDER, "text");
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -1158,6 +1118,24 @@ public class CatalogIcebergIT extends AbstractIT {
                 partitioning,
                 distribution,
                 sortOrders));
+  }
+
+  private static void assertionsTableProperties(
+      TableCatalog tableCatalog,
+      NameIdentifier tableIdentifier,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      String expectedFileFormat) {
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier, columns, comment, properties, partitioning, distribution, sortOrders);
+    Assertions.assertEquals(expectedFileFormat, createdTable.properties().get(DEFAULT_FILE_FORMAT));
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(expectedFileFormat, loadTable.properties().get(DEFAULT_FILE_FORMAT));
   }
 
   protected static void assertionsTableInfo(

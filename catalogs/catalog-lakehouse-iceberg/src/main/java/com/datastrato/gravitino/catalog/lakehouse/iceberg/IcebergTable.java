@@ -48,10 +48,11 @@ public class IcebergTable extends BaseTable {
   /** The default provider of the table. */
   public static final String DEFAULT_ICEBERG_PROVIDER = "iceberg";
 
-  /** The supported file formats for Iceberg tables. */
+  /** The supported parquet file format for Iceberg tables. */
   public static final String ICEBERG_PARQUET_FILE_FORMAT = "parquet";
-
+  /** The supported orc file format for Iceberg tables. */
   public static final String ICEBERG_ORC_FILE_FORMAT = "orc";
+  /** The supported avro file format for Iceberg tables. */
   public static final String ICEBERG_AVRO_FILE_FORMAT = "avro";
 
   public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
