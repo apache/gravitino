@@ -169,7 +169,7 @@ public class SecurableObjects {
     @Override
     public String toString() {
       if (parent != null) {
-        return parent + "." + name;
+        return parent.toString() + "." + name;
       } else {
         return name;
       }
