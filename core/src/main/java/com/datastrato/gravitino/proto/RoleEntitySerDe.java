@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.Resource;
-import com.datastrato.gravitino.authorization.Resources;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
@@ -34,7 +34,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 roleEntity.privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .setResource(roleEntity.resource().toString());
+            .setSecurableObject(roleEntity.securableObject().toString());
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
       builder.putAllProperties(roleEntity.properties());
@@ -59,7 +59,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 role.getPrivilegesList().stream()
                     .map(Privileges::fromString)
                     .collect(Collectors.toList()))
-            .withResource(parseResource(role.getResource()))
+            .securableObject(parseSecurableObject(role.getSecurableObject()))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo()));
 
     if (!role.getPropertiesMap().isEmpty()) {
@@ -69,16 +69,16 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
     return builder.build();
   }
 
-  public static Resource parseResource(String resourceIdentifier) {
-    if ("*".equals(resourceIdentifier)) {
-      return Resources.ofAllCatalogs();
+  private static SecurableObject parseSecurableObject(String securableObjectIdentifier) {
+    if ("*".equals(securableObjectIdentifier)) {
+      return SecurableObjects.ofAllCatalogs();
     }
 
-    if (StringUtils.isBlank(resourceIdentifier)) {
-      throw new IllegalArgumentException("resource identifier can't be blank");
+    if (StringUtils.isBlank(securableObjectIdentifier)) {
+      throw new IllegalArgumentException("securable object identifier can't be blank");
     }
 
-    Iterable<String> parts = DOT.split(resourceIdentifier);
-    return Resources.of(Iterables.toArray(parts, String.class));
+    Iterable<String> parts = DOT.split(securableObjectIdentifier);
+    return SecurableObjects.of(Iterables.toArray(parts, String.class));
   }
 }

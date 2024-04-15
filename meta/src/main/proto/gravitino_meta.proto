@@ -120,7 +120,7 @@ message Role {
   uint64 id = 1;
   string name = 2;
   repeated string privileges = 3;
-  string resource = 4;
+  string securable_object = 4;
   map<string, string> properties = 5;
   AuditInfo audit_info = 6;
 }

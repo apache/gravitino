@@ -7,7 +7,7 @@ package com.datastrato.gravitino.proto;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.Resources;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -332,7 +332,7 @@ public class TestEntityProtoSerDe {
             .withId(roleId)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withResource(Resources.of(catalogName))
+            .securableObject(SecurableObjects.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(props)
             .build();
@@ -345,7 +345,7 @@ public class TestEntityProtoSerDe {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withResource(Resources.of(catalogName))
+            .securableObject(SecurableObjects.of(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     roleBytes = protoEntitySerDe.serialize(roleWithoutFields);

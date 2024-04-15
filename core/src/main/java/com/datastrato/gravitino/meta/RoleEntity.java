@@ -10,8 +10,8 @@ import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Resource;
 import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
@@ -32,8 +32,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field RESOURCE =
-      Field.required("resource", Resource.class, "The resource of the role entity.");
+  public static final Field SECURABLE_OBJECT =
+      Field.required(
+          "securable_object", SecurableObject.class, "The securable object of the role entity.");
 
   public static final Field PRIVILEGES =
       Field.required("privileges", List.class, "The privileges of the role entity.");
@@ -44,7 +45,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private AuditInfo auditInfo;
   private List<Privilege> privileges;
   private Namespace namespace;
-  private Resource resource;
+  private SecurableObject securableObject;
 
   /**
    * The name of the role.
@@ -73,22 +74,24 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * The resource represents a special kind of entity with a unique identifier. All resources are
-   * organized by tree structure. For example: If the resource is a table, the identifier may be
-   * `catalog1.schema1.table1`.
+   * The securable object represents a special kind of entity with a unique identifier. All
+   * securable objects are organized by tree structure. For example: If the securable object is a
+   * table, the identifier may be `catalog1.schema1.table1`.
    *
-   * @return The resource of the role.
+   * @return The securable object of the role.
    */
   @Override
-  public Resource resource() {
-    // The resource is a special kind of entities. Some entity types aren't the resource, such as
+  public SecurableObject securableObject() {
+    // The securable object is a special kind of entities. Some entity types aren't the securable
+    // object, such as
     // User, Role, etc.
-    // The resource identifier must be unique.
+    // The securable object identifier must be unique.
     // Gravitino assumes that the identifiers of the entities may be the same if they have different
     // types.
-    // So one type of them can't be the resource at least if there are the two same identifier
+    // So one type of them can't be the securable object at least if there are the two same
+    // identifier
     // entities .
-    return resource;
+    return securableObject;
   }
 
   /**
@@ -115,7 +118,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(RESOURCE, resource);
+    fields.put(SECURABLE_OBJECT, securableObject);
     fields.put(PRIVILEGES, privileges);
 
     return Collections.unmodifiableMap(fields);
@@ -151,13 +154,13 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(resource, that.resource)
+        && Objects.equals(securableObject, that.securableObject)
         && Objects.equals(privileges, that.privileges);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, resource, privileges);
+    return Objects.hash(id, name, properties, auditInfo, securableObject, privileges);
   }
 
   /**
@@ -226,13 +229,13 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the resource of the role entity.
+     * Sets the securable object of the role entity.
      *
-     * @param resource The resource of the role entity.
+     * @param securableObject The securable object of the role entity.
      * @return The builder instance.
      */
-    public Builder withResource(Resource resource) {
-      roleEntity.resource = resource;
+    public Builder securableObject(SecurableObject securableObject) {
+      roleEntity.securableObject = securableObject;
       return this;
     }
 

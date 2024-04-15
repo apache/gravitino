@@ -47,7 +47,7 @@ class RoleManager {
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
    * @param properties The properties of the Role.
-   * @param resource The resource of the Role.
+   * @param securableObject The resource of the Role.
    * @param privileges The privileges of the Role.
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same identifier already exists.
@@ -57,7 +57,7 @@ class RoleManager {
       String metalake,
       String role,
       Map<String, String> properties,
-      Resource resource,
+      SecurableObject securableObject,
       List<Privilege> privileges)
       throws RoleAlreadyExistsException {
     AuthorizationUtils.checkMetalakeExists(store, metalake);
@@ -66,7 +66,7 @@ class RoleManager {
             .withId(idGenerator.nextId())
             .withName(role)
             .withProperties(properties)
-            .withResource(resource)
+            .securableObject(securableObject)
             .withPrivileges(privileges)
             .withNamespace(
                 Namespace.of(
