@@ -129,6 +129,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     // Add Partition Info
     if (partitioning != null && partitioning.length > 0) {
       // TODO: Add partitioning support
+      throw new UnsupportedOperationException("Currently we do not support Partitioning in Doris");
     }
 
     // Return the generated SQL statement

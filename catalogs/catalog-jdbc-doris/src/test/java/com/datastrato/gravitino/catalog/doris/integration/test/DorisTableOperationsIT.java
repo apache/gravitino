@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.doris.integration.test;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
@@ -35,9 +36,13 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
   private static final Type VARCHAR_1024 = Types.VarCharType.of(1024);
 
-  private static Type INT = Types.IntegerType.get();
+  private static final Type INT = Types.IntegerType.get();
 
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
+
+  private static final long MAX_WAIT = 5;
+
+  private static final long WAIT_INTERVAL = 1;
 
   @BeforeAll
   public static void startup() {
@@ -88,6 +93,19 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     Assertions.assertTrue(listTables.contains(tableName));
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
+    // rename table
+    String newName = GravitinoITUtils.genRandomName("new_table");
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.rename(databaseName, tableName, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.load(databaseName, newName));
+
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(databaseName, newName));
+
+    listTables = TABLE_OPERATIONS.listTables(databaseName);
+    Assertions.assertFalse(listTables.contains(newName));
+
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(databaseName, newName));
   }
 
   @Test
@@ -141,8 +159,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
 
     Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -188,8 +206,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     columns.add(col_4);
     Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -213,8 +231,83 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_4);
     columns.add(col_3);
     Awaitility.await()
-        .atMost(5, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
+
+    // drop column if exist
+    TABLE_OPERATIONS.alterTable(
+        databaseName, tableName, TableChange.deleteColumn(new String[] {"col_4"}, true));
+    columns.clear();
+    columns.add(col_1);
+    columns.add(col_2);
+    columns.add(col_3);
+    Awaitility.await()
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
+
+    // delete column that does not exist
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.alterTable(
+                    databaseName,
+                    tableName,
+                    TableChange.deleteColumn(new String[] {"col_4"}, false)));
+
+    Assertions.assertEquals(
+        "Delete column does not exist: col_4", illegalArgumentException.getMessage());
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.deleteColumn(new String[] {"col_4"}, true)));
+
+    // test add index
+    TABLE_OPERATIONS.alterTable(
+        databaseName,
+        tableName,
+        TableChange.addIndex(
+            Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{"col_2"}, {"col_3"}}));
+
+    Index[] newIndexes =
+        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
+    Awaitility.await()
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    newIndexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
+
+    // test delete index
+    TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.deleteIndex("k2_index", true));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
