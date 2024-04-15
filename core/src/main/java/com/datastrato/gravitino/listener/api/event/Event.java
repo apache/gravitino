@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 public abstract class Event {
   private final String user;
   @Nullable private final NameIdentifier identifier;
+  private final long eventTime;
 
   /**
    * Constructs an Event instance with the specified user and resource identifier details.
@@ -30,6 +31,7 @@ public abstract class Event {
   protected Event(String user, NameIdentifier identifier) {
     this.user = user;
     this.identifier = identifier;
+    this.eventTime = System.currentTimeMillis();
   }
 
   /**
@@ -53,5 +55,14 @@ public abstract class Event {
   @Nullable
   public NameIdentifier identifier() {
     return identifier;
+  }
+
+  /**
+   * Returns the timestamp when the event was created.
+   *
+   * @return The event creation time in milliseconds since epoch.
+   */
+  public long eventTime() {
+    return eventTime;
   }
 }
