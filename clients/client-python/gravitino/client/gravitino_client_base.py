@@ -8,18 +8,25 @@ from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.name_identifier import NameIdentifier
-from gravitino.utils import HTTPClient
+from gravitino.utils import HTTPClient, Response
 
 logger = logging.getLogger(__name__)
+
 
 class GravitinoClientBase:
     """
     Base class for Gravitino Java client;
     It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the API.
     """
-    rest_client: HTTPClient  # The REST client to communicate with the REST server
-    API_METALAKES_LIST_PATH = "api/metalakes"  # The REST API path for listing metalakes
-    API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"  # The REST API path prefix for load a specific metalake
+    rest_client: HTTPClient
+    """The REST client to communicate with the REST server"""
+
+    API_METALAKES_LIST_PATH = "api/metalakes"
+    """The REST API path for listing metalakes"""
+
+
+    API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"
+    """The REST API path prefix for load a specific metalake"""
 
     def __init__(self, uri: str):
         self.rest_client = HTTPClient(uri)
@@ -30,16 +37,17 @@ class GravitinoClientBase:
         Args:
             ident The identifier of the Metalake to be loaded.
 
-        Return:
+        Returns:
             A GravitinoMetalake instance representing the loaded Metalake.
 
         Raises:
             NoSuchMetalakeException If the specified Metalake does not exist.
         """
+
         NameIdentifier.check_metalake(ident)
 
-        resp = self.rest_client.get(GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name)
-        metalake_response = MetalakeResponse.from_json(resp.body)
+        response = self.rest_client.get(GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name())
+        metalake_response = MetalakeResponse.from_json(response.body, infer_missing=True)
         metalake_response.validate()
 
         return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
@@ -47,7 +55,7 @@ class GravitinoClientBase:
     def get_version(self) -> GravitinoVersion:
         """Retrieves the version of the Gravitino API.
 
-        Return:
+        Returns:
             A GravitinoVersion instance representing the version of the Gravitino API.
         """
         resp = self.rest_client.get("api/version")

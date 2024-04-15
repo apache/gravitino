@@ -2,34 +2,38 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+import logging
+
 import gravitino
 from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.dto.responses.metalake_response import MetalakeResponse
-from gravitino.meta_change import MetalakeChange
+from gravitino.api.metalake_change import MetalakeChange
 from gravitino.name_identifier import NameIdentifier
 from gravitino.utils.exceptions import NotFoundError
-from tests.integration_test_env import IntegrationTestEnv
+from tests.integration.integration_test_env import IntegrationTestEnv
+
+logger = logging.getLogger(__name__)
 
 
-class TestGravitinoClient(IntegrationTestEnv):
+class TestGravitinoAdminClient(IntegrationTestEnv):
     def setUp(self):
         self._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
 
     def test_create_metalake(self):
         metalake_name = "metalake00"
-        try:
-            self.create_metalake(metalake_name)
-        except gravitino.utils.exceptions.HTTPError:
-            self.drop_metalake(metalake_name)
 
         # Clean test data
         self.drop_metalake(metalake_name)
 
+        self.create_metalake(metalake_name)
+        # Clean test data
+        self.drop_metalake(metalake_name)
+
     def create_metalake(self, metalake_name):
-        comment = "This is a sample comment"
         ident = NameIdentifier.of(metalake_name)
+        comment = "This is a sample comment"
         properties = {"key1": "value1", "key2": "value2"}
 
         gravitinoMetalake = self._gravitino_admin_client.create_metalake(ident, comment, properties)
@@ -37,16 +41,17 @@ class TestGravitinoClient(IntegrationTestEnv):
         self.assertEqual(gravitinoMetalake.name, metalake_name)
         self.assertEqual(gravitinoMetalake.comment, comment)
         self.assertEqual(gravitinoMetalake.properties.get("key1"), "value1")
-        self.assertEqual(gravitinoMetalake.audit.creator, "anonymous")
+        self.assertEqual(gravitinoMetalake.audit._creator, "anonymous")
 
     def test_alter_metalake(self):
         metalake_name = "metalake02"
         metalake_new_name = metalake_name + "_new"
-        try:
-            self.create_metalake(metalake_name)
-        except gravitino.utils.exceptions.HTTPError:
-            self.drop_metalake(metalake_name)
 
+        # Clean test data
+        self.drop_metalake(metalake_name)
+        self.drop_metalake(metalake_new_name)
+
+        self.create_metalake(metalake_name)
         changes = (
             MetalakeChange.rename(metalake_new_name),
             MetalakeChange.update_comment("new metalake comment"),
@@ -55,7 +60,7 @@ class TestGravitinoClient(IntegrationTestEnv):
         metalake = self._gravitino_admin_client.alter_metalake(NameIdentifier.of(metalake_name), *changes)
         self.assertEqual(metalake_new_name, metalake.name)
         self.assertEqual("new metalake comment", metalake.comment)
-        self.assertEqual("anonymous", metalake.audit.creator)  # Assuming a constant or similar attribute
+        self.assertEqual("anonymous", metalake.audit._creator)  # Assuming a constant or similar attribute
 
         # Reload metadata via new name to check if the changes are applied
         new_metalake = self._gravitino_admin_client.load_metalake(NameIdentifier.of(metalake_new_name))
@@ -67,13 +72,9 @@ class TestGravitinoClient(IntegrationTestEnv):
         with self.assertRaises(NotFoundError):  # TODO: NoSuchMetalakeException
             self._gravitino_admin_client.load_metalake(old)
 
-        # Clean test data
-        self.drop_metalake(metalake_name)
-        self.drop_metalake(metalake_new_name)
-
-    def drop_metalake(self, metalake_name):
+    def drop_metalake(self, metalake_name) -> bool:
         ident = NameIdentifier.of(metalake_name)
-        self.assertTrue(self._gravitino_admin_client.drop_metalake(ident))
+        return self._gravitino_admin_client.drop_metalake(ident)
 
     def test_drop_metalake(self):
         metalake_name = "metalake03"
@@ -82,7 +83,7 @@ class TestGravitinoClient(IntegrationTestEnv):
         except gravitino.utils.exceptions.HTTPError:
             self.drop_metalake(metalake_name)
 
-        self.drop_metalake(metalake_name)
+        assert self.drop_metalake(metalake_name) == True
 
     def test_metalake_update_request_to_json(self):
         changes = (
@@ -103,7 +104,7 @@ class TestGravitinoClient(IntegrationTestEnv):
         self.assertEqual(metalake_response.code, 0)
         self.assertIsNotNone(metalake_response.metalake)
         self.assertEqual(metalake_response.metalake.name, "example_name18")
-        self.assertEqual(metalake_response.metalake.audit.creator, "anonymous")
+        self.assertEqual(metalake_response.metalake.audit._creator, "anonymous")
 
     def test_list_metalakes(self):
         metalake_name = "metalake05"
@@ -113,4 +114,3 @@ class TestGravitinoClient(IntegrationTestEnv):
 
         # Clean test data
         self.drop_metalake(metalake_name)
-
