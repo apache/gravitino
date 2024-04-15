@@ -7,7 +7,6 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -16,10 +15,8 @@ import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
@@ -64,10 +61,7 @@ public class TestAccessControlManagerForPermissions {
   private static UserEntity userEntity =
       UserEntity.builder()
           .withNamespace(
-              Namespace.of(
-                  METALAKE,
-                  CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                  SchemaEntity.USER_SCHEMA_NAME))
+              Namespace.of(METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
           .withId(1L)
           .withName(USER)
           .withAuditInfo(auditInfo)
@@ -76,10 +70,7 @@ public class TestAccessControlManagerForPermissions {
   private static GroupEntity groupEntity =
       GroupEntity.builder()
           .withNamespace(
-              Namespace.of(
-                  METALAKE,
-                  CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                  SchemaEntity.GROUP_SCHEMA_NAME))
+              Namespace.of(METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
           .withId(1L)
           .withName(GROUP)
           .withAuditInfo(auditInfo)
@@ -88,16 +79,12 @@ public class TestAccessControlManagerForPermissions {
   private static RoleEntity roleEntity =
       RoleEntity.builder()
           .withNamespace(
-              Namespace.of(
-                  METALAKE,
-                  CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                  SchemaEntity.ROLE_SCHEMA_NAME))
+              Namespace.of(METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
           .withId(1L)
           .withName(ROLE)
           .withProperties(Maps.newHashMap())
           .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
-          .withPrivilegeEntityIdentifier(NameIdentifier.ofCatalog(METALAKE, CATALOG))
-          .withPrivilegeEntityType(Entity.EntityType.METALAKE)
+          .withSecurableObject(SecurableObjects.of(CATALOG))
           .withAuditInfo(auditInfo)
           .build();
 
@@ -258,15 +245,12 @@ public class TestAccessControlManagerForPermissions {
         RoleEntity.builder()
             .withNamespace(
                 Namespace.of(
-                    METALAKE,
-                    CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                    SchemaEntity.ROLE_SCHEMA_NAME))
+                    METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
             .withId(1L)
             .withName(anotherRole)
             .withProperties(Maps.newHashMap())
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
-            .withPrivilegeEntityIdentifier(NameIdentifier.ofCatalog(METALAKE, CATALOG))
-            .withPrivilegeEntityType(Entity.EntityType.METALAKE)
+            .withSecurableObject(SecurableObjects.ofCatalog(CATALOG))
             .withAuditInfo(auditInfo)
             .build();
 

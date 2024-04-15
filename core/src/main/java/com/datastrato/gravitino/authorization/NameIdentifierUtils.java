@@ -4,9 +4,8 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 
 class NameIdentifierUtils {
 
@@ -14,19 +13,16 @@ class NameIdentifierUtils {
 
   public static NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.USER_SCHEMA_NAME, user);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
   public static NameIdentifier ofGroup(String metalake, String group) {
     return NameIdentifier.of(
-        metalake,
-        CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-        SchemaEntity.GROUP_SCHEMA_NAME,
-        group);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 
   public static NameIdentifier ofRole(String metalake, String role) {
     return NameIdentifier.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.ROLE_SCHEMA_NAME, role);
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME, role);
   }
 }
