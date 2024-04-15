@@ -5,17 +5,11 @@
 package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Iterables;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 
 public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
-
-  private static final Splitter DOT = Splitter.on('.');
 
   /**
    * Serializes the provided entity into its corresponding Protocol Buffer message representation.
@@ -59,7 +53,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 role.getPrivilegesList().stream()
                     .map(Privileges::fromString)
                     .collect(Collectors.toList()))
-            .securableObject(parseSecurableObject(role.getSecurableObject()))
+            .withSecurableObject(SecurableObjects.parse(role.getSecurableObject()))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo()));
 
     if (!role.getPropertiesMap().isEmpty()) {
@@ -67,18 +61,5 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
     }
 
     return builder.build();
-  }
-
-  private static SecurableObject parseSecurableObject(String securableObjectIdentifier) {
-    if ("*".equals(securableObjectIdentifier)) {
-      return SecurableObjects.ofAllCatalogs();
-    }
-
-    if (StringUtils.isBlank(securableObjectIdentifier)) {
-      throw new IllegalArgumentException("securable object identifier can't be blank");
-    }
-
-    Iterable<String> parts = DOT.split(securableObjectIdentifier);
-    return SecurableObjects.of(Iterables.toArray(parts, String.class));
   }
 }
