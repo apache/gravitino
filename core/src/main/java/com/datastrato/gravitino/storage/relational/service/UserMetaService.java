@@ -121,7 +121,7 @@ public class UserMetaService {
                 });
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, userEntity.nameIdentifier().toString());
       throw re;
     }
