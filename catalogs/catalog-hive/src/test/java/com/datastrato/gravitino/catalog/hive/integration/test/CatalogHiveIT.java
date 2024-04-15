@@ -485,6 +485,28 @@ public class CatalogHiveIT extends AbstractIT {
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
+
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
   }
 
   @Test
@@ -1097,6 +1119,20 @@ public class CatalogHiveIT extends AbstractIT {
                 "The DEFAULT constraint for column is only supported since Hive 3.0, "
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"),
         "The exception message is: " + exception.getMessage());
+
+    // test alter column nullability exception
+    TableChange alterColumnNullability =
+        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(id, alterColumnNullability));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0,"
+                    + " but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: hive_col_name1"));
 
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");

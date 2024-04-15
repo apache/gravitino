@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -44,6 +45,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile CatalogOperations ops;
 
+  private volatile Capability capability;
+
   private volatile Map<String, String> properties;
 
   private static String ENTITY_IS_NOT_SET = "entity is not set";
@@ -64,6 +67,18 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   @Evolving
   protected abstract CatalogOperations newOps(Map<String, String> config);
+
+  /**
+   * Create a new instance of {@link Capability}, if the child class has special capabilities, it
+   * should implement this method to provide a specific {@link Capability} instance regarding that
+   * catalog.
+   *
+   * @return A new instance of {@link Capability}.
+   */
+  @Evolving
+  protected Capability newCapability() {
+    return new Capability() {};
+  }
 
   /**
    * Create a new instance of ProxyPlugin, it is optional. If the child class needs to support the
@@ -129,6 +144,18 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  public Capability capability() {
+    if (capability == null) {
+      synchronized (this) {
+        if (capability == null) {
+          capability = newCapability();
+        }
+      }
+    }
+
+    return capability;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {
