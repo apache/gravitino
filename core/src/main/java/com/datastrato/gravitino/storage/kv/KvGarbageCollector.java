@@ -49,7 +49,7 @@ public final class KvGarbageCollector implements Closeable {
           new byte[] {0x1D, 0x00, 0x03}, "last_collect_commit_id".getBytes(StandardCharsets.UTF_8));
 
   // Keep the last collect commit id to avoid collecting the same data multiple times, the first
-  // time the commit is 1 (minimum), and assuming we have collocated the data with transaction id
+  // time the commit is 1 (minimum), and assuming we have collected the data with transaction id
   // [1, 100], then the second time we collect the data, the starting commit id will be 100 and so
   // on.
   byte[] commitIdHasBeenCollected;
