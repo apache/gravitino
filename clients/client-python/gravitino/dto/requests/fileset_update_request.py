@@ -7,31 +7,31 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.api.metalake_change import MetalakeChange
+from gravitino.api.fileset_change import FilesetChange
 from gravitino.rest.rest_message import RESTRequest
 
 
 @dataclass
-class MetalakeUpdateRequestBase(RESTRequest):
-    type: str = field(metadata=config(field_name='@type'))
+class FilesetUpdateRequestBase(RESTRequest):
+    _type: str = field(metadata=config(field_name='@type'))
 
     def __init__(self, type: str):
-        self.type = type
+        self._type = type
 
     @abstractmethod
-    def metalake_change(self):
+    def fileset_change(self):
         pass
 
 
-class MetalakeUpdateRequest:
-    """Represents an interface for Metalake update requests."""
+class FilesetUpdateRequest:
+    """Request to update a fileset."""
 
     @dataclass
-    class RenameMetalakeRequest(MetalakeUpdateRequestBase):
-        """Represents a request to rename a Metalake."""
+    class RenameFilesetRequest(FilesetUpdateRequestBase):
+        """The fileset update request for renaming a fileset."""
 
         new_name: str = field(metadata=config(field_name='newName'))
-        """The new name for the Metalake."""
+        """The new name for the Fileset."""
 
         def __init__(self, new_name: str):
             super().__init__("rename")
@@ -44,17 +44,22 @@ class MetalakeUpdateRequest:
                 IllegalArgumentException if the new name is not set.
             """
             if not self.new_name:
-                raise ValueError('"newName" field is required and cannot be empty')
+                raise ValueError('"new_name" field is required and cannot be empty')
 
-        def metalake_change(self):
-            return MetalakeChange.rename(self.new_name)
+        def fileset_change(self):
+            """Returns the fileset change.
+
+            Returns:
+                the fileset change.
+            """
+            return FilesetChange.rename(self.new_name)
 
     @dataclass
-    class UpdateMetalakeCommentRequest(MetalakeUpdateRequestBase):
-        """Represents a request to update the comment on a Metalake."""
+    class UpdateFilesetCommentRequest(FilesetUpdateRequestBase):
+        """Represents a request to update the comment on a Fileset."""
 
         new_comment: str = field(metadata=config(field_name='newComment'))
-        """The new comment for the Metalake."""
+        """The new comment for the Fileset."""
 
         def __init__(self, new_comment: str):
             super().__init__("updateComment")
@@ -67,14 +72,15 @@ class MetalakeUpdateRequest:
                 IllegalArgumentException if the new comment is not set.
             """
             if not self.new_comment:
-                raise ValueError('"newComment" field is required and cannot be empty')
+                raise ValueError('"new_comment" field is required and cannot be empty')
 
-        def metalake_change(self):
-            return MetalakeChange.update_comment(self.new_comment)
+        def fileset_change(self):
+            """Returns the fileset change"""
+            return FilesetChange.update_comment(self.new_comment)
 
     @dataclass
-    class SetMetalakePropertyRequest(MetalakeUpdateRequestBase):
-        """Represents a request to set a property on a Metalake."""
+    class SetFilesetPropertyRequest(FilesetUpdateRequestBase):
+        """Represents a request to set a property on a Fileset."""
 
         property: str = None
         """The property to set."""
@@ -98,12 +104,12 @@ class MetalakeUpdateRequest:
             if not self.value:
                 raise ValueError('"value" field is required and cannot be empty')
 
-        def metalake_change(self):
-            return MetalakeChange.set_property(self.property, self.value)
+        def fileset_change(self):
+            return FilesetChange.set_property(self.property, self.value)
 
     @dataclass
-    class RemoveMetalakePropertyRequest(MetalakeUpdateRequestBase):
-        """Represents a request to remove a property from a Metalake."""
+    class RemoveFilesetPropertyRequest(FilesetUpdateRequestBase):
+        """Represents a request to remove a property from a Fileset."""
 
         property: str = None
         """The property to remove."""
@@ -121,5 +127,5 @@ class MetalakeUpdateRequest:
             if not self.property:
                 raise ValueError('"property" field is required and cannot be empty')
 
-        def metalake_change(self):
-            return MetalakeChange.remove_property(self.property)
+        def fileset_change(self):
+            return FilesetChange.remove_property(self.property)

@@ -30,7 +30,7 @@ class MetalakeChange:
         Args:
             new_comment: The new comment of the metalake.
 
-        Return:
+        Returns:
             The metalake change.
         """
         return MetalakeChange.UpdateMetalakeComment(new_comment)
@@ -43,7 +43,7 @@ class MetalakeChange:
             property: The property name to set.
             value: The value to set the property to.
 
-        Return:
+        Returns:
              The metalake change.
         """
         return MetalakeChange.SetProperty(property, value)
@@ -55,7 +55,7 @@ class MetalakeChange:
         Args:
             property: The property name to remove.
 
-        Return:
+        Returns:
             The metalake change.
         """
         return MetalakeChange.RemoveProperty(property)
