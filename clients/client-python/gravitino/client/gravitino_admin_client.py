@@ -13,7 +13,7 @@ from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesReque
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.metalake_list_response import MetalakeListResponse
 from gravitino.dto.responses.metalake_response import MetalakeResponse
-from gravitino.meta_change import MetalakeChange
+from gravitino.api.metalake_change import MetalakeChange
 from gravitino.name_identifier import NameIdentifier
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         super().__init__(uri)
 
     def list_metalakes(self) -> List[GravitinoMetalake]:
-        """
-        Retrieves a list of Metalakes from the Gravitino API.
-        Return:
+        """Retrieves a list of Metalakes from the Gravitino API.
+
+        Returns:
             An array of GravitinoMetalake objects representing the Metalakes.
         """
         resp = self.rest_client.get(self.API_METALAKES_LIST_PATH)
@@ -41,19 +41,20 @@ class GravitinoAdminClient(GravitinoClientBase):
         return [GravitinoMetalake.build(o, self.rest_client) for o in metalake_list_resp.metalakes]
 
     def create_metalake(self, ident: NameIdentifier, comment: str, properties: Dict[str, str]) -> GravitinoMetalake:
-        """
-        Creates a new Metalake using the Gravitino API.
+        """Creates a new Metalake using the Gravitino API.
+
         Args:
             ident: The identifier of the new Metalake.
             comment: The comment for the new Metalake.
             properties: The properties of the new Metalake.
-        Return:
+
+        Returns:
             A GravitinoMetalake instance representing the newly created Metalake.
-        TODO: @throws MetalakeAlreadyExistsException If a Metalake with the specified identifier already exists.
+            TODO: @throws MetalakeAlreadyExistsException If a Metalake with the specified identifier already exists.
         """
         NameIdentifier.check_metalake(ident)
 
-        req = MetalakeCreateRequest(ident.name, comment, properties)
+        req = MetalakeCreateRequest(ident.name(), comment, properties)
         req.validate()
 
         resp = self.rest_client.post(self.API_METALAKES_LIST_PATH, req)
@@ -63,12 +64,13 @@ class GravitinoAdminClient(GravitinoClientBase):
         return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
 
     def alter_metalake(self, ident: NameIdentifier, *changes: MetalakeChange) -> GravitinoMetalake:
-        """
-        Alters a specific Metalake using the Gravitino API.
+        """Alters a specific Metalake using the Gravitino API.
+
         Args:
             ident: The identifier of the Metalake to be altered.
             changes: The changes to be applied to the Metalake.
-        Return:
+
+        Returns:
              A GravitinoMetalake instance representing the updated Metalake.
         TODO: @throws NoSuchMetalakeException If the specified Metalake does not exist.
         TODO: @throws IllegalArgumentException If the provided changes are invalid or not applicable.
@@ -79,29 +81,28 @@ class GravitinoAdminClient(GravitinoClientBase):
         updates_request = MetalakeUpdatesRequest(reqs)
         updates_request.validate()
 
-        resp = self.rest_client.put(self.API_METALAKES_IDENTIFIER_PATH + ident.name,
-                                    updates_request)  # , MetalakeResponse, {}, ErrorHandlers.metalake_error_handler())
-        metalake_response = MetalakeResponse.from_json(resp.body)
+        resp = self.rest_client.put(self.API_METALAKES_IDENTIFIER_PATH + ident.name(), updates_request)
+        metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
 
         return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
 
     def drop_metalake(self, ident: NameIdentifier) -> bool:
-        """
-        Drops a specific Metalake using the Gravitino API.
+        """Drops a specific Metalake using the Gravitino API.
+
         Args:
             ident: The identifier of the Metalake to be dropped.
-        Return:
+
+        Returns:
             True if the Metalake was successfully dropped, false otherwise.
         """
         NameIdentifier.check_metalake(ident)
 
         try:
-            resp = self.rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + ident.name)
-            dropResponse = DropResponse.from_json(resp.body)
+            resp = self.rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + ident.name())
+            dropResponse = DropResponse.from_json(resp.body, infer_missing=True)
 
             return dropResponse.dropped()
-
         except Exception as e:
-            logger.warning(f"Failed to drop metadata ", e)
+            logger.warning(f"Failed to drop metalake {ident.name()}", e)
             return False
