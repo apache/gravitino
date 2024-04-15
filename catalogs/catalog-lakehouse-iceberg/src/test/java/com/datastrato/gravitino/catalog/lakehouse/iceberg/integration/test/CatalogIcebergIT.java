@@ -1120,6 +1120,21 @@ public class CatalogIcebergIT extends AbstractIT {
                 partitioning,
                 distribution,
                 sortOrders));
+
+    properties.put(PROP_PROVIDER, ICEBERG_PARQUET_FILE_FORMAT);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.setProperty(PROP_PROVIDER, ICEBERG_ORC_FILE_FORMAT)));
   }
 
   private static void checkIcebergTableFileFormat(
