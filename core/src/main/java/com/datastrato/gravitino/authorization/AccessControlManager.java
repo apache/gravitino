@@ -120,7 +120,7 @@ public class AccessControlManager {
   /**
    * Grant a role to a user.
    *
-   * @param metalake The Metalake of the User.
+   * @param metalake The metalake of the User.
    * @param user The name of the User.
    * @return true` if the User was successfully granted, `false` otherwise.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
@@ -136,7 +136,7 @@ public class AccessControlManager {
   /**
    * Grant a role to a group.
    *
-   * @param metalake The Metalake of the Group.
+   * @param metalake The metalake of the Group.
    * @param group THe name of the Group.
    * @return true` if the Group was successfully granted, `false` otherwise.
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
@@ -152,7 +152,7 @@ public class AccessControlManager {
   /**
    * Revoke a role from a group.
    *
-   * @param metalake The Metalake of the Group.
+   * @param metalake The metalake of the Group.
    * @param group The name of the Group.
    * @return true` if the Group was successfully revoked, `false` otherwise.
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
@@ -168,7 +168,7 @@ public class AccessControlManager {
   /**
    * Revoke a role from a user.
    *
-   * @param metalake The Metalake of the User.
+   * @param metalake The metalake of the User.
    * @param user The name of the User.
    * @return true` if the User was successfully revoked, `false` otherwise.
    * @throws NoSuchUserException If the User with the given identifier does not exist.
