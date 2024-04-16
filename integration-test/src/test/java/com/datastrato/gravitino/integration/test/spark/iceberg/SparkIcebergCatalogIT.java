@@ -6,10 +6,9 @@ package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import java.util.List;
 import java.util.Map;
-
-import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -64,17 +63,48 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_iceberg_table_loaded_properties";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
+
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     Map<String, String> tableProperties = table.getTableProperties();
+
     Assertions.assertNotNull(tableProperties);
-    Assertions.assertEquals("iceberg/parquet", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FILE_FORMAT));
-    Assertions.assertEquals("iceberg", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_PROVIDER));
-    Assertions.assertEquals("none", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CURRENT_SNAPSHOT_ID));
-    Assertions.assertTrue(tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_LOCATION).contains(tableName));
-    Assertions.assertEquals("1", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FORMAT_VERSION));
-    /**  */
-    Assertions.assertFalse(tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_SORT_ORDER));
-    Assertions.assertFalse(tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_IDENTIFIER_FIELDS));
+    Assertions.assertEquals(
+        "iceberg/parquet",
+        tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FILE_FORMAT));
+    Assertions.assertEquals(
+        "iceberg", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_PROVIDER));
+    Assertions.assertEquals(
+        "none",
+        tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CURRENT_SNAPSHOT_ID));
+    Assertions.assertTrue(
+        tableProperties
+            .get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_LOCATION)
+            .contains(tableName));
+    Assertions.assertEquals(
+        "1", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FORMAT_VERSION));
+    // TODO: we can use `ALTER TABLE ... WRITE ORDERED BY ...` to set the sort-order of Iceberg
+    // tables
+    //  after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
+    // `SetWriteDistributionAndOrdering` command.
+    //  now they don't know the `GravitinoCatalog` and the `SparkIcebergTable` of Gravitino
+    // Spark-connector,
+    //  so here
+    // `tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_SORT_ORDER)` is
+    // always false.
+    Assertions.assertFalse(
+        tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_SORT_ORDER));
+    // TODO: we can use `ALTER TABLE ... SET IDENTIFIER FIELDS` to set the identifier-fields of
+    // Iceberg tables
+    //  after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
+    // `SetWriteDistributionAndOrdering` command.
+    //  now they don't know the `GravitinoCatalog` and the `SparkIcebergTable` of Gravitino
+    // Spark-connector,
+    //  so here
+    // `tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_IDENTIFIER_FIELDS)`
+    // is always false.
+    Assertions.assertFalse(
+        tableProperties.containsKey(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_IDENTIFIER_FIELDS));
   }
 }

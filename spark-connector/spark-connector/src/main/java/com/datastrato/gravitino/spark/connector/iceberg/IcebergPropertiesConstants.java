@@ -38,9 +38,12 @@ public class IcebergPropertiesConstants {
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
 
   public static final String GRAVITINO_ICEBERG_LOCATION = IcebergTablePropertiesMetadata.LOCATION;
-  public static final String GRAVITINO_ICEBERG_CURRENT_SNAPSHOT_ID = IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID;
-  public static final String GRAVITINO_ICEBERG_SORT_ORDER = IcebergTablePropertiesMetadata.SORT_ORDER;
-  public static final String GRAVITINO_ICEBERG_IDENTIFIER_FIELDS = IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS;
+  public static final String GRAVITINO_ICEBERG_CURRENT_SNAPSHOT_ID =
+      IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID;
+  public static final String GRAVITINO_ICEBERG_SORT_ORDER =
+      IcebergTablePropertiesMetadata.SORT_ORDER;
+  public static final String GRAVITINO_ICEBERG_IDENTIFIER_FIELDS =
+      IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS;
   public static final String GRAVITINO_ICEBERG_PROVIDER = IcebergTablePropertiesMetadata.PROVIDER;
   public static final String GRAVITINO_ID_KEY = "gravitino.identifier";
   public static final String GRAVITINO_ICEBERG_FILE_FORMAT = "format";
