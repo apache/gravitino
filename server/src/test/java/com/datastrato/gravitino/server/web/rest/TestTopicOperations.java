@@ -16,6 +16,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
 import com.datastrato.gravitino.dto.messaging.TopicDTO;
 import com.datastrato.gravitino.dto.requests.TopicCreateRequest;
@@ -91,7 +92,7 @@ public class TestTopicOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(TopicOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(TopicDispatcher.class).ranked(2);
             bindFactory(TestTopicOperations.MockServletRequestFactory.class)
                 .to(HttpServletRequest.class);
           }

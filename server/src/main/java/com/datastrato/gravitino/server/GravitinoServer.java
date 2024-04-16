@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
@@ -82,9 +83,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
-            bind(gravitinoEnv.topicOperationDispatcher())
-                .to(com.datastrato.gravitino.catalog.TopicOperationDispatcher.class)
-                .ranked(1);
+            bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
