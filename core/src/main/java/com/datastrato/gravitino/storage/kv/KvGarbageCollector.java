@@ -193,14 +193,15 @@ public final class KvGarbageCollector implements Closeable {
           removeAllVersionsOfKey(rawKey, key, false);
 
           LogHelper logHelper = decodeKey(key, transactionId);
+          kvBackend.delete(rawKey);
           LOG.info(
-              "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+              "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}',"
+                  + " createTime: '{}({})', key: '{}'",
               logHelper.identifier,
               logHelper.type,
               logHelper.createTimeAsString,
               logHelper.createTimeInMs,
               Bytes.wrap(key));
-          kvBackend.delete(rawKey);
           keysDeletedCount++;
           continue;
         }
@@ -225,8 +226,10 @@ public final class KvGarbageCollector implements Closeable {
           LogHelper logHelper = decodeKey(key, transactionId);
           byte[] newVersionKey = newVersionOfKey.get(0).getKey();
           LogHelper newVersionLogHelper = decodeKey(newVersionKey);
+          kvBackend.delete(rawKey);
           LOG.info(
-              "Physically delete key that has newer version: name identifier: '{}', entity type: '{}', createTime: '{}({})', newVersion createTime: '{}({})',"
+              "Physically delete key that has newer version: name identifier: '{}', entity type: '{}',"
+                  + " createTime: '{}({})', newVersion createTime: '{}({})',"
                   + " key: '{}', newVersion key: '{}'",
               logHelper.identifier,
               logHelper.type,
@@ -236,13 +239,13 @@ public final class KvGarbageCollector implements Closeable {
               newVersionLogHelper.createTimeInMs,
               Bytes.wrap(rawKey),
               Bytes.wrap(newVersionKey));
-          kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
       }
 
       // All keys in this transaction have been deleted, we can remove the commit mark.
       if (keysDeletedCount == keysInTheTransaction.size()) {
+        kvBackend.delete(kv.getKey());
         long timestamp = getTransactionId(transactionId) >> 18;
         LOG.info(
             "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
@@ -250,7 +253,6 @@ public final class KvGarbageCollector implements Closeable {
             DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT),
             timestamp,
             Bytes.wrap(kv.getKey()));
-        kvBackend.delete(kv.getKey());
       }
     }
 
@@ -283,7 +285,8 @@ public final class KvGarbageCollector implements Closeable {
 
       LogHelper logHelper = decodeKey(kv.getKey());
       LOG.info(
-          "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+          "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}',"
+              + " createTime: '{}({})', key: '{}'",
           logHelper.identifier,
           logHelper.type,
           logHelper.createTimeAsString,
@@ -308,6 +311,7 @@ public final class KvGarbageCollector implements Closeable {
 
       // Try to delete the commit mark.
       if (allDropped) {
+        kvBackend.delete(transactionKey);
         long timestamp = TransactionalKvBackendImpl.getTransactionId(transactionId) >> 18;
         LOG.info(
             "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
@@ -315,7 +319,6 @@ public final class KvGarbageCollector implements Closeable {
             DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT),
             timestamp,
             Bytes.wrap(kv.getKey()));
-        kvBackend.delete(transactionKey);
       }
     }
   }
