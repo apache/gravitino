@@ -22,6 +22,8 @@ import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
 import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.EventListenerManager;
 import com.datastrato.gravitino.lock.LockManager;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
+import com.datastrato.gravitino.metalake.MetalakeEventDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
@@ -55,7 +57,7 @@ public class GravitinoEnv {
 
   private TopicOperationDispatcher topicOperationDispatcher;
 
-  private MetalakeManager metalakeManager;
+  private MetalakeDispatcher metalakeDispatcher;
 
   private AccessControlManager accessControlManager;
 
@@ -131,7 +133,8 @@ public class GravitinoEnv {
     EventBus eventBus = eventListenerManager.createEventBus();
 
     // Create and initialize metalake related modules
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeManager);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
@@ -231,12 +234,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the MetalakeManager associated with the Gravitino environment.
+   * Get the MetalakeDispatcher associated with the Gravitino environment.
    *
-   * @return The MetalakeManager instance.
+   * @return The MetalakeDispatcher instance.
    */
-  public MetalakeManager metalakesManager() {
-    return metalakeManager;
+  public MetalakeDispatcher metalakeDispatcher() {
+    return metalakeDispatcher;
   }
 
   /**

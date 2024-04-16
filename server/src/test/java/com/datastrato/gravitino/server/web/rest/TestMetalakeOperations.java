@@ -29,6 +29,7 @@ import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
@@ -87,7 +88,7 @@ public class TestMetalakeOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(metalakeManager).to(MetalakeManager.class).ranked(2);
+            bind(metalakeManager).to(MetalakeDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
