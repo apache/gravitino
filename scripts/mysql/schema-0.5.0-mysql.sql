@@ -135,6 +135,8 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
+    `securable_object` VARCHAR(256) NOT NULL COMMENT 'securable object',
+    `privileges` VARCHAR(64) NOT NULL COMMENT 'securable privileges',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
