@@ -264,6 +264,7 @@ const MetalakeTree = props => {
 
   useEffect(() => {
     dispatch(setExpandedNodes(store.expandedNodes))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.metalakeTree, dispatch])
 
   return (
