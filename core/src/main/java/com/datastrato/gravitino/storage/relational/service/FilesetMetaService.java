@@ -13,6 +13,7 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
+import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -48,6 +49,12 @@ public class FilesetMetaService {
           filesetName);
     }
     return filesetPO;
+  }
+
+  public List<FilesetVersionPO> getFilesetVersionPOsByRetentionCount(Long versionRetentionCount) {
+    return SessionUtils.getWithoutCommit(
+        FilesetVersionMapper.class,
+        mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
   }
 
   public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
@@ -224,6 +231,14 @@ public class FilesetMetaService {
         mapper -> {
           mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
         });
+  }
+
+  public Integer deleteFilesetVersionsByRetentionLine(
+      Long filesetId, Long versionRetentionLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        FilesetVersionMapper.class,
+        mapper ->
+            mapper.deleteFilesetVersionsByRetentionLine(filesetId, versionRetentionLine, limit));
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {

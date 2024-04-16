@@ -5,9 +5,12 @@
 
 package com.datastrato.gravitino.storage.relational;
 
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
@@ -17,6 +20,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -48,7 +52,7 @@ public final class RelationalGarbageCollector implements Closeable {
   }
 
   public void start() {
-    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -72,41 +76,71 @@ public final class RelationalGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveLegacyData() throws SQLException {
-    long legacyTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
-    // TODO: put limit to configuration
-    int limit = 20;
+    long legacyTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
 
     for (AllTables.TABLE_NAMES tableName : AllTables.TABLE_NAMES.values()) {
       switch (tableName) {
         case METALAKE_TABLE_NAME:
           MetalakeMetaService.getInstance()
-              .deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
+              .deleteMetalakeMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case CATALOG_TABLE_NAME:
           CatalogMetaService.getInstance()
-              .deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
+              .deleteCatalogMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case SCHEMA_TABLE_NAME:
-          SchemaMetaService.getInstance().deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+          SchemaMetaService.getInstance()
+              .deleteSchemaMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case TABLE_TABLE_NAME:
-          TableMetaService.getInstance().deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+          TableMetaService.getInstance()
+              .deleteTableMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case FILESET_TABLE_NAME:
           FilesetMetaService.getInstance()
-              .deleteFilesetAndVersionMetasByLegacyTimeLine(legacyTimeLine, limit);
+              .deleteFilesetAndVersionMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case FILESET_VERSION_TABLE_NAME:
           FilesetMetaService.getInstance()
-              .deleteFilesetAndVersionMetasByLegacyTimeLine(legacyTimeLine, limit);
+              .deleteFilesetAndVersionMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         default:
-          throw new IllegalArgumentException("Unsupported table name: " + tableName);
+          throw new IllegalArgumentException(
+              "Unsupported table name when collectAndRemoveLegacyData: " + tableName);
       }
     }
   }
 
   private void collectAndRemoveOldVersionData() {
-    long deleteTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
+    long version_retention_count = config.get(VERSION_RETENTION_COUNT);
 
-    int version_retention_count = 1;
+    for (AllTables.TABLE_NAMES tableName : AllTables.TABLE_NAMES.values()) {
+      switch (tableName) {
+        case FILESET_VERSION_TABLE_NAME:
+          List<FilesetVersionPO> filesetCurVersions =
+              FilesetMetaService.getInstance()
+                  .getFilesetVersionPOsByRetentionCount(version_retention_count);
 
-
-    for (AllTables.TABLE_NAMES table : AllTables.TABLE_NAMES.values()) {}
+          for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
+            long versionRetentionLine =
+                filesetVersionPO.getVersion().longValue() - version_retention_count;
+            FilesetMetaService.getInstance()
+                .deleteFilesetVersionsByRetentionLine(
+                    filesetVersionPO.getFilesetId(),
+                    versionRetentionLine,
+                    GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+          }
+        case METALAKE_TABLE_NAME:
+        case CATALOG_TABLE_NAME:
+        case SCHEMA_TABLE_NAME:
+        case TABLE_TABLE_NAME:
+        case FILESET_TABLE_NAME:
+          continue;
+        default:
+          throw new IllegalArgumentException(
+              "Unsupported table name when collectAndRemoveOldVersionData: " + tableName);
+      }
+    }
   }
 
   @Override

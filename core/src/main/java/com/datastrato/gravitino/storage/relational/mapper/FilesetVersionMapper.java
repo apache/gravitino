@@ -7,9 +7,11 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
+import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 /**
@@ -106,4 +108,25 @@ public interface FilesetVersionMapper {
           + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
   Integer deleteFilesetVersionsByLegacyTimeLine(
       @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+
+  @Select(
+      "SELECT id, fileset_id as filesetId,"
+          + " Max(version) as version, deleted_at as deletedAt,"
+          + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+          + " storage_location as storageLocation"
+          + " FROM "
+          + VERSION_TABLE_NAME
+          + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
+          + " GROUP BY fileset_id")
+  List<FilesetVersionPO> selectFilesetVersionsByRetentionCount(
+      @Param("versionRetentionCount") Long versionRetentionCount);
+
+  @Delete(
+      "DELETE FROM "
+          + VERSION_TABLE_NAME
+          + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}")
+  Integer deleteFilesetVersionsByRetentionLine(
+      @Param("filesetId") Long filesetId,
+      @Param("versionRetentionLine") Long versionRetentionLine,
+      @Param("limit") int limit);
 }
