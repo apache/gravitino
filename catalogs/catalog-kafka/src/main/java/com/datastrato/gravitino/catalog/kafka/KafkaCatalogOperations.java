@@ -133,6 +133,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         AdminClientConfig.CLIENT_ID_CONFIG,
         String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));
 
+    createDefaultSchemaIfNecessary();
     adminClient = AdminClient.create(adminClientConfig);
   }
 
@@ -328,7 +329,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    createDefaultSchemaIfNecessary();
     try {
       List<SchemaEntity> schemas =
           store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA);
@@ -352,7 +352,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    createDefaultSchemaIfNecessary();
     try {
       SchemaEntity schema = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
 
@@ -430,11 +429,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   private void checkSchemaExists(NameIdentifier ident) throws NoSuchSchemaException {
-    if (ident.equals(defaultSchemaIdent)) {
-      createDefaultSchemaIfNecessary();
-      return;
-    }
-
     if (!schemaExists(ident)) {
       LOG.warn("Kafka catalog schema {} does not exist", ident);
       throw new NoSuchSchemaException("Schema %s does not exist", ident);
@@ -543,7 +537,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     return topicConfigs;
   }
 
-  private synchronized void createDefaultSchemaIfNecessary() {
+  private void createDefaultSchemaIfNecessary() {
     // If the default schema already exists, do nothing
     try {
       if (store.exists(defaultSchemaIdent, Entity.EntityType.SCHEMA)) {

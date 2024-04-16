@@ -10,11 +10,13 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.messaging.TopicDTO;
@@ -366,6 +368,26 @@ public class DTOConverters {
         .withName(group.name())
         .withRoles(group.roles())
         .withAudit(toDTO(group.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a role implementation to a RoleDTO.
+   *
+   * @param role The role implementation.
+   * @return The role DTO.
+   */
+  public static RoleDTO toDTO(Role role) {
+    if (role instanceof RoleDTO) {
+      return (RoleDTO) role;
+    }
+
+    return RoleDTO.builder()
+        .withName(role.name())
+        .withSecurableObject(role.securableObject())
+        .withPrivileges(role.privileges())
+        .withProperties(role.properties())
+        .withAudit(toDTO(role.auditInfo()))
         .build();
   }
 

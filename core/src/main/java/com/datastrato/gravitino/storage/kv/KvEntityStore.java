@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.kv;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
+import static com.datastrato.gravitino.Entity.EntityType.ROLE;
 import static com.datastrato.gravitino.Entity.EntityType.USER;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.generateKeyForMapping;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.getSubEntitiesPrefix;
@@ -228,7 +229,8 @@ public class KvEntityStore implements EntityStore {
     }
     byte[] encode = entityKeyEncoder.encode(ident, type, true);
 
-    String[] entityShortNames = new String[] {USER.getShortName(), GROUP.getShortName()};
+    String[] entityShortNames =
+        new String[] {USER.getShortName(), GROUP.getShortName(), ROLE.getShortName()};
     for (String name : entityShortNames) {
       byte[] prefix = replacePrefixTypeInfo(encode, name);
       transactionalKvBackend.deleteRange(

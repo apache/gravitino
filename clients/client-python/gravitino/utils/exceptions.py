@@ -17,7 +17,7 @@ class HTTPError(Exception):
 
     def json(self):
         """
-        :return: object of response error from the API
+        :Returns: object of response error from the API
         """
         try:
             return json.loads(self.body.decode("utf-8"))

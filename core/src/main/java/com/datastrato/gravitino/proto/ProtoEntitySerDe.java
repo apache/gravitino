@@ -46,6 +46,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
           .put(
               "com.datastrato.gravitino.meta.GroupEntity",
               "com.datastrato.gravitino.proto.GroupEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.RoleEntity",
+              "com.datastrato.gravitino.proto.RoleEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
@@ -67,7 +70,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.gravitino.meta.UserEntity",
           "com.datastrato.gravitino.proto.User",
           "com.datastrato.gravitino.meta.GroupEntity",
-          "com.datastrato.gravitino.proto.Group");
+          "com.datastrato.gravitino.proto.Group",
+          "com.datastrato.gravitino.meta.RoleEntity",
+          "com.datastrato.gravitino.proto.Role");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

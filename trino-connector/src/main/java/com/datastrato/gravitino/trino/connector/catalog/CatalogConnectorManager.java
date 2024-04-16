@@ -7,6 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 
 import com.datastrato.gravitino.Catalog;
@@ -90,14 +91,11 @@ public class CatalogConnectorManager {
     this.config = Preconditions.checkNotNull(config, "config is not null");
   }
 
-  @VisibleForTesting
-  public void setGravitinoClient(GravitinoAdminClient gravitinoClient) {
-    this.gravitinoClient = gravitinoClient;
-  }
-
-  public void start() {
-    if (gravitinoClient == null) {
-      gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
+  public void start(GravitinoAdminClient client) {
+    if (client == null) {
+      this.gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
+    } else {
+      this.gravitinoClient = client;
     }
 
     // Schedule a task to load catalog from gravitino server.
@@ -147,7 +145,9 @@ public class CatalogConnectorManager {
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
-        Arrays.stream(catalogNames).map(NameIdentifier::toString).collect(Collectors.toSet());
+        Arrays.stream(catalogNames)
+            .map(config.simplifyCatalogNames() ? NameIdentifier::name : NameIdentifier::toString)
+            .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
       if (!catalogNameStrings.contains(entry.getKey())
@@ -164,7 +164,8 @@ public class CatalogConnectorManager {
             (NameIdentifier nameIdentifier) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(nameIdentifier);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
+                GravitinoCatalog gravitinoCatalog =
+                    new GravitinoCatalog(metalake.name(), catalog, config.simplifyCatalogNames());
                 if (catalogConnectors.containsKey(gravitinoCatalog.getFullName())) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(metalake, gravitinoCatalog);
@@ -360,6 +361,10 @@ public class CatalogConnectorManager {
   }
 
   public void addMetalake(String metalake) {
+    if (config.simplifyCatalogNames() && usedMetalakes.size() > 1)
+      throw new TrinoException(
+          GRAVITINO_MISSING_CONFIG,
+          "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
     usedMetalakes.add(metalake);
   }
 }
