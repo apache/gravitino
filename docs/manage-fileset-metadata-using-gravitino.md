@@ -38,7 +38,7 @@ For a fileset catalog, you must specify the catalog `type` as `FILESET` when cre
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -59,7 +59,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://127.0.0.1:8090")
+    .builder("http://localhost:8090")
     .withMetalake("metalake")
     .build();
 
@@ -76,6 +76,19 @@ Catalog catalog = gravitinoClient.createCatalog(
     "This is a Hadoop fileset catalog",
     properties);
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog = gravitino_client.create_catalog(ident=NameIdentifier.of("metalake", "catalog"),
+                                          type=Catalog.Type.FILESET,
+                                          provider="hadoop", 
+                                          comment="This is a Hadoop fileset catalog",
+                                          properties={"location": "/tmp/test1"})
 ```
 
 </TabItem>
@@ -131,7 +144,7 @@ Users should create a metalake and a catalog before creating a schema.
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
 endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -150,7 +163,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://127.0.0.1:8090")
+    .builder("http://localhost:8090")
     .withMetalake("metalake")
     .build();
 
@@ -170,6 +183,19 @@ Schema schema = supportsSchemas.createSchema(
     schemaProperties
 );
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+
+catalog.as_schemas().create_schema(ident=NameIdentifier.of("metalake", "catalog", "schema"), 
+                                   comment="This is a schema",
+                                   properties={"location": "/tmp/root/schema"})
 ```
 
 </TabItem>
@@ -221,7 +247,7 @@ You can create a fileset by sending a `POST` request to the `/api/metalakes/{met
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or just use the Gravitino Java
 client. The following is an example of creating a fileset:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -242,7 +268,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://127.0.0.1:8090")
+    .builder("http://localhost:8090")
     .withMetalake("metalake")
     .build();
 
@@ -260,6 +286,21 @@ filesetCatalog.createFileset(
   "file:/tmp/root/schema/example_fileset",
   propertiesMap,
 );
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("metalake", "catalog", "schema", "example_fileset"),
+                                            type=Fileset.Type.MANAGED,
+                                            comment="This is an example fileset",
+                                            storage_location="/tmp/root/schema/example_fileset",
+                                            properties={"k1": "v1"})
 ```
 
 </TabItem>
@@ -299,7 +340,7 @@ You can modify a fileset by sending a `PUT` request to the `/api/metalakes/{meta
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or just use the
 Gravitino Java client. The following is an example of modifying a fileset:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -334,6 +375,22 @@ Fileset f = filesetCatalog.alterFileset(NameIdentifier.of("metalake", "catalog",
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+
+changes = (
+   FilesetChange.remove_property("fileset_properties_key1"),
+   FilesetChange.set_property("fileset_properties_key2", "fileset_propertie_new_value"),
+)
+fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("metalake", "catalog", "schema", "fileset"), 
+                                                         *changes)
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following changes to a fileset:
@@ -351,7 +408,7 @@ You can remove a fileset by sending a `DELETE` request to the `/api/metalakes/{m
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a fileset:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -376,6 +433,16 @@ filesetCatalog.dropFileset(NameIdentifier.of("metalake", "catalog", "schema", "f
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+
+catalog.as_fileset_catalog().drop_fileset(ident=NameIdentifier.of("metalake", "catalog", "schema", "fileset"))
+```
+</TabItem>
 </Tabs>
 
 For a `MANAGED` fileset, the physical location of the fileset will be deleted when this fileset is
@@ -387,7 +454,7 @@ You can list all filesets in a schema by sending a `GET` request to the `/api/me
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or by using the
 Gravitino Java client. The following is an example of listing all the filesets in a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -407,6 +474,17 @@ FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 NameIdentifier[] identifiers =
     filesetCatalog.listFilesets(Namespace.ofFileset("metalake", "catalog", "schema"));
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+
+fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(namespace=Namespace.of_fileset("metalake", "catalog", "schema")))
 ```
 
 </TabItem>

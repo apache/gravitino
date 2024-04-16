@@ -189,8 +189,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
             return drop_resp.dropped()
-        except Exception as e:
-            logger.warning(f"Failed to drop schema {ident}")
+        except Exception:
+            logger.warning("Failed to drop schema %s", ident)
             return False
 
     @staticmethod
@@ -200,10 +200,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     @staticmethod
     def to_schema_update_request(change: SchemaChange):
         if isinstance(change, SchemaChange.SetProperty):
-            return SchemaUpdateRequest.SetSchemaPropertyRequest(
-                change.property(), change.value()
-            )
-        elif isinstance(change, SchemaChange.RemoveProperty):
+            return SchemaUpdateRequest.SetSchemaPropertyRequest(change.property(), change.value())
+        if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        raise ValueError(f"Unknown change type: {type(change).__name__}")

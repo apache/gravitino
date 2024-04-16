@@ -172,7 +172,7 @@ Currently, Gravitino supports the following changes to a catalog:
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -204,7 +204,7 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
 a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -230,7 +230,7 @@ NameIdentifier[] catalogsIdents = gravitinoClient.listCatalogs(Namespace.ofCatal
 
 You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -263,7 +263,7 @@ Users should create a metalake and a catalog before creating a schema.
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -297,6 +297,18 @@ Schema schema = supportsSchemas.createSchema(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+catalog.as_schemas().create_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"),
+                                   comment="This is a schema",
+                                   properties={})
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following schema property:
@@ -313,7 +325,7 @@ Currently, Gravitino supports the following schema property:
 
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -335,13 +347,23 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "hive_c
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+schema: Schema = catalog.as_schemas().load_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"))
+```
+
+</TabItem>
 </Tabs>
 
 ### Alter a schema
 
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -377,6 +399,21 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+changes = (
+    SchemaChange.remove_property("schema_properties_key1"),
+    SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
+)
+schema_new: Schema = catalog.as_schemas().alter_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), 
+                                               *changes)
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following changes to a schema:
@@ -389,7 +426,7 @@ Currently, Gravitino supports the following changes to a schema:
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -413,6 +450,16 @@ supportsSchemas.dropSchema(NameIdentifier.of("metalake", "hive_catalog", "schema
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+catalog.as_schemas().drop_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), cascade=True)
+```
+
+</TabItem>
 </Tabs>
 
 If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
@@ -424,7 +471,7 @@ You can alter all schemas under a catalog by sending a `GET` request to the `/ap
     in a catalog:
 
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -442,6 +489,16 @@ Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hiv
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "hive_catalog"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(Namespace.of_schema("metalake", "hive_catalog"))
 ```
 
 </TabItem>

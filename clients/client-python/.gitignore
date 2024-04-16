@@ -9,3 +9,5 @@ venv
 .vevn
 .venv
 .idea
+dist
+build

@@ -7,12 +7,8 @@ import logging
 from random import randint
 from typing import Dict, List
 
-from gravitino.api.catalog import Catalog
-from gravitino.api.schema import Schema
-from gravitino.api.schema_change import SchemaChange
-from gravitino.client.gravitino_admin_client import GravitinoAdminClient
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.name_identifier import NameIdentifier
+from gravitino import NameIdentifier, GravitinoAdminClient, GravitinoClient, Catalog, SchemaChange, Schema
+
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)

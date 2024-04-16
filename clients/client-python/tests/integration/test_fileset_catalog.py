@@ -7,12 +7,7 @@ import logging
 from random import randint
 from typing import Dict, List
 
-from gravitino.api.fileset import Fileset
-from gravitino.api.fileset_change import FilesetChange
-from gravitino.client.gravitino_admin_client import GravitinoAdminClient
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.dto.catalog_dto import CatalogDTO
-from gravitino.name_identifier import NameIdentifier
+from gravitino import NameIdentifier, GravitinoAdminClient, GravitinoClient, Catalog, Fileset, FilesetChange
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -21,7 +16,7 @@ logger = logging.getLogger(__name__)
 class TestFilesetCatalog(IntegrationTestEnv):
     metalake_name: str = "TestFilesetCatalog-metalake" + str(randint(1, 10000))
     catalog_name: str = "catalog"
-    catalog_location_pcatarop: str = "location"  # Fileset Catalog must set `location`
+    catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
 
     schema_name: str = "schema"
@@ -109,10 +104,10 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
         catalog = self.gravitino_client.create_catalog(
             ident=self.catalog_ident,
-            type=CatalogDTO.Type.FILESET,
+            type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
-            properties={self.catalog_location_pcatarop: "/tmp/test1"},
+            properties={self.catalog_location_prop: "/tmp/test1"},
         )
         catalog.as_schemas().create_schema(
             ident=self.schema_ident, comment="", properties={}

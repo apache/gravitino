@@ -32,6 +32,35 @@ fun gravitinoServer(operation: String) {
     }
 }
 
+fun generateReadmeFile() {
+  try {
+    val inputFile = file("${project.rootDir}/docs/how-to-use-python-client.md")
+    val outputFile = file("README.md")
+
+    // Front matter is the metadata at the beginning of the file between two sets of three dashes (---)
+    // Because the https://pypi.org/project/gravitino/README.md file cannot contain the front matter
+    val lines = inputFile.readLines()
+    var skipFrontMatterHead = false
+    var skipFrontMatterEnd = false
+    for (line in lines) {
+      if (line.trim() == "---") {
+        if (!skipFrontMatterHead) {
+          skipFrontMatterHead = true
+          continue
+        } else if (!skipFrontMatterEnd) {
+          skipFrontMatterEnd = true
+          continue
+        }
+      }
+      if (skipFrontMatterHead && skipFrontMatterEnd) {
+        outputFile.appendText(line + "\n")
+      }
+    }
+  } catch (e: Exception) {
+    throw GradleException("client-python README.md file not generated!")
+  }
+}
+
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
@@ -89,8 +118,31 @@ tasks {
   val build by registering(VenvTask::class) {
   }
 
+  val distribution by registering(VenvTask::class) {
+    doFirst {
+      generateReadmeFile()
+      delete("dist")
+    }
+
+    venvExec = "Python3"
+    args = listOf("setup.py", "sdist")
+
+    doLast {
+      delete("README.md")
+    }
+  }
+
+  // Deploy to https://pypi.org/project/gravitino/
+  val deploy by registering(VenvTask::class) {
+    dependsOn(distribution)
+    val twine_password = System.getenv("TWINE_PASSWORD")
+    venvExec = "twine"
+    args = listOf("upload", "dist/*", "-p${twine_password}")
+  }
+
   val clean by registering(Delete::class) {
     delete("build")
+    delete("dist")
     delete("gravitino.egg-info")
 
     doLast {
