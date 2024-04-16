@@ -52,8 +52,8 @@ class PermissionManager {
       checkRoleExists(metalake, role);
 
       RoleEntity roleEntity =
-          store.get(
-              NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE, RoleEntity.class);
+          AuthorizationUtils.getRoleEntity(
+              cache, store, NameIdentifierUtils.ofRole(metalake, role));
 
       store.update(
           NameIdentifierUtils.ofUser(metalake, user),
@@ -62,7 +62,7 @@ class PermissionManager {
           userEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    metalake, userEntity.roles(), userEntity.roleIds(), store, null);
+                    cache, store, metalake, userEntity.roles(), userEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -113,7 +113,7 @@ class PermissionManager {
 
       RoleEntity roleEntity =
           AuthorizationUtils.getRoleEntity(
-              NameIdentifierUtils.ofRole(metalake, role), cache, store);
+              cache, store, NameIdentifierUtils.ofRole(metalake, role));
 
       store.update(
           NameIdentifierUtils.ofGroup(metalake, group),
@@ -122,7 +122,7 @@ class PermissionManager {
           groupEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    metalake, groupEntity.roles(), groupEntity.roleIds(), store, cache);
+                    cache, store, metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -185,7 +185,7 @@ class PermissionManager {
           groupEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    metalake, groupEntity.roles(), groupEntity.roleIds(), store, cache);
+                    cache, store, metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
@@ -193,7 +193,10 @@ class PermissionManager {
 
             if (!removed.get()) {
               LOG.warn(
-                  "Fail to revoke, role {} does not exist in the group {} of metalake {}", role, group, metalake);
+                  "Fail to revoke, role {} does not exist in the group {} of metalake {}",
+                  role,
+                  group,
+                  metalake);
             }
 
             AuditInfo auditInfo =
@@ -248,13 +251,17 @@ class PermissionManager {
           userEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    metalake, userEntity.roles(), userEntity.roleIds(), store, cache);
+                    cache, store, metalake, userEntity.roles(), userEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
             removed.set(roleIds.remove(roleEntity.id()));
             if (!removed.get()) {
-              LOG.warn("Fail to revoke, role {} doesn't exist in the user {} of metalake {}", role, user, metalake);
+              LOG.warn(
+                  "Fail to revoke, role {} doesn't exist in the user {} of metalake {}",
+                  role,
+                  user,
+                  metalake);
             }
 
             AuditInfo auditInfo =

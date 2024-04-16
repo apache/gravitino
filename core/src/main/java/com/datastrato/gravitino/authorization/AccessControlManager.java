@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
@@ -22,13 +21,12 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -52,20 +50,21 @@ public class AccessControlManager {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
 
     long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
-    Cache<NameIdentifier, RoleEntity> roleCache = Caffeine.newBuilder()
+    Cache<NameIdentifier, RoleEntity> roleCache =
+        Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
-                    (k, v, c) -> {
-                      LOG.info("Remove role {} from the cache.", k);
-                    })
+                (k, v, c) -> {
+                  LOG.info("Remove role {} from the cache.", k);
+                })
             .scheduler(
-                    Scheduler.forScheduledExecutorService(
-                            new ScheduledThreadPoolExecutor(
-                                    1,
-                                    new ThreadFactoryBuilder()
-                                            .setDaemon(true)
-                                            .setNameFormat("role-cleaner-%d")
-                                            .build())))
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(
+                        1,
+                        new ThreadFactoryBuilder()
+                            .setDaemon(true)
+                            .setNameFormat("role-cleaner-%d")
+                            .build())))
             .build();
 
     this.userGroupManager = new UserGroupManager(store, idGenerator, roleCache);

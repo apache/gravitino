@@ -17,12 +17,11 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.github.benmanes.caffeine.cache.Cache;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-
-import com.github.benmanes.caffeine.cache.Cache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +38,8 @@ class RoleManager {
   private final IdGenerator idGenerator;
   private final Cache<NameIdentifier, RoleEntity> cache;
 
-  public RoleManager(EntityStore store, IdGenerator idGenerator, Cache<NameIdentifier, RoleEntity> cache) {
+  public RoleManager(
+      EntityStore store, IdGenerator idGenerator, Cache<NameIdentifier, RoleEntity> cache) {
     this.store = store;
     this.idGenerator = idGenerator;
     this.cache = cache;
@@ -108,7 +108,7 @@ class RoleManager {
   public Role loadRole(String metalake, String role) throws NoSuchRoleException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return AuthorizationUtils.getRoleEntity(ofRole(metalake, role), cache, store);
+      return AuthorizationUtils.getRoleEntity(cache, store, ofRole(metalake, role));
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);

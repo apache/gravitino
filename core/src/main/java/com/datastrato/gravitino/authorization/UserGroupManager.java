@@ -131,7 +131,7 @@ class UserGroupManager {
 
       List<RoleEntity> roleEntities =
           AuthorizationUtils.getValidRoles(
-              metalake, entity.roles(), entity.roleIds(), store, cache);
+              cache, store, metalake, entity.roles(), entity.roleIds());
 
       return UserEntity.builder()
           .withId(entity.id())
@@ -231,7 +231,7 @@ class UserGroupManager {
               GroupEntity.class);
       List<RoleEntity> roleEntities =
           AuthorizationUtils.getValidRoles(
-              metalake, entity.roles(), entity.roleIds(), store, cache);
+              cache, store, metalake, entity.roles(), entity.roleIds());
       return GroupEntity.builder()
           .withId(entity.id())
           .withName(entity.name())

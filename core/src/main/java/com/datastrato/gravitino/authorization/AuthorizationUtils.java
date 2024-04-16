@@ -43,7 +43,7 @@ class AuthorizationUtils {
   }
 
   static RoleEntity getRoleEntity(
-      NameIdentifier identifier, Cache<NameIdentifier, RoleEntity> cache, EntityStore store) {
+      Cache<NameIdentifier, RoleEntity> cache, EntityStore store, NameIdentifier identifier) {
     return cache.get(
         identifier,
         id -> {
@@ -57,11 +57,11 @@ class AuthorizationUtils {
   }
 
   static List<RoleEntity> getValidRoles(
+      Cache<NameIdentifier, RoleEntity> cache,
+      EntityStore store,
       String metalake,
       List<String> roleNames,
-      List<Long> roleIds,
-      EntityStore store,
-      Cache<NameIdentifier, RoleEntity> cache) {
+      List<Long> roleIds) {
     List<RoleEntity> roleEntities = Lists.newArrayList();
     if (roleNames == null || roleNames.isEmpty()) {
       return roleEntities;
@@ -73,7 +73,7 @@ class AuthorizationUtils {
 
         RoleEntity roleEntity =
             AuthorizationUtils.getRoleEntity(
-                NameIdentifierUtils.ofRole(metalake, role), cache, store);
+                cache, store, NameIdentifierUtils.ofRole(metalake, role));
 
         if (roleEntity.id().equals(roleIds.get(index))) {
           roleEntities.add(roleEntity);
