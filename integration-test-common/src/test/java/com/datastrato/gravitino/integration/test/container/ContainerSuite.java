@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import com.datastrato.gravitino.integration.test.util.CloseableGroup;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
@@ -154,7 +155,7 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startMySQLContainer(Class<?> clz) {
+  public void startMySQLContainer(TestDatabaseName testDatabaseName) {
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
@@ -176,11 +177,11 @@ public class ContainerSuite implements Closeable {
       }
     }
     synchronized (MySQLContainer.class) {
-      mySQLContainer.createDatabase(mySQLContainer.getDatabaseNameByClass(clz));
+      mySQLContainer.createDatabase(testDatabaseName);
     }
   }
 
-  public void startMySQLVersion5Container(Class<?> clz) {
+  public void startMySQLVersion5Container(TestDatabaseName testDatabaseName) {
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
@@ -203,7 +204,7 @@ public class ContainerSuite implements Closeable {
       }
     }
     synchronized (MySQLContainer.class) {
-      mySQLVersion5Container.createDatabase(mySQLVersion5Container.getDatabaseNameByClass(clz));
+      mySQLVersion5Container.createDatabase(testDatabaseName);
     }
   }
 

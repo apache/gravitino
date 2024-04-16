@@ -8,6 +8,7 @@ import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -105,27 +106,22 @@ public class MySQLContainer extends BaseContainer {
     return isMySQLContainerReady;
   }
 
-  public void createDatabase(String testDBName) {
+  public void createDatabase(TestDatabaseName testDatabaseName) {
     String mySQLJdbcUrl =
-        StringUtils.substring(getJdbcUrl(testDBName), 0, getJdbcUrl(testDBName).lastIndexOf("/"));
+        StringUtils.substring(getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
             DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
         Statement statement = connection.createStatement()) {
 
-      String query = String.format("CREATE DATABASE IF NOT EXISTS %s;", testDBName);
+      String query = String.format("CREATE DATABASE IF NOT EXISTS %s;", testDatabaseName);
       // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
-      LOG.info(String.format("MySQL container database %s has been created", testDBName));
+      LOG.info(String.format("MySQL container database %s has been created", testDatabaseName));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
-  }
-
-  public String getDatabaseNameByClass(Class<?> clz) {
-    // use hashcode to avoid two class with same name in different directories.
-    return clz.getSimpleName().concat(String.valueOf(clz.hashCode()));
   }
 
   public String getUsername() {
@@ -136,17 +132,13 @@ public class MySQLContainer extends BaseContainer {
     return PASSWORD;
   }
 
-  public String getJdbcUrl(Class<?> clz) {
+  public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format(
-        "jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, getDatabaseNameByClass(clz));
+        "jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT,testDatabaseName);
   }
 
-  public String getJdbcUrl(String dbName) {
-    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, dbName);
-  }
-
-  public String getDriverClassName() throws SQLException {
-    return DriverManager.getDriver(getJdbcUrl(AbstractIT.class)).getClass().getName();
+  public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
+    return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
   public static class Builder

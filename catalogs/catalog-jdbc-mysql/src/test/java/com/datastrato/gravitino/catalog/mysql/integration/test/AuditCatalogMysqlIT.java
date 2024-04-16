@@ -15,10 +15,7 @@ import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlServ
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.*;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -45,7 +42,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   private static final String expectUser = System.getProperty("user.name");
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  protected static String TEST_DB_NAME;
+  protected static TestDatabaseName TEST_DB_NAME;
   private static final String provider = "jdbc-mysql";
 
   private static MysqlService mysqlService;
@@ -66,10 +63,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     }
 
     // FIXME: startMySQLContainer should create db name by test class name
-    containerSuite.startMySQLContainer(AuditCatalogMysqlIT.class);
+    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AuditCatalogMysqlIT);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    TEST_DB_NAME = MYSQL_CONTAINER.getDatabaseNameByClass(AuditCatalogMysqlIT.class);
-
+    TEST_DB_NAME = TestDatabaseName.MYSQL_AuditCatalogMysqlIT;
     mysqlService = new MysqlService(containerSuite.getMySQLContainer(), TEST_DB_NAME);
     createMetalake();
   }
@@ -152,7 +148,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
             MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
             0,
             MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
-    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName());
+    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
 

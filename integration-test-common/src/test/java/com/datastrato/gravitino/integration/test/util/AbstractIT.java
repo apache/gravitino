@@ -64,7 +64,7 @@ public class AbstractIT {
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
-  private static String META_DATA;
+  private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
@@ -168,9 +168,9 @@ public class AbstractIT {
 
     if ("true".equals(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      containerSuite.startMySQLContainer(AbstractIT.class);
+      META_DATA = TestDatabaseName.MYSQL_JdbcBackend;
+      containerSuite.startMySQLContainer(META_DATA);
       MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-      META_DATA = MYSQL_CONTAINER.getDatabaseNameByClass(AbstractIT.class);
 
       setMySQLBackend();
     }

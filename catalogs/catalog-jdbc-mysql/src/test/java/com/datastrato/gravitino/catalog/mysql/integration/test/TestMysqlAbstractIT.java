@@ -14,6 +14,7 @@ import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.google.common.collect.Maps;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -24,14 +25,13 @@ import org.junit.jupiter.api.BeforeAll;
 public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
   public static final String defaultMysqlImageName = "mysql:8.0";
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  protected static String TEST_DB_NAME;
+  protected static TestDatabaseName TEST_DB_NAME;
 
   @BeforeAll
   public static void startup() throws Exception {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(TestMysqlAbstractIT.class);
-    TEST_DB_NAME =
-        containerSuite.getMySQLContainer().getDatabaseNameByClass(TestMysqlAbstractIT.class);
+    TEST_DB_NAME = TestDatabaseName.MYSQL_MysqlAbstractIT;
+    containerSuite.startMySQLContainer(TEST_DB_NAME);
     DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
 
     DATABASE_OPERATIONS = new MysqlDatabaseOperations();
@@ -54,7 +54,7 @@ public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
     String jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
 
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
+    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
 
