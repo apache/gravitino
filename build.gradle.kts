@@ -10,14 +10,12 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
-import java.io.File
 import java.io.IOException
-import java.util.Locale
+import java.util.*
 
 plugins {
   `maven-publish`
@@ -539,7 +537,10 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "ROADMAP.md",
-    "clients/client-python/.pytest_cache/*"
+    "clients/client-python/.pytest_cache/*",
+    "clients/client-python/gravitino.egg-info/*",
+    "clients/client-python/gravitino/utils/exceptions.py",
+    "clients/client-python/gravitino/utils/http_client.py"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
