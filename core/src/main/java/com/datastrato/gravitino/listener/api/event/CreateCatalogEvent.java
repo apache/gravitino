@@ -14,9 +14,18 @@ import com.datastrato.gravitino.listener.api.info.CatalogInfo;
 public class CreateCatalogEvent extends CatalogEvent {
   private final CatalogInfo createdCatalogInfo;
 
-  public CreateCatalogEvent(String user, NameIdentifier identifier, CatalogInfo catalogInfo) {
+  /**
+   * Constructs an instance of {@code CreateCatalogEvent}, capturing essential details about the
+   * successful creation of a catalog.
+   *
+   * @param user The username of the individual who initiated the catalog creation.
+   * @param identifier The unique identifier of the catalog that was created.
+   * @param createdCatalogInfo The final state of the catalog post-creation.
+   */
+  public CreateCatalogEvent(
+      String user, NameIdentifier identifier, CatalogInfo createdCatalogInfo) {
     super(user, identifier);
-    this.createdCatalogInfo = catalogInfo;
+    this.createdCatalogInfo = createdCatalogInfo;
   }
 
   /**

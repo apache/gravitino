@@ -14,6 +14,12 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
 public final class ListCatalogEvent extends CatalogEvent {
   private final Namespace namespace;
 
+  /**
+   * Constructs an instance of {@code ListCatalogEvent}.
+   *
+   * @param user The username of the individual who initiated the catalog listing.
+   * @param namespace The namespace from which catalogs were listed.
+   */
   public ListCatalogEvent(String user, Namespace namespace) {
     super(user, NameIdentifier.of(namespace.toString()));
     this.namespace = namespace;

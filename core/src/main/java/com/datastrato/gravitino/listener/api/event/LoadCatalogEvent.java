@@ -14,6 +14,13 @@ import com.datastrato.gravitino.listener.api.info.CatalogInfo;
 public final class LoadCatalogEvent extends CatalogEvent {
   private final CatalogInfo loadedCatalogInfo;
 
+  /**
+   * Constructs an instance of {@code LoadCatalogEvent}.
+   *
+   * @param user The username of the individual who initiated the catalog loading.
+   * @param identifier The unique identifier of the catalog that was loaded.
+   * @param loadedCatalogInfo The state of the catalog post-loading.
+   */
   public LoadCatalogEvent(String user, NameIdentifier identifier, CatalogInfo loadedCatalogInfo) {
     super(user, identifier);
     this.loadedCatalogInfo = loadedCatalogInfo;

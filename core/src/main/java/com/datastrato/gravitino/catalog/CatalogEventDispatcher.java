@@ -21,8 +21,6 @@ import com.datastrato.gravitino.listener.api.event.DropCatalogEvent;
 import com.datastrato.gravitino.listener.api.event.DropCatalogFailureEvent;
 import com.datastrato.gravitino.listener.api.event.ListCatalogEvent;
 import com.datastrato.gravitino.listener.api.event.ListCatalogFailureEvent;
-import com.datastrato.gravitino.listener.api.event.ListCatalogInfoEvent;
-import com.datastrato.gravitino.listener.api.event.ListCatalogInfoFailureEvent;
 import com.datastrato.gravitino.listener.api.event.LoadCatalogEvent;
 import com.datastrato.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import com.datastrato.gravitino.listener.api.info.CatalogInfo;
@@ -68,12 +66,11 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
     try {
       Catalog[] catalogs = dispatcher.listCatalogsInfo(namespace);
-      eventBus.dispatchEvent(
-          new ListCatalogInfoEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(new ListCatalogEvent(PrincipalUtils.getCurrentUserName(), namespace));
       return catalogs;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new ListCatalogInfoFailureEvent(PrincipalUtils.getCurrentUserName(), e, namespace));
+          new ListCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), e, namespace));
       throw e;
     }
   }

@@ -17,6 +17,18 @@ import com.datastrato.gravitino.listener.api.info.CatalogInfo;
 public final class CreateCatalogFailureEvent extends CatalogFailureEvent {
   private final CatalogInfo createCatalogRequest;
 
+  /**
+   * Constructs a {@code CreateCatalogFailureEvent} instance, capturing detailed information about
+   * the failed catalog creation attempt.
+   *
+   * @param user The user who initiated the catalog creation operation.
+   * @param identifier The identifier of the catalog that was attempted to be created.
+   * @param exception The exception that was thrown during the catalog creation operation, providing
+   *     insight into what went wrong.
+   * @param createCatalogRequest The original request information used to attempt to create the
+   *     catalog. This includes details such as the intended catalog schema, properties, and other
+   *     configuration options that were specified.
+   */
   public CreateCatalogFailureEvent(
       String user,
       NameIdentifier identifier,

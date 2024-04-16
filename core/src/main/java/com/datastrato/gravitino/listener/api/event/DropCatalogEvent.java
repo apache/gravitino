@@ -13,6 +13,15 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
 public final class DropCatalogEvent extends CatalogEvent {
   private final boolean isExists;
 
+  /**
+   * Constructs a new {@code DropCatalogEvent} instance, encapsulating information about the outcome
+   * of a catalog drop operation.
+   *
+   * @param user The user who initiated the drop catalog operation.
+   * @param identifier The identifier of the catalog that was attempted to be dropped.
+   * @param isExists A boolean flag indicating whether the catalog existed at the time of the drop
+   *     operation.
+   */
   public DropCatalogEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
     this.isExists = isExists;

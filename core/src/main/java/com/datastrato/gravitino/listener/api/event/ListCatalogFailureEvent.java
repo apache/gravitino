@@ -17,6 +17,13 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
 public final class ListCatalogFailureEvent extends CatalogFailureEvent {
   private final Namespace namespace;
 
+  /**
+   * Constructs a {@code ListCatalogFailureEvent} instance.
+   *
+   * @param user The username of the individual who initiated the operation to list catalogs.
+   * @param namespace The namespace for which the catalog listing was attempted.
+   * @param exception The exception encountered during the attempt to list catalogs.
+   */
   public ListCatalogFailureEvent(String user, Exception exception, Namespace namespace) {
     super(user, NameIdentifier.of(namespace.toString()), exception);
     this.namespace = namespace;
