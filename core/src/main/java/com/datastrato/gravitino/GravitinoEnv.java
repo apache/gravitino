@@ -6,6 +6,8 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
+import com.datastrato.gravitino.catalog.CatalogEventDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
@@ -40,6 +42,8 @@ public class GravitinoEnv {
   private Config config;
 
   private EntityStore entityStore;
+
+  private CatalogDispatcher catalogDispatcher;
 
   private CatalogManager catalogManager;
 
@@ -131,6 +135,8 @@ public class GravitinoEnv {
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogManager);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
@@ -180,12 +186,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogManager associated with the Gravitino environment.
+   * Get the CatalogDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogManager instance.
+   * @return The CatalogDispatcher instance.
    */
-  public CatalogManager catalogManager() {
-    return catalogManager;
+  public CatalogDispatcher catalogDispatcher() {
+    return catalogDispatcher;
   }
 
   /**
