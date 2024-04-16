@@ -30,7 +30,7 @@ public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
   @BeforeAll
   public static void startup() throws Exception {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
-    TEST_DB_NAME = TestDatabaseName.MYSQL_MysqlAbstractIT;
+    TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
     containerSuite.startMySQLContainer(TEST_DB_NAME);
     DataSource dataSource = DataSourceUtils.createDataSource(getMySQLCatalogProperties());
 

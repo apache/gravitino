@@ -63,9 +63,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     }
 
     // FIXME: startMySQLContainer should create db name by test class name
-    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AuditCatalogMysqlIT);
+    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    TEST_DB_NAME = TestDatabaseName.MYSQL_AuditCatalogMysqlIT;
+    TEST_DB_NAME = TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT;
     mysqlService = new MysqlService(containerSuite.getMySQLContainer(), TEST_DB_NAME);
     createMetalake();
   }

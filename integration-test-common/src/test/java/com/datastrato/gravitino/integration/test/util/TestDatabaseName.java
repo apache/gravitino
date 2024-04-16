@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.gravitino.integration.test.util;
 
 /**
@@ -11,26 +15,26 @@ package com.datastrato.gravitino.integration.test.util;
  * <p>The available test database names are:
  *
  * <ul>
- *   <li>{@link #MYSQL_JdbcBackend}: Represents the MySQL database used for testing the JDBC backend
- *       of Gravitino.
- *   <li>{@link #MYSQL_MysqlAbstractIT}: Represents the MySQL database used for testing the
+ *   <li>{@link #MYSQL_JDBC_BACKEND}: Represents the MySQL database used for testing the JDBC
+ *       backend of Gravitino.
+ *   <li>{@link #MYSQL_MYSQL_ABSTRACT_IT}: Represents the MySQL database used for testing the
  *       MysqlAbstractIT and its subclasses.
- *   <li>{@link #MYSQL_AuditCatalogMysqlIT}: Represents the MySQL database used for testing the
+ *   <li>{@link #MYSQL_AUDIT_CATALOG_MYSQL_IT}: Represents the MySQL database used for testing the
  *       AuditCatalogMysqlIT.
- *   <li>{@link #MYSQL_CatalogMysqlIT}: Represents the MySQL database used for testing the catalog
+ *   <li>{@link #MYSQL_CATALOG_MYSQL_IT}: Represents the MySQL database used for testing the catalog
  *       integration with MySQL.
  * </ul>
  */
 public enum TestDatabaseName {
   /** Represents the MySQL database used for JDBC backend of Gravitino. */
-  MYSQL_JdbcBackend,
+  MYSQL_JDBC_BACKEND,
 
   /** Represents the MySQL database for MysqlAbstractIT and its subclasses. */
-  MYSQL_MysqlAbstractIT,
+  MYSQL_MYSQL_ABSTRACT_IT,
 
   /** Represents the MySQL database for AudtCatalogMysqlIT. */
-  MYSQL_AuditCatalogMysqlIT,
+  MYSQL_AUDIT_CATALOG_MYSQL_IT,
 
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
-  MYSQL_CatalogMysqlIT
+  MYSQL_CATALOG_MYSQL_IT
 }

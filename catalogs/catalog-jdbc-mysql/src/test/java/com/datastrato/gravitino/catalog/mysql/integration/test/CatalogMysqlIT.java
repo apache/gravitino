@@ -113,10 +113,10 @@ public class CatalogMysqlIT extends AbstractIT {
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
 
-    TEST_DB_NAME = TestDatabaseName.MYSQL_CatalogMysqlIT;
+    TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
 
     if (mysqlImageName.equals("mysql:5.7")) {
-      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CatalogMysqlIT);
+      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
       MYSQL_CONTAINER = containerSuite.getMySQLVersion5Container();
     } else {
       containerSuite.startMySQLContainer(TEST_DB_NAME);

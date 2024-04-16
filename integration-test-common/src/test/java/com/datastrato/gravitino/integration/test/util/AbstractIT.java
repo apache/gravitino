@@ -168,7 +168,7 @@ public class AbstractIT {
 
     if ("true".equals(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      META_DATA = TestDatabaseName.MYSQL_JdbcBackend;
+      META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
       containerSuite.startMySQLContainer(META_DATA);
       MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
