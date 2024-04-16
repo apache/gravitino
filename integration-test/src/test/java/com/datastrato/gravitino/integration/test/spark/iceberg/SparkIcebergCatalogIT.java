@@ -84,23 +84,17 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(
         "1", tableProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_FORMAT_VERSION));
     // TODO: we can use `ALTER TABLE ... WRITE ORDERED BY ...` to set the sort-order of Iceberg
-    // tables
-    //  after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
-    // `SetWriteDistributionAndOrdering` command.
-    //  now they don't know the `GravitinoCatalog` and the `SparkIcebergTable` of Gravitino
-    // Spark-connector,
-    //  so here
+    // tables after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
+    // `SetWriteDistributionAndOrdering` command. now they don't know the `GravitinoCatalog` and the
+    // `SparkIcebergTable` of Gravitino Spark-connector, so here
     // `tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_SORT_ORDER)` is
     // always false.
     Assertions.assertFalse(
         tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_SORT_ORDER));
     // TODO: we can use `ALTER TABLE ... SET IDENTIFIER FIELDS` to set the identifier-fields of
-    // Iceberg tables
-    //  after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
-    // `SetWriteDistributionAndOrdering` command.
-    //  now they don't know the `GravitinoCatalog` and the `SparkIcebergTable` of Gravitino
-    // Spark-connector,
-    //  so here
+    // Iceberg tables after rewriting the `` parser, the `ExtendedDataSourceV2Strategy` rule and the
+    // `SetWriteDistributionAndOrdering` command. now they don't know the `GravitinoCatalog` and the
+    // `SparkIcebergTable` of Gravitino Spark-connector, so here
     // `tableProperties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_IDENTIFIER_FIELDS)`
     // is always false.
     Assertions.assertFalse(
