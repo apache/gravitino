@@ -10,7 +10,7 @@ import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.metalake.MetalakeManager;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
@@ -76,7 +76,7 @@ public class GravitinoServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
+            bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
 
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
