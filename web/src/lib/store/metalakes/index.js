@@ -605,7 +605,7 @@ export const getTableDetails = createAsyncThunk(
     const tableProps = [
       {
         type: 'partitioning',
-        icon: 'tabler:circle-letter-p-filled',
+        icon: 'ant-design:partition-outlined',
         items: partitioning.map(i => {
           let fields = i.fieldName || []
           let sub = ''
@@ -615,14 +615,14 @@ export const getTableDetails = createAsyncThunk(
             case 'bucket':
               sub = `[${i.numBuckets}]`
               fields = i.fieldNames
-              last = i.fieldNames.join(',')
+              last = i.fieldNames.map(v => v[0]).join(',')
               break
             case 'truncate':
               sub = `[${i.width}]`
               break
             case 'list':
               fields = i.fieldNames
-              last = i.fieldNames.join(',')
+              last = i.fieldNames.map(v => v[0]).join(',')
               break
             case 'function':
               sub = `[${i.funcName}]`
@@ -645,7 +645,7 @@ export const getTableDetails = createAsyncThunk(
       },
       {
         type: 'sortOrders',
-        icon: 'mdi:letter-s-circle',
+        icon: 'iconamoon:sorting-left-bold',
         items: sortOrders.map(i => {
           return {
             fields: i.sortTerm.fieldName,
@@ -674,7 +674,7 @@ export const getTableDetails = createAsyncThunk(
       },
       {
         type: 'indexes',
-        icon: 'mdi:letter-i-circle',
+        icon: 'mdi:key',
         items: indexes.map(i => {
           return {
             fields: i.fieldNames,

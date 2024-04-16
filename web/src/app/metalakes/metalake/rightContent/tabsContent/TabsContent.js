@@ -178,13 +178,26 @@ const TabsContent = () => {
                           <ListItemText
                             sx={{ m: 0 }}
                             primary={
-                              <Typography
-                                sx={{ display: 'flex', alignItems: 'center', textTransform: 'capitalize' }}
-                                fontWeight={700}
-                                fontSize={14}
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  color: theme => theme.palette.text.primary
+                                }}
                               >
-                                {item.type} <Icon icon={item.icon} />
-                              </Typography>
+                                <Typography
+                                  component={'span'}
+                                  textTransform={'capitalize'}
+                                  fontWeight={700}
+                                  fontSize={14}
+                                  sx={{ display: 'inline-block', pr: 2 }}
+                                >
+                                  {item.type}
+                                </Typography>{' '}
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Icon icon={item.icon} />
+                                </Box>
+                              </Box>
                             }
                             secondary={
                               <Box
