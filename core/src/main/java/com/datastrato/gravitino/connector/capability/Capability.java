@@ -13,6 +13,8 @@ import com.datastrato.gravitino.annotation.Evolving;
 @Evolving
 public interface Capability {
 
+  Capability DEFAULT = new DefaultCapability();
+
   /** The scope of the capability. */
   enum Scope {
     CATALOG,
@@ -30,7 +32,7 @@ public interface Capability {
    * @return The check result of the not null constraint.
    */
   default CapabilityResult columnNotNull() {
-    return CapabilityResult.SUPPORTED;
+    return DEFAULT.columnNotNull();
   }
 
   /**
@@ -39,7 +41,7 @@ public interface Capability {
    * @return The check result of the default value.
    */
   default CapabilityResult columnDefaultValue() {
-    return CapabilityResult.SUPPORTED;
+    return DEFAULT.columnDefaultValue();
   }
 
   /**
@@ -49,7 +51,7 @@ public interface Capability {
    * @return The capability of the case-sensitive on name.
    */
   default CapabilityResult caseSensitiveOnName(Scope scope) {
-    return CapabilityResult.SUPPORTED;
+    return DEFAULT.caseSensitiveOnName(scope);
   }
 
   /**
@@ -60,7 +62,7 @@ public interface Capability {
    * @return The capability of the specification on name.
    */
   default CapabilityResult specificationOnName(Scope scope, String name) {
-    return CapabilityResult.SUPPORTED;
+    return DEFAULT.specificationOnName(scope, name);
   }
 
   /**
@@ -70,7 +72,35 @@ public interface Capability {
    * @return The capability of the managed storage.
    */
   default CapabilityResult managedStorage(Scope scope) {
-    return CapabilityResult.unsupported(
-        String.format("The %s entity is not fully managed by Gravitino.", scope));
+    return DEFAULT.managedStorage(scope);
+  }
+
+  /** The default implementation of the capability. */
+  class DefaultCapability implements Capability {
+    @Override
+    public CapabilityResult columnNotNull() {
+      return CapabilityResult.SUPPORTED;
+    }
+
+    @Override
+    public CapabilityResult columnDefaultValue() {
+      return CapabilityResult.SUPPORTED;
+    }
+
+    @Override
+    public CapabilityResult caseSensitiveOnName(Scope scope) {
+      return CapabilityResult.SUPPORTED;
+    }
+
+    @Override
+    public CapabilityResult specificationOnName(Scope scope, String name) {
+      return CapabilityResult.SUPPORTED;
+    }
+
+    @Override
+    public CapabilityResult managedStorage(Scope scope) {
+      return CapabilityResult.unsupported(
+          String.format("The %s entity is not fully managed by Gravitino.", scope));
+    }
   }
 }

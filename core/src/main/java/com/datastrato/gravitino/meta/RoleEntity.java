@@ -234,7 +234,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @param securableObject The securable object of the role entity.
      * @return The builder instance.
      */
-    public Builder securableObject(SecurableObject securableObject) {
+    public Builder withSecurableObject(SecurableObject securableObject) {
       roleEntity.securableObject = securableObject;
       return this;
     }
