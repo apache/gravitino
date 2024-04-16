@@ -18,6 +18,7 @@ import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObjects;
+import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
@@ -52,6 +53,7 @@ import org.mockito.Mockito;
 public class TestRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final CatalogManager catalogManager = mock(CatalogManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -87,6 +89,7 @@ public class TestRoleOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            bind(catalogManager).to(CatalogManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
