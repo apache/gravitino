@@ -58,7 +58,7 @@ const MetalakeTree = props => {
       case 'messaging':
         return 'skill-icons:kafka'
       case 'fileset':
-        return 'mdi:folder-text-outline'
+        return 'twemoji:file-folder'
       default:
         return 'bx:book'
     }
