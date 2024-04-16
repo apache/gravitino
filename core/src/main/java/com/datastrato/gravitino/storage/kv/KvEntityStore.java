@@ -135,7 +135,7 @@ public class KvEntityStore implements EntityStore {
                         .limit(Integer.MAX_VALUE)
                         .build()));
     for (Pair<byte[], byte[]> pairs : kvs) {
-      entities.add(serDe.deserialize(pairs.getRight(), e));
+      entities.add(serDe.deserialize(pairs.getRight(), e, namespace));
     }
     // TODO (yuqi), if the list is too large, we need to do pagination or streaming
     return entities;
@@ -177,7 +177,7 @@ public class KvEntityStore implements EntityStore {
             throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
           }
 
-          E e = serDe.deserialize(value, type);
+          E e = serDe.deserialize(value, type, ident.namespace());
           E updatedE = updater.apply(e);
           if (updatedE.nameIdentifier().equals(ident)) {
             transactionalKvBackend.put(key, serDe.serialize(updatedE), true);
@@ -219,7 +219,7 @@ public class KvEntityStore implements EntityStore {
     if (value == null) {
       throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
     }
-    return serDe.deserialize(value, e);
+    return serDe.deserialize(value, e, ident.namespace());
   }
 
   void deleteAuthorizationEntitiesIfNecessary(NameIdentifier ident, EntityType type)
