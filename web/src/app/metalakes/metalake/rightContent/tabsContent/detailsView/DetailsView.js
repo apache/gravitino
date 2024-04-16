@@ -42,8 +42,6 @@ const DetailsView = () => {
     })
   }
 
-  console.log(paramsSize)
-
   const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
       return <EmptyText />
