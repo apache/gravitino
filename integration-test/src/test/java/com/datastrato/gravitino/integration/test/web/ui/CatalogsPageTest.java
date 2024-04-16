@@ -11,7 +11,6 @@ import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
@@ -40,7 +39,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   CatalogsPage catalogsPage = new CatalogsPage();
 
   protected static TrinoITContainers trinoITContainers;
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  // private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
@@ -108,7 +107,10 @@ public class CatalogsPageTest extends AbstractWebIT {
     mysqlUri = trinoITContainers.getMysqlUri();
     postgresqlUri = trinoITContainers.getPostgresqlUri();
 
-    containerSuite.startHiveContainer();
+    // containerSuite.startKafkaContainer();
+
+    // String address = containerSuite.getKafkaContainer().getContainerIpAddress();
+    // kafkaUri = String.format("%s:%s", address, "9092");
   }
 
   /**
@@ -163,9 +165,8 @@ public class CatalogsPageTest extends AbstractWebIT {
     if (defaultBaseLocation == null) {
       defaultBaseLocation =
           String.format(
-              "hdfs://%s:%d/user/hadoop/%s.db",
-              containerSuite.getHiveContainer().getContainerIpAddress(),
-              HiveContainer.HDFS_DEFAULTFS_PORT,
+              "%s/user/hadoop/%s.db",
+              hdfsUri,
               schemaName.toLowerCase());
     }
     return defaultBaseLocation;
