@@ -42,6 +42,8 @@ const DetailsView = () => {
     })
   }
 
+  console.log(paramsSize)
+
   const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
       return <EmptyText />
@@ -70,6 +72,22 @@ const DetailsView = () => {
                 Provider
               </Typography>
               {renderFieldText({ value: activatedItem?.provider })}
+            </Grid>
+          </>
+        ) : null}
+        {paramsSize === 5 && searchParams.get('fileset') ? (
+          <>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Type
+              </Typography>
+              {renderFieldText({ value: activatedItem?.type })}
+            </Grid>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Storage location
+              </Typography>
+              {renderFieldText({ value: activatedItem?.storageLocation })}
             </Grid>
           </>
         ) : null}
