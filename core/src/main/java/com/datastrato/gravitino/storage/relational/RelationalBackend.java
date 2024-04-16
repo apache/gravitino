@@ -92,4 +92,20 @@ public interface RelationalBackend extends Closeable {
    * @return True, if the entity was successfully deleted, else false.
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade);
+
+  /**
+   * Permanent deletes the legacy data that has been marked as deleted before the given legacy
+   * timeline.
+   *
+   * @param legacyTimeLine The time before which the data has been marked as deleted.
+   */
+  void hardDeleteLegacyData(long legacyTimeLine);
+
+  /**
+   * Permanent deletes the old version data that is older than or equal to the given version
+   * retention count.
+   *
+   * @param versionRetentionCount The count of versions to retain.
+   */
+  void hardDeleteOldVersionData(long versionRetentionCount);
 }

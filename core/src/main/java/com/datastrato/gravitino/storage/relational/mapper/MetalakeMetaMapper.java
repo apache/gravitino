@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
-import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
@@ -23,7 +22,7 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface MetalakeMetaMapper {
-  String TABLE_NAME = AllTables.METALAKE_TABLE_NAME;
+  String TABLE_NAME = "metalake_meta";
 
   @Select(
       "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"

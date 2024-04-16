@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
-import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
@@ -23,7 +22,7 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface SchemaMetaMapper {
-  String TABLE_NAME = AllTables.SCHEMA_TABLE_NAME;
+  String TABLE_NAME = "schema_meta";
 
   @Select(
       "SELECT schema_id as schemaId, schema_name as schemaName,"

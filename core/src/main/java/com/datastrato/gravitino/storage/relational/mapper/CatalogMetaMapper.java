@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
-import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
@@ -23,7 +22,7 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface CatalogMetaMapper {
-  String TABLE_NAME = AllTables.CATALOG_TABLE_NAME;
+  String TABLE_NAME = "catalog_meta";
 
   @Select(
       "SELECT catalog_id as catalogId, catalog_name as catalogName,"

@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
-import com.datastrato.gravitino.storage.relational.AllTables;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
@@ -25,9 +24,9 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface FilesetMetaMapper {
-  String META_TABLE_NAME = AllTables.FILESET_TABLE_NAME;
+  String META_TABLE_NAME = "fileset_meta";
 
-  String VERSION_TABLE_NAME = AllTables.FILESET_VERSION_TABLE_NAME;
+  String VERSION_TABLE_NAME = "fileset_version_info";
 
   @Select(
       "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
