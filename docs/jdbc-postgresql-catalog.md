@@ -46,6 +46,7 @@ If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-datab
 | `jdbc-password`      | The JDBC password.                                                                                                                                                 | (none)        | Yes      | 0.3.0         |
 | `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                     | `2`           | No       | 0.3.0         |
 | `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                    | `10`          | No       | 0.3.0         |
+
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
 You must explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
