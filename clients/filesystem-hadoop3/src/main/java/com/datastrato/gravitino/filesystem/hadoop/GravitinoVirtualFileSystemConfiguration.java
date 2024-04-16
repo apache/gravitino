@@ -6,7 +6,7 @@ package com.datastrato.gravitino.filesystem.hadoop;
 
 /** Configuration class for Gravitino Virtual File System. */
 class GravitinoVirtualFileSystemConfiguration {
-  public static final String GVFS_FILESET_PREFIX = "gvfs://fileset/";
+  public static final String GVFS_FILESET_PREFIX = "gvfs://fileset";
   public static final String GVFS_SCHEME = "gvfs";
 
   /** The configuration key for the Gravitino server URI. */

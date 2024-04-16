@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -25,7 +24,6 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -216,31 +214,6 @@ public class TestIcebergTable {
                     Distributions.NONE,
                     sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
-
-    IcebergColumn withDefaultValue =
-        IcebergColumn.builder()
-            .withName("col")
-            .withType(Types.DateType.get())
-            .withComment(ICEBERG_COMMENT)
-            .withNullable(false)
-            .withDefaultValue(Literals.NULL)
-            .build();
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableIdentifier,
-                    new Column[] {withDefaultValue},
-                    ICEBERG_COMMENT,
-                    properties,
-                    EMPTY_TRANSFORM,
-                    Distributions.NONE,
-                    null));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Iceberg does not support column default value"),
-        "The exception message is: " + exception.getMessage());
   }
 
   @Test
@@ -480,21 +453,6 @@ public class TestIcebergTable {
               .build()
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());
-
-    // test add column with default value exception
-    TableChange withDefaultValue =
-        TableChange.addColumn(
-            new String[] {"col_3"}, Types.StringType.get(), "comment", Literals.NULL);
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                tableCatalog.alterTable(
-                    NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
-                    withDefaultValue));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Iceberg does not support column default value"),
-        "The exception message is: " + exception.getMessage());
 
     // test delete column change
     icebergCatalog

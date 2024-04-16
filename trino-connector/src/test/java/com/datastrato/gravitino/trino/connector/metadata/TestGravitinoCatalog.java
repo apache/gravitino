@@ -24,7 +24,7 @@ public class TestGravitinoCatalog {
     Catalog mockCatalog =
         mockCatalog(
             catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, Collections.emptyMap());
-    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog, false);
     assertEquals(catalogName, catalog.getName());
     assertEquals(provider, catalog.getProvider());
   }
