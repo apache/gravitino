@@ -164,10 +164,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static String defaultBaseLocation(String schemaName) {
     if (defaultBaseLocation == null) {
       defaultBaseLocation =
-          String.format(
-              "%s/user/hadoop/%s.db",
-              hdfsUri,
-              schemaName.toLowerCase());
+          String.format("%s/user/hadoop/%s.db", hdfsUri, schemaName.toLowerCase());
     }
     return defaultBaseLocation;
   }
@@ -241,8 +238,7 @@ public class CatalogsPageTest extends AbstractWebIT {
         metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
     catalog_kafka
         .asTopicCatalog()
-        .dropTopic(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));
+        .dropTopic(NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));
   }
 
   @AfterAll
