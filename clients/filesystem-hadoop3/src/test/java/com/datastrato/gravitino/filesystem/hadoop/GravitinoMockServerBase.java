@@ -112,7 +112,7 @@ public abstract class GravitinoMockServerBase {
           Method.GET,
           "/api/version",
           null,
-          new VersionResponse(VersionUtil.createCurrentVersionDTO()),
+          new VersionResponse(VersionUtil.getCurrentVersionDTO()),
           HttpStatus.SC_OK);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);

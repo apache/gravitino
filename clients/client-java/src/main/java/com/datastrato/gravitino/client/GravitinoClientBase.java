@@ -94,7 +94,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @return A GravitinoVersion instance representing the version of the Gravitino client.
    */
   public GravitinoVersion clientVersion() {
-    return new GravitinoVersion(VersionUtil.createCurrentVersionDTO());
+    return new GravitinoVersion(VersionUtil.getCurrentVersionDTO());
   }
 
   /**

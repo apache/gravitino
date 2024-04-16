@@ -256,10 +256,11 @@ public class TestGravitinoClient extends TestBase {
   @Test
   public void testGetClientVersion() {
     GravitinoVersion version = client.clientVersion();
+    VersionUtil.VersionInfo currentVersion = VersionUtil.getCurrentVersion();
 
-    Assertions.assertEquals(VersionUtil.version, version.version());
-    Assertions.assertEquals(VersionUtil.compileDate, version.compileDate());
-    Assertions.assertEquals(VersionUtil.gitCommit, version.gitCommit());
+    Assertions.assertEquals(currentVersion.version, version.version());
+    Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
+    Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());
   }
 
   @Test
@@ -277,7 +278,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testCheckVersionSuccess() throws JsonProcessingException {
-    VersionResponse resp = new VersionResponse(VersionUtil.createCurrentVersionDTO());
+    VersionResponse resp = new VersionResponse(VersionUtil.getCurrentVersionDTO());
     buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
 
     // check the client version is equal to server version
@@ -296,7 +297,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testUnusedDTOAttribute() throws JsonProcessingException {
-    VersionResponse resp = new VersionResponse(VersionUtil.createCurrentVersionDTO());
+    VersionResponse resp = new VersionResponse(VersionUtil.getCurrentVersionDTO());
 
     HttpRequest mockRequest = HttpRequest.request("/api/version").withMethod(Method.GET.name());
     HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
@@ -310,9 +311,10 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertDoesNotThrow(
         () -> {
           GravitinoVersion version = client.getVersion();
-          Assertions.assertEquals(VersionUtil.version, version.version());
-          Assertions.assertEquals(VersionUtil.compileDate, version.compileDate());
-          Assertions.assertEquals(VersionUtil.gitCommit, version.gitCommit());
+          VersionUtil.VersionInfo currentVersion = VersionUtil.getCurrentVersion();
+          Assertions.assertEquals(currentVersion.version, version.version());
+          Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
+          Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());
         });
   }
 }

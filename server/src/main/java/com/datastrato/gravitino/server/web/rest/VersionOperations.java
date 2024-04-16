@@ -27,6 +27,6 @@ public class VersionOperations extends HttpServlet {
   @Timed(name = "version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "version", absolute = true)
   public Response getVersion() {
-    return Utils.ok(new VersionResponse(VersionUtil.createCurrentVersionDTO()));
+    return Utils.ok(new VersionResponse(VersionUtil.getCurrentVersionDTO()));
   }
 }
