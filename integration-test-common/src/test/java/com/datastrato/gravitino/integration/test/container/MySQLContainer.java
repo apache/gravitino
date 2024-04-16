@@ -7,7 +7,6 @@ package com.datastrato.gravitino.integration.test.container;
 import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
@@ -108,7 +107,8 @@ public class MySQLContainer extends BaseContainer {
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
     String mySQLJdbcUrl =
-        StringUtils.substring(getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
+        StringUtils.substring(
+            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
@@ -133,8 +133,7 @@ public class MySQLContainer extends BaseContainer {
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format(
-        "jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT,testDatabaseName);
+    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
