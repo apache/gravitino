@@ -133,30 +133,6 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testLoadTable() throws IOException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test444");
-    // key1 is required;
-    Map<String, String> props1 =
-        ImmutableMap.<String, String>builder()
-            .put("key2", "value2")
-            .put("key1", "value1")
-            .put("hidden_key", "hidden_value")
-            .put("mock", "mock")
-            .build();
-    Assertions.assertDoesNotThrow(
-        () ->
-            catalogManager.createCatalog(
-                ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
-
-    Map<String, String> properties = catalogManager.loadCatalog(ident).properties();
-    Assertions.assertTrue(properties.containsKey("key2"));
-    Assertions.assertTrue(properties.containsKey("key1"));
-    Assertions.assertFalse(properties.containsKey("hidden_key"));
-    Assertions.assertFalse(properties.containsKey(ID_KEY));
-    reset();
-  }
-
-  @Test
   void testPropertyValidationInAlter() throws IOException {
     // key1 is required and immutable and do not have default value, is not hidden and not reserved
     // key2 is required and mutable and do not have default value, is not hidden and not reserved

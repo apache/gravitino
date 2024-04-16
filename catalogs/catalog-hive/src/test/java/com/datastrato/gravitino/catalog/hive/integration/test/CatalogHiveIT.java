@@ -584,7 +584,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
     Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
-    Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
@@ -1224,7 +1224,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
         actualTable.getTableType());
-    Assertions.assertEquals(tableName, actualTable.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(tableName.toLowerCase(), actualTable.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));

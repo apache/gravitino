@@ -14,6 +14,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.FilesetChange;
@@ -118,6 +119,70 @@ public abstract class OperationDispatcher {
         IllegalArgumentException.class);
   }
 
+  <E extends Throwable> NameIdentifier[] doWithStandardizedList(
+      Namespace namespace,
+      Capability.Scope identScope,
+      ThrowableFunction<Namespace, NameIdentifier[]> fn,
+      Class<E> ex)
+      throws E {
+    Namespace standardizeNamespace = standardizeNamespace(namespace, identScope);
+    try {
+      NameIdentifier[] idents = fn.apply(standardizeNamespace);
+      return standardizeNameIdentifiers(standardizeNamespace, idents, identScope);
+    } catch (Throwable throwable) {
+      if (ex.isInstance(throwable)) {
+        throw ex.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
+      throw new RuntimeException(throwable);
+    }
+  }
+
+  <R, E extends Throwable> R doWithStandardizedIdent(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      ThrowableFunction<NameIdentifier, R> fn,
+      Class<E> ex)
+      throws E {
+    NameIdentifier standardizedIdent = standardizeNameIdentifier(ident, scope);
+    try {
+      return fn.apply(standardizedIdent);
+    } catch (Throwable throwable) {
+      if (ex.isInstance(throwable)) {
+        throw ex.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
+      throw new RuntimeException(throwable);
+    }
+  }
+
+  <R, E1 extends Throwable, E2 extends Throwable> R doWithStandardizedIdent(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      ThrowableFunction<NameIdentifier, R> fn,
+      Class<E1> ex1,
+      Class<E2> ex2)
+      throws E1, E2 {
+    NameIdentifier standardizedIdent = standardizeNameIdentifier(ident, scope);
+    try {
+      return fn.apply(standardizedIdent);
+    } catch (Throwable throwable) {
+      if (ex1.isInstance(throwable)) {
+        throw ex1.cast(throwable);
+      } else if (ex2.isInstance(throwable)) {
+        throw ex2.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
+      throw new RuntimeException(throwable);
+    }
+  }
+
   <T> void validateAlterProperties(
       NameIdentifier ident,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
@@ -132,6 +197,28 @@ public abstract class OperationDispatcher {
                   validatePropertyForAlter(provider.apply(p), upserts, deletes);
                   return null;
                 }),
+        IllegalArgumentException.class);
+  }
+
+  private Namespace standardizeNamespace(Namespace namespace, Capability.Scope identScope) {
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        c -> CapabilityHelpers.applyCapabilities(namespace, identScope, c.capabilities()),
+        IllegalArgumentException.class);
+  }
+
+  private NameIdentifier standardizeNameIdentifier(NameIdentifier ident, Capability.Scope scope) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> CapabilityHelpers.applyCapabilities(ident, scope, c.capabilities()),
+        IllegalArgumentException.class);
+  }
+
+  private NameIdentifier[] standardizeNameIdentifiers(
+      Namespace namespace, NameIdentifier[] idents, Capability.Scope scope) {
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        c -> CapabilityHelpers.applyCapabilities(idents, scope, c.capabilities()),
         IllegalArgumentException.class);
   }
 

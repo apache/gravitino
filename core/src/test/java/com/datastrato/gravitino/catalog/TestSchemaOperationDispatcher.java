@@ -54,8 +54,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("comment", schema.comment());
     testProperties(props, schema.properties());
 
-    // Test required table properties exception
-    Map<String, String> illegalTableProperties =
+    // Test required schema properties exception
+    Map<String, String> illegalSchemaProperties =
         new HashMap<String, String>() {
           {
             put("k2", "v2");
@@ -63,14 +63,14 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         };
 
     testPropertyException(
-        () -> dispatcher.createSchema(schemaIdent, "comment", illegalTableProperties),
+        () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
         "Properties are required and must be set");
 
     // Test reserved table properties exception
-    illegalTableProperties.put(COMMENT_KEY, "table comment");
-    illegalTableProperties.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
+    illegalSchemaProperties.put(COMMENT_KEY, "table comment");
+    illegalSchemaProperties.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
     testPropertyException(
-        () -> dispatcher.createSchema(schemaIdent, "comment", illegalTableProperties),
+        () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
         "Properties are reserved and cannot be set",
         "comment",
         "gravitino.identifier");
@@ -195,5 +195,34 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+  }
+
+  @Test
+  public void testNameCaseInsensitive() {
+    // test case-insensitive in creation
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schemaNAME");
+    Schema createdSchema =
+        dispatcher.createSchema(schemaIdent, null, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Assertions.assertEquals(schemaIdent.name().toLowerCase(), createdSchema.name());
+
+    // test case-insensitive in loading
+    Schema loadSchema = dispatcher.loadSchema(schemaIdent);
+    Assertions.assertEquals(schemaIdent.name().toLowerCase(), loadSchema.name());
+
+    // test case-insensitive in listing
+    NameIdentifier[] schemas = dispatcher.listSchemas(Namespace.of(metalake, catalog));
+    Arrays.stream(schemas).forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
+
+    // test case-insensitive in altering
+    Schema alteredSchema =
+        dispatcher.alterSchema(
+            schemaIdent, SchemaChange.setProperty("k2", "v2"), SchemaChange.removeProperty("k1"));
+    Assertions.assertEquals(schemaIdent.name().toLowerCase(), alteredSchema.name());
+
+    // test case-insensitive in dropping
+    Assertions.assertTrue(
+        dispatcher.dropSchema(
+            NameIdentifier.of(schemaIdent.namespace(), schemaIdent.name().toLowerCase()), false));
+    Assertions.assertFalse(dispatcher.schemaExists(schemaIdent));
   }
 }
