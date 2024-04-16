@@ -50,8 +50,8 @@ public final class KvGarbageCollector implements Closeable {
 
   // Keep the last collect commit id to avoid collecting the same data multiple times, the first
   // time the commit is 1 (minimum), and assuming we have collected the data with transaction id
-  // [1, 100], then the second time we collect the data, the starting commit id will be 100 and so
-  // on.
+  // (1, 100], then the second time we collect the data and current tx_id is 200,
+  // then the current transaction id range is (100, 200] and so on.
   byte[] commitIdHasBeenCollected;
   private long frequencyInMinutes;
 
@@ -155,7 +155,7 @@ public final class KvGarbageCollector implements Closeable {
 
     long lastGCId = getTransactionId(getBinaryTransactionId(commitIdHasBeenCollected));
     LOG.info(
-        "Start to collect data which is modified between '{}({})' and '{}({})'",
+        "Start to collect data which is modified between '{}({})' (exclusive) and '{}({})' (inclusive)",
         lastGCId,
         lastGCId == 1 ? lastGCId : DateFormatUtils.format(lastGCId >> 18, TIME_STAMP_FORMAT),
         transactionIdToDelete,
