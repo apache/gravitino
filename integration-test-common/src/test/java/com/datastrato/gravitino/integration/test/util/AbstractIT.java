@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -13,13 +12,8 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -31,16 +25,12 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
@@ -263,63 +253,6 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
-    }
-  }
-
-  protected static void assertionsTableInfo(
-      String tableName,
-      String tableComment,
-      List<Column> columns,
-      Map<String, String> properties,
-      Index[] indexes,
-      Table table) {
-    Assertions.assertEquals(tableName, table.name());
-    Assertions.assertEquals(tableComment, table.comment());
-    Assertions.assertEquals(columns.size(), table.columns().length);
-    for (int i = 0; i < columns.size(); i++) {
-      assertColumn(columns.get(i), table.columns()[i]);
-    }
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
-    }
-    if (ArrayUtils.isNotEmpty(indexes)) {
-      Assertions.assertEquals(indexes.length, table.index().length);
-
-      Map<String, Index> indexByName =
-          Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
-
-      for (int i = 0; i < table.index().length; i++) {
-        Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
-        Assertions.assertEquals(
-            indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
-        for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
-          for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
-            Assertions.assertEquals(
-                indexByName.get(table.index()[i].name()).fieldNames()[j][k],
-                table.index()[i].fieldNames()[j][k]);
-          }
-        }
-      }
-    }
-  }
-
-  protected static void assertColumn(Column expected, Column actual) {
-    if (!(actual instanceof ColumnDTO)) {
-      actual = toDTO(actual);
-    }
-    if (!(expected instanceof ColumnDTO)) {
-      expected = toDTO(expected);
-    }
-
-    Assertions.assertEquals(expected.name(), actual.name());
-    Assertions.assertEquals(expected.dataType(), actual.dataType());
-    Assertions.assertEquals(expected.nullable(), actual.nullable());
-    Assertions.assertEquals(expected.comment(), actual.comment());
-    Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
-    if (expected.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET) && expected.nullable()) {
-      Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
-    } else {
-      Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
     }
   }
 }

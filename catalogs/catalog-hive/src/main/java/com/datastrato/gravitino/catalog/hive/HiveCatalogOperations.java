@@ -591,11 +591,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       || !partitionFields.contains(fieldToAdd),
                   "Cannot alter partition column: " + fieldToAdd);
 
-              if (c instanceof TableChange.UpdateColumnNullability) {
-                throw new IllegalArgumentException(
-                    "Hive does not support altering column nullability");
-              }
-
               if (c instanceof TableChange.UpdateColumnDefaultValue) {
                 throw new IllegalArgumentException(
                     "Hive does not support altering column default value");
@@ -690,7 +685,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Arrays.stream(columns)
         .forEach(
             c -> {
-              validateNullable(c.name(), c.nullable());
               validateColumnDefaultValue(c.name(), c.defaultValue());
             });
 
@@ -791,7 +785,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           if (change instanceof TableChange.AddColumn) {
             TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
             String fieldName = String.join(".", addColumn.fieldName());
-            validateNullable(fieldName, addColumn.isNullable());
             validateColumnDefaultValue(fieldName, addColumn.getDefaultValue());
             doAddColumn(cols, addColumn);
 
@@ -867,17 +860,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
       throw new IllegalArgumentException(
           "The DEFAULT constraint for column is only supported since Hive 3.0, "
-              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + fieldName);
-    }
-  }
-
-  private void validateNullable(String fieldName, boolean nullable) {
-    // The NOT NULL constraint for column is supported since Hive3.0, see
-    // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!nullable) {
-      throw new IllegalArgumentException(
-          "The NOT NULL constraint for column is only supported since Hive 3.0, "
               + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
               + fieldName);
     }
