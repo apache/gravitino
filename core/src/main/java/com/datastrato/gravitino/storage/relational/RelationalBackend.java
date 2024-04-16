@@ -84,7 +84,7 @@ public interface RelationalBackend extends Closeable {
       throws IOException;
 
   /**
-   * Deletes the entity associated with the identifier and the entity type.
+   * Soft deletes the entity associated with the identifier and the entity type.
    *
    * @param ident The identifier of the entity.
    * @param entityType The type of the entity.

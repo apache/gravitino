@@ -77,6 +77,9 @@ public final class RelationalGarbageCollector implements Closeable {
 
   private void collectAndRemoveLegacyData() throws SQLException {
     long legacyTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
+    LOG.info(
+        "Try to physically delete legacy data that has been marked deleted before {}",
+        legacyTimeLine);
 
     for (AllTables.TABLE_NAMES tableName : AllTables.TABLE_NAMES.values()) {
       switch (tableName) {
@@ -101,9 +104,8 @@ public final class RelationalGarbageCollector implements Closeable {
               .deleteFilesetAndVersionMetasByLegacyTimeLine(
                   legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         case FILESET_VERSION_TABLE_NAME:
-          FilesetMetaService.getInstance()
-              .deleteFilesetAndVersionMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+          // using the same method as FILESET_TABLE_NAME
+          continue;
         default:
           throw new IllegalArgumentException(
               "Unsupported table name when collectAndRemoveLegacyData: " + tableName);
@@ -129,6 +131,10 @@ public final class RelationalGarbageCollector implements Closeable {
                     filesetVersionPO.getFilesetId(),
                     versionRetentionLine,
                     GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            LOG.info(
+                "Physically delete FilesetVersion: {} which version is older than or equal to versionRetentionLine: {}.",
+                filesetVersionPO,
+                versionRetentionLine);
           }
         case METALAKE_TABLE_NAME:
         case CATALOG_TABLE_NAME:

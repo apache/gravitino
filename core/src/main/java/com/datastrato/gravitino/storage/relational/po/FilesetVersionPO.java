@@ -96,6 +96,30 @@ public class FilesetVersionPO {
         getDeletedAt());
   }
 
+  @Override
+  public String toString() {
+    return new StringBuilder()
+        .append("FilesetVersionPO{id=")
+        .append(id)
+        .append(", metalakeId=")
+        .append(metalakeId)
+        .append(", catalogId=")
+        .append(catalogId)
+        .append(", schemaId=")
+        .append(schemaId)
+        .append(", filesetId=")
+        .append(filesetId)
+        .append(", version=")
+        .append(version)
+        .append(", storageLocation='")
+        .append(storageLocation)
+        .append('\'')
+        .append(", deletedAt=")
+        .append(deletedAt)
+        .append('}')
+        .toString();
+  }
+
   public static class Builder {
     private final FilesetVersionPO filesetVersionPO;
 
