@@ -34,7 +34,7 @@ import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
 import { useSearchParams } from 'next/navigation'
 
-const fonts = Inconsolata({})
+const fonts = Inconsolata({ subsets: ['latin'] })
 
 const EmptyText = () => {
   return (

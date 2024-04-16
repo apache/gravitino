@@ -21,7 +21,7 @@ import DetailsView from './detailsView/DetailsView'
 
 import Icon from '@/components/Icon'
 
-const fonts = Inconsolata({})
+const fonts = Inconsolata({ subsets: ['latin'] })
 
 const CustomTab = props => {
   const { icon, label, value, ...others } = props
