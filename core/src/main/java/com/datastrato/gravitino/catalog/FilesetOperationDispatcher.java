@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -16,12 +17,11 @@ import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import java.util.Map;
 
-public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetCatalog {
+public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
   /**
    * Creates a new FilesetOperationDispatcher instance.
    *
@@ -100,6 +100,10 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a fileset with with reserved name `*`");
+    }
+
     doWithCatalog(
         catalogIdent,
         c ->

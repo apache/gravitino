@@ -7,6 +7,7 @@ package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.DeveloperApi;
+import javax.annotation.Nullable;
 
 /**
  * The abstract base class for all events. It encapsulates common information such as the user who
@@ -16,7 +17,8 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public abstract class Event {
   private final String user;
-  private final NameIdentifier identifier;
+  @Nullable private final NameIdentifier identifier;
+  private final long eventTime;
 
   /**
    * Constructs an Event instance with the specified user and resource identifier details.
@@ -29,6 +31,7 @@ public abstract class Event {
   protected Event(String user, NameIdentifier identifier) {
     this.user = user;
     this.identifier = identifier;
+    this.eventTime = System.currentTimeMillis();
   }
 
   /**
@@ -43,10 +46,23 @@ public abstract class Event {
   /**
    * Retrieves the resource identifier associated with this event.
    *
+   * <p>For list operations within a namespace, the identifier is the identifier corresponds to that
+   * namespace. For metalake list operation, identifier is null.
+   *
    * @return A NameIdentifier object that represents the resource, like a metalake, catalog, schema,
    *     table, etc., associated with the event.
    */
+  @Nullable
   public NameIdentifier identifier() {
     return identifier;
+  }
+
+  /**
+   * Returns the timestamp when the event was created.
+   *
+   * @return The event creation time in milliseconds since epoch.
+   */
+  public long eventTime() {
+    return eventTime;
   }
 }

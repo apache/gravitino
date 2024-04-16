@@ -22,8 +22,7 @@ public abstract class TableEvent extends Event {
   /**
    * Constructs a new {@code TableEvent} with the specified user and table identifier.
    *
-   * @param user The user responsible for triggering the table operation. This information is
-   *     crucial for auditing and tracking purposes.
+   * @param user The user responsible for triggering the table operation.
    * @param identifier The identifier of the table involved in the operation. This encapsulates
    *     details such as the metalake, catalog, schema, and table name.
    */

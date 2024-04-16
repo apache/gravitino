@@ -25,6 +25,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -145,6 +146,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+    }
+
+    public Capability capabilities() throws Exception {
+      return classLoader.withClassLoader(cl -> catalog.capability());
     }
 
     public void close() {
@@ -305,6 +310,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
+    }
+
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
     }
 
     // load catalog-related configuration from catalog-specific configuration file
@@ -596,6 +605,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           // so. For simply, We will preload the value of properties and thus AppClassLoader can get
           // the value of properties.
           wrapper.catalog.properties();
+          wrapper.catalog.capability();
           return null;
         },
         IllegalArgumentException.class);

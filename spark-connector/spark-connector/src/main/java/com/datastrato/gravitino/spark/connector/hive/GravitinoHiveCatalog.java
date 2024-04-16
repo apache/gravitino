@@ -6,9 +6,9 @@
 package com.datastrato.gravitino.spark.connector.hive;
 
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
@@ -19,29 +19,13 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-/** HiveAdaptor provides specific operations for Hive Catalog to adapt to GravitinoCatalog. */
-public class HiveAdaptor implements GravitinoCatalogAdaptor {
+public class GravitinoHiveCatalog extends BaseCatalog {
 
   @Override
-  public PropertiesConverter getPropertiesConverter() {
-    return new HivePropertiesConverter();
-  }
-
-  @Override
-  public SparkBaseTable createSparkTable(
-      Identifier identifier,
-      Table gravitinoTable,
-      TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
-    return new SparkHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
-  }
-
-  @Override
-  public TableCatalog createAndInitSparkCatalog(
-      String name, CaseInsensitiveStringMap options, Map<String, String> catalogProperties) {
-    Preconditions.checkArgument(
-        catalogProperties != null, "Hive Catalog properties should not be null");
-    String metastoreUri = catalogProperties.get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
+  protected TableCatalog createAndInitSparkCatalog(
+      String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    Preconditions.checkArgument(properties != null, "Hive Catalog properties should not be null");
+    String metastoreUri = properties.get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metastoreUri),
         "Couldn't get "
@@ -54,5 +38,19 @@ public class HiveAdaptor implements GravitinoCatalogAdaptor {
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
 
     return hiveCatalog;
+  }
+
+  @Override
+  protected SparkBaseTable createSparkTable(
+      Identifier identifier,
+      Table gravitinoTable,
+      TableCatalog sparkCatalog,
+      PropertiesConverter propertiesConverter) {
+    return new SparkHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+  }
+
+  @Override
+  protected PropertiesConverter getPropertiesConverter() {
+    return new HivePropertiesConverter();
   }
 }
