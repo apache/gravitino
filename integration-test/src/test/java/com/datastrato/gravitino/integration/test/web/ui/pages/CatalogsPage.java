@@ -456,7 +456,7 @@ public class CatalogsPage extends AbstractWebIT {
       List<WebElement> list =
           driver.findElements(
               By.xpath(
-                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']//p"));
       List<String> texts = new ArrayList<>();
       for (WebElement element : list) {
         texts.add(element.getText());
@@ -543,7 +543,7 @@ public class CatalogsPage extends AbstractWebIT {
       List<WebElement> list =
           tableGrid.findElements(
               By.xpath(
-                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+                  "./div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']//p"));
       List<String> texts = new ArrayList<>();
       for (WebElement webElement : list) {
         String rowItemColName = webElement.getText();
