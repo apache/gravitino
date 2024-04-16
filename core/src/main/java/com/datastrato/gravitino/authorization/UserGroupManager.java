@@ -7,7 +7,6 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -22,7 +21,6 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
-import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -44,13 +42,10 @@ class UserGroupManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  public UserGroupManager(
-      EntityStore store, IdGenerator idGenerator, Cache<NameIdentifier, RoleEntity> cache) {
+  public UserGroupManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-    this.cache = cache;
   }
 
   /**
@@ -65,7 +60,7 @@ class UserGroupManager {
   public User addUser(String metalake, String name) throws UserAlreadyExistsException {
 
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
@@ -104,7 +99,7 @@ class UserGroupManager {
   public boolean removeUser(String metalake, String user) {
 
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -124,14 +119,13 @@ class UserGroupManager {
    */
   public User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity entity =
           store.get(
               NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
       List<RoleEntity> roleEntities =
-          AuthorizationUtils.getValidRoles(
-              cache, store, metalake, entity.roles(), entity.roleIds());
+          AuthorizationUtils.getValidRoles(metalake, entity.roles(), entity.roleIds());
 
       return UserEntity.builder()
           .withId(entity.id())
@@ -159,7 +153,7 @@ class UserGroupManager {
    */
   public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
@@ -199,7 +193,7 @@ class UserGroupManager {
    */
   public boolean removeGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(NameIdentifierUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
@@ -222,7 +216,7 @@ class UserGroupManager {
    */
   public Group getGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
 
       GroupEntity entity =
           store.get(
@@ -230,8 +224,7 @@ class UserGroupManager {
               Entity.EntityType.GROUP,
               GroupEntity.class);
       List<RoleEntity> roleEntities =
-          AuthorizationUtils.getValidRoles(
-              cache, store, metalake, entity.roles(), entity.roleIds());
+          AuthorizationUtils.getValidRoles(metalake, entity.roles(), entity.roleIds());
       return GroupEntity.builder()
           .withId(entity.id())
           .withName(entity.name())

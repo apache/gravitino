@@ -6,6 +6,7 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -28,9 +29,10 @@ class AuthorizationUtils {
 
   private AuthorizationUtils() {}
 
-  static void checkMetalakeExists(EntityStore store, String metalake)
-      throws NoSuchMetalakeException {
+  static void checkMetalakeExists(String metalake) throws NoSuchMetalakeException {
     try {
+      EntityStore store = GravitinoEnv.getInstance().entityStore();
+
       NameIdentifier metalakeIdent = NameIdentifier.ofMetalake(metalake);
       if (!store.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
@@ -42,8 +44,12 @@ class AuthorizationUtils {
     }
   }
 
-  static RoleEntity getRoleEntity(
-      Cache<NameIdentifier, RoleEntity> cache, EntityStore store, NameIdentifier identifier) {
+  static RoleEntity getRoleEntity(NameIdentifier identifier) {
+
+    Cache<NameIdentifier, RoleEntity> cache =
+        GravitinoEnv.getInstance().accessControlManager().getRoleCache();
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+
     return cache.get(
         identifier,
         id -> {
@@ -57,11 +63,7 @@ class AuthorizationUtils {
   }
 
   static List<RoleEntity> getValidRoles(
-      Cache<NameIdentifier, RoleEntity> cache,
-      EntityStore store,
-      String metalake,
-      List<String> roleNames,
-      List<Long> roleIds) {
+      String metalake, List<String> roleNames, List<Long> roleIds) {
     List<RoleEntity> roleEntities = Lists.newArrayList();
     if (roleNames == null || roleNames.isEmpty()) {
       return roleEntities;
@@ -72,8 +74,7 @@ class AuthorizationUtils {
       try {
 
         RoleEntity roleEntity =
-            AuthorizationUtils.getRoleEntity(
-                cache, store, NameIdentifierUtils.ofRole(metalake, role));
+            AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
 
         if (roleEntity.id().equals(roleIds.get(index))) {
           roleEntities.add(roleEntity);

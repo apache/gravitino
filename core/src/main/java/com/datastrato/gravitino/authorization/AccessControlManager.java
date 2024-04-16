@@ -46,11 +46,12 @@ public class AccessControlManager {
   private final PermissionManager permissionManager;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
+  private final Cache<NameIdentifier, RoleEntity> roleCache;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
 
     long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
-    Cache<NameIdentifier, RoleEntity> roleCache =
+    roleCache =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
@@ -67,10 +68,10 @@ public class AccessControlManager {
                             .build())))
             .build();
 
-    this.userGroupManager = new UserGroupManager(store, idGenerator, roleCache);
+    this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator, roleCache);
-    this.permissionManager = new PermissionManager(store, roleCache);
+    this.permissionManager = new PermissionManager(store);
   }
 
   /**
@@ -302,6 +303,10 @@ public class AccessControlManager {
    */
   public boolean dropRole(String metalake, String role) {
     return doWithNonAdminLock(() -> roleManager.dropRole(metalake, role));
+  }
+
+  Cache<NameIdentifier, RoleEntity> getRoleCache() {
+    return roleCache;
   }
 
   private <R, E extends Exception> R doWithNonAdminLock(Executable<R, E> executable) throws E {

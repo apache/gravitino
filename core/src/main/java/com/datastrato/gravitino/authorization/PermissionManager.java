@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.authorization.AuthorizationUtils.USER_DOE
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
@@ -20,7 +19,6 @@ import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.utils.PrincipalUtils;
-import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -38,22 +36,19 @@ class PermissionManager {
   private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
 
   private final EntityStore store;
-  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  PermissionManager(EntityStore store, Cache<NameIdentifier, RoleEntity> cache) {
+  PermissionManager(EntityStore store) {
     this.store = store;
-    this.cache = cache;
   }
 
   public boolean grantRoleToUser(String metalake, String role, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
 
       checkRoleExists(metalake, role);
 
       RoleEntity roleEntity =
-          AuthorizationUtils.getRoleEntity(
-              cache, store, NameIdentifierUtils.ofRole(metalake, role));
+          AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
 
       store.update(
           NameIdentifierUtils.ofUser(metalake, user),
@@ -62,7 +57,7 @@ class PermissionManager {
           userEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    cache, store, metalake, userEntity.roles(), userEntity.roleIds());
+                    metalake, userEntity.roles(), userEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -107,13 +102,12 @@ class PermissionManager {
 
   public boolean grantRoleToGroup(String metalake, String role, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
 
       checkRoleExists(metalake, role);
 
       RoleEntity roleEntity =
-          AuthorizationUtils.getRoleEntity(
-              cache, store, NameIdentifierUtils.ofRole(metalake, role));
+          AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
 
       store.update(
           NameIdentifierUtils.ofGroup(metalake, group),
@@ -122,7 +116,7 @@ class PermissionManager {
           groupEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    cache, store, metalake, groupEntity.roles(), groupEntity.roleIds());
+                    metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -168,7 +162,7 @@ class PermissionManager {
 
   public boolean revokeRoleFromGroup(String metalake, String role, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
 
       checkRoleExists(metalake, role);
 
@@ -185,7 +179,7 @@ class PermissionManager {
           groupEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    cache, store, metalake, groupEntity.roles(), groupEntity.roleIds());
+                    metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
@@ -234,7 +228,7 @@ class PermissionManager {
 
   public boolean revokeRoleFromUser(String metalake, String role, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
 
       checkRoleExists(metalake, role);
 
@@ -251,7 +245,7 @@ class PermissionManager {
           userEntity -> {
             List<RoleEntity> roleEntities =
                 AuthorizationUtils.getValidRoles(
-                    cache, store, metalake, userEntity.roles(), userEntity.roleIds());
+                    metalake, userEntity.roles(), userEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
