@@ -15,8 +15,21 @@ import com.datastrato.gravitino.rel.SchemaChange;
  */
 @DeveloperApi
 public final class AlterSchemaFailureEvent extends SchemaFailureEvent {
+  private final SchemaChange[] schemaChanges;
+
   public AlterSchemaFailureEvent(
       String user, NameIdentifier identifier, Exception exception, SchemaChange[] schemaChanges) {
     super(user, identifier, exception);
+    this.schemaChanges = schemaChanges.clone();
+  }
+
+  /**
+   * Retrieves the specific changes that were made to the schema during the alteration process.
+   *
+   * @return An array of {@link SchemaChange} objects detailing each modification applied to the
+   *     schema.
+   */
+  public SchemaChange[] schemaChanges() {
+    return schemaChanges;
   }
 }
