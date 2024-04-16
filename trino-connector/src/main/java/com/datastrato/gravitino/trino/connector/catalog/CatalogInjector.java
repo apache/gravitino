@@ -273,6 +273,12 @@ public class CatalogInjector {
 
             Object catalogConnector =
                 createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+            if (catalogs.containsKey(catalogName)) {
+              String message =
+                  String.format("Inject catalog failed. catalog %s already exists", catalogName);
+              LOG.error(message);
+              throw new TrinoException(GRAVITINO_CREATE_INNER_CONNECTOR_FAILED, message);
+            }
             catalogs.put(catalogName, catalogConnector);
           };
     }

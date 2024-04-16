@@ -57,8 +57,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table1");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
         };
 
     Table table1 =
