@@ -1,7 +1,3 @@
-"""
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
-"""
 import logging
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
