@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.authorization.AuthorizationUtils.USER_DOE
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
@@ -19,6 +20,7 @@ import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -36,9 +38,11 @@ class PermissionManager {
   private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
 
   private final EntityStore store;
+  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  PermissionManager(EntityStore store) {
+  PermissionManager(EntityStore store, Cache<NameIdentifier, RoleEntity> cache) {
     this.store = store;
+    this.cache = cache;
   }
 
   public boolean grantRoleToUser(String metalake, String role, String user) {
@@ -56,7 +60,9 @@ class PermissionManager {
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
-            List<RoleEntity> roleEntities = removeInvalidRoles(metalake, userEntity.roles());
+            List<RoleEntity> roleEntities =
+                AuthorizationUtils.getValidRoles(
+                    metalake, userEntity.roles(), userEntity.roleIds(), store, null);
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -86,7 +92,7 @@ class PermissionManager {
           });
       return true;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("User {} does not exist in the metalake {}", user, metalake, nse);
+      LOG.warn("Fail to grant, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -106,15 +112,17 @@ class PermissionManager {
       checkRoleExists(metalake, role);
 
       RoleEntity roleEntity =
-          store.get(
-              NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE, RoleEntity.class);
+          AuthorizationUtils.getRoleEntity(
+              NameIdentifierUtils.ofRole(metalake, role), cache, store);
 
       store.update(
           NameIdentifierUtils.ofGroup(metalake, group),
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
-            List<RoleEntity> roleEntities = removeInvalidRoles(metalake, groupEntity.roles());
+            List<RoleEntity> roleEntities =
+                AuthorizationUtils.getValidRoles(
+                    metalake, groupEntity.roles(), groupEntity.roleIds(), store, cache);
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -145,7 +153,7 @@ class PermissionManager {
           });
       return true;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Fail to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -175,7 +183,9 @@ class PermissionManager {
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
-            List<RoleEntity> roleEntities = removeInvalidRoles(metalake, groupEntity.roles());
+            List<RoleEntity> roleEntities =
+                AuthorizationUtils.getValidRoles(
+                    metalake, groupEntity.roles(), groupEntity.roleIds(), store, cache);
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
@@ -183,7 +193,7 @@ class PermissionManager {
 
             if (!removed.get()) {
               LOG.warn(
-                  "Role {} does not exist in the group {} of metalake {}", role, group, metalake);
+                  "Fail to revoke, role {} does not exist in the group {} of metalake {}", role, group, metalake);
             }
 
             AuditInfo auditInfo =
@@ -206,7 +216,7 @@ class PermissionManager {
 
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Fail to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -236,13 +246,15 @@ class PermissionManager {
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
-            List<RoleEntity> roleEntities = removeInvalidRoles(metalake, userEntity.roles());
+            List<RoleEntity> roleEntities =
+                AuthorizationUtils.getValidRoles(
+                    metalake, userEntity.roles(), userEntity.roleIds(), store, cache);
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
             removed.set(roleIds.remove(roleEntity.id()));
             if (!removed.get()) {
-              LOG.warn("Role {} doesn't exist in the user {} of metalake {}", role, user, metalake);
+              LOG.warn("Fail to revoke, role {} doesn't exist in the user {} of metalake {}", role, user, metalake);
             }
 
             AuditInfo auditInfo =
@@ -263,7 +275,7 @@ class PermissionManager {
           });
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("User {} does not exist in the metalake {}", user, metalake, nse);
+      LOG.warn("Fail to revoke, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -288,32 +300,5 @@ class PermissionManager {
     if (!store.exists(NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE)) {
       throw new NoSuchRoleException(AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     }
-  }
-
-  private List<RoleEntity> removeInvalidRoles(String metalake, List<String> roles) {
-    if (roles == null || roles.isEmpty()) {
-      return Lists.newArrayList();
-    }
-
-    List<RoleEntity> roleEntities = Lists.newArrayList();
-    for (String role : roles) {
-      try {
-        roleEntities.add(
-            store.get(
-                NameIdentifierUtils.ofRole(metalake, role),
-                Entity.EntityType.ROLE,
-                RoleEntity.class));
-      } catch (IOException ioe) {
-        LOG.error(
-            "Checking roles {} failed in the metalake {} due to storage issues",
-            role,
-            metalake,
-            ioe);
-        throw new RuntimeException(ioe);
-      } catch (NoSuchEntityException nse) {
-        // ignore this entity
-      }
-    }
-    return roleEntities;
   }
 }

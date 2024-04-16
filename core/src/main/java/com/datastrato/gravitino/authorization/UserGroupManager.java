@@ -7,6 +7,7 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -21,6 +22,7 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -42,10 +44,13 @@ class UserGroupManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
+  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  public UserGroupManager(EntityStore store, IdGenerator idGenerator) {
+  public UserGroupManager(
+      EntityStore store, IdGenerator idGenerator, Cache<NameIdentifier, RoleEntity> cache) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.cache = cache;
   }
 
   /**
@@ -125,7 +130,8 @@ class UserGroupManager {
               NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
       List<RoleEntity> roleEntities =
-          removeInvalidRoles(metalake, entity.roles(), entity.roleIds());
+          AuthorizationUtils.getValidRoles(
+              metalake, entity.roles(), entity.roleIds(), store, cache);
 
       return UserEntity.builder()
           .withId(entity.id())
@@ -224,7 +230,8 @@ class UserGroupManager {
               Entity.EntityType.GROUP,
               GroupEntity.class);
       List<RoleEntity> roleEntities =
-          removeInvalidRoles(metalake, entity.roles(), entity.roleIds());
+          AuthorizationUtils.getValidRoles(
+              metalake, entity.roles(), entity.roleIds(), store, cache);
       return GroupEntity.builder()
           .withId(entity.id())
           .withName(entity.name())
@@ -238,39 +245,5 @@ class UserGroupManager {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
     }
-  }
-
-  private List<RoleEntity> removeInvalidRoles(
-      String metalake, List<String> roleNames, List<Long> roleIds) {
-    List<RoleEntity> roleEntities = Lists.newArrayList();
-    if (roleNames == null || roleNames.isEmpty()) {
-      return roleEntities;
-    }
-
-    int index = 0;
-    for (String role : roleNames) {
-      try {
-        RoleEntity roleEntity =
-            store.get(
-                NameIdentifierUtils.ofRole(metalake, role),
-                Entity.EntityType.ROLE,
-                RoleEntity.class);
-        if (roleEntity.id().equals(roleIds.get(index))) {
-          roleEntities.add(roleEntity);
-        }
-        index++;
-
-      } catch (IOException ioe) {
-        LOG.error(
-            "Checking roles {} failed in the metalake {} due to storage issues",
-            role,
-            metalake,
-            ioe);
-        throw new RuntimeException(ioe);
-      } catch (NoSuchEntityException nse) {
-        // ignore this entity
-      }
-    }
-    return roleEntities;
   }
 }

@@ -5,17 +5,30 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.Executable;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -27,6 +40,8 @@ import java.util.Map;
  */
 public class AccessControlManager {
 
+  private static final Logger LOG = LoggerFactory.getLogger(AccessControlManager.class);
+
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
@@ -35,10 +50,28 @@ public class AccessControlManager {
   private final Object nonAdminOperationLock = new Object();
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
-    this.userGroupManager = new UserGroupManager(store, idGenerator);
+
+    long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
+    Cache<NameIdentifier, RoleEntity> roleCache = Caffeine.newBuilder()
+            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
+            .removalListener(
+                    (k, v, c) -> {
+                      LOG.info("Remove role {} from the cache.", k);
+                    })
+            .scheduler(
+                    Scheduler.forScheduledExecutorService(
+                            new ScheduledThreadPoolExecutor(
+                                    1,
+                                    new ThreadFactoryBuilder()
+                                            .setDaemon(true)
+                                            .setNameFormat("role-cleaner-%d")
+                                            .build())))
+            .build();
+
+    this.userGroupManager = new UserGroupManager(store, idGenerator, roleCache);
     this.adminManager = new AdminManager(store, idGenerator, config);
-    this.roleManager = new RoleManager(store, idGenerator);
-    this.permissionManager = new PermissionManager(store);
+    this.roleManager = new RoleManager(store, idGenerator, roleCache);
+    this.permissionManager = new PermissionManager(store, roleCache);
   }
 
   /**

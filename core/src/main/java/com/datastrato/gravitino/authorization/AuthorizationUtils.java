@@ -7,8 +7,13 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.meta.RoleEntity;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,5 +40,50 @@ class AuthorizationUtils {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
     }
+  }
+
+  static RoleEntity getRoleEntity(
+      NameIdentifier identifier, Cache<NameIdentifier, RoleEntity> cache, EntityStore store) {
+    return cache.get(
+        identifier,
+        id -> {
+          try {
+            return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
+          } catch (IOException ioe) {
+            LOG.error("getting roles {} failed  due to storage issues", identifier, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
+  }
+
+  static List<RoleEntity> getValidRoles(
+      String metalake,
+      List<String> roleNames,
+      List<Long> roleIds,
+      EntityStore store,
+      Cache<NameIdentifier, RoleEntity> cache) {
+    List<RoleEntity> roleEntities = Lists.newArrayList();
+    if (roleNames == null || roleNames.isEmpty()) {
+      return roleEntities;
+    }
+
+    int index = 0;
+    for (String role : roleNames) {
+      try {
+
+        RoleEntity roleEntity =
+            AuthorizationUtils.getRoleEntity(
+                NameIdentifierUtils.ofRole(metalake, role), cache, store);
+
+        if (roleEntity.id().equals(roleIds.get(index))) {
+          roleEntities.add(roleEntity);
+        }
+        index++;
+
+      } catch (NoSuchEntityException nse) {
+        // ignore this entity
+      }
+    }
+    return roleEntities;
   }
 }

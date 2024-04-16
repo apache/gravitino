@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+
+import com.github.benmanes.caffeine.cache.Cache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +37,12 @@ class RoleManager {
   private static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private final EntityStore store;
   private final IdGenerator idGenerator;
+  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  public RoleManager(EntityStore store, IdGenerator idGenerator) {
+  public RoleManager(EntityStore store, IdGenerator idGenerator, Cache<NameIdentifier, RoleEntity> cache) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.cache = cache;
   }
 
   /**
@@ -79,6 +83,7 @@ class RoleManager {
             .build();
     try {
       store.put(roleEntity, false /* overwritten */);
+      cache.put(roleEntity.nameIdentifier(), roleEntity);
       return roleEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Role {} in the metalake {} already exists", role, metalake, e);
@@ -103,13 +108,10 @@ class RoleManager {
   public Role loadRole(String metalake, String role) throws NoSuchRoleException {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.get(ofRole(metalake, role), Entity.EntityType.ROLE, RoleEntity.class);
+      return AuthorizationUtils.getRoleEntity(ofRole(metalake, role), cache, store);
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Loading role {} failed due to storage issues", role, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -124,7 +126,10 @@ class RoleManager {
   public boolean dropRole(String metalake, String role) {
     try {
       AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.delete(ofRole(metalake, role), Entity.EntityType.ROLE);
+      NameIdentifier ident = ofRole(metalake, role);
+      cache.invalidate(ident);
+
+      return store.delete(ident, Entity.EntityType.ROLE);
     } catch (IOException ioe) {
       LOG.error(
           "Deleting role {} in the metalake {} failed due to storage issues", role, metalake, ioe);

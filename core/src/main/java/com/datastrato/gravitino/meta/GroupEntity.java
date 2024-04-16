@@ -25,10 +25,10 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
       Field.required("name", String.class, "The name of the group entity.");
 
   public static final Field ROLE_NAMES =
-      Field.optional("roleNames", List.class, "The role names of the group entity.");
+      Field.optional("role_names", List.class, "The role names of the group entity.");
 
   public static final Field ROLE_IDS =
-      Field.optional("roleIds", List.class, "The role names of the group entity.");
+      Field.optional("role_ids", List.class, "The role names of the group entity.");
 
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the group entity.");
