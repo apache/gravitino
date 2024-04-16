@@ -5,17 +5,22 @@
 
 'use client'
 
+import { Inconsolata } from 'next/font/google'
+
 import { useState, useEffect } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, IconButton } from '@mui/material'
+import { styled, Box, Typography, IconButton, Stack } from '@mui/material'
+import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { DataGrid } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
   EditOutlined as EditIcon,
   DeleteOutlined as DeleteIcon
 } from '@mui/icons-material'
+
+import Icon from '@/components/Icon'
 
 import ColumnTypeChip from '@/components/ColumnTypeChip'
 import DetailsDrawer from '@/components/DetailsDrawer'
@@ -29,6 +34,8 @@ import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
 import { useSearchParams } from 'next/navigation'
 
+const fonts = Inconsolata({})
+
 const EmptyText = () => {
   return (
     <Typography variant='caption' color={theme => theme.palette.text.disabled}>
@@ -36,6 +43,16 @@ const EmptyText = () => {
     </Typography>
   )
 }
+
+const CustomTooltip = styled(({ className, ...props }) => <Tooltip {...props} classes={{ popper: className }} />)(
+  ({ theme }) => ({
+    [`& .${tooltipClasses.tooltip}`]: {
+      backgroundColor: '#23282a',
+      padding: 0,
+      border: '1px solid #dadde9'
+    }
+  })
+)
 
 const TableView = () => {
   const searchParams = useSearchParams()
@@ -62,6 +79,56 @@ const TableView = () => {
     if (!path) {
       return
     }
+  }
+
+  const renderIconTooltip = (type, name) => {
+    const propsItem = store.tableProps.find(i => i.type === type)
+    const items = propsItem.items
+
+    const isCond = propsItem.items.find(i => i.fields.find(v => (Array.isArray(v) ? v.includes(name) : v === name)))
+
+    const icon = propsItem.icon
+
+    return (
+      <>
+        {isCond && (
+          <CustomTooltip
+            placement='right'
+            title={
+              <>
+                <Box
+                  sx={{
+                    backgroundColor: '#525c61',
+                    p: 1.5,
+                    px: 4,
+                    borderTopLeftRadius: 4,
+                    borderTopRightRadius: 4
+                  }}
+                >
+                  <Typography color='white' fontWeight={700} fontSize={14} sx={{ textTransform: 'capitalize' }}>
+                    {type}:{' '}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ p: 1.5, px: 4 }}>
+                  {items.map(i => {
+                    return (
+                      <Typography key={i} variant='caption' color='white' className={fonts.className}>
+                        {i.text || i.fields}
+                      </Typography>
+                    )
+                  })}
+                </Box>
+              </>
+            }
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Icon icon={icon} />
+            </Box>
+          </CustomTooltip>
+        )}
+      </>
+    )
   }
 
   const columns = [
@@ -182,7 +249,7 @@ const TableView = () => {
 
   const tableColumns = [
     {
-      flex: 0.1,
+      flex: 0.15,
       minWidth: 60,
       disableColumnMenu: true,
       type: 'string',
@@ -197,6 +264,7 @@ const TableView = () => {
               title={name}
               noWrap
               sx={{
+                pr: 4,
                 fontWeight: 400,
                 color: 'text.main',
                 textDecoration: 'none'
@@ -204,6 +272,12 @@ const TableView = () => {
             >
               {name}
             </Typography>
+            <Stack spacing={0} direction={'row'}>
+              {renderIconTooltip('partitioning', name)}
+              {renderIconTooltip('sortOrders', name)}
+              {renderIconTooltip('distribution', name)}
+              {renderIconTooltip('indexes', name)}
+            </Stack>
           </Box>
         )
       }
