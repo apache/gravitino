@@ -12,7 +12,6 @@ import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -30,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Manages Metalakes within the Gravitino system. */
-public class MetalakeManager implements SupportsMetalakes {
+public class MetalakeManager implements MetalakeDispatcher {
 
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
