@@ -65,8 +65,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testFunctionsViaGravitinoIcebergCatalog()
-      throws NoSuchNamespaceException, NoSuchFunctionException {
+  void testIcebergListAndLoadFunctions() throws NoSuchNamespaceException, NoSuchFunctionException {
     String[] empty_namespace = new String[] {};
     String[] system_namespace = new String[] {"system"};
     String[] default_namespace = new String[] {getDefaultDatabase()};
@@ -106,7 +105,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testCallingFunctionInSQLEndToEnd() {
+  void testIcebergFunction() {
     String[] catalogAndNamespaces = new String[] {getCatalogName() + ".system", getCatalogName()};
     Arrays.stream(catalogAndNamespaces)
         .forEach(

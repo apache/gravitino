@@ -80,21 +80,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    Preconditions.checkArgument(
-        sparkCatalog instanceof SparkCatalog,
-        String.format(
-            "Expected the Type of RealCatalog: %s, but was %s.",
-            SparkCatalog.class.getName(), sparkCatalog.getClass().getName()));
     return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
   }
 
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    Preconditions.checkArgument(
-        sparkCatalog instanceof SparkCatalog,
-        String.format(
-            "Expected the Type of RealCatalog: %s, but was %s.",
-            SparkCatalog.class.getName(), sparkCatalog.getClass().getName()));
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 
