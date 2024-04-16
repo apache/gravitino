@@ -6,7 +6,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Version;
+import com.datastrato.gravitino.VersionUtil;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.VersionDTO;
@@ -246,7 +246,7 @@ public class TestGravitinoClient extends TestBase {
 
     VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
     buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
-    GravitinoVersion gravitinoVersion = client.getServerVersion();
+    GravitinoVersion gravitinoVersion = client.getVersion();
 
     Assertions.assertEquals(version, gravitinoVersion.version());
     Assertions.assertEquals(date, gravitinoVersion.compileDate());
@@ -257,9 +257,9 @@ public class TestGravitinoClient extends TestBase {
   public void testGetClientVersion() {
     GravitinoVersion version = client.clientVersion();
 
-    Assertions.assertEquals(Version.version, version.version());
-    Assertions.assertEquals(Version.compileDate, version.compileDate());
-    Assertions.assertEquals(Version.gitCommit, version.gitCommit());
+    Assertions.assertEquals(VersionUtil.version, version.version());
+    Assertions.assertEquals(VersionUtil.compileDate, version.compileDate());
+    Assertions.assertEquals(VersionUtil.gitCommit, version.gitCommit());
   }
 
   @Test
@@ -277,9 +277,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testCheckVersionSuccess() throws JsonProcessingException {
-    VersionResponse resp =
-        new VersionResponse(
-            new VersionDTO(Version.version, Version.compileDate, Version.gitCommit));
+    VersionResponse resp = new VersionResponse(VersionUtil.createCurrentVersionDTO());
     buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
 
     // check the client version is equal to server version
@@ -298,9 +296,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testUnusedDTOAttribute() throws JsonProcessingException {
-    VersionResponse resp =
-        new VersionResponse(
-            new VersionDTO(Version.version, Version.compileDate, Version.gitCommit));
+    VersionResponse resp = new VersionResponse(VersionUtil.createCurrentVersionDTO());
 
     HttpRequest mockRequest = HttpRequest.request("/api/version").withMethod(Method.GET.name());
     HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
@@ -313,10 +309,10 @@ public class TestGravitinoClient extends TestBase {
 
     Assertions.assertDoesNotThrow(
         () -> {
-          GravitinoVersion version = client.getServerVersion();
-          Assertions.assertEquals(Version.version, version.version());
-          Assertions.assertEquals(Version.compileDate, version.compileDate());
-          Assertions.assertEquals(Version.gitCommit, version.gitCommit());
+          GravitinoVersion version = client.getVersion();
+          Assertions.assertEquals(VersionUtil.version, version.version());
+          Assertions.assertEquals(VersionUtil.compileDate, version.compileDate());
+          Assertions.assertEquals(VersionUtil.gitCommit, version.gitCommit());
         });
   }
 }

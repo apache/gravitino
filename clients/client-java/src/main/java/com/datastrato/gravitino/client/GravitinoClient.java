@@ -33,13 +33,26 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
    * @param authDataProvider The provider of the data which is used for authentication.
-   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
+   *     support the case that the client-side version is higher than the server-side version.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
       String uri, String metalakeName, AuthDataProvider authDataProvider, boolean checkVersion) {
     super(uri, authDataProvider, checkVersion);
     this.metalake = loadMetalake(NameIdentifier.of(metalakeName));
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param metalakeName The specified metalake name.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
+   */
+  private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
+    this(uri, metalakeName, authDataProvider, true);
   }
 
   /**

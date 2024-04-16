@@ -64,7 +64,7 @@ public class TestGravitinoMetalake extends TestBase {
     gravitinoClient =
         GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
             .withMetalake(metalakeName)
-            .withoutCheckVersion()
+            .withVersionCheckDisabled()
             .build();
   }
 

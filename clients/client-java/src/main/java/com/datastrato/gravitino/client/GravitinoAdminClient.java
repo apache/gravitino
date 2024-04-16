@@ -40,11 +40,22 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
-   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
+   *     support the case that the client-side version is higher than the server-side version.
    */
   private GravitinoAdminClient(
       String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
     super(uri, authDataProvider, checkVersion);
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   */
+  private GravitinoAdminClient(String uri, AuthDataProvider authDataProvider) {
+    this(uri, authDataProvider, true);
   }
 
   /**

@@ -320,6 +320,14 @@ public class HTTPClient implements RESTClient {
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
 
+    // beforeConnectHandle is a pre-connection handler that needs to be executed before the first
+    // HTTP request.
+    // During execution, beforeConnectHandle must be unloaded to prevent recursive calls.
+    // After beforeConnectHandle executes successfully, other requests can be processed normally.
+    // If an exception occurs during the execution of beforeConnectHandle,
+    // likely due to a network issue, beforeConnectHandle needs to be reloaded to ensure
+    // it can be successfully executed once the connection is restored.
+    // Double-checking is used to avoid unnecessary locking overhead after a successful connection
     if (beforeConnectHandle != null) {
       synchronized (this) {
         if (beforeConnectHandle != null) {

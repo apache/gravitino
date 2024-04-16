@@ -6,8 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Version;
-import com.datastrato.gravitino.dto.VersionDTO;
+import com.datastrato.gravitino.VersionUtil;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
@@ -28,7 +27,6 @@ public class VersionOperations extends HttpServlet {
   @Timed(name = "version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "version", absolute = true)
   public Response getVersion() {
-    VersionDTO versionDTO = new VersionDTO(Version.version, Version.compileDate, Version.gitCommit);
-    return Utils.ok(new VersionResponse(versionDTO));
+    return Utils.ok(new VersionResponse(VersionUtil.createCurrentVersionDTO()));
   }
 }

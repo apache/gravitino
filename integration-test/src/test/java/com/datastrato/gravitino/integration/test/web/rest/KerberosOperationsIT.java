@@ -76,8 +76,8 @@ public class KerberosOperationsIT extends AbstractIT {
 
   @Test
   public void testAuthenticationApi() throws Exception {
-    GravitinoVersion gravitinoVersion = client.getServerVersion();
-    client.getServerVersion();
+    GravitinoVersion gravitinoVersion = client.getVersion();
+    client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
 
@@ -88,7 +88,7 @@ public class KerberosOperationsIT extends AbstractIT {
 
     // Test to re-login with the keytab
     Uninterruptibles.sleepUninterruptibly(6, TimeUnit.SECONDS);
-    client.getServerVersion();
+    client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
   }

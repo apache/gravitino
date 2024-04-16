@@ -6,8 +6,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Version;
-import com.datastrato.gravitino.dto.VersionDTO;
+import com.datastrato.gravitino.VersionUtil;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
@@ -79,11 +78,12 @@ public abstract class GravitinoClientBase implements Closeable {
    * @throws GravitinoRuntimeException If the client version is greater than the server version.
    */
   public void checkVersion() {
-    GravitinoVersion serverVersion = getServerVersion();
+    GravitinoVersion serverVersion = getVersion();
     GravitinoVersion clientVersion = clientVersion();
-    if (clientVersion.greaterThan(serverVersion)) {
+    if (clientVersion.compareTo(serverVersion) > 0) {
       throw new GravitinoRuntimeException(
-          "Can not support Gravitino client version %s is greater than server version %s",
+          "Gravitino does not support the case that the client-side version is higher than the server-side version."
+              + "The client version is %s, and the server version %s",
           clientVersion.version(), serverVersion.version());
     }
   }
@@ -94,8 +94,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @return A GravitinoVersion instance representing the version of the Gravitino client.
    */
   public GravitinoVersion clientVersion() {
-    VersionDTO versionDTO = new VersionDTO(Version.version, Version.compileDate, Version.gitCommit);
-    return new GravitinoVersion(versionDTO);
+    return new GravitinoVersion(VersionUtil.createCurrentVersionDTO());
   }
 
   /**
@@ -124,7 +123,7 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @return A GravitinoVersion instance representing the version of the Gravitino API.
    */
-  public GravitinoVersion getServerVersion() {
+  public GravitinoVersion getVersion() {
     VersionResponse resp =
         restClient.get(
             "api/version",
@@ -182,7 +181,7 @@ public abstract class GravitinoClientBase implements Closeable {
      *
      * @return This Builder instance for method chaining.
      */
-    public Builder<T> withoutCheckVersion() {
+    public Builder<T> withVersionCheckDisabled() {
       this.checkVersion = false;
       return this;
     }
