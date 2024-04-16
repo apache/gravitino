@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
@@ -25,6 +26,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.Connector;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -166,7 +168,7 @@ public class CatalogConnectorManager {
                 Catalog catalog = metalake.loadCatalog(nameIdentifier);
                 GravitinoCatalog gravitinoCatalog =
                     new GravitinoCatalog(metalake.name(), catalog, config.simplifyCatalogNames());
-                if (catalogConnectors.containsKey(gravitinoCatalog.getFullName())) {
+                if (catalogConnectors.containsKey(getFullCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(metalake, gravitinoCatalog);
 
@@ -183,13 +185,13 @@ public class CatalogConnectorManager {
   }
 
   private void reloadCatalog(GravitinoMetalake metalake, GravitinoCatalog catalog) {
-    GravitinoCatalog oldCatalog = catalogConnectors.get(catalog.getFullName()).getCatalog();
+    GravitinoCatalog oldCatalog = catalogConnectors.get(getFullCatalogName(catalog)).getCatalog();
     if (!catalog.getLastModifiedTime().isAfter(oldCatalog.getLastModifiedTime())) {
       return;
     }
 
-    catalogInjector.removeCatalogConnector(catalog.getFullName());
-    catalogConnectors.remove(catalog.getFullName());
+    catalogInjector.removeCatalogConnector((getFullCatalogName(catalog)));
+    catalogConnectors.remove(getFullCatalogName(catalog));
 
     loadCatalogImpl(metalake, catalog);
     LOG.info("Update catalog '{}' in metalake {} successfully.", catalog, metalake.name());
@@ -197,16 +199,27 @@ public class CatalogConnectorManager {
 
   private void loadCatalog(GravitinoMetalake metalake, GravitinoCatalog catalog) {
     loadCatalogImpl(metalake, catalog);
-    LOG.info(
-        "Load catalog {} in metalake {} successfully.", catalog.getFullName(), metalake.name());
+    LOG.info("Load catalog {} in metalake {} successfully.", catalog, metalake.name());
   }
 
   private void loadCatalogImpl(GravitinoMetalake metalake, GravitinoCatalog catalog) {
-    CatalogConnectorContext catalogConnectorContext =
-        catalogConnectorFactory.loadCatalogConnector(metalake, catalog);
+    CatalogConnectorContext.Builder builder =
+        catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
+    try {
+      Connector internalConnector =
+          catalogInjector.createConnector(
+              getFullCatalogName(catalog), builder.buildConfig(catalog));
 
-    catalogConnectors.put(catalog.getFullName(), catalogConnectorContext);
-    catalogInjector.injectCatalogConnector(catalog.getFullName());
+      builder.withMetalake(metalake).withCatalog(catalog).withInternalConnector(internalConnector);
+    } catch (Exception e) {
+      String message =
+          String.format("Failed to create internal catalog connector. The catalog is: %s", catalog);
+      LOG.error(message, e);
+      throw new TrinoException(GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR, message, e);
+    }
+
+    catalogConnectors.put(getFullCatalogName(catalog), builder.build());
+    catalogInjector.injectCatalogConnector(getFullCatalogName(catalog));
   }
 
   private void unloadCatalog(GravitinoMetalake metalake, String catalogFullName) {
@@ -228,6 +241,14 @@ public class CatalogConnectorManager {
     throw new NotImplementedException();
   }
 
+  public String getFullCatalogName(String metalake, String catalog) {
+    return config.simplifyCatalogNames() ? catalog : metalake + "." + catalog;
+  }
+
+  public String getFullCatalogName(GravitinoCatalog catalog) {
+    return getFullCatalogName(catalog.getMetalake(), catalog.getName());
+  }
+
   public void createCatalog(
       String metalakeName,
       String catalogName,
@@ -235,7 +256,7 @@ public class CatalogConnectorManager {
       Map<String, String> properties,
       boolean ignoreExist) {
     NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);
-    if (catalogConnectors.containsKey(catalog.toString())) {
+    if (catalogConnectors.containsKey(getFullCatalogName(metalakeName, catalogName))) {
       if (!ignoreExist) {
         throw new TrinoException(
             GRAVITINO_CATALOG_ALREADY_EXISTS, String.format("Catalog %s already exists.", catalog));
@@ -249,7 +270,7 @@ public class CatalogConnectorManager {
       metalake.createCatalog(
           catalog, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
-      LOG.info("Create catalog {} in metalake {} successfully.", catalog, metalake);
+      LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
 
       Future<?> future = executorService.submit(this::loadMetalake);
       future.get(30, TimeUnit.SECONDS);
@@ -286,7 +307,7 @@ public class CatalogConnectorManager {
         throw new TrinoException(
             GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalog + " does not support.");
       }
-      LOG.info("Drop catalog {} in metalake {} successfully.", catalog, metalake);
+      LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
 
       Future<?> future = executorService.submit(this::loadMetalake);
       future.get(30, TimeUnit.SECONDS);
@@ -305,10 +326,10 @@ public class CatalogConnectorManager {
       String catalogName,
       Map<String, String> setProperties,
       List<String> removeProperties) {
+    NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);
     try {
-      NameIdentifier catalogNameId = NameIdentifier.of(metalakeName, catalogName);
       CatalogConnectorContext catalogConnectorContext =
-          catalogConnectors.get(catalogNameId.toString());
+          catalogConnectors.get(getFullCatalogName(metalakeName, catalogName));
       GravitinoCatalog oldCatalog = catalogConnectorContext.getCatalog();
 
       List<CatalogChange> changes = new ArrayList<>();
@@ -341,9 +362,7 @@ public class CatalogConnectorManager {
 
       GravitinoMetalake metalake =
           gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, catalogName),
-          changes.toArray(changes.toArray(new CatalogChange[0])));
+      metalake.alterCatalog(catalog, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       Future<?> future = executorService.submit(this::loadMetalake);
       future.get(30, TimeUnit.SECONDS);
@@ -352,8 +371,7 @@ public class CatalogConnectorManager {
       throw new TrinoException(
           GRAVITINO_METALAKE_NOT_EXISTS, "Metalake " + metalakeName + " not exists.");
     } catch (NoSuchCatalogException e) {
-      throw new TrinoException(
-          GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalogName + " not exists.");
+      throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalog + " not exists.");
     } catch (Exception e) {
       throw new TrinoException(
           GRAVITINO_UNSUPPORTED_OPERATION, "alter catalog failed. " + e.getMessage(), e);

@@ -64,8 +64,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         try {
           CatalogInjector catalogInjector = new CatalogInjector();
           catalogInjector.init(context);
-          CatalogConnectorFactory catalogConnectorFactory =
-              new CatalogConnectorFactory(catalogInjector);
+          CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
 
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);

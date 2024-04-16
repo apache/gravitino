@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_hive".gt_db1;
+CREATE SCHEMA gt_hive.gt_db1;
 
-CREATE TABLE "test.gt_hive".gt_db1.tb01 (
+CREATE TABLE gt_hive.gt_db1.tb01 (
     name varchar,
     salary int
 )
@@ -8,6 +8,6 @@ WITH (
   format = 'TEXTFILE'
 );
 
-drop table "test.gt_hive".gt_db1.tb01;
+drop table gt_hive.gt_db1.tb01;
 
-drop schema "test.gt_hive".gt_db1;
+drop schema gt_hive.gt_db1;
