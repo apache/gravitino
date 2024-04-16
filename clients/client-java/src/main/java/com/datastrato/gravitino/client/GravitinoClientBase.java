@@ -61,8 +61,8 @@ public abstract class GravitinoClientBase implements Closeable {
                     return null;
                   })
               .build();
-    } else {
 
+    } else {
       this.restClient =
           HTTPClient.builder(Collections.emptyMap())
               .uri(uri)

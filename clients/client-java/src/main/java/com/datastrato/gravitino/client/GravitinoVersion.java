@@ -25,7 +25,8 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
   }
 
   @VisibleForTesting
-  public int[] getVersionNumber() {
+  /** @return parse the version number for a version string */
+  int[] getVersionNumber() {
     Pattern pattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)(-\\w+){0,1}");
     Matcher matcher = pattern.matcher(version());
     if (matcher.matches()) {

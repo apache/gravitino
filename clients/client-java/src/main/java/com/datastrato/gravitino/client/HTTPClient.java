@@ -336,7 +336,7 @@ public class HTTPClient implements RESTClient {
           try {
             handle.apply(this);
           } catch (Exception e) {
-            // process until it succeeds
+            // The beforeConnectHandle will continue processing until it succeeds.
             beforeConnectHandle = handle;
             throw e;
           }
