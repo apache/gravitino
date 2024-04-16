@@ -67,7 +67,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     }
 
     try (final Connection connection = this.dataSource.getConnection()) {
-      String query = "SHOW TABLES IN " + databaseName;
+      String query = "SHOW TABLES IN `" + databaseName + "`";
       try (Statement statement = connection.createStatement()) {
         // Execute the query and check if there exists any tables in the database
         try (ResultSet resultSet = statement.executeQuery(query)) {
