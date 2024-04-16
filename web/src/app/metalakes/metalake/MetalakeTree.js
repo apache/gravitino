@@ -71,7 +71,7 @@ const MetalakeTree = props => {
       case 'table': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, table] = pathArr
+          const [metalake, catalog, type, schema, table] = pathArr
           dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
         }
         break
