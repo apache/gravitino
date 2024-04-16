@@ -66,7 +66,7 @@ class RoleManager {
             .withId(idGenerator.nextId())
             .withName(role)
             .withProperties(properties)
-            .securableObject(securableObject)
+            .withSecurableObject(securableObject)
             .withPrivileges(privileges)
             .withNamespace(
                 Namespace.of(

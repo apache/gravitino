@@ -17,12 +17,11 @@ import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import java.util.Map;
 
-public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetCatalog {
+public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
   /**
    * Creates a new FilesetOperationDispatcher instance.
    *
