@@ -10,12 +10,14 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
+import java.io.File
 import java.io.IOException
-import java.util.*
+import java.util.Locale
 
 plugins {
   `maven-publish`
