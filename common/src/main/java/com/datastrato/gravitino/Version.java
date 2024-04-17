@@ -12,7 +12,7 @@ import java.util.Properties;
 /** Retrieve the version and build information from the building process */
 public class Version {
 
-  private static volatile Version INSTANCE = new Version();
+  private static final Version INSTANCE = new Version();
 
   private VersionInfo versionInfo;
   private VersionDTO versionDTO;
