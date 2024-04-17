@@ -51,6 +51,9 @@ public class AccessControlManager {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
 
     long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
+    // One role entity is about 40 bytes using jol estimate, there are usually about 100w+
+    // roles in the production environment, this won't bring too much memory cost, but it
+    // can improve the performance significantly.
     roleCache =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
