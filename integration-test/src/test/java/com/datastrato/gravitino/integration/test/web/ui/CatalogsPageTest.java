@@ -39,7 +39,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   CatalogsPage catalogsPage = new CatalogsPage();
 
   protected static TrinoITContainers trinoITContainers;
-  // private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
@@ -107,10 +107,10 @@ public class CatalogsPageTest extends AbstractWebIT {
     mysqlUri = trinoITContainers.getMysqlUri();
     postgresqlUri = trinoITContainers.getPostgresqlUri();
 
-    // containerSuite.startKafkaContainer();
+    containerSuite.startKafkaContainer();
 
-    // String address = containerSuite.getKafkaContainer().getContainerIpAddress();
-    // kafkaUri = String.format("%s:%s", address, "9092");
+    String address = containerSuite.getKafkaContainer().getContainerIpAddress();
+    kafkaUri = String.format("%s:%s", address, "9092");
   }
 
   /**
@@ -634,7 +634,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickTreeNode(filesetCatalogNode);
     // 4. verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_FILESET));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_FILESET, false));
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
@@ -653,7 +653,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickTreeNode(filesetSchemaNode);
     // 6. verify show table title、 fileset name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_FILESET_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(FILESET_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(FILESET_NAME, false));
     treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
@@ -702,7 +702,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickTreeNode(kafkaCatalogNode);
     // 4. verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
@@ -721,7 +721,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickTreeNode(kafkaSchemaNode);
     // 6. verify show table title、 fileset name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TOPIC_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TOPIC_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TOPIC_NAME, false));
     treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
