@@ -58,7 +58,7 @@ public class TestSparkTransformConverter {
           Transform[] gravitinoPartitionings =
               SparkTransformConverter.toGravitinoPartitionings(
                   new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform},
-                  true);
+                  false);
           if (sparkTransform instanceof BucketTransform) {
             Assertions.assertTrue(
                 gravitinoPartitionings != null && gravitinoPartitionings.length == 0);
