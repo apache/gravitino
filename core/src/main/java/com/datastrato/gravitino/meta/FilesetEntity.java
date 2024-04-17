@@ -166,6 +166,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     FilesetEntity that = (FilesetEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
+        && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(type, that.type)
         && Objects.equals(storageLocation, that.storageLocation)
