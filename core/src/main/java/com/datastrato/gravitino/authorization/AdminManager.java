@@ -38,21 +38,13 @@ class AdminManager {
   private final IdGenerator idGenerator;
   private final List<String> serviceAdmins;
 
-  public AdminManager(EntityStore store, IdGenerator idGenerator, Config config) {
+  AdminManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
 
-  /**
-   * Adds a new metalake admin.
-   *
-   * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addMetalakeAdmin(String user) {
+  User addMetalakeAdmin(String user) {
 
     UserEntity userEntity =
         UserEntity.builder()
@@ -82,14 +74,7 @@ class AdminManager {
     }
   }
 
-  /**
-   * Removes a metalake admin.
-   *
-   * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  public boolean removeMetalakeAdmin(String user) {
+  boolean removeMetalakeAdmin(String user) {
     try {
       return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);
     } catch (IOException ioe) {
@@ -99,23 +84,11 @@ class AdminManager {
     }
   }
 
-  /**
-   * Judges whether the user is the service admin.
-   *
-   * @param user the name of the user
-   * @return true, if the user is service admin, otherwise false.
-   */
-  public boolean isServiceAdmin(String user) {
+  boolean isServiceAdmin(String user) {
     return serviceAdmins.contains(user);
   }
 
-  /**
-   * Judges whether the user is the metalake admin.
-   *
-   * @param user the name of the user
-   * @return true, if the user is metalake admin, otherwise false.
-   */
-  public boolean isMetalakeAdmin(String user) {
+  boolean isMetalakeAdmin(String user) {
     try {
       return store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER);
     } catch (IOException ioe) {

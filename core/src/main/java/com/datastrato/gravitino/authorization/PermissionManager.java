@@ -42,7 +42,7 @@ class PermissionManager {
     this.roleManager = roleManager;
   }
 
-  public boolean grantRoleToUser(String metalake, String role, String user) {
+  boolean grantRoleToUser(String metalake, String role, String user) {
     try {
       RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
@@ -96,7 +96,7 @@ class PermissionManager {
     }
   }
 
-  public boolean grantRoleToGroup(String metalake, String role, String group) {
+  boolean grantRoleToGroup(String metalake, String role, String group) {
     try {
       RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
@@ -150,7 +150,7 @@ class PermissionManager {
     }
   }
 
-  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
+  boolean revokeRoleFromGroup(String metalake, String role, String group) {
     try {
       RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
@@ -196,7 +196,8 @@ class PermissionManager {
 
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Failed to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn(
+          "Failed to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -209,7 +210,7 @@ class PermissionManager {
     }
   }
 
-  public boolean revokeRoleFromUser(String metalake, String role, String user) {
+  boolean revokeRoleFromUser(String metalake, String role, String user) {
     try {
       RoleEntity roleEntity = roleManager.loadRole(metalake, role);
       AtomicBoolean removed = new AtomicBoolean(true);

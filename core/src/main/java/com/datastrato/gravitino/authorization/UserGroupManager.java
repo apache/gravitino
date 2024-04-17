@@ -44,22 +44,13 @@ class UserGroupManager {
   private final IdGenerator idGenerator;
   private final RoleManager roleManager;
 
-  public UserGroupManager(EntityStore store, IdGenerator idGenerator, RoleManager roleManager) {
+  UserGroupManager(EntityStore store, IdGenerator idGenerator, RoleManager roleManager) {
     this.store = store;
     this.idGenerator = idGenerator;
     this.roleManager = roleManager;
   }
 
-  /**
-   * Adds a new User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param name The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+  User addUser(String metalake, String name) throws UserAlreadyExistsException {
 
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
@@ -90,15 +81,7 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Removes a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user THe name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  public boolean removeUser(String metalake, String user) {
+  boolean removeUser(String metalake, String user) {
 
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
@@ -110,16 +93,7 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @return The getting User instance.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException If getting the User encounters storage issues.
-   */
-  public User getUser(String metalake, String user) throws NoSuchUserException {
+  User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity entity =
@@ -144,16 +118,7 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Adds a new Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group The name of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+  Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       GroupEntity groupEntity =
@@ -185,15 +150,7 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Removes a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the Group encounters storage issues.
-   */
-  public boolean removeGroup(String metalake, String group) {
+  boolean removeGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
@@ -207,16 +164,7 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return The getting Group instance.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException If getting the Group encounters storage issues.
-   */
-  public Group getGroup(String metalake, String group) {
+  Group getGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 

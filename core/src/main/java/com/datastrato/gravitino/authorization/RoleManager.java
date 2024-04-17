@@ -47,7 +47,7 @@ class RoleManager {
   private final IdGenerator idGenerator;
   private final Cache<NameIdentifier, RoleEntity> cache;
 
-  public RoleManager(EntityStore store, IdGenerator idGenerator, Config config) {
+  RoleManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
 
