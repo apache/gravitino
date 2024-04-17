@@ -54,7 +54,8 @@ public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
     String jdbcUrl = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
 
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
 
