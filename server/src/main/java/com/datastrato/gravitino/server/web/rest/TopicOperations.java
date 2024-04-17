@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.dto.requests.TopicCreateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdatesRequest;
@@ -40,12 +40,12 @@ import org.slf4j.LoggerFactory;
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
-  private final TopicOperationDispatcher dispatcher;
+  private final TopicDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TopicOperations(TopicOperationDispatcher dispatcher) {
+  public TopicOperations(TopicDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 

@@ -22,7 +22,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -75,7 +74,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Manages the catalog instances and operations. */
-public class CatalogManager implements SupportsCatalogs, Closeable {
+public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";

@@ -35,6 +35,12 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   private static final Pattern DATABASE_ALREADY_EXISTS_PATTERN =
       Pattern.compile(DATABASE_ALREADY_EXISTS_PATTERN_STRING);
 
+  private static final String TABLE_NOT_EXIST_PATTERN_STRING =
+      ".*detailMessage = Unknown table '.*' in .*:.*";
+
+  private static final Pattern TABLE_NOT_EXIST_PATTERN =
+      Pattern.compile(TABLE_NOT_EXIST_PATTERN_STRING);
+
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
@@ -68,6 +74,10 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
     }
     if (DATABASE_ALREADY_EXISTS_PATTERN.matcher(message).matches()) {
       return CODE_DATABASE_EXISTS;
+    }
+
+    if (TABLE_NOT_EXIST_PATTERN.matcher(message).matches()) {
+      return CODE_NO_SUCH_TABLE;
     }
 
     return CODE_OTHER;
