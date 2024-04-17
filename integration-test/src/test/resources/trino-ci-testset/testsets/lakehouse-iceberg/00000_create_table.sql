@@ -11,7 +11,6 @@ CREATE TABLE "test.gt_iceberg".gt_db2.tb02 (
     name varchar,
     salary int
 ) with (
-      location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb02',
       partitioning = ARRAY['name'],
       sorted_by = ARRAY['salary']
     );

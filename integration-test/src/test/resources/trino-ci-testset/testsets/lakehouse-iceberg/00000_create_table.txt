@@ -19,6 +19,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb02',
    partitioning = ARRAY['name'],
    sorted_by = ARRAY['salary']
 )"
@@ -33,6 +34,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb03',
    partitioning = ARRAY['name'],
    sorted_by = ARRAY['name']
 )"
@@ -45,6 +47,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb04',
    sorted_by = ARRAY['name']
 )"
 
@@ -56,6 +59,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb05',
    partitioning = ARRAY['name']
 )"
 
