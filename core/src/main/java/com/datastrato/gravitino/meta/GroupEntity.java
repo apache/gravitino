@@ -118,9 +118,18 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   }
 
   /**
+   * Returns the role names of the group entity.
+   *
+   * @return The role names of the group entity.
+   */
+  public List<String> roleNames() {
+    return roleNames;
+  }
+
+  /**
    * Returns the role ids of the group entity.
    *
-   * @return The roles of the group entity.
+   * @return The role ids of the group entity.
    */
   public List<Long> roleIds() {
     return roleIds;
@@ -202,7 +211,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     /**
      * Sets the role ids of the group entity.
      *
-     * @param roleIds The role names of the group entity.
+     * @param roleIds The role ids of the group entity.
      * @return The builder instance.
      */
     public Builder withRoleIds(List<Long> roleIds) {

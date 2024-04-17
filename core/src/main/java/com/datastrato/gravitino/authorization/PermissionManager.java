@@ -52,7 +52,7 @@ class PermissionManager {
           Entity.EntityType.USER,
           userEntity -> {
             List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, userEntity.roles(), userEntity.roleIds());
+                roleManager.getValidRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
 
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
@@ -87,7 +87,7 @@ class PermissionManager {
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Granting role {} from  user {} failed in the metalake {} due to storage issues",
+          "Fail to grant role {} to user {} failed in the metalake {} due to storage issues",
           role,
           user,
           metalake,
@@ -106,7 +106,7 @@ class PermissionManager {
           Entity.EntityType.GROUP,
           groupEntity -> {
             List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, groupEntity.roles(), groupEntity.roleIds());
+                roleManager.getValidRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -137,11 +137,11 @@ class PermissionManager {
           });
       return true;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Fail to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Revoking role {} from  group {} failed in the metalake {} due to storage issues",
+          "Fail to grant role {} to group {} in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -162,7 +162,7 @@ class PermissionManager {
           Entity.EntityType.GROUP,
           groupEntity -> {
             List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, groupEntity.roles(), groupEntity.roleIds());
+                roleManager.getValidRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
@@ -196,11 +196,11 @@ class PermissionManager {
 
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to grant, group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Fail to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Revoking role {} from  group {} failed in the metalake {} due to storage issues",
+          "Fail to revoke role {} from  group {} in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -222,7 +222,7 @@ class PermissionManager {
           Entity.EntityType.USER,
           userEntity -> {
             List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, userEntity.roles(), userEntity.roleIds());
+                roleManager.getValidRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
 
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
@@ -259,7 +259,7 @@ class PermissionManager {
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Revoking role {} from  user {} failed in the metalake {} due to storage issues",
+          "Fail to revoke role {} from  user {} in the metalake {} due to storage issues",
           role,
           user,
           metalake,
