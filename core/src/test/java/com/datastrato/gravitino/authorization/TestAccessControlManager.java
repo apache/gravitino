@@ -244,8 +244,9 @@ public class TestAccessControlManager {
 
     accessControlManager.createRole(
         "metalake", "loadRole", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
+
     Role cachedRole = accessControlManager.loadRole("metalake", "loadRole");
-    accessControlManager.getRoleCache().invalidateAll();
+    accessControlManager.getRoleManager().getCache().invalidateAll();
     Role role = accessControlManager.loadRole("metalake", "loadRole");
 
     // Verify the cached roleEntity is correct

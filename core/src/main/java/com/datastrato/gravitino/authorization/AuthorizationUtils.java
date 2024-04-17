@@ -8,13 +8,8 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.meta.RoleEntity;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,47 +39,18 @@ class AuthorizationUtils {
     }
   }
 
-  static RoleEntity getRoleEntity(NameIdentifier identifier) {
-
-    Cache<NameIdentifier, RoleEntity> cache =
-        GravitinoEnv.getInstance().accessControlManager().getRoleCache();
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-
-    return cache.get(
-        identifier,
-        id -> {
-          try {
-            return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
-          } catch (IOException ioe) {
-            LOG.error("getting roles {} failed  due to storage issues", identifier, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+  public static NameIdentifier ofRole(String metalake, String role) {
+    return NameIdentifier.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME, role);
   }
 
-  static List<RoleEntity> getValidRoles(
-      String metalake, List<String> roleNames, List<Long> roleIds) {
-    List<RoleEntity> roleEntities = Lists.newArrayList();
-    if (roleNames == null || roleNames.isEmpty()) {
-      return roleEntities;
-    }
+  public static NameIdentifier ofGroup(String metalake, String group) {
+    return NameIdentifier.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
+  }
 
-    int index = 0;
-    for (String role : roleNames) {
-      try {
-
-        RoleEntity roleEntity =
-            AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
-
-        if (roleEntity.id().equals(roleIds.get(index))) {
-          roleEntities.add(roleEntity);
-        }
-        index++;
-
-      } catch (NoSuchEntityException nse) {
-        // ignore this entity
-      }
-    }
-    return roleEntities;
+  public static NameIdentifier ofUser(String metalake, String user) {
+    return NameIdentifier.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 }

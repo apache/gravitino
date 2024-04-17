@@ -5,28 +5,18 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
-import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.Executable;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
@@ -38,43 +28,18 @@ import org.slf4j.LoggerFactory;
  */
 public class AccessControlManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AccessControlManager.class);
-
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
   private final PermissionManager permissionManager;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
-  private final Cache<NameIdentifier, RoleEntity> roleCache;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
-
-    long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
-    // One role entity is about 40 bytes using jol estimate, there are usually about 100w+
-    // roles in the production environment, this won't bring too much memory cost, but it
-    // can improve the performance significantly.
-    roleCache =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
-            .removalListener(
-                (k, v, c) -> {
-                  LOG.info("Remove role {} from the cache.", k);
-                })
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("role-cleaner-%d")
-                            .build())))
-            .build();
-
-    this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
-    this.roleManager = new RoleManager(store, idGenerator, roleCache);
-    this.permissionManager = new PermissionManager(store);
+    this.roleManager = new RoleManager(store, idGenerator, config);
+    this.userGroupManager = new UserGroupManager(store, idGenerator, roleManager);
+    this.permissionManager = new PermissionManager(store, roleManager);
   }
 
   /**
@@ -308,8 +273,9 @@ public class AccessControlManager {
     return doWithNonAdminLock(() -> roleManager.dropRole(metalake, role));
   }
 
-  Cache<NameIdentifier, RoleEntity> getRoleCache() {
-    return roleCache;
+  @VisibleForTesting
+  RoleManager getRoleManager() {
+    return roleManager;
   }
 
   private <R, E extends Exception> R doWithNonAdminLock(Executable<R, E> executable) throws E {

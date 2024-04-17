@@ -42,10 +42,12 @@ class UserGroupManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
+  private final RoleManager roleManager;
 
-  public UserGroupManager(EntityStore store, IdGenerator idGenerator) {
+  public UserGroupManager(EntityStore store, IdGenerator idGenerator, RoleManager roleManager) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.roleManager = roleManager;
   }
 
   /**
@@ -100,7 +102,7 @@ class UserGroupManager {
 
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
-      return store.delete(NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER);
+      return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -122,10 +124,10 @@ class UserGroupManager {
       AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity entity =
           store.get(
-              NameIdentifierUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+              AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
       List<RoleEntity> roleEntities =
-          AuthorizationUtils.getValidRoles(metalake, entity.roles(), entity.roleIds());
+          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
 
       return UserEntity.builder()
           .withId(entity.id())
@@ -194,7 +196,7 @@ class UserGroupManager {
   public boolean removeGroup(String metalake, String group) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
-      return store.delete(NameIdentifierUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
+      return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
           "Removing group {} in the metalake {} failed due to storage issues",
@@ -220,11 +222,13 @@ class UserGroupManager {
 
       GroupEntity entity =
           store.get(
-              NameIdentifierUtils.ofGroup(metalake, group),
+              AuthorizationUtils.ofGroup(metalake, group),
               Entity.EntityType.GROUP,
               GroupEntity.class);
+
       List<RoleEntity> roleEntities =
-          AuthorizationUtils.getValidRoles(metalake, entity.roles(), entity.roleIds());
+          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
+
       return GroupEntity.builder()
           .withId(entity.id())
           .withName(entity.name())

@@ -11,7 +11,6 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -36,28 +35,25 @@ class PermissionManager {
   private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
 
   private final EntityStore store;
+  private final RoleManager roleManager;
 
-  PermissionManager(EntityStore store) {
+  PermissionManager(EntityStore store, RoleManager roleManager) {
     this.store = store;
+    this.roleManager = roleManager;
   }
 
   public boolean grantRoleToUser(String metalake, String role, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
-      checkRoleExists(metalake, role);
-
-      RoleEntity roleEntity =
-          AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
+      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
       store.update(
-          NameIdentifierUtils.ofUser(metalake, user),
+          AuthorizationUtils.ofUser(metalake, user),
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
             List<RoleEntity> roleEntities =
-                AuthorizationUtils.getValidRoles(
-                    metalake, userEntity.roles(), userEntity.roleIds());
+                roleManager.getValidRoles(metalake, userEntity.roles(), userEntity.roleIds());
+
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -102,21 +98,15 @@ class PermissionManager {
 
   public boolean grantRoleToGroup(String metalake, String role, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
-      checkRoleExists(metalake, role);
-
-      RoleEntity roleEntity =
-          AuthorizationUtils.getRoleEntity(NameIdentifierUtils.ofRole(metalake, role));
+      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
       store.update(
-          NameIdentifierUtils.ofGroup(metalake, group),
+          AuthorizationUtils.ofGroup(metalake, group),
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
             List<RoleEntity> roleEntities =
-                AuthorizationUtils.getValidRoles(
-                    metalake, groupEntity.roles(), groupEntity.roleIds());
+                roleManager.getValidRoles(metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -162,24 +152,17 @@ class PermissionManager {
 
   public boolean revokeRoleFromGroup(String metalake, String role, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
-      checkRoleExists(metalake, role);
-
-      RoleEntity roleEntity =
-          store.get(
-              NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE, RoleEntity.class);
+      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
 
       AtomicBoolean removed = new AtomicBoolean(true);
 
       store.update(
-          NameIdentifierUtils.ofGroup(metalake, group),
+          AuthorizationUtils.ofGroup(metalake, group),
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
             List<RoleEntity> roleEntities =
-                AuthorizationUtils.getValidRoles(
-                    metalake, groupEntity.roles(), groupEntity.roleIds());
+                roleManager.getValidRoles(metalake, groupEntity.roles(), groupEntity.roleIds());
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
             roleNames.remove(roleEntity.name());
@@ -230,24 +213,20 @@ class PermissionManager {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
-      checkRoleExists(metalake, role);
-
-      RoleEntity roleEntity =
-          store.get(
-              NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE, RoleEntity.class);
-
+      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
       AtomicBoolean removed = new AtomicBoolean(true);
 
       store.update(
-          NameIdentifierUtils.ofUser(metalake, user),
+          AuthorizationUtils.ofUser(metalake, user),
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
             List<RoleEntity> roleEntities =
-                AuthorizationUtils.getValidRoles(
-                    metalake, userEntity.roles(), userEntity.roleIds());
+                roleManager.getValidRoles(metalake, userEntity.roles(), userEntity.roleIds());
+
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+
             roleNames.remove(roleEntity.name());
             removed.set(roleIds.remove(roleEntity.id()));
             if (!removed.get()) {
@@ -295,11 +274,5 @@ class PermissionManager {
 
   private List<Long> toRoleIds(List<RoleEntity> roleEntities) {
     return roleEntities.stream().map(RoleEntity::id).collect(Collectors.toList());
-  }
-
-  private void checkRoleExists(String metalake, String role) throws IOException {
-    if (!store.exists(NameIdentifierUtils.ofRole(metalake, role), Entity.EntityType.ROLE)) {
-      throw new NoSuchRoleException(AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG, role, metalake);
-    }
   }
 }
