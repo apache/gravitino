@@ -211,8 +211,6 @@ class PermissionManager {
 
   public boolean revokeRoleFromUser(String metalake, String role, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
       RoleEntity roleEntity = roleManager.loadRole(metalake, role);
       AtomicBoolean removed = new AtomicBoolean(true);
 
