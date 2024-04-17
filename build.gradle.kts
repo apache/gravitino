@@ -280,7 +280,7 @@ subprojects {
     }
 
     tasks.withType<JavaCompile>().configureEach {
-      options.errorprone.isEnabled.set(false)
+      options.errorprone.isEnabled.set(true)
       options.errorprone.disableWarningsInGeneratedCode.set(true)
       options.errorprone.disable(
         "CanonicalDuration",
