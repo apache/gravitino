@@ -701,7 +701,8 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertTrue(
         illegalArgumentException
             .getMessage()
-            .contains("Iceberg doesn't support update column default value"));
+            .contains("Iceberg does not support column default value. Illegal column: name"),
+        "The exception is: " + illegalArgumentException.getMessage());
 
     catalog
         .asTableCatalog()

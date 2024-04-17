@@ -103,7 +103,11 @@ public class DorisContainer extends BaseContainer {
         try (ResultSet resultSet = statement.executeQuery(query)) {
           while (resultSet.next()) {
             String alive = resultSet.getString("Alive");
-            if (alive.equalsIgnoreCase("true")) {
+            String totalCapacity = resultSet.getString("TotalCapacity");
+            float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
+
+            // alive should be true and totalCapacity should not be 0.000
+            if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
               LOG.info("Doris container startup success!");
               return true;
             }
