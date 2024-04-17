@@ -136,7 +136,6 @@ class RoleManager {
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {
-
     return cache.get(
         identifier,
         id -> {
