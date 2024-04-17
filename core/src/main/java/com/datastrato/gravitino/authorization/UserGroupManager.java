@@ -7,17 +7,14 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -51,16 +48,13 @@ class UserGroupManager {
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
-
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
               .withName(name)
-              .withNamespace(
-                  Namespace.of(
-                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
+              .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
               .withRoleNames(Lists.newArrayList())
               .withAuditInfo(
                   AuditInfo.builder()
@@ -82,7 +76,6 @@ class UserGroupManager {
   }
 
   boolean removeUser(String metalake, String user) {
-
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
@@ -107,6 +100,7 @@ class UserGroupManager {
           .withId(entity.id())
           .withName(entity.name())
           .withAuditInfo(entity.auditInfo())
+          .withNamespace(entity.namespace())
           .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
           .build();
     } catch (NoSuchEntityException e) {
@@ -125,11 +119,7 @@ class UserGroupManager {
           GroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(group)
-              .withNamespace(
-                  Namespace.of(
-                      metalake,
-                      CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                      SchemaEntity.GROUP_SCHEMA_NAME))
+              .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
               .withRoleNames(Collections.emptyList())
               .withAuditInfo(
                   AuditInfo.builder()
@@ -181,6 +171,7 @@ class UserGroupManager {
           .withId(entity.id())
           .withName(entity.name())
           .withAuditInfo(entity.auditInfo())
+          .withNamespace(entity.namespace())
           .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
           .build();
     } catch (NoSuchEntityException e) {

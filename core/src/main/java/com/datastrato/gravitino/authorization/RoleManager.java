@@ -11,7 +11,6 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
@@ -87,9 +86,7 @@ class RoleManager {
             .withProperties(properties)
             .withSecurableObject(securableObject)
             .withPrivileges(privileges)
-            .withNamespace(
-                Namespace.of(
-                    metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -136,14 +133,13 @@ class RoleManager {
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {
-
     return cache.get(
         identifier,
         id -> {
           try {
             return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
           } catch (IOException ioe) {
-            LOG.error("getting roles {} failed  due to storage issues", identifier, ioe);
+            LOG.error("Failed to get roles {} due to storage issues", identifier, ioe);
             throw new RuntimeException(ioe);
           }
         });
