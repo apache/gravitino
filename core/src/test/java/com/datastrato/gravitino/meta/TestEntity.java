@@ -6,6 +6,8 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -55,6 +57,10 @@ public class TestEntity {
   // Group test data
   private final Long groupId = 1L;
   private final String groupName = "testGroup";
+
+  // Role test data
+  private final Long roleId = 1L;
+  private final String roleName = "testRole";
 
   @Test
   public void testMetalake() {
@@ -251,5 +257,38 @@ public class TestEntity {
         GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(groupWithoutFields.roles());
+  }
+
+  @Test
+  public void testRole() {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObject(SecurableObjects.of(catalogName))
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .withProperties(map)
+            .build();
+
+    Map<Field, Object> fields = role.fields();
+    Assertions.assertEquals(roleId, fields.get(RoleEntity.ID));
+    Assertions.assertEquals(roleName, fields.get(RoleEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
+    Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
+    Assertions.assertEquals(
+        Lists.newArrayList(Privileges.LoadCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
+    Assertions.assertEquals(
+        SecurableObjects.of(catalogName), fields.get(RoleEntity.SECURABLE_OBJECT));
+
+    RoleEntity roleWithoutFields =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObject(SecurableObjects.of(catalogName))
+            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .build();
+    Assertions.assertNull(roleWithoutFields.properties());
   }
 }

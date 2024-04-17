@@ -49,6 +49,12 @@ public class TrinoITContainers implements AutoCloseable {
             command, false, ProcessData.TypesOfData.STREAMS_MERGED, env);
     LOG.info("Command {} output:\n{}", command, output);
 
+    String outputString = output.toString();
+    if (Strings.isNotEmpty(outputString)
+        && !outputString.contains("All docker compose service is now available")) {
+      throw new ContainerLaunchException("Failed to start containers:\n " + outputString);
+    }
+
     resolveServerAddress();
   }
 
@@ -67,7 +73,8 @@ public class TrinoITContainers implements AutoCloseable {
 
     String containerIpMapping = output.toString();
     if (containerIpMapping.isEmpty()) {
-      throw new ContainerLaunchException("Missing to get container status");
+      throw new ContainerLaunchException(
+          "Failed to get the container status, the containers have not started");
     }
 
     try {
@@ -96,7 +103,7 @@ public class TrinoITContainers implements AutoCloseable {
     for (String serviceName : servicesName) {
       if (!servicesUri.containsKey(serviceName)) {
         throw new ContainerLaunchException(
-            "The container for the {} service is not started: " + serviceName);
+            String.format("The container for the %s service is not started: ", serviceName));
       }
     }
   }

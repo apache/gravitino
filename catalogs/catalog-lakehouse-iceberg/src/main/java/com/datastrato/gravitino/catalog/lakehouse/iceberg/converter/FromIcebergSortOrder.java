@@ -94,7 +94,7 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
   /**
    * Convert Iceberg order to Gravitino.
    *
-   * @param sortOrder
+   * @param sortOrder Iceberg sort order
    * @return Gravitino sort order
    */
   public static SortOrder[] fromSortOrder(org.apache.iceberg.SortOrder sortOrder) {

@@ -4,18 +4,14 @@ This software is licensed under the Apache License version 2.
 """
 from dataclasses import dataclass
 
-from dataclasses_json import DataClassJsonMixin
+from gravitino.rest.rest_message import RESTResponse
 
 
 @dataclass
-class BaseResponse(DataClassJsonMixin):
+class BaseResponse(RESTResponse):
     """Represents a base response for REST API calls."""
 
     code: int
-
-    @classmethod
-    def default(cls):
-        return cls(code=0)
 
     def validate(self):
         """Validates the response code.

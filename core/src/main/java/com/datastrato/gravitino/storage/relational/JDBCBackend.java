@@ -21,6 +21,7 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
@@ -44,6 +45,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void initialize(Config config) {
     SqlSessionFactoryHelper.getInstance().init(config);
+    SQLExceptionConverterFactory.initConverter(config);
   }
 
   @Override

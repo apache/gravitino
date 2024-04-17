@@ -24,6 +24,7 @@ dependencies {
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.trino.memory) {
