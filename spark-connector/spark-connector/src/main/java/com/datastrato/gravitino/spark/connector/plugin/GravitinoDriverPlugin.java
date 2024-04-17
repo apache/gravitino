@@ -5,9 +5,9 @@
 
 package com.datastrato.gravitino.spark.connector.plugin;
 
-import com.datastrato.gravitino.Catalog;
 import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicates;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalog;

@@ -9,6 +9,7 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,11 +17,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
-import com.google.common.collect.ImmutableMap;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -29,8 +31,6 @@ import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -489,14 +489,14 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String extensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
     Assertions.assertTrue(StringUtils.isNotBlank(extensions));
     Assertions.assertEquals(
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions", extensions);
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions", extensions);
   }
 
   @Test
   void testCopyOnWriteDeleteInUnPartitionedTable() {
     String tableName = "test_copy_on_write_delete_unpartitioned";
     createIcebergTableWithTabProperties(
-            tableName, false, ImmutableMap.of(ICEBERG_DELETE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, false, ImmutableMap.of(ICEBERG_DELETE_MODE, ICEBERG_COPY_ON_WRITE));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableRowLevelDelete(tableName);
@@ -506,7 +506,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   void testCopyOnWriteDeleteInPartitionedTable() {
     String tableName = "test_copy_on_write_delete_partitioned";
     createIcebergTableWithTabProperties(
-            tableName, true, ImmutableMap.of(ICEBERG_DELETE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, true, ImmutableMap.of(ICEBERG_DELETE_MODE, ICEBERG_COPY_ON_WRITE));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableRowLevelDelete(tableName);
@@ -516,9 +516,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   void testMergeOnReadDeleteInUnPartitionedTable() {
     String tableName = "test_merge_on_read_delete_unpartitioned";
     createIcebergTableWithTabProperties(
-            tableName,
-            false,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableRowLevelDelete(tableName);
@@ -528,9 +528,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   void testMergeOnReadDeleteInPartitionedTable() {
     String tableName = "test_merge_on_read_delete_partitioned";
     createIcebergTableWithTabProperties(
-            tableName,
-            true,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        true,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableRowLevelDelete(tableName);
@@ -541,7 +541,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, false, ImmutableMap.of(ICEBERG_UPDATE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, false, ImmutableMap.of(ICEBERG_UPDATE_MODE, ICEBERG_COPY_ON_WRITE));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableReadAndUpdate(table);
@@ -552,7 +552,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, true, ImmutableMap.of(ICEBERG_UPDATE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, true, ImmutableMap.of(ICEBERG_UPDATE_MODE, ICEBERG_COPY_ON_WRITE));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableReadAndUpdate(table);
@@ -563,9 +563,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_merge_on_read_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            false,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_UPDATE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_UPDATE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableReadAndUpdate(table);
@@ -576,9 +576,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_merge_on_read_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            true,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_UPDATE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        true,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_UPDATE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableReadAndUpdate(table);
@@ -589,7 +589,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -601,7 +601,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -613,9 +613,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_merge_on_read_merge_update_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            false,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableUpdateInMerge(table);
@@ -623,12 +623,12 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadMergeUpdateInPartitionedTable() {
-    String tableName = "test_merge_on_read_merge_update_unpartitioned";
+    String tableName = "test_merge_on_read_merge_update_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            true,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        true,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
     checkTableUpdateInMerge(table);
@@ -639,7 +639,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_delete_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -651,7 +651,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_delete_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -663,9 +663,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_merge_on_read_merge_delete_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            false,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -677,9 +677,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_merge_on_read_merge_delete_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            true,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        true,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -691,7 +691,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_insert_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, false, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -703,7 +703,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String tableName = "test_copy_on_write_merge_insert_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
+        tableName, true, ImmutableMap.of(ICEBERG_MERGE_MODE, ICEBERG_COPY_ON_WRITE));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -712,12 +712,12 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInsertInMergeInUnPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert_unpartitioned";
+    String tableName = "test_merge_on_read_merge_insert_unpartitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            false,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -726,12 +726,12 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Test
   void testMergeOnReadInsertInMergeInPartitionedTable() {
-    String tableName = "test_copy_on_write_merge_insert_partitioned";
+    String tableName = "test_merge_on_read_merge_insert_partitioned";
     dropTableIfExists(tableName);
     createIcebergTableWithTabProperties(
-            tableName,
-            true,
-            ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
+        tableName,
+        true,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_MERGE_MODE, ICEBERG_MERGE_ON_READ));
 
     SparkTableInfo table = getTableInfo(tableName);
     checkTableColumns(tableName, getSimpleTableColumn(), table);
@@ -759,17 +759,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void createIcebergTableWithTabProperties(
-          String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
+      String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
     String partitionedClause = isPartitioned ? " PARTITIONED BY (id) " : "";
     String tblPropertiesStr =
-            tblProperties.entrySet().stream()
-                    .map(e -> String.format("'%s'='%s'", e.getKey(), e.getValue()))
-                    .collect(Collectors.joining(","));
+        tblProperties.entrySet().stream()
+            .map(e -> String.format("'%s'='%s'", e.getKey(), e.getValue()))
+            .collect(Collectors.joining(","));
     String createSql =
-            String.format(
-                    "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
-                    tableName, partitionedClause, tblPropertiesStr);
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
+            tableName, partitionedClause, tblPropertiesStr);
     sql(createSql);
   }
-
 }
