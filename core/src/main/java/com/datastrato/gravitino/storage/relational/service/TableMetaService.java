@@ -102,7 +102,7 @@ public class TableMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, tableEntity.nameIdentifier().toString());
       throw re;
     }
@@ -135,7 +135,7 @@ public class TableMetaService {
                   mapper.updateTableMeta(
                       POConverters.updateTablePOWithVersion(oldTablePO, newEntity), oldTablePO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, newEntity.nameIdentifier().toString());
       throw re;
     }

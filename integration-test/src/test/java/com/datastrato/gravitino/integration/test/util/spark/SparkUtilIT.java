@@ -86,7 +86,11 @@ public abstract class SparkUtilIT extends AbstractIT {
 
   // columns data are joined by ','
   protected List<String> getTableData(String tableName) {
-    return sql(getSelectAllSql(tableName)).stream()
+    return getQueryData(getSelectAllSql(tableName));
+  }
+
+  protected List<String> getQueryData(String querySql) {
+    return sql(querySql).stream()
         .map(
             line ->
                 Arrays.stream(line)

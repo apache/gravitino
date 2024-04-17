@@ -12,6 +12,7 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
@@ -66,6 +67,11 @@ public class ExceptionHandlers {
   public static Response handleGroupException(
       OperationType op, String group, String metalake, Exception e) {
     return GroupExceptionHandler.INSTANCE.handle(op, group, metalake, e);
+  }
+
+  public static Response handleRoleException(
+      OperationType op, String role, String metalake, Exception e) {
+    return RoleExceptionHandler.INSTANCE.handle(op, role, metalake, e);
   }
 
   public static Response handleTopicException(
@@ -171,6 +177,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NonEmptySchemaException) {
         return Utils.nonEmpty(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
 
       } else {
         return super.handle(op, schema, catalog, e);
@@ -338,6 +347,38 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, group, metalake, e);
+      }
+    }
+  }
+
+  private static class RoleExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new RoleExceptionHandler();
+
+    private static String getRoleErrorMsg(
+        String role, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to operate role %s operation [%s] under metalake [%s], reason [%s]",
+          role, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String role, String metalake, Exception e) {
+      String formatted = StringUtil.isBlank(role) ? "" : " [" + role + "]";
+      String errorMsg = getRoleErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof RoleAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, role, metalake, e);
       }
     }
   }

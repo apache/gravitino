@@ -45,7 +45,7 @@ message Catalog {
   enum Type {
     RELATIONAL = 0; // Catalog Type for Relational Data Structure, like db.table.
     FILESET = 1; // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file.
-    STREAM = 2; // Catalog Type for Streaming Data, like kafka://topic.
+    MESSAGING = 2; // Catalog Type for MESSAGING, like Kafka://topic.
   }
 
   uint64 id = 1;
@@ -114,4 +114,13 @@ message Group {
   string name = 2;
   repeated string roles = 3;
   AuditInfo audit_info = 4;
+}
+
+message Role {
+  uint64 id = 1;
+  string name = 2;
+  repeated string privileges = 3;
+  string securable_object = 4;
+  map<string, string> properties = 5;
+  AuditInfo audit_info = 6;
 }

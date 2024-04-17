@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.file.Fileset;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +34,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
   protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
@@ -79,7 +83,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Fileset.Type.MANAGED,
         localDirPath.toString());
     managedFilesetPath =
-        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, managedFilesetName);
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, managedFilesetName, true);
 
     localFilePath =
         new Path(
@@ -93,7 +97,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Fileset.Type.EXTERNAL,
         localFilePath.toString());
     externalFilesetPath =
-        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, externalFilesetName);
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, externalFilesetName, true);
   }
 
   @AfterEach
@@ -164,7 +168,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
             .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY,
         "1000");
 
-    Path filesetPath1 = FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "fileset1");
+    Path filesetPath1 =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "fileset1", true);
     try (FileSystem fs = filesetPath1.getFileSystem(configuration)) {
       Path localPath1 =
           FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, "fileset1");
@@ -179,7 +184,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       // expired by size
       Path filesetPath2 =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "fileset2");
+          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "fileset2", true);
       Path localPath2 =
           FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, "fileset2");
       mockFilesetDTO(
@@ -219,8 +224,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testCreate() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCreate(boolean withScheme) throws IOException {
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localDirPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
@@ -234,7 +240,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // mock the invalid fileset not in the server
       String invalidFilesetName = "invalid_fileset";
       Path invalidFilesetPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, invalidFilesetName);
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, invalidFilesetName, withScheme);
       assertThrows(
           RuntimeException.class,
           () -> FileSystemTestUtils.create(invalidFilesetPath, gravitinoFileSystem));
@@ -255,9 +262,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   @Disabled("Append operation is not supported in LocalFileSystem. We can't test it now.")
-  public void testAppend() throws IOException {
+  public void testAppend(boolean withScheme) throws IOException {
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localDirPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
@@ -277,7 +285,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // mock the invalid fileset not in server
       String invalidAppendFilesetName = "invalid_fileset";
       Path invalidAppendFilesetPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, invalidAppendFilesetName);
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, invalidAppendFilesetName, withScheme);
       assertThrows(
           RuntimeException.class,
           () -> FileSystemTestUtils.append(invalidAppendFilesetPath, gravitinoFileSystem));
@@ -299,8 +308,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testRename() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRename(boolean withScheme) throws IOException {
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localDirPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
@@ -313,7 +323,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       // cannot rename the identifier
       Path dstRenamePath1 =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "rename_dst1");
+          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "rename_dst1", withScheme);
       assertThrows(
           RuntimeException.class, () -> gravitinoFileSystem.rename(srcRenamePath, dstRenamePath1));
 
@@ -325,15 +335,18 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       // test invalid src path
       Path invalidSrcPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "invalid_src_name");
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, "invalid_src_name", withScheme);
       Path validDstPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, managedFilesetName);
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, managedFilesetName, withScheme);
       assertThrows(
           RuntimeException.class, () -> gravitinoFileSystem.rename(invalidSrcPath, validDstPath));
 
       // test invalid dst path
       Path invalidDstPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "invalid_dst_name");
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, "invalid_dst_name", withScheme);
       assertThrows(
           RuntimeException.class,
           () -> gravitinoFileSystem.rename(managedFilesetPath, invalidDstPath));
@@ -343,7 +356,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertTrue(gravitinoFileSystem.exists(externalFilesetPath));
       assertTrue(gravitinoFileSystem.getFileStatus(externalFilesetPath).isFile());
 
-      Path dstPath = FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "rename_dst");
+      Path dstPath =
+          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, "rename_dst", withScheme);
       assertThrows(
           RuntimeException.class, () -> gravitinoFileSystem.rename(externalFilesetPath, dstPath));
       localFileSystem.delete(localFilePath, true);
@@ -351,8 +365,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testDelete() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testDelete(boolean withScheme) throws IOException {
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localDirPath.getFileSystem(conf)) {
 
@@ -366,7 +381,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // mock the invalid fileset not in server
       String invalidFilesetName = "invalid_fileset";
       Path invalidFilesetPath =
-          FileSystemTestUtils.createFilesetPath(catalogName, schemaName, invalidFilesetName);
+          FileSystemTestUtils.createFilesetPath(
+              catalogName, schemaName, invalidFilesetName, withScheme);
       assertThrows(
           RuntimeException.class, () -> gravitinoFileSystem.delete(invalidFilesetPath, true));
 
@@ -479,6 +495,69 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               .replaceFirst(
                   GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                   FileSystemTestUtils.localRootPrefix()));
+    }
+  }
+
+  @Test
+  public void testExtractIdentifier() throws IOException, URISyntaxException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      NameIdentifier identifier =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier);
+
+      NameIdentifier identifier2 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier2);
+
+      NameIdentifier identifier3 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/files"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier3);
+
+      NameIdentifier identifier4 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier4);
+
+      NameIdentifier identifier5 =
+          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier5);
+
+      NameIdentifier identifier6 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier6);
+
+      NameIdentifier identifier7 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier7);
+
+      NameIdentifier identifier8 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier8);
+
+      NameIdentifier identifier9 =
+          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir/"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier9);
+
+      NameIdentifier identifier10 =
+          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir"));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("hdfs://fileset/catalog1/schema1/fileset1")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("/catalog1/schema1/")));
     }
   }
 }

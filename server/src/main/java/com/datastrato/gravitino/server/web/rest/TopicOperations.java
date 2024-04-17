@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.dto.requests.TopicCreateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdatesRequest;
@@ -40,12 +40,12 @@ import org.slf4j.LoggerFactory;
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
-  private final TopicOperationDispatcher dispatcher;
+  private final TopicDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TopicOperations(TopicOperationDispatcher dispatcher) {
+  public TopicOperations(TopicDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -65,7 +65,7 @@ public class TopicOperations {
             NameIdentifier[] topics =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
+                    LockType.READ,
                     () -> dispatcher.listTopics(topicNS));
             return Utils.ok(new EntityListResponse(topics));
           });
@@ -99,7 +99,7 @@ public class TopicOperations {
 
             Topic topic =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createTopic(
@@ -166,7 +166,9 @@ public class TopicOperations {
 
             Topic t =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.alterTopic(ident, changes));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.alterTopic(ident, changes));
             return Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
           });
     } catch (Exception e) {
@@ -192,7 +194,9 @@ public class TopicOperations {
             NameIdentifier ident = NameIdentifier.ofTopic(metalake, catalog, schema, topic);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.dropTopic(ident));
+                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    LockType.WRITE,
+                    () -> dispatcher.dropTopic(ident));
 
             if (!dropped) {
               LOG.warn("Failed to drop topic {} under schema {}", topic, schema);

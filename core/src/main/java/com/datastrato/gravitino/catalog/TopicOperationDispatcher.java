@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
 import static com.datastrato.gravitino.StringIdentifier.fromProperties;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -18,7 +19,6 @@ import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.messaging.DataLayout;
 import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -26,10 +26,11 @@ import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TopicOperationDispatcher extends OperationDispatcher implements TopicCatalog {
+public class TopicOperationDispatcher extends OperationDispatcher implements TopicDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperationDispatcher.class);
 
   /**
@@ -117,6 +118,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a topic with with reserved name `*`");
+    }
+
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
         catalogIdent,
@@ -149,6 +154,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         TopicEntity.builder()
             .withId(fromProperties(topic.properties()).id())
             .withName(ident.name())
+            .withComment(comment)
             .withNamespace(ident.namespace())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -188,7 +194,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     validateAlterProperties(ident, HasPropertyMetadata::topicPropertiesMetadata, changes);
 
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Topic tempAlteredTable =
+    Topic tempAlteredTopic =
         doWithCatalog(
             catalogIdent,
             c -> c.doWithTopicOps(t -> t.alterTopic(ident, changes)),
@@ -202,7 +208,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             c ->
                 c.doWithTopicOps(
                     t ->
-                        t.loadTopic(NameIdentifier.of(ident.namespace(), tempAlteredTable.name()))),
+                        t.loadTopic(NameIdentifier.of(ident.namespace(), tempAlteredTopic.name()))),
             NoSuchTopicException.class);
 
     TopicEntity updatedTopicEntity =
@@ -218,6 +224,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                             .withId(topicEntity.id())
                             .withName(topicEntity.name())
                             .withNamespace(ident.namespace())
+                            .withComment(
+                                StringUtils.isBlank(tempAlteredTopic.comment())
+                                    ? topicEntity.comment()
+                                    : tempAlteredTopic.comment())
                             .withAuditInfo(
                                 AuditInfo.builder()
                                     .withCreator(topicEntity.auditInfo().creator())

@@ -14,7 +14,7 @@
 
 1. Install dependency
     ```bash
-    pip install -e .[dev]
+    pip install -e '.[dev]'
     ```
    
 2. Run tests

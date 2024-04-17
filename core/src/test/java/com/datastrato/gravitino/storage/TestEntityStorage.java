@@ -27,6 +27,8 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -36,6 +38,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -55,6 +58,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -421,7 +425,7 @@ public class TestEntityStorage {
   @ParameterizedTest
   @MethodSource("storageProvider")
   public void testAuthorizationEntityDelete(String type) throws IOException {
-    // User and Group entity only support kv store.
+    // User, Group and Role entity only support kv store.
     Assumptions.assumeTrue(Configs.DEFAULT_ENTITY_STORE.equals(type));
     Config config = Mockito.mock(Config.class);
     init(type, config);
@@ -442,15 +446,23 @@ public class TestEntityStorage {
       store.put(oneGroup);
       GroupEntity anotherGroup = createGroup("metalake", "anotherGroup", auditInfo);
       store.put(anotherGroup);
+      RoleEntity oneRole = createRole("metalake", "oneRole", auditInfo);
+      store.put(oneRole);
+      RoleEntity anotherRole = createRole("metalake", "anotherRole", auditInfo);
+      store.put(anotherRole);
       Assertions.assertTrue(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertTrue(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertTrue(store.exists(oneGroup.nameIdentifier(), Entity.EntityType.GROUP));
       Assertions.assertTrue(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
+      Assertions.assertTrue(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
+      Assertions.assertTrue(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
       store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
       Assertions.assertFalse(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertFalse(store.exists(oneGroup.nameIdentifier(), Entity.EntityType.GROUP));
       Assertions.assertFalse(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
+      Assertions.assertFalse(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
+      Assertions.assertFalse(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
     }
   }
 
@@ -1159,6 +1171,20 @@ public class TestEntityStorage {
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoles(Lists.newArrayList())
+        .build();
+  }
+
+  private static RoleEntity createRole(String metalake, String name, AuditInfo auditInfo) {
+    return RoleEntity.builder()
+        .withId(1L)
+        .withNamespace(
+            Namespace.of(
+                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+        .withName(name)
+        .withAuditInfo(auditInfo)
+        .withSecurableObject(SecurableObjects.of("catalog"))
+        .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+        .withProperties(Collections.emptyMap())
         .build();
   }
 
