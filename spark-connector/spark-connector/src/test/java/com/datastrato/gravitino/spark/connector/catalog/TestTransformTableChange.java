@@ -19,7 +19,7 @@ public class TestTransformTableChange {
   void testTransformSetProperty() {
     TableChange sparkSetProperty = TableChange.setProperty("key", "value");
     com.datastrato.gravitino.rel.TableChange tableChange =
-        GravitinoCatalog.transformTableChange(sparkSetProperty);
+        BaseCatalog.transformTableChange(sparkSetProperty);
     Assertions.assertTrue(
         tableChange instanceof com.datastrato.gravitino.rel.TableChange.SetProperty);
     com.datastrato.gravitino.rel.TableChange.SetProperty gravitinoSetProperty =
@@ -32,7 +32,7 @@ public class TestTransformTableChange {
   void testTransformRemoveProperty() {
     TableChange sparkRemoveProperty = TableChange.removeProperty("key");
     com.datastrato.gravitino.rel.TableChange tableChange =
-        GravitinoCatalog.transformTableChange(sparkRemoveProperty);
+        BaseCatalog.transformTableChange(sparkRemoveProperty);
     Assertions.assertTrue(
         tableChange instanceof com.datastrato.gravitino.rel.TableChange.RemoveProperty);
     com.datastrato.gravitino.rel.TableChange.RemoveProperty gravitinoRemoveProperty =
@@ -48,7 +48,7 @@ public class TestTransformTableChange {
     TableChange.RenameColumn sparkRenameColumn =
         (TableChange.RenameColumn) TableChange.renameColumn(oldFiledsName, newFiledName);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkRenameColumn);
+        BaseCatalog.transformTableChange(sparkRenameColumn);
 
     Assertions.assertTrue(
         gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.RenameColumn);
@@ -67,7 +67,7 @@ public class TestTransformTableChange {
     TableChange.UpdateColumnComment updateColumnComment =
         (TableChange.UpdateColumnComment) TableChange.updateColumnComment(fieldNames, newComment);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(updateColumnComment);
+        BaseCatalog.transformTableChange(updateColumnComment);
 
     Assertions.assertTrue(
         gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnComment);
@@ -92,7 +92,7 @@ public class TestTransformTableChange {
             TableChange.addColumn(
                 new String[] {"col1"}, DataTypes.StringType, true, "", first, defaultValue);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeFirst =
-        GravitinoCatalog.transformTableChange(sparkAddColumnFirst);
+        BaseCatalog.transformTableChange(sparkAddColumnFirst);
 
     Assertions.assertTrue(
         gravitinoChangeFirst instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
@@ -112,7 +112,7 @@ public class TestTransformTableChange {
             TableChange.addColumn(
                 new String[] {"col1"}, DataTypes.StringType, true, "", after, defaultValue);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeAfter =
-        GravitinoCatalog.transformTableChange(sparkAddColumnAfter);
+        BaseCatalog.transformTableChange(sparkAddColumnAfter);
 
     Assertions.assertTrue(
         gravitinoChangeAfter instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
@@ -132,7 +132,7 @@ public class TestTransformTableChange {
             TableChange.addColumn(
                 new String[] {"col1"}, DataTypes.StringType, true, "", null, defaultValue);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeDefault =
-        GravitinoCatalog.transformTableChange(sparkAddColumnDefault);
+        BaseCatalog.transformTableChange(sparkAddColumnDefault);
 
     Assertions.assertTrue(
         gravitinoChangeDefault instanceof com.datastrato.gravitino.rel.TableChange.AddColumn);
@@ -153,7 +153,7 @@ public class TestTransformTableChange {
     TableChange.DeleteColumn sparkDeleteColumn =
         (TableChange.DeleteColumn) TableChange.deleteColumn(new String[] {"col1"}, true);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkDeleteColumn);
+        BaseCatalog.transformTableChange(sparkDeleteColumn);
 
     Assertions.assertTrue(
         gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.DeleteColumn);
@@ -170,7 +170,7 @@ public class TestTransformTableChange {
         (TableChange.UpdateColumnType)
             TableChange.updateColumnType(new String[] {"col1"}, DataTypes.StringType);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkUpdateColumnType);
+        BaseCatalog.transformTableChange(sparkUpdateColumnType);
 
     Assertions.assertTrue(
         gravitinoChange instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnType);
@@ -192,7 +192,7 @@ public class TestTransformTableChange {
         (TableChange.UpdateColumnPosition)
             TableChange.updateColumnPosition(new String[] {"col1"}, first);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeFirst =
-        GravitinoCatalog.transformTableChange(sparkUpdateColumnFirst);
+        BaseCatalog.transformTableChange(sparkUpdateColumnFirst);
 
     Assertions.assertTrue(
         gravitinoChangeFirst
@@ -210,7 +210,7 @@ public class TestTransformTableChange {
         (TableChange.UpdateColumnPosition)
             TableChange.updateColumnPosition(new String[] {"col1"}, after);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeAfter =
-        GravitinoCatalog.transformTableChange(sparkUpdateColumnAfter);
+        BaseCatalog.transformTableChange(sparkUpdateColumnAfter);
 
     Assertions.assertTrue(
         gravitinoChangeAfter
@@ -231,7 +231,7 @@ public class TestTransformTableChange {
         (TableChange.UpdateColumnNullability)
             TableChange.updateColumnNullability(new String[] {"col1"}, true);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkUpdateColumnNullability);
+        BaseCatalog.transformTableChange(sparkUpdateColumnNullability);
 
     Assertions.assertTrue(
         gravitinoChange
@@ -255,7 +255,7 @@ public class TestTransformTableChange {
             TableChange.updateColumnDefaultValue(fieldNames, newDedauleValue);
 
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        GravitinoCatalog.transformTableChange(sparkUpdateColumnDefaultValue);
+        BaseCatalog.transformTableChange(sparkUpdateColumnDefaultValue);
 
     Assertions.assertTrue(
         gravitinoChange

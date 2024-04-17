@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
@@ -30,6 +31,10 @@ public class CapabilityHelpers {
               } else if (change instanceof TableChange.UpdateColumnNullability) {
                 return applyCapabilities(
                     (TableChange.UpdateColumnNullability) change, capabilities);
+
+              } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+                return applyCapabilities(
+                    ((TableChange.UpdateColumnDefaultValue) change), capabilities);
               }
               return change;
             })
@@ -72,6 +77,18 @@ public class CapabilityHelpers {
         updateColumnNullability.nullable());
   }
 
+  private static TableChange applyCapabilities(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, Capability capabilities) {
+    applyColumnDefaultValue(
+        String.join(".", updateColumnDefaultValue.fieldName()),
+        updateColumnDefaultValue.getNewDefaultValue(),
+        capabilities);
+
+    return TableChange.updateColumnDefaultValue(
+        applyCaseSensitiveOnColumnName(updateColumnDefaultValue.fieldName(), capabilities),
+        updateColumnDefaultValue.getNewDefaultValue());
+  }
+
   private static Column applyCapabilities(Column column, Capability capabilities) {
     applyColumnNotNull(column, capabilities);
     applyColumnDefaultValue(column, capabilities);
@@ -112,12 +129,14 @@ public class CapabilityHelpers {
   }
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
+    applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+  }
+
+  private static void applyColumnDefaultValue(
+      String columnName, Expression defaultValue, Capability capabilities) {
     Preconditions.checkArgument(
-        capabilities.columnDefaultValue().supported()
-            || DEFAULT_VALUE_NOT_SET.equals(column.defaultValue()),
-        capabilities.columnDefaultValue().unsupportedMessage()
-            + " Illegal column: "
-            + column.name());
+        capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
+        capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
   }
 
   private static void applyNameSpecification(
