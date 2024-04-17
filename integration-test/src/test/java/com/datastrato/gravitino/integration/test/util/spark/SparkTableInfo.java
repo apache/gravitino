@@ -77,27 +77,27 @@ public class SparkTableInfo {
   }
 
   void setHour(Transform hour) {
-    Assertions.assertNull(this.hour, "Should only one distribution");
+    Assertions.assertNull(this.hour, "HourPartition cannot be set repeatedly");
     this.hour = hour;
   }
 
   void setDay(Transform day) {
-    Assertions.assertNull(this.day, "Should only one distribution");
+    Assertions.assertNull(this.day, "DayPartition cannot be set repeatedly");
     this.day = day;
   }
 
   void setMonth(Transform month) {
-    Assertions.assertNull(this.month, "Should only one distribution");
+    Assertions.assertNull(this.month, "MonthPartition cannot be set repeatedly");
     this.month = month;
   }
 
   void setYear(Transform year) {
-    Assertions.assertNull(this.year, "Should only one distribution");
+    Assertions.assertNull(this.year, "YearPartition cannot be set repeatedly");
     this.year = year;
   }
 
   void setTruncate(Transform truncate) {
-    Assertions.assertNull(this.truncate, "Should only one distribution");
+    Assertions.assertNull(this.truncate, "TruncatePartition cannot be set repeatedly");
     this.truncate = truncate;
   }
 

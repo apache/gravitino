@@ -33,7 +33,6 @@ public class HivePropertiesConstants {
   public static final String GRAVITINO_HIVE_EXTERNAL_TABLE = EXTERNAL_TABLE.name();
   public static final String GRAVITINO_HIVE_TABLE_TYPE = HiveTablePropertiesMetadata.TABLE_TYPE;
   public static final String GRAVITINO_HIVE_TABLE_LOCATION = HiveTablePropertiesMetadata.LOCATION;
-  public static final String GRAVITINO_HIVE_PROVIDER = "hive";
 
   public static final String SPARK_HIVE_STORED_AS = "hive.stored-as";
   public static final String SPARK_HIVE_INPUT_FORMAT = "input-format";

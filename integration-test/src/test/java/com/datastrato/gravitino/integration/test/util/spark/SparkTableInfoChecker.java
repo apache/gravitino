@@ -83,35 +83,35 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-  public SparkTableInfoChecker withHour(List<String> partitionColumns) {
+  public SparkTableInfoChecker withHourPartition(List<String> partitionColumns) {
     Transform hourTransform = Expressions.hours(partitionColumns.get(0));
     this.expectedTableInfo.setHour(hourTransform);
     this.checkFields.add(CheckField.HOUR);
     return this;
   }
 
-  public SparkTableInfoChecker withDay(List<String> partitionColumns) {
+  public SparkTableInfoChecker withDayPartition(List<String> partitionColumns) {
     Transform dayTransform = Expressions.days(partitionColumns.get(0));
     this.expectedTableInfo.setDay(dayTransform);
     this.checkFields.add(CheckField.DAY);
     return this;
   }
 
-  public SparkTableInfoChecker withMonth(List<String> partitionColumns) {
+  public SparkTableInfoChecker withMonthPartition(List<String> partitionColumns) {
     Transform monthTransform = Expressions.months(partitionColumns.get(0));
     this.expectedTableInfo.setMonth(monthTransform);
     this.checkFields.add(CheckField.MONTH);
     return this;
   }
 
-  public SparkTableInfoChecker withYear(List<String> partitionColumns) {
+  public SparkTableInfoChecker withYearPartition(List<String> partitionColumns) {
     Transform yearTransform = Expressions.years(partitionColumns.get(0));
     this.expectedTableInfo.setYear(yearTransform);
     this.checkFields.add(CheckField.YEAR);
     return this;
   }
 
-  public SparkTableInfoChecker withTruncate(int width, List<String> partitionColumns) {
+  public SparkTableInfoChecker withTruncatePartition(int width, List<String> partitionColumns) {
     Transform truncateTransform =
         Expressions.apply(
             "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));

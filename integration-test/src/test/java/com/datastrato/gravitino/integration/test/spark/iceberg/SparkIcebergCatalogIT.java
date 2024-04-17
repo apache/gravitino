@@ -58,7 +58,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Override
   protected String getTableLocation(SparkTableInfo table) {
-    return String.join("/", table.getTableLocation(), "data");
+    return String.join(File.separator, table.getTableLocation(), "data");
   }
 
   @Test
@@ -166,9 +166,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "id_bucket=4";
-    Path partitionPath = new Path(location, partitionExpression);
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
     checkDirExists(partitionPath);
   }
 
@@ -184,7 +183,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withDay(Collections.singletonList("ts"));
+            .withDayPartition(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
@@ -194,9 +193,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_day=2024-01-01";
-    Path partitionPath = new Path(location, partitionExpression);
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
     checkDirExists(partitionPath);
   }
 
@@ -212,7 +210,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withMonth(Collections.singletonList("ts"));
+            .withMonthPartition(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
@@ -222,9 +220,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_month=2024-01";
-    Path partitionPath = new Path(location, partitionExpression);
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
     checkDirExists(partitionPath);
   }
 
@@ -240,7 +237,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withYear(Collections.singletonList("ts"));
+            .withYearPartition(Collections.singletonList("ts"));
     checker.check(tableInfo);
 
     String insertData =
@@ -250,9 +247,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_year=2024";
-    Path partitionPath = new Path(location, partitionExpression);
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
     checkDirExists(partitionPath);
   }
 
@@ -268,7 +264,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withTruncate(1, Collections.singletonList("name"));
+            .withTruncatePartition(1, Collections.singletonList("name"));
     checker.check(tableInfo);
 
     String insertData =
@@ -278,9 +274,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "name_trunc=a";
-    Path partitionPath = new Path(location, partitionExpression);
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
     checkDirExists(partitionPath);
   }
 
