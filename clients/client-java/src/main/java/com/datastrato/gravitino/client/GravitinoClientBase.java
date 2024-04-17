@@ -14,10 +14,12 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,9 +45,13 @@ public abstract class GravitinoClientBase implements Closeable {
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
    * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param headers The base header of the Gravitino API.
    */
   protected GravitinoClientBase(
-      String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
+      String uri,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers) {
     ObjectMapper mapper = JsonUtils.objectMapper();
     mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
@@ -56,6 +62,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
               .withPreConnectHandle(this::checkVersion)
+              .withHeaders(headers)
               .build();
 
     } else {
@@ -64,6 +71,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
+              .withHeaders(headers)
               .build();
     }
   }
@@ -162,6 +170,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected AuthDataProvider authDataProvider;
     /** The check version flag. */
     protected boolean checkVersion = true;
+    /** The request base header for the Gravitino API. */
+    protected Map<String, String> headers = ImmutableMap.of();
 
     /**
      * The constructor for the Builder class.
@@ -220,6 +230,19 @@ public abstract class GravitinoClientBase implements Closeable {
         throw new IllegalArgumentException("URI has the wrong format", ue);
       }
       this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Set base header for Gravitino Client.
+     *
+     * @param headers the base header.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withHeaders(Map<String, String> headers) {
+      if (headers != null) {
+        this.headers = ImmutableMap.copyOf(headers);
+      }
       return this;
     }
 
