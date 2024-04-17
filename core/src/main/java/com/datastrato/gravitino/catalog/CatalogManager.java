@@ -43,6 +43,7 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -83,19 +84,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
-    private BaseCatalog catalog;
+    @Getter private BaseCatalog catalog;
     @Getter private IsolatedClassLoader classLoader;
-
-    /**
-     * Whether the class loader should be closed when the catalog is closed. This is set to true by
-     * default, in some cases, the class loader should not be closed when the catalog is closed,
-     * such a catalog is renamed and the class loader is reused.
-     */
-    private boolean shouldCloseClassLoader = true;
-
-    public void setShouldCloseClassLoader(boolean shouldCloseClassLoader) {
-      this.shouldCloseClassLoader = shouldCloseClassLoader;
-    }
 
     public CatalogWrapper(BaseCatalog catalog, IsolatedClassLoader classLoader) {
       this.catalog = catalog;
@@ -166,9 +156,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         LOG.warn("Failed to close catalog", e);
       }
 
-      if (shouldCloseClassLoader) {
-        classLoader.close();
-      }
+      classLoader.close();
     }
 
     private SupportsSchemas asSchemas() {
@@ -214,8 +202,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
-                  LOG.info("Closing catalog {}.", k);
-                  ((CatalogWrapper) v).close();
+                  if (c == RemovalCause.EXPIRED) {
+                    LOG.info("Closing catalog {}.", k);
+                    ((CatalogWrapper) v).close();
+                  }
                 })
             .scheduler(
                 Scheduler.forScheduledExecutorService(
@@ -464,9 +454,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 return newCatalogBuilder.build();
               });
 
-      catalogWrapper.setShouldCloseClassLoader(false);
       catalogCache.invalidate(ident);
-
       try {
         CatalogWrapper updateCatalogWrapper =
             catalogCache.get(
@@ -476,7 +464,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       } catch (Exception e) {
         // If we failed to create the new catalog wrapper, we should close the class loader
         // manually.
-        catalogWrapper.classLoader.close();
+        catalogWrapper.close();
         throw e;
       }
     } catch (NoSuchEntityException ne) {
@@ -502,7 +490,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
     // There could be a race issue that someone is using the catalog while we are dropping it.
-    catalogCache.invalidate(ident);
+    CatalogWrapper oldCatalogWrapper = catalogCache.getIfPresent(ident);
+    if (oldCatalogWrapper != null) {
+      catalogCache.invalidate(ident);
+      oldCatalogWrapper.close();
+    }
 
     try {
       CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
