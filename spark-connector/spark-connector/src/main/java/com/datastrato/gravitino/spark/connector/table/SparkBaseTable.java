@@ -96,10 +96,6 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
       properties.putAll(gravitinoTable.properties());
     }
 
-    if (getSparkTable().properties() != null) {
-      properties.putAll(getSparkTable().properties());
-    }
-
     properties = propertiesConverter.toSparkTableProperties(properties);
 
     // Spark will retrieve comment from properties.
