@@ -292,6 +292,14 @@ public class DorisTableOperations extends JdbcTableOperations {
   @Override
   protected String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes) {
+    /*
+     * NOTICE:
+     * As described in the Doris documentation, the creation of Schema Change is an asynchronous process.
+     * If you load the table immediately after altering it, you might get the old schema.
+     * You can see in: https://doris.apache.org/docs/1.2/advanced/alter-table/schema-change/#create-job
+     * TODO: return state of the operation to user
+     * */
+
     // Not all operations require the original table information, so lazy loading is used here
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;

@@ -40,7 +40,10 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
 
-  private static final long MAX_WAIT = 5;
+  // Because the creation of Schema Change is an asynchronous process, we need wait for a while
+  // For more information, you can refer to the comment in
+  // DorisTableOperations.generateAlterTableSql().
+  private static final long MAX_WAIT = 30;
 
   private static final long WAIT_INTERVAL = 1;
 

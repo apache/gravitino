@@ -539,7 +539,8 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "ROADMAP.md",
-    "clients/client-python/.pytest_cache/*"
+    "clients/client-python/.pytest_cache/*",
+    "clients/client-python/gravitino.egg-info/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
