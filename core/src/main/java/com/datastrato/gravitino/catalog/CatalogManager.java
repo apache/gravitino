@@ -202,6 +202,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
+                  // Since we will reuse the class loader in the wrapper (it wraps the catalog and
+                  // class loader instance) in some case (alter operation), we can't close the
+                  // wrapper directly without judging the remove causes. If the remove cause is
+                  // EXPIRED, we will close the catalog and the corresponding classloader
+                  // automatically, or we would close the wrapper by ourselves when evicting the
+                  // cache.
                   if (c == RemovalCause.EXPIRED) {
                     LOG.info("Closing catalog {}.", k);
                     ((CatalogWrapper) v).close();
