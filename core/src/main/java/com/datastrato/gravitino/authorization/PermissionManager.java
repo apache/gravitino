@@ -83,11 +83,11 @@ class PermissionManager {
           });
       return true;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to grant, user {} does not exist in the metalake {}", user, metalake, nse);
+      LOG.warn("Failed to grant, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Fail to grant role {} to user {} failed in the metalake {} due to storage issues",
+          "Failed to grant role {} to user {} in the metalake {} due to storage issues",
           role,
           user,
           metalake,
@@ -137,11 +137,11 @@ class PermissionManager {
           });
       return true;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to grant, group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Failed to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Fail to grant role {} to group {} in the metalake {} due to storage issues",
+          "Failed to grant role {} to group {} in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -170,7 +170,7 @@ class PermissionManager {
 
             if (!removed.get()) {
               LOG.warn(
-                  "Fail to revoke, role {} does not exist in the group {} of metalake {}",
+                  "Failed to revoke, role {} does not exist in the group {} of metalake {}",
                   role,
                   group,
                   metalake);
@@ -196,11 +196,11 @@ class PermissionManager {
 
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
+      LOG.warn("Failed to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Fail to revoke role {} from  group {} in the metalake {} due to storage issues",
+          "Failed to revoke role {} from  group {} in the metalake {} due to storage issues",
           role,
           group,
           metalake,
@@ -231,7 +231,7 @@ class PermissionManager {
             removed.set(roleIds.remove(roleEntity.id()));
             if (!removed.get()) {
               LOG.warn(
-                  "Fail to revoke, role {} doesn't exist in the user {} of metalake {}",
+                  "Failed to revoke, role {} doesn't exist in the user {} of metalake {}",
                   role,
                   user,
                   metalake);
@@ -255,11 +255,11 @@ class PermissionManager {
           });
       return removed.get();
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Fail to revoke, user {} does not exist in the metalake {}", user, metalake, nse);
+      LOG.warn("Failed to revoke, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Fail to revoke role {} from  user {} in the metalake {} due to storage issues",
+          "Failed to revoke role {} from  user {} in the metalake {} due to storage issues",
           role,
           user,
           metalake,
