@@ -79,20 +79,20 @@ public class HTTPClient implements RESTClient {
   private final ObjectMapper mapper;
   private final AuthDataProvider authDataProvider;
 
-  // Handle to be executed before connecting to the server.
-  private Runnable beforeConnectHandle;
-  // Handle status
-  enum HandleStatus {
-    // The handle has not been executed yet.
+  // Handler to be executed before connecting to the server.
+  private final Runnable beforeConnectHandler;
+  // Handler status
+  enum HandlerStatus {
+    // The handler has not been executed yet.
     Start,
-    // The handle has been executed successfully.
+    // The handler has been executed successfully.
     Finished,
-    // The handle is currently running.
+    // The handler is currently running.
     Running,
   }
 
-  // The status of the handle.
-  private volatile HandleStatus handleStatus = HandleStatus.Start;
+  // The status of the handler.
+  private volatile HandlerStatus handlerStatus = HandlerStatus.Start;
 
   /**
    * Constructs an instance of HTTPClient with the provided information.
@@ -101,14 +101,14 @@ public class HTTPClient implements RESTClient {
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
-   * @param beforeConnectHandle The function to be executed before connecting to the server.
+   * @param beforeConnectHandler The function to be executed before connecting to the server.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
-      Runnable beforeConnectHandle) {
+      Runnable beforeConnectHandler) {
     this.uri = uri;
     this.mapper = objectMapper;
 
@@ -124,10 +124,10 @@ public class HTTPClient implements RESTClient {
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
 
-    if (beforeConnectHandle == null) {
-      handleStatus = HandleStatus.Finished;
+    if (beforeConnectHandler == null) {
+      handlerStatus = HandlerStatus.Finished;
     }
-    this.beforeConnectHandle = beforeConnectHandle;
+    this.beforeConnectHandler = beforeConnectHandler;
   }
 
   /**
@@ -337,8 +337,8 @@ public class HTTPClient implements RESTClient {
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
 
-    if (handleStatus != HandleStatus.Finished) {
-      performPreConnectHandle();
+    if (handlerStatus != HandlerStatus.Finished) {
+      performPreConnectHandler();
     }
 
     if (path.startsWith("/")) {
@@ -410,23 +410,16 @@ public class HTTPClient implements RESTClient {
     }
   }
 
-  synchronized void performPreConnectHandle() {
-    // beforeConnectHandle is a pre-connection handler that needs to be executed before the first
-    // HTTP request.
-    // During execution, beforeConnectHandle must be unloaded to prevent recursive calls.
-    // After beforeConnectHandle executes successfully, other requests can be processed normally.
-    // If an exception occurs during the execution of beforeConnectHandle,
-    // likely due to a network issue, beforeConnectHandle needs to be reloaded to ensure
-    // it can be successfully executed once the connection is restored.
-    // Double-checking is used to avoid unnecessary locking overhead after a successful connection
-    if (handleStatus == HandleStatus.Start) {
-      handleStatus = HandleStatus.Running;
+  private synchronized void performPreConnectHandler() {
+    // beforeConnectHandler is a pre-connection handler that needs to be executed before the first
+    // HTTP request. if the handler execute fails, we set the status to Start to retry the handler.
+    if (handlerStatus == HandlerStatus.Start) {
+      handlerStatus = HandlerStatus.Running;
       try {
-        beforeConnectHandle.run();
-        handleStatus = HandleStatus.Finished;
+        beforeConnectHandler.run();
+        handlerStatus = HandlerStatus.Finished;
       } catch (Exception e) {
-        // The beforeConnectHandle will continue processing until it succeeds.
-        handleStatus = HandleStatus.Start;
+        handlerStatus = HandlerStatus.Start;
         throw e;
       }
     }
@@ -704,7 +697,7 @@ public class HTTPClient implements RESTClient {
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
     private AuthDataProvider authDataProvider;
-    private Runnable beforeConnectHandle;
+    private Runnable beforeConnectHandler;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -760,11 +753,11 @@ public class HTTPClient implements RESTClient {
     /**
      * Sets the preConnect handle for the HTTP client.
      *
-     * @param beforeConnectHandle The handle run before connect to the server .
+     * @param beforeConnectHandler The handle run before connect to the server .
      * @return This Builder instance for method chaining.
      */
-    public Builder withPreConnectHandle(Runnable beforeConnectHandle) {
-      this.beforeConnectHandle = beforeConnectHandle;
+    public Builder withPreConnectHandle(Runnable beforeConnectHandler) {
+      this.beforeConnectHandler = beforeConnectHandler;
       return this;
     }
 
@@ -786,7 +779,7 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandle);
+      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler);
     }
   }
 

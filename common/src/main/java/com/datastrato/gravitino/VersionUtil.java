@@ -43,7 +43,9 @@ public class VersionUtil {
     if (INSTANCE != null) {
       return INSTANCE;
     }
-    return new VersionUtil();
+
+    INSTANCE = new VersionUtil();
+    return INSTANCE;
   }
 
   /** @return the current versionInfo */
