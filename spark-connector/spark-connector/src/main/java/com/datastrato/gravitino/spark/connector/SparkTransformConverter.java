@@ -72,7 +72,7 @@ public class SparkTransformConverter {
     }
 
     return Arrays.stream(transforms)
-        .filter(transform -> !(transform instanceof SortedBucketTransform))
+        .filter(transform -> supportsBucketTransform(transform, supportsBucketTransfrom))
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
@@ -338,6 +338,14 @@ public class SparkTransformConverter {
   private static boolean isBucketTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
     return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
+  }
+
+  private static boolean supportsBucketTransform(
+      org.apache.spark.sql.connector.expressions.Transform transform,
+      boolean supportsBucketTransform) {
+    return supportsBucketTransform
+        ? !(transform instanceof SortedBucketTransform)
+        : !isBucketTransform(transform);
   }
 
   // Referred from org.apache.iceberg.spark.Spark3Util
