@@ -44,18 +44,6 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @param metalakeName The specified metalake name.
-   * @param authDataProvider The provider of the data which is used for authentication.
-   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
-   */
-  private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
-    this(uri, metalakeName, authDataProvider, true);
-  }
-
-  /**
    * Get the current metalake object
    *
    * @return the {@link GravitinoMetalake} object

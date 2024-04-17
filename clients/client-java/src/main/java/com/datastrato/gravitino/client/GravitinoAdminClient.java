@@ -49,16 +49,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   }
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @param authDataProvider The provider of the data which is used for authentication.
-   */
-  private GravitinoAdminClient(String uri, AuthDataProvider authDataProvider) {
-    this(uri, authDataProvider, true);
-  }
-
-  /**
    * Retrieves a list of Metalakes from the Gravitino API.
    *
    * @return An array of GravitinoMetalake objects representing the Metalakes.

@@ -43,6 +43,7 @@ public class VersionUtil {
     return new VersionDTO(versionInfo.version, versionInfo.compileDate, versionInfo.gitCommit);
   }
 
+  /** Store version information */
   public static class VersionInfo {
     /** build version */
     public String version;
