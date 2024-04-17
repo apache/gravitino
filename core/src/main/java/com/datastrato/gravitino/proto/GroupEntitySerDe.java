@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.GroupEntity;
 import java.util.Collection;
 
@@ -25,12 +26,13 @@ public class GroupEntitySerDe implements ProtoSerDe<GroupEntity, Group> {
   }
 
   @Override
-  public GroupEntity deserialize(Group group) {
+  public GroupEntity deserialize(Group group, Namespace namespace) {
     GroupEntity.Builder builder =
         GroupEntity.builder()
             .withId(group.getId())
             .withName(group.getName())
-            .withAuditInfo(new AuditInfoSerDe().deserialize(group.getAuditInfo()));
+            .withNamespace(namespace)
+            .withAuditInfo(new AuditInfoSerDe().deserialize(group.getAuditInfo(), namespace));
 
     if (group.getRolesCount() > 0) {
       builder.withRoles(group.getRolesList());

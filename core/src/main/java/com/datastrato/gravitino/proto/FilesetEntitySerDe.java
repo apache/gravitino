@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.FilesetEntity;
 
 public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
@@ -31,13 +32,14 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
   }
 
   @Override
-  public FilesetEntity deserialize(Fileset p) {
+  public FilesetEntity deserialize(Fileset p, Namespace namespace) {
     FilesetEntity.Builder builder =
         FilesetEntity.builder()
             .withId(p.getId())
             .withName(p.getName())
+            .withNamespace(namespace)
             .withStorageLocation(p.getStorageLocation())
-            .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
+            .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace))
             .withFilesetType(
                 com.datastrato.gravitino.file.Fileset.Type.valueOf(p.getType().name()));
 
