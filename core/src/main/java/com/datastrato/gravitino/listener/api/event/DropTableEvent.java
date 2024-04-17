@@ -10,9 +10,6 @@ import com.datastrato.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated after a table is successfully dropped from the database.
- * This class extends {@link TableEvent} to capture specific details related to the dropping of a
- * table, including the status of the table's existence at the time of the operation and identifying
- * information about the table and the user who initiated the drop operation.
  */
 @DeveloperApi
 public final class DropTableEvent extends TableEvent {
@@ -22,12 +19,9 @@ public final class DropTableEvent extends TableEvent {
    * Constructs a new {@code DropTableEvent} instance, encapsulating information about the outcome
    * of a table drop operation.
    *
-   * @param user The user who initiated the drop table operation. This information is important for
-   *     auditing purposes and understanding who is responsible for the change.
-   * @param identifier The identifier of the table that was attempted to be dropped. This provides a
-   *     clear reference to the specific table affected by the operation.
+   * @param user The user who initiated the drop table operation.
+   * @param identifier The identifier of the table that was attempted to be dropped.
    * @param isExists A boolean flag indicating whether the table existed at the time of the drop
-   *     operation. This can be useful to understand the state of the database prior to the
    *     operation.
    */
   public DropTableEvent(String user, NameIdentifier identifier, boolean isExists) {

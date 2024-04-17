@@ -5,15 +5,17 @@
 
 package com.datastrato.gravitino.spark.connector.plugin;
 
+import com.datastrato.gravitino.Catalog;
 import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicates;
 
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
-import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalog;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalog;
+import com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
@@ -55,8 +57,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     catalogManager.loadRelationalCatalogs();
-    Set<String> catalogNames = catalogManager.getCatalogNames();
-    registerGravitinoCatalogs(conf, catalogNames);
+    registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
     return Collections.emptyMap();
   }
@@ -68,16 +69,48 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(SparkConf sparkConf, Set<String> catalogNames) {
-    catalogNames.forEach(
-        catalogName -> {
-          String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
-          Preconditions.checkArgument(
-              !sparkConf.contains(sparkCatalogConfigName),
-              catalogName + " is already registered to SparkCatalogManager");
-          sparkConf.set(sparkCatalogConfigName, GravitinoCatalog.class.getName());
-          LOG.info("Register {} catalog to Spark catalog manager", catalogName);
-        });
+  private void registerGravitinoCatalogs(
+      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+    gravitinoCatalogs
+        .entrySet()
+        .forEach(
+            entry -> {
+              String catalogName = entry.getKey();
+              Catalog gravitinoCatalog = entry.getValue();
+              String provider = gravitinoCatalog.provider();
+              try {
+                registerCatalog(sparkConf, catalogName, provider);
+              } catch (Exception e) {
+                LOG.warn("Register catalog {} failed.", catalogName, e);
+              }
+            });
+  }
+
+  private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
+    if (StringUtils.isBlank(provider)) {
+      LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
+      return;
+    }
+
+    String catalogClassName;
+    switch (provider.toLowerCase(Locale.ROOT)) {
+      case "hive":
+        catalogClassName = GravitinoHiveCatalog.class.getName();
+        break;
+      case "lakehouse-iceberg":
+        catalogClassName = GravitinoIcebergCatalog.class.getName();
+        break;
+      default:
+        LOG.warn("Skip registering {} because {} is not supported yet.", catalogName, provider);
+        return;
+    }
+
+    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+    Preconditions.checkArgument(
+        !sparkConf.contains(sparkCatalogConfigName),
+        catalogName + " is already registered to SparkCatalogManager");
+    sparkConf.set(sparkCatalogConfigName, catalogClassName);
+    LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
   }
 
   private void registerSqlExtensions(SparkConf conf) {

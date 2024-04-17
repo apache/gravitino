@@ -30,7 +30,7 @@
 ### Prerequisites
 
 1. The field name of schema should use lowercase with "_" connecting different words, the name convention is `^[a-z](?:_?[a-z0-9]+)*$`.
-1. The schema system uses Google Protobuf to describe the structs.
+2. The schema system uses Google Protobuf to describe the structs.
 
 ### Schema Entities
 

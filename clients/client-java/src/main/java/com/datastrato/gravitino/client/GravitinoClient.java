@@ -33,10 +33,15 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param headers The base header for Gravitino API.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
-    super(uri, authDataProvider);
+  private GravitinoClient(
+      String uri,
+      String metalakeName,
+      AuthDataProvider authDataProvider,
+      Map<String, String> headers) {
+    super(uri, authDataProvider, headers);
     this.metalake = loadMetalake(NameIdentifier.of(metalakeName));
   }
 
@@ -138,7 +143,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider);
+      return new GravitinoClient(uri, metalakeName, authDataProvider, headers);
     }
   }
 }

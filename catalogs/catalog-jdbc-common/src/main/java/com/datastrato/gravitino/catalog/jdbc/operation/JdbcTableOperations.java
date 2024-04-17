@@ -167,7 +167,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
 
       // 3.Get index information
-      List<Index> indexes = getIndexes(databaseName, tableName, connection.getMetaData());
+      List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
       // 4.Get table properties
@@ -175,7 +175,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       jdbcTableBuilder.withProperties(tableProperties);
 
       // 5.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
+      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
       return jdbcTableBuilder.build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
@@ -275,13 +275,17 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @throws SQLException
    */
   protected void correctJdbcTableFields(
-      Connection connection, String tableName, JdbcTable.Builder jdbcTableBuilder)
+      Connection connection,
+      String databaseName,
+      String tableName,
+      JdbcTable.Builder jdbcTableBuilder)
       throws SQLException {
     // nothing to do
   }
 
-  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+  protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
       throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
     List<Index> indexes = new ArrayList<>();
 
     // Get primary key information

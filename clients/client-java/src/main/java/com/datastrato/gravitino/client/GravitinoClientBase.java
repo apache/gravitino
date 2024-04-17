@@ -9,10 +9,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,12 +39,15 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param headers The base header of the Gravitino API.
    */
-  protected GravitinoClientBase(String uri, AuthDataProvider authDataProvider) {
+  protected GravitinoClientBase(
+      String uri, AuthDataProvider authDataProvider, Map<String, String> headers) {
     this.restClient =
         HTTPClient.builder(Collections.emptyMap())
             .uri(uri)
             .withAuthDataProvider(authDataProvider)
+            .withHeaders(headers)
             .build();
   }
 
@@ -103,6 +108,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected String uri;
     /** The authentication provider. */
     protected AuthDataProvider authDataProvider;
+    /** The request base header for the Gravitino API. */
+    protected Map<String, String> headers = ImmutableMap.of();
 
     /**
      * The constructor for the Builder class.
@@ -151,6 +158,19 @@ public abstract class GravitinoClientBase implements Closeable {
         throw new IllegalArgumentException("URI has the wrong format", ue);
       }
       this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Set base header for Gravitino Client.
+     *
+     * @param headers the base header.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withHeaders(Map<String, String> headers) {
+      if (headers != null) {
+        this.headers = ImmutableMap.copyOf(headers);
+      }
       return this;
     }
 
