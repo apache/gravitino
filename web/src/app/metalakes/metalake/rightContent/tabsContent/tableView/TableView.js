@@ -83,11 +83,11 @@ const TableView = () => {
 
   const renderIconTooltip = (type, name) => {
     const propsItem = store.tableProps.find(i => i.type === type)
-    const items = propsItem.items
+    const items = propsItem?.items || []
 
-    const isCond = propsItem.items.find(i => i.fields.find(v => (Array.isArray(v) ? v.includes(name) : v === name)))
+    const isCond = propsItem?.items.find(i => i.fields.find(v => (Array.isArray(v) ? v.includes(name) : v === name)))
 
-    const icon = propsItem.icon
+    const icon = propsItem?.icon
 
     return (
       <>

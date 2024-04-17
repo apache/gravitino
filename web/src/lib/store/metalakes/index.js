@@ -959,6 +959,7 @@ export const appMetalakesSlice = createSlice({
       state.loadedNodes = []
 
       state.tableData = []
+      state.tableProps = []
       state.catalogs = []
       state.schemas = []
       state.tables = []
