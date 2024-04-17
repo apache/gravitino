@@ -1996,8 +1996,6 @@ public class TestEntityStorage {
       Assertions.assertDoesNotThrow(
           () ->
               store.get(filesetEntity1.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
-
-
     }
   }
 }
