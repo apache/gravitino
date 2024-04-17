@@ -17,6 +17,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
@@ -154,6 +155,7 @@ public class SparkTransformConverter {
       com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrder) {
+    AtomicBoolean isBucketTransform = new AtomicBoolean(false);
     List<org.apache.spark.sql.connector.expressions.Transform> sparkTransforms = new ArrayList<>();
     if (ArrayUtils.isNotEmpty(partitions)) {
       Arrays.stream(partitions)
@@ -169,6 +171,7 @@ public class SparkTransformConverter {
                   Transforms.HourTransform hourTransform = (Transforms.HourTransform) transform;
                   sparkTransforms.add(createSparkHoursTransform(hourTransform.fieldName()));
                 } else if (transform instanceof Transforms.BucketTransform) {
+                  isBucketTransform.set(true);
                   Transforms.BucketTransform bucketTransform =
                       (Transforms.BucketTransform) transform;
                   int numBuckets = bucketTransform.numBuckets();
@@ -202,10 +205,12 @@ public class SparkTransformConverter {
               });
     }
 
-    org.apache.spark.sql.connector.expressions.Transform bucketTransform =
-        toSparkBucketTransform(distribution, sortOrder);
-    if (bucketTransform != null) {
-      sparkTransforms.add(bucketTransform);
+    if (!isBucketTransform.get()) {
+      org.apache.spark.sql.connector.expressions.Transform bucketTransform =
+          toSparkBucketTransform(distribution, sortOrder);
+      if (bucketTransform != null) {
+        sparkTransforms.add(bucketTransform);
+      }
     }
 
     return sparkTransforms.toArray(new org.apache.spark.sql.connector.expressions.Transform[0]);

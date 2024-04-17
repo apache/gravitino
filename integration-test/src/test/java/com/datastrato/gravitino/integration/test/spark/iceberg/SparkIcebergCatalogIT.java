@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -39,14 +40,14 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogIT extends SparkCommonIT {
 
-  protected List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
+  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
         SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
         SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
   }
 
-  protected SparkMetadataColumn[] getIcebergSimpleTableColumnWithPartition() {
+    private SparkMetadataColumn[] getIcebergSimpleTableColumnWithPartition() {
     return new SparkMetadataColumn[] {
       new SparkMetadataColumn("_spec_id", DataTypes.IntegerType, false),
       new SparkMetadataColumn(
@@ -58,12 +59,6 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
       new SparkMetadataColumn("_pos", DataTypes.LongType, false),
       new SparkMetadataColumn("_deleted", DataTypes.BooleanType, false)
     };
-  }
-
-  private String getCreateIcebergSimpleTableString(String tableName) {
-    return String.format(
-        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
-        tableName);
   }
 
   @Override
@@ -84,6 +79,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   @Override
   protected boolean supportsPartition() {
     return true;
+  }
+
+  @Override
+  protected String getTableLocation(SparkTableInfo table) {
+    return String.join("/", table.getTableLocation(), "data");
   }
 
   @Test
@@ -186,43 +186,13 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData =
         String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "id_bucket=4";
-    Path partitionPath = new Path(location, partitionExpression);
-    checkDirExists(partitionPath);
-  }
-
-  @Test
-  void testCreateIcebergHourPartitionTable() {
-    String tableName = "iceberg_hour_partition_table";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateIcebergSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (hours(ts));";
-    sql(createTableSQL);
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getIcebergSimpleTableColumn())
-            .withHour(Collections.singletonList("ts"));
-    checker.check(tableInfo);
-
-    String insertData =
-        String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
-    sql(insertData);
-    List<String> queryResult = getTableData(tableName);
-    Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
-    String location = tableInfo.getTableLocation() + File.separator + "data";
-    String partitionExpression = "ts_hour=12";
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
   }
@@ -244,12 +214,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData =
         String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_day=2024-01-01";
     Path partitionPath = new Path(location, partitionExpression);
@@ -273,12 +242,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData =
         String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_month=2024-01";
     Path partitionPath = new Path(location, partitionExpression);
@@ -302,12 +270,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData =
         String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_year=2024";
     Path partitionPath = new Path(location, partitionExpression);
@@ -331,190 +298,196 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String insertData =
         String.format(
-            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.000' as timestamp));",
-            tableName);
+            "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("2,a,2024-01-01 12:00:00.000", queryResult.get(0));
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "name_trunc=a";
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
   }
 
-  @Test
-  void testMetadataColumns() {
-    String tableName = "test_metadata_columns";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
 
-    SparkTableInfo tableInfo = getTableInfo(tableName);
+    @Test
+    void testMetadataColumns() {
+        String tableName = "test_metadata_columns";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+        sql(createTableSQL);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
-  }
+        SparkTableInfo tableInfo = getTableInfo(tableName);
 
-  @Test
-  void testSpecAndPartitionMetadataColumns() {
-    String tableName = "test_spec_partition";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
-
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
-
-    String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
-    sql(insertData);
-
-    String expectedMetadata = "0,a";
-    String getMetadataSQL =
-        String.format("SELECT _spec_id, _partition FROM %s ORDER BY _spec_id", tableName);
-    List<String> queryResult = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals(expectedMetadata, queryResult.get(0));
-  }
-
-  @Test
-  public void testPositionMetadataColumn() throws NoSuchTableException {
-    String tableName = "test_position_metadata_column";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
-
-    SparkTableInfo tableInfo = getTableInfo(tableName);
-
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
-
-    List<Integer> ids = new ArrayList<>();
-    for (int id = 0; id < 200; id++) {
-      ids.add(id);
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
     }
-    Dataset<Row> df =
-        getSparkSession()
-            .createDataset(ids, Encoders.INT())
-            .withColumnRenamed("value", "id")
-            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
-            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
-    df.coalesce(1).writeTo(tableName).append();
 
-    Assertions.assertEquals(200, getSparkSession().table(tableName).count());
+    @Test
+    void testSpecAndPartitionMetadataColumns() {
+        String tableName = "test_spec_partition";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+        sql(createTableSQL);
 
-    String getMetadataSQL = String.format("SELECT _pos FROM %s", tableName);
-    List<String> expectedRows = ids.stream().map(String::valueOf).collect(Collectors.toList());
-    List<String> queryResult = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(expectedRows.size(), queryResult.size());
-    Assertions.assertArrayEquals(expectedRows.toArray(), queryResult.toArray());
-  }
+        SparkTableInfo tableInfo = getTableInfo(tableName);
 
-  @Test
-  public void testPartitionMetadataColumnWithUnPartitionedTable() {
-    String tableName = "test_position_metadata_column_with_multiple_batches";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    sql(createTableSQL);
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
 
-    SparkTableInfo tableInfo = getTableInfo(tableName);
+        String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
+        sql(insertData);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    metadataColumns[1] =
-        new SparkMetadataColumn(
-            "_partition", DataTypes.createStructType(new StructField[] {}), true);
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
+        String expectedMetadata = "0,a";
+        String getMetadataSQL =
+                String.format("SELECT _spec_id, _partition FROM %s ORDER BY _spec_id", tableName);
+        List<String> queryResult = getTableMetadata(getMetadataSQL);
+        Assertions.assertEquals(1, queryResult.size());
+        Assertions.assertEquals(expectedMetadata, queryResult.get(0));
+    }
 
-    String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
-    sql(insertData);
+    @Test
+    public void testPositionMetadataColumn() throws NoSuchTableException {
+        String tableName = "test_position_metadata_column";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+        sql(createTableSQL);
 
-    String getMetadataSQL = String.format("SELECT _partition FROM %s", tableName);
-    Assertions.assertEquals(1, getSparkSession().sql(getMetadataSQL).count());
-    // _partition value is null for unPartitioned table
-    Assertions.assertThrows(NullPointerException.class, () -> getTableMetadata(getMetadataSQL));
-  }
+        SparkTableInfo tableInfo = getTableInfo(tableName);
 
-  @Test
-  public void testFileMetadataColumn() {
-    String tableName = "test_file_metadata_column";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
 
-    SparkTableInfo tableInfo = getTableInfo(tableName);
+        List<Integer> ids = new ArrayList<>();
+        for (int id = 0; id < 200; id++) {
+            ids.add(id);
+        }
+        Dataset<Row> df =
+                getSparkSession()
+                        .createDataset(ids, Encoders.INT())
+                        .withColumnRenamed("value", "id")
+                        .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+                        .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
+        df.coalesce(1).writeTo(tableName).append();
 
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
+        Assertions.assertEquals(200, getSparkSession().table(tableName).count());
 
-    String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
-    sql(insertData);
+        String getMetadataSQL = String.format("SELECT _pos FROM %s", tableName);
+        List<String> expectedRows = ids.stream().map(String::valueOf).collect(Collectors.toList());
+        List<String> queryResult = getTableMetadata(getMetadataSQL);
+        Assertions.assertEquals(expectedRows.size(), queryResult.size());
+        Assertions.assertArrayEquals(expectedRows.toArray(), queryResult.toArray());
+    }
 
-    String getMetadataSQL = String.format("SELECT _file FROM %s", tableName);
-    List<String> queryResult = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertTrue(queryResult.get(0).contains(tableName));
-  }
+    @Test
+    public void testPartitionMetadataColumnWithUnPartitionedTable() {
+        String tableName = "test_position_metadata_column_with_multiple_batches";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        sql(createTableSQL);
 
-  @Test
-  void testDeleteMetadataColumn() {
-    String tableName = "test_delete_metadata_column";
-    dropTableIfExists(tableName);
-    String createTableSQL = getCreateSimpleTableString(tableName);
-    createTableSQL = createTableSQL + " PARTITIONED BY (name);";
-    sql(createTableSQL);
+        SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkTableInfo tableInfo = getTableInfo(tableName);
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        metadataColumns[1] =
+                new SparkMetadataColumn(
+                        "_partition", DataTypes.createStructType(new StructField[] {}), true);
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
-    SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
-    checker.check(tableInfo);
+        String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
+        sql(insertData);
 
-    String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
-    sql(insertData);
+        String getMetadataSQL = String.format("SELECT _partition FROM %s", tableName);
+        Assertions.assertEquals(1, getSparkSession().sql(getMetadataSQL).count());
+        // _partition value is null for unPartitioned table
+        Assertions.assertThrows(NullPointerException.class, () -> getTableMetadata(getMetadataSQL));
+    }
 
-    String getMetadataSQL = String.format("SELECT _deleted FROM %s", tableName);
-    List<String> queryResult = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(1, queryResult.size());
-    Assertions.assertEquals("false", queryResult.get(0));
+    @Test
+    public void testFileMetadataColumn() {
+        String tableName = "test_file_metadata_column";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+        sql(createTableSQL);
 
-    sql(getDeleteSql(tableName, "1 = 1"));
+        SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    List<String> queryResult1 = getTableMetadata(getMetadataSQL);
-    Assertions.assertEquals(0, queryResult1.size());
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
+
+        String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
+        sql(insertData);
+
+        String getMetadataSQL = String.format("SELECT _file FROM %s", tableName);
+        List<String> queryResult = getTableMetadata(getMetadataSQL);
+        Assertions.assertEquals(1, queryResult.size());
+        Assertions.assertTrue(queryResult.get(0).contains(tableName));
+    }
+
+    @Test
+    void testDeleteMetadataColumn() {
+        String tableName = "test_delete_metadata_column";
+        dropTableIfExists(tableName);
+        String createTableSQL = getCreateSimpleTableString(tableName);
+        createTableSQL = createTableSQL + " PARTITIONED BY (name);";
+        sql(createTableSQL);
+
+        SparkTableInfo tableInfo = getTableInfo(tableName);
+
+        SparkMetadataColumn[] metadataColumns = getIcebergSimpleTableColumnWithPartition();
+        SparkTableInfoChecker checker =
+                SparkTableInfoChecker.create()
+                        .withName(tableName)
+                        .withColumns(getSimpleTableColumn())
+                        .withMetadataColumns(metadataColumns);
+        checker.check(tableInfo);
+
+        String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
+        sql(insertData);
+
+        String getMetadataSQL = String.format("SELECT _deleted FROM %s", tableName);
+        List<String> queryResult = getTableMetadata(getMetadataSQL);
+        Assertions.assertEquals(1, queryResult.size());
+        Assertions.assertEquals("false", queryResult.get(0));
+
+        sql(getDeleteSql(tableName, "1 = 1"));
+
+        List<String> queryResult1 = getTableMetadata(getMetadataSQL);
+        Assertions.assertEquals(0, queryResult1.size());
+    }
+
+  private String getCreateIcebergSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
+        tableName);
   }
 }
