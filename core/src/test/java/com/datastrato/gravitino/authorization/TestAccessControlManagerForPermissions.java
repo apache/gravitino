@@ -7,6 +7,7 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -102,6 +103,9 @@ public class TestAccessControlManagerForPermissions {
     entityStore.put(roleEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
+
+    GravitinoEnv.getInstance().setEntityStore(entityStore);
+    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
   }
 
   @AfterAll

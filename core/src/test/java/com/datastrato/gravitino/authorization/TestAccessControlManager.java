@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -62,6 +63,8 @@ public class TestAccessControlManager {
     entityStore.put(metalakeEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
+    GravitinoEnv.getInstance().setEntityStore(entityStore);
+    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
   }
 
   @AfterAll
