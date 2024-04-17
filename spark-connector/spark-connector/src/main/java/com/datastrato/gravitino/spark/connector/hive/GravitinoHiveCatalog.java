@@ -22,6 +22,11 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoHiveCatalog extends BaseCatalog {
 
   @Override
+  protected boolean supportsBucketTransfrom() {
+    return false;
+  }
+
+  @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Hive Catalog properties should not be null");

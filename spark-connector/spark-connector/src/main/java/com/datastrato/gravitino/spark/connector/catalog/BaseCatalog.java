@@ -75,6 +75,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
 
+  protected abstract boolean supportsBucketTransfrom();
+
   /**
    * Create a specific Spark catalog, mainly used to create Spark table.
    *
@@ -169,7 +171,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
     com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
-        SparkTransformConverter.toGravitinoPartitionings(transforms);
+        SparkTransformConverter.toGravitinoPartitionings(transforms, supportsBucketTransfrom());
 
     try {
       com.datastrato.gravitino.rel.Table table =

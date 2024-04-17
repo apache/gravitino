@@ -65,18 +65,20 @@ public class SparkTransformConverter {
   }
 
   public static Transform[] toGravitinoPartitionings(
-      org.apache.spark.sql.connector.expressions.Transform[] transforms) {
+      org.apache.spark.sql.connector.expressions.Transform[] transforms,
+      boolean supportsBucketTransfrom) {
     if (ArrayUtils.isEmpty(transforms)) {
       return Transforms.EMPTY_TRANSFORM;
     }
 
     return Arrays.stream(transforms)
+        .filter(transform -> !(transform instanceof SortedBucketTransform))
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
-              } else if (transform instanceof BucketTransform) {
+              } else if (transform instanceof BucketTransform && supportsBucketTransfrom) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =
