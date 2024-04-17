@@ -9,9 +9,11 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -179,7 +181,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testCreateIcebergHourPartitionTable() {
+  void testCreateIcebergHourPartitionTable() throws IOException {
     String tableName = "iceberg_hour_partition_table";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateIcebergSimpleTableString(tableName);
@@ -202,6 +204,16 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
     String location = tableInfo.getTableLocation() + File.separator + "data";
     String partitionExpression = "ts_hour=2024-01-01-04";
+    FileStatus[] fileStatuses =
+        hdfs.listStatus(
+            new Path(
+                "hdfs://172.17.0.3:9000/user/hive/default_db/iceberg_hour_partition_table/data"));
+    String[] dirs = Arrays.stream(fileStatuses).map(FileStatus::getPath).toArray(String[]::new);
+    Assertions.assertArrayEquals(
+        new String[] {
+          "hdfs://172.17.0.3:9000/user/hive/default_db/iceberg_hour_partition_table/data/ts_hour=2024-01-01-04"
+        },
+        dirs);
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
   }
