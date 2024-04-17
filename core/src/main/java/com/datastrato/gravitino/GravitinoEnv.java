@@ -6,12 +6,26 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
+import com.datastrato.gravitino.catalog.CatalogEventDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.SchemaEventDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TableEventDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
+import com.datastrato.gravitino.catalog.TopicEventDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.listener.EventBus;
+import com.datastrato.gravitino.listener.EventListenerManager;
 import com.datastrato.gravitino.lock.LockManager;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
+import com.datastrato.gravitino.metalake.MetalakeEventDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
@@ -33,17 +47,19 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
+  private CatalogDispatcher catalogDispatcher;
+
   private CatalogManager catalogManager;
 
-  private SchemaOperationDispatcher schemaOperationDispatcher;
+  private SchemaDispatcher schemaDispatcher;
 
-  private TableOperationDispatcher tableOperationDispatcher;
+  private TableDispatcher tableDispatcher;
 
-  private FilesetOperationDispatcher filesetOperationDispatcher;
+  private FilesetDispatcher filesetDispatcher;
 
-  private TopicOperationDispatcher topicOperationDispatcher;
+  private TopicDispatcher topicDispatcher;
 
-  private MetalakeManager metalakeManager;
+  private MetalakeDispatcher metalakeDispatcher;
 
   private AccessControlManager accessControlManager;
 
@@ -54,6 +70,7 @@ public class GravitinoEnv {
   private MetricsSystem metricsSystem;
 
   private LockManager lockManager;
+  private EventListenerManager eventListenerManager;
 
   private GravitinoEnv() {}
 
@@ -112,19 +129,31 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    this.eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+    EventBus eventBus = eventListenerManager.createEventBus();
+
     // Create and initialize metalake related modules
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeManager);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.schemaOperationDispatcher =
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogManager);
+
+    SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.tableOperationDispatcher =
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
+    TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.filesetOperationDispatcher =
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
+    FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.topicOperationDispatcher =
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetOperationDispatcher);
+    TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicOperationDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
@@ -163,57 +192,57 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogManager associated with the Gravitino environment.
+   * Get the CatalogDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogManager instance.
+   * @return The CatalogDispatcher instance.
    */
-  public CatalogManager catalogManager() {
-    return catalogManager;
+  public CatalogDispatcher catalogDispatcher() {
+    return catalogDispatcher;
   }
 
   /**
-   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaDispatcher associated with the Gravitino environment.
    *
-   * @return The SchemaOperationDispatcher instance.
+   * @return The SchemaDispatcher instance.
    */
-  public SchemaOperationDispatcher schemaOperationDispatcher() {
-    return schemaOperationDispatcher;
+  public SchemaDispatcher schemaDispatcher() {
+    return schemaDispatcher;
   }
 
   /**
-   * Get the TableOperationDispatcher associated with the Gravitino environment.
+   * Get the TableDispatcher associated with the Gravitino environment.
    *
-   * @return The TableOperationDispatcher instance.
+   * @return The TableDispatcher instance.
    */
-  public TableOperationDispatcher tableOperationDispatcher() {
-    return tableOperationDispatcher;
+  public TableDispatcher tableDispatcher() {
+    return tableDispatcher;
   }
 
   /**
-   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   * Get the FilesetDispatcher associated with the Gravitino environment.
    *
-   * @return The FilesetOperationDispatcher instance.
+   * @return The FilesetDispatcher instance.
    */
-  public FilesetOperationDispatcher filesetOperationDispatcher() {
-    return filesetOperationDispatcher;
+  public FilesetDispatcher filesetDispatcher() {
+    return filesetDispatcher;
   }
 
   /**
-   * Get the TopicOperationDispatcher associated with the Gravitino environment.
+   * Get the TopicDispatcher associated with the Gravitino environment.
    *
-   * @return The TopicOperationDispatcher instance.
+   * @return The TopicDispatcher instance.
    */
-  public TopicOperationDispatcher topicOperationDispatcher() {
-    return topicOperationDispatcher;
+  public TopicDispatcher topicDispatcher() {
+    return topicDispatcher;
   }
 
   /**
-   * Get the MetalakeManager associated with the Gravitino environment.
+   * Get the MetalakeDispatcher associated with the Gravitino environment.
    *
-   * @return The MetalakeManager instance.
+   * @return The MetalakeDispatcher instance.
    */
-  public MetalakeManager metalakesManager() {
-    return metalakeManager;
+  public MetalakeDispatcher metalakeDispatcher() {
+    return metalakeDispatcher;
   }
 
   /**
@@ -250,6 +279,7 @@ public class GravitinoEnv {
   public void start() {
     auxServiceManager.serviceStart();
     metricsSystem.start();
+    eventListenerManager.start();
   }
 
   /** Shutdown the Gravitino environment. */
@@ -278,6 +308,10 @@ public class GravitinoEnv {
 
     if (metricsSystem != null) {
       metricsSystem.close();
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
     }
 
     LOG.info("Gravitino Environment is shut down.");

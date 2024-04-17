@@ -538,8 +538,9 @@ tasks.rat {
     "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*",
-    "ROADMAP",
-    "clients/client-python/.pytest_cache/*"
+    "ROADMAP.md",
+    "clients/client-python/.pytest_cache/*",
+    "clients/client-python/gravitino.egg-info/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.

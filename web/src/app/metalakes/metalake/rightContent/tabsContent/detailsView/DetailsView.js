@@ -23,12 +23,24 @@ const DetailsView = () => {
 
   const audit = activatedItem?.audit || {}
 
-  const properties = Object.keys(activatedItem?.properties || []).map(item => {
-    return {
-      key: item,
-      value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
-    }
-  })
+  const properties = Object.keys(activatedItem?.properties || [])
+    .filter(key => !['partition-count', 'replication-factor'].includes(key))
+    .map(item => {
+      return {
+        key: item,
+        value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
+      }
+    })
+  if (paramsSize === 5 && searchParams.get('topic')) {
+    properties.unshift({
+      key: 'replication-factor',
+      value: JSON.stringify(activatedItem?.properties['replication-factor'])?.replace(/^"|"$/g, '')
+    })
+    properties.unshift({
+      key: 'partition-count',
+      value: JSON.stringify(activatedItem?.properties['partition-count'])?.replace(/^"|"$/g, '')
+    })
+  }
 
   const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
     if (!value) {
@@ -45,7 +57,7 @@ const DetailsView = () => {
   return (
     <Box sx={{ p: 4, height: '100%', overflow: 'auto' }}>
       <Grid container spacing={6}>
-        {paramsSize == 2 && searchParams.hasOwnProperty('catalog') ? (
+        {paramsSize == 3 && searchParams.get('catalog') && searchParams.get('type') ? (
           <>
             <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
               <Typography variant='body2' sx={{ mb: 2 }}>
@@ -58,6 +70,22 @@ const DetailsView = () => {
                 Provider
               </Typography>
               {renderFieldText({ value: activatedItem?.provider })}
+            </Grid>
+          </>
+        ) : null}
+        {paramsSize === 5 && searchParams.get('fileset') ? (
+          <>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Type
+              </Typography>
+              {renderFieldText({ value: activatedItem?.type })}
+            </Grid>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Storage location
+              </Typography>
+              {renderFieldText({ value: activatedItem?.storageLocation })}
             </Grid>
           </>
         ) : null}
@@ -117,8 +145,30 @@ const DetailsView = () => {
                 {properties.map((item, index) => {
                   return (
                     <TableRow key={index}>
-                      <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>{item.key}</TableCell>
-                      <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>{item.value}</TableCell>
+                      <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>
+                        <Typography
+                          sx={{
+                            fontWeight:
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? 500
+                                : 400
+                          }}
+                        >
+                          {item.key}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>
+                        <Typography
+                          sx={{
+                            fontWeight:
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? 500
+                                : 400
+                          }}
+                        >
+                          {item.value}
+                        </Typography>
+                      </TableCell>
                     </TableRow>
                   )
                 })}

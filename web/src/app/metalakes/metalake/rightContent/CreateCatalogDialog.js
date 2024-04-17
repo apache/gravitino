@@ -36,7 +36,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
-import { providers } from '@/lib/utils/initial'
+import { providers, filesetProviders, messagingProviders } from '@/lib/utils/initial'
 import { nameRegex, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 
@@ -45,10 +45,8 @@ const defaultValues = {
   type: 'relational',
   provider: '',
   comment: '',
-  propItems: providers[0].defaultProps
+  propItems: []
 }
-
-const providerTypeValues = providers.map(i => i.value)
 
 const schema = yup.object().shape({
   name: yup
@@ -58,8 +56,19 @@ const schema = yup.object().shape({
       nameRegex,
       'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
     ),
-  type: yup.mixed().oneOf(['relational', 'fileset']).required(),
-  provider: yup.mixed().oneOf(providerTypeValues).required(),
+  type: yup.mixed().oneOf(['relational', 'fileset', 'messaging']).required(),
+  provider: yup.string().when('type', (type, schema) => {
+    switch (type) {
+      case 'relational':
+        return schema.oneOf(providers.map(i => i.value)).required()
+      case 'fileset':
+        return schema.oneOf(filesetProviders.map(i => i.value)).required()
+      case 'messaging':
+        return schema.oneOf(messagingProviders.map(i => i.value)).required()
+      default:
+        return schema
+    }
+  }),
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
@@ -284,12 +293,22 @@ const CreateCatalogDialog = props => {
   }
 
   useEffect(() => {
-    if (typeSelect === 'fileset') {
-      setProviderTypes(providers.filter(p => p.value === 'hadoop'))
-      setValue('provider', 'hadoop')
-    } else {
-      setProviderTypes(providers.filter(p => p.value !== 'hadoop'))
-      setValue('provider', 'hive')
+    switch (typeSelect) {
+      case 'relational': {
+        setProviderTypes(providers)
+        setValue('provider', 'hive')
+        break
+      }
+      case 'fileset': {
+        setProviderTypes(filesetProviders)
+        setValue('provider', 'hadoop')
+        break
+      }
+      case 'messaging': {
+        setProviderTypes(messagingProviders)
+        setValue('provider', 'kafka')
+        break
+      }
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -298,16 +317,16 @@ const CreateCatalogDialog = props => {
   useEffect(() => {
     let defaultProps = []
 
-    const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
+    const providerItemIndex = providerTypes.findIndex(i => i.value === providerSelect)
 
     if (providerItemIndex !== -1) {
-      defaultProps = providers[providerItemIndex].defaultProps
+      defaultProps = providerTypes[providerItemIndex].defaultProps
 
-      resetPropsFields(providers, providerItemIndex)
+      resetPropsFields(providerTypes, providerItemIndex)
 
       if (type === 'create') {
         setInnerProps(defaultProps)
-        setValue('propItems', providers[providerItemIndex].defaultProps)
+        setValue('propItems', providerTypes[providerItemIndex].defaultProps)
       }
     }
 
@@ -324,7 +343,26 @@ const CreateCatalogDialog = props => {
       setValue('type', data.type)
       setValue('provider', data.provider)
 
-      const providerItem = providers.find(i => i.value === data.provider)
+      let providersItems = []
+
+      switch (data.type) {
+        case 'relational': {
+          providersItems = providers
+          break
+        }
+        case 'fileset': {
+          providersItems = filesetProviders
+          break
+        }
+        case 'messaging': {
+          providersItems = messagingProviders
+          break
+        }
+      }
+
+      setProviderTypes(providersItems)
+
+      const providerItem = providersItems.find(i => i.value === data.provider)
       let propsItems = [...providerItem.defaultProps]
 
       propsItems = propsItems.map((it, idx) => {
@@ -348,7 +386,8 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item]
+            value: properties[item],
+            disabled: data.type === 'fileset' && item === 'location' && type === 'update'
           }
           propsItems.push(propItem)
         }
@@ -427,6 +466,7 @@ const CreateCatalogDialog = props => {
                     >
                       <MenuItem value={'relational'}>relational</MenuItem>
                       <MenuItem value={'fileset'}>fileset</MenuItem>
+                      <MenuItem value={'messaging'}>messaging</MenuItem>
                     </Select>
                   )}
                 />
@@ -513,7 +553,7 @@ const CreateCatalogDialog = props => {
                                   name='key'
                                   label='Key'
                                   value={item.key}
-                                  disabled={item.required}
+                                  disabled={item.required || item.disabled}
                                   onChange={event => handleFormChange({ index, event })}
                                   error={item.hasDuplicateKey}
                                   data-refer={`props-key-${index}`}
@@ -552,7 +592,7 @@ const CreateCatalogDialog = props => {
                                 )}
                               </Box>
 
-                              {!item.required ? (
+                              {!(item.required || item.disabled) ? (
                                 <Box sx={{ minWidth: 40 }}>
                                   <IconButton onClick={() => removeFields(index)}>
                                     <Icon icon='mdi:minus-circle-outline' />

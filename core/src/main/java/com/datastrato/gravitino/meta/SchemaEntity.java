@@ -145,6 +145,7 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     SchemaEntity schema = (SchemaEntity) o;
     return Objects.equal(id, schema.id)
         && Objects.equal(name, schema.name)
+        && Objects.equal(namespace, schema.namespace)
         && Objects.equal(comment, schema.comment)
         && Objects.equal(properties, schema.properties)
         && Objects.equal(auditInfo, schema.auditInfo);

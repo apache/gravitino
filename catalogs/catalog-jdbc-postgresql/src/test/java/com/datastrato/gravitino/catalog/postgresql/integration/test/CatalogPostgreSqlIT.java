@@ -38,6 +38,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -239,6 +240,33 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testCreateTableWithArrayType() {
+    String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column[] columns = new Column[] {col};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+
+    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertEquals(columns.length, createdTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(columns.length, loadTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
+    }
+  }
+
+  @Test
   void testCreateTableWithSpecialColumnNames() {
     // Create table from Gravitino API
     Column[] columns = columnsWithSpecialNames();
@@ -378,7 +406,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], createdTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -391,7 +419,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], loadTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -619,10 +647,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create index complex fields fail.
@@ -991,22 +1019,26 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Table t1 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
-    assertionsTableInfo(t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
+    ITUtils.assertionsTableInfo(
+        t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
     Table t2 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
-    assertionsTableInfo(t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
+    ITUtils.assertionsTableInfo(
+        t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
     Table t3 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
-    assertionsTableInfo(t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
+    ITUtils.assertionsTableInfo(
+        t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
     Table t4 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
-    assertionsTableInfo(t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
+    ITUtils.assertionsTableInfo(
+        t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
   }
 
   @Test
@@ -1033,7 +1065,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tablename",
         "low case table name",
         Arrays.asList(newColumns),
@@ -1041,7 +1073,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         indexes,
         createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create table with same name but different case
@@ -1232,7 +1264,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
           Indexes.primary("pk1_key", new String[][] {{"col_1"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // delete index and add new column and index.
@@ -1254,7 +1286,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // Add a previously existing index
@@ -1274,7 +1306,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         };
     table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
 
@@ -1314,7 +1346,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Column col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
@@ -1328,7 +1360,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier);
     col5 = Column.of("col_5", Types.LongType.get(), "id", false, false, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
@@ -1342,7 +1374,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier);
     col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
@@ -1390,7 +1422,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Table table = tableCatalog.loadTable(tableIdentifier);
 
     newColumns = new Column[] {col1, col2, col3};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),

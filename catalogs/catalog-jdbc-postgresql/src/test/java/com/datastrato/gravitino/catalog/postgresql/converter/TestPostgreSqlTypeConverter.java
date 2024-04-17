@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIME;
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIMESTAMP;
 import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARCHAR;
+import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.ARRAY_TOKEN;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
@@ -17,6 +18,7 @@ import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTy
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_2;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_4;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
+import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
 
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -50,6 +52,27 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null);
     checkJdbcTypeToGravitinoType(
         Types.UnparsedType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+  }
+
+  @Test
+  public void testArrayType() {
+    Type elmentType = Types.IntegerType.get();
+    Type list1 = Types.ListType.of(elmentType, false);
+
+    checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list1);
+    checkJdbcTypeToGravitinoType(list1, JDBC_ARRAY_PREFIX + INT_4, null, null);
+
+    // not support element nullable
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, Types.ListType.of(elmentType, true)));
+
+    // not support multidimensional
+    Type list2 = Types.ListType.of(list1, false);
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list2));
   }
 
   @Test

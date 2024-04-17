@@ -17,6 +17,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
@@ -91,7 +92,7 @@ public class TestCatalogOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(CatalogManager.class).ranked(2);
+            bind(manager).to(CatalogDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

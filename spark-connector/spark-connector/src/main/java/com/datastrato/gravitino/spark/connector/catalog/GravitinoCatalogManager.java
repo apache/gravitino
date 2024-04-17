@@ -13,9 +13,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.util.Arrays;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,8 +79,8 @@ public class GravitinoCatalogManager {
         .forEach(catalog -> gravitinoCatalogs.put(catalog.name(), catalog));
   }
 
-  public Set<String> getCatalogNames() {
-    return gravitinoCatalogs.asMap().keySet().stream().collect(Collectors.toSet());
+  public Map<String, Catalog> getCatalogs() {
+    return gravitinoCatalogs.asMap();
   }
 
   private Catalog loadCatalog(String catalogName) {

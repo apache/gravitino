@@ -47,6 +47,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   protected static String hdfsUri = "hdfs://127.0.0.1:9000";
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
+  protected static String kafkaUri = "http://127.0.0.1:9092";
 
   private static final String WEB_TITLE = "Gravitino";
   private static final String CATALOG_TABLE_TITLE = "Schemas";
@@ -60,6 +61,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String MODIFIED_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
   private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
   private static final String FILESET_CATALOG_NAME = "catalog_fileset";
+  private static final String KAFKA_CATALOG_NAME = "catalog_kafka";
   private static final String SCHEMA_NAME = "default";
   private static final String TABLE_NAME = "table1";
   private static final String TABLE_NAME_2 = "table2";
@@ -233,6 +235,20 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(6)
+  public void testCreateKafkaCatalog() throws InterruptedException {
+    clickAndWait(catalogsPage.createCatalogBtn);
+    catalogsPage.setCatalogNameField(KAFKA_CATALOG_NAME);
+    clickAndWait(catalogsPage.catalogTypeSelector);
+    catalogsPage.clickSelectType("messaging");
+    catalogsPage.setCatalogCommentField("kafka catalog comment");
+    // set kafka catalog props
+    catalogsPage.setCatalogFixedProp("bootstrap.servers", kafkaUri);
+    clickAndWait(catalogsPage.handleSubmitCatalogBtn);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(KAFKA_CATALOG_NAME));
+  }
+
+  @Test
+  @Order(7)
   public void testRefreshPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
@@ -243,12 +259,13 @@ public class CatalogsPageTest extends AbstractWebIT {
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            FILESET_CATALOG_NAME,
+            KAFKA_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyCreatedCatalogs(catalogsNames));
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   public void testViewTabMetalakeDetails() throws InterruptedException {
     clickAndWait(catalogsPage.tabDetailsBtn);
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
@@ -257,7 +274,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(8)
+  @Order(9)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
     Assertions.assertTrue(
@@ -265,7 +282,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(9)
+  @Order(10)
   public void testEditCatalog() throws InterruptedException {
     catalogsPage.clickEditCatalogBtn(HIVE_CATALOG_NAME);
     catalogsPage.setCatalogNameField(MODIFIED_CATALOG_NAME);
@@ -275,21 +292,21 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   // test catalog show schema list
   @Test
-  @Order(10)
+  @Order(11)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
   }
 
   @Test
-  @Order(11)
+  @Order(12)
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_CATALOG_NAME,
@@ -297,31 +314,32 @@ public class CatalogsPageTest extends AbstractWebIT {
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            FILESET_CATALOG_NAME,
+            KAFKA_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
   }
 
   // test schema show table list
   @Test
-  @Order(12)
+  @Order(13)
   public void testClickSchemaLink() {
     // create table
     createTableAndColumn(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
     catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   @Test
-  @Order(13)
+  @Order(14)
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_CATALOG_NAME,
@@ -330,32 +348,33 @@ public class CatalogsPageTest extends AbstractWebIT {
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            FILESET_CATALOG_NAME,
+            KAFKA_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   // test table show column list
   @Test
-  @Order(14)
+  @Order(15)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
   }
 
   @Test
-  @Order(15)
+  @Order(16)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
     Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_CATALOG_NAME,
@@ -364,12 +383,13 @@ public class CatalogsPageTest extends AbstractWebIT {
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            FILESET_CATALOG_NAME,
+            KAFKA_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
-  @Order(16)
+  @Order(17)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
@@ -379,7 +399,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(17)
+  @Order(18)
   public void testClickTreeList() throws InterruptedException {
     String icebergNode =
         String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE);
@@ -408,19 +428,19 @@ public class CatalogsPageTest extends AbstractWebIT {
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
     catalogsPage.clickTreeNode(schemaNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     String tableNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
     catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }
 
   @Test
-  @Order(18)
+  @Order(19)
   public void testTreeNodeRefresh() throws InterruptedException {
     createTableAndColumn(
         METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
@@ -438,12 +458,12 @@ public class CatalogsPageTest extends AbstractWebIT {
             METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME_2);
     catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2, true));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
   }
 
   @Test
-  @Order(19)
+  @Order(20)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

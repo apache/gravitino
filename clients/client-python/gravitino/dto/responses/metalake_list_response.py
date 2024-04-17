@@ -16,6 +16,11 @@ class MetalakeListResponse(BaseResponse):
     metalakes: List[MetalakeDTO]
 
     def validate(self):
+        """Validates the response data.
+
+        Raises:
+            IllegalArgumentException if catalog identifiers are not set.
+        """
         super().validate()
 
         if self.metalakes is None:

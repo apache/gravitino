@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import { IconButton, Typography } from '@mui/material'
+import { IconButton, Typography, Box } from '@mui/material'
 import { Tree } from 'antd'
 
 import Icon from '@/components/Icon'
@@ -23,7 +23,8 @@ import {
   setSelectedNodes,
   setLoadedNodes,
   getTableDetails,
-  getFilesetDetails
+  getFilesetDetails,
+  getTopicDetails
 } from '@/lib/store/metalakes'
 
 import { extractPlaceholder } from '@/lib/utils'
@@ -54,7 +55,10 @@ const MetalakeTree = props => {
           default:
             return 'bx:book'
         }
+      case 'messaging':
+        return 'skill-icons:kafka'
       case 'fileset':
+        return 'twemoji:file-folder'
       default:
         return 'bx:book'
     }
@@ -63,20 +67,33 @@ const MetalakeTree = props => {
   const handleClickIcon = (e, nodeProps) => {
     e.stopPropagation()
 
-    if (nodeProps.data.node === 'table') {
-      if (store.selectedNodes.includes(nodeProps.data.key)) {
-        const pathArr = extractPlaceholder(nodeProps.data.key)
-        const [metalake, catalog, schema, table] = pathArr
-        dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+    switch (nodeProps.data.node) {
+      case 'table': {
+        if (store.selectedNodes.includes(nodeProps.data.key)) {
+          const pathArr = extractPlaceholder(nodeProps.data.key)
+          const [metalake, catalog, type, schema, table] = pathArr
+          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+        }
+        break
       }
-    } else if (nodeProps.data.node === 'fileset') {
-      if (store.selectedNodes.includes(nodeProps.data.key)) {
-        const pathArr = extractPlaceholder(nodeProps.data.key)
-        const [metalake, catalog, schema, fileset] = pathArr
-        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+      case 'fileset': {
+        if (store.selectedNodes.includes(nodeProps.data.key)) {
+          const pathArr = extractPlaceholder(nodeProps.data.key)
+          const [metalake, catalog, schema, fileset] = pathArr
+          dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+        }
+        break
       }
-    } else {
-      dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
+      case 'topic': {
+        if (store.selectedNodes.includes(nodeProps.data.key)) {
+          const pathArr = extractPlaceholder(nodeProps.data.key)
+          const [metalake, catalog, schema, topic] = pathArr
+          dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+        }
+        break
+      }
+      default:
+        dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
     }
   }
 
@@ -195,6 +212,22 @@ const MetalakeTree = props => {
             <Icon icon={isHover !== nodeProps.data.key ? 'bx:file' : 'mdi:reload'} fontSize='inherit' />
           </IconButton>
         )
+      case 'topic':
+        return (
+          <IconButton
+            disableRipple={!store.selectedNodes.includes(nodeProps.data.key)}
+            size='small'
+            sx={{ color: '#666' }}
+            onClick={e => handleClickIcon(e, nodeProps)}
+            onMouseEnter={e => onMouseEnter(e, nodeProps)}
+            onMouseLeave={e => onMouseLeave(e, nodeProps)}
+          >
+            <Icon
+              icon={isHover !== nodeProps.data.key ? 'material-symbols:topic-outline' : 'mdi:reload'}
+              fontSize='inherit'
+            />
+          </IconButton>
+        )
 
       default:
         return <></>
@@ -225,51 +258,64 @@ const MetalakeTree = props => {
 
   useEffect(() => {
     if (store.selectedNodes.length !== 0) {
-      treeRef.current.scrollTo({ key: store.selectedNodes[0] })
+      treeRef.current && treeRef.current.scrollTo({ key: store.selectedNodes[0] })
     }
-  }, [store.selectedNodes])
+  }, [store.selectedNodes, treeRef])
+
+  useEffect(() => {
+    dispatch(setExpandedNodes(store.expandedNodes))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.metalakeTree, dispatch])
 
   return (
     <>
-      <Tree
-        ref={treeRef}
-        rootStyle={{
-          '& .antTreeTitle': {
-            width: '100%'
-          }
-        }}
-        treeData={store.metalakeTree}
-        loadData={onLoadData}
-        loadedKeys={store.loadedNodes}
-        selectedKeys={store.selectedNodes}
-        expandedKeys={store.expandedNodes}
-        onExpand={onExpand}
-        onSelect={onSelect}
-        height={height}
-        defaultExpandAll
-        blockNode
-        showIcon
-        className={clsx([
-          '[&_.ant-tree-switcher]:twc-inline-flex',
-          '[&_.ant-tree-switcher]:twc-justify-center',
-          '[&_.ant-tree-switcher]:twc-items-center',
+      {store.metalakeTree.length ? (
+        <Tree
+          ref={treeRef}
+          rootStyle={{
+            '& .antTreeTitle': {
+              width: '100%'
+            }
+          }}
+          treeData={store.metalakeTree}
+          loadData={onLoadData}
+          loadedKeys={store.loadedNodes}
+          selectedKeys={store.selectedNodes}
+          expandedKeys={store.expandedNodes}
+          onExpand={onExpand}
+          onSelect={onSelect}
+          height={height}
+          defaultExpandAll
+          blockNode
+          showIcon
+          className={clsx([
+            '[&_.ant-tree-switcher]:twc-inline-flex',
+            '[&_.ant-tree-switcher]:twc-justify-center',
+            '[&_.ant-tree-switcher]:twc-items-center',
 
-          '[&_.ant-tree-iconEle]:twc-w-[unset]',
-          '[&_.ant-tree-iconEle]:twc-inline-flex',
-          '[&_.ant-tree-iconEle]:twc-items-center',
+            '[&_.ant-tree-iconEle]:twc-w-[unset]',
+            '[&_.ant-tree-iconEle]:twc-inline-flex',
+            '[&_.ant-tree-iconEle]:twc-items-center',
 
-          '[&_.ant-tree-title]:twc-inline-flex',
-          '[&_.ant-tree-title]:twc-w-[calc(100%-24px)]',
-          '[&_.ant-tree-title]:twc-text-lg',
+            '[&_.ant-tree-title]:twc-inline-flex',
+            '[&_.ant-tree-title]:twc-w-[calc(100%-24px)]',
+            '[&_.ant-tree-title]:twc-text-lg',
 
-          '[&_.ant-tree-node-content-wrapper]:twc-inline-flex',
-          '[&_.ant-tree-node-content-wrapper]:twc-items-center',
-          '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]'
-        ])}
-        data-refer='tree-view'
-        icon={nodeProps => renderIcon(nodeProps)}
-        titleRender={nodeData => renderNode(nodeData)}
-      />
+            '[&_.ant-tree-node-content-wrapper]:twc-inline-flex',
+            '[&_.ant-tree-node-content-wrapper]:twc-items-center',
+            '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]'
+          ])}
+          data-refer='tree-view'
+          icon={nodeProps => renderIcon(nodeProps)}
+          titleRender={nodeData => renderNode(nodeData)}
+        />
+      ) : (
+        <Box className={`twc-h-full twc-grow twc-flex twc-items-center twc-flex-col twc-justify-center`}>
+          <Typography sx={{ color: theme => theme.palette.text.primary }} data-refer='no-data'>
+            No data
+          </Typography>
+        </Box>
+      )}
     </>
   )
 }
