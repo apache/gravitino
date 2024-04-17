@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 
@@ -49,13 +50,14 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
    * @return The deserialized CatalogEntity object.
    */
   @Override
-  public CatalogEntity deserialize(Catalog p) {
+  public CatalogEntity deserialize(Catalog p, Namespace namespace) {
     CatalogEntity.Builder builder = CatalogEntity.builder();
     builder
         .withId(p.getId())
         .withName(p.getName())
+        .withNamespace(namespace)
         .withProvider(p.getProvider())
-        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
+        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());
