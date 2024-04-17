@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 class RoleManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(RoleManager.class);
-  private static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private final EntityStore store;
   private final IdGenerator idGenerator;
   private final Cache<NameIdentifier, RoleEntity> cache;
@@ -118,7 +117,7 @@ class RoleManager {
       return getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
-      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+      throw new NoSuchRoleException(AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     }
   }
 
