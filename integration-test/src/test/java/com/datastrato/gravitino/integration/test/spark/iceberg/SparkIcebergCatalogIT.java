@@ -29,17 +29,11 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogIT extends SparkCommonIT {
 
-  protected List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
+  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
         SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
         SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
-  }
-
-  private String getCreateIcebergSimpleTableString(String tableName) {
-    return String.format(
-        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
-        tableName);
   }
 
   @Override
@@ -288,5 +282,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     String partitionExpression = "name_trunc=a";
     Path partitionPath = new Path(location, partitionExpression);
     checkDirExists(partitionPath);
+  }
+
+  private String getCreateIcebergSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
+        tableName);
   }
 }
