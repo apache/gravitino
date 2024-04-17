@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
@@ -44,17 +45,18 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    * @return The entity representing the deserialized Protocol Buffer message.
    */
   @Override
-  public RoleEntity deserialize(Role role) {
+  public RoleEntity deserialize(Role role, Namespace namespace) {
     RoleEntity.Builder builder =
         RoleEntity.builder()
             .withId(role.getId())
             .withName(role.getName())
+            .withNamespace(namespace)
             .withPrivileges(
                 role.getPrivilegesList().stream()
                     .map(Privileges::fromString)
                     .collect(Collectors.toList()))
             .withSecurableObject(SecurableObjects.parse(role.getSecurableObject()))
-            .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo()));
+            .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {
       builder.withProperties(role.getPropertiesMap());

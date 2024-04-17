@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 
 /** A class for serializing and deserializing BaseMetalake objects. */
@@ -52,13 +53,13 @@ class BaseMetalakeSerDe
    * @return The deserialized BaseMetalake object.
    */
   @Override
-  public com.datastrato.gravitino.meta.BaseMetalake deserialize(Metalake p) {
+  public com.datastrato.gravitino.meta.BaseMetalake deserialize(Metalake p, Namespace namespace) {
     com.datastrato.gravitino.meta.BaseMetalake.Builder builder =
         com.datastrato.gravitino.meta.BaseMetalake.builder();
     builder
         .withId(p.getId())
         .withName(p.getName())
-        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
+        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.google.protobuf.Message;
 
 /**
@@ -26,7 +27,8 @@ public interface ProtoSerDe<T, M extends Message> {
    * Deserializes the provided Protocol Buffer message into its corresponding entity representation.
    *
    * @param p The Protocol Buffer message to be deserialized.
+   * @param namespace The namespace to be specified for entity deserialization.
    * @return The entity representing the deserialized Protocol Buffer message.
    */
-  T deserialize(M p);
+  T deserialize(M p, Namespace namespace);
 }
