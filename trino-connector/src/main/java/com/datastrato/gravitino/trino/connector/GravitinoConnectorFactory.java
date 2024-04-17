@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
@@ -69,8 +70,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
-          catalogConnectorManager.setGravitinoClient(clientProvider().get());
-          catalogConnectorManager.start();
+          catalogConnectorManager.start(clientProvider().get());
 
           new GravitinoSystemTableFactory(catalogConnectorManager);
 
@@ -94,6 +94,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       String metalake = config.getMetalake();
       if (Strings.isNullOrEmpty(metalake)) {
         throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
+      }
+      if (config.simplifyCatalogNames() && catalogConnectorManager.getCatalogs().size() > 1) {
+        throw new TrinoException(
+            GRAVITINO_MISSING_CONFIG,
+            "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
       }
       catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =

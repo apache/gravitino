@@ -351,7 +351,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], createdTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -364,7 +364,7 @@ public class CatalogMysqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], loadTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -821,10 +821,10 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed");
@@ -922,10 +922,10 @@ public class CatalogMysqlIT extends AbstractIT {
             new SortOrder[0],
             indexes);
     // Test create auto increment key success.
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test alter table. auto increment exist.
@@ -942,7 +942,7 @@ public class CatalogMysqlIT extends AbstractIT {
           col4,
           col5
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     // UpdateColumnComment
@@ -957,7 +957,7 @@ public class CatalogMysqlIT extends AbstractIT {
           col4,
           col5
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     // RenameColumn
@@ -977,7 +977,7 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     tableCatalog.dropTable(tableIdentifier);
@@ -1158,22 +1158,26 @@ public class CatalogMysqlIT extends AbstractIT {
     Table t1 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
-    assertionsTableInfo(t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
+    ITUtils.assertionsTableInfo(
+        t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
     Table t2 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
-    assertionsTableInfo(t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
+    ITUtils.assertionsTableInfo(
+        t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
     Table t3 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
-    assertionsTableInfo(t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
+    ITUtils.assertionsTableInfo(
+        t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
     Table t4 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
-    assertionsTableInfo(t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
+    ITUtils.assertionsTableInfo(
+        t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
   }
 
   @Test
@@ -1205,10 +1209,10 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tableName", table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tableName", table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create table with same name but different case
@@ -1230,7 +1234,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals("TABLENAME", tableAgain.name());
 
     table = tableCatalog.loadTable(tableIdentifier2);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "TABLENAME", table_comment, Arrays.asList(newColumns), properties, indexes, table);
   }
 
@@ -1345,7 +1349,7 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
           Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // delete index and add new column and index.
@@ -1367,7 +1371,7 @@ public class CatalogMysqlIT extends AbstractIT {
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // Add a previously existing index
@@ -1387,7 +1391,7 @@ public class CatalogMysqlIT extends AbstractIT {
         };
     table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
 
@@ -1454,7 +1458,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
     Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
 
     // Test the auto-increment property of modified fields
@@ -1464,7 +1468,7 @@ public class CatalogMysqlIT extends AbstractIT {
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
     indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
 
     // Add the auto-increment attribute to the field
@@ -1474,7 +1478,7 @@ public class CatalogMysqlIT extends AbstractIT {
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
     indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
   }
 
@@ -1516,7 +1520,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Table table = tableCatalog.loadTable(tableIdentifier);
     newColumns = new Column[] {col1, col2, col3, col4};
 
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),

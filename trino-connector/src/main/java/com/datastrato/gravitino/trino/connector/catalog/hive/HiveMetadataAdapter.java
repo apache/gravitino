@@ -94,11 +94,11 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<String> partitionColumns =
         propertyMap.containsKey(HIVE_PARTITION_KEY)
             ? (List<String>) propertyMap.get(HIVE_PARTITION_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
     List<String> bucketColumns =
         propertyMap.containsKey(HIVE_BUCKET_KEY)
             ? (List<String>) propertyMap.get(HIVE_BUCKET_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
     int bucketCount =
         propertyMap.containsKey(HIVE_BUCKET_COUNT_KEY)
             ? (int) propertyMap.get(HIVE_BUCKET_COUNT_KEY)
@@ -106,7 +106,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<SortingColumn> sortColumns =
         propertyMap.containsKey(HIVE_SORT_ORDER_KEY)
             ? (List<SortingColumn>) propertyMap.get(HIVE_SORT_ORDER_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
 
     if (!sortColumns.isEmpty() && (bucketColumns.isEmpty() || bucketCount == 0)) {
       throw new TrinoException(
@@ -186,7 +186,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
                           ((Transform.SingleFieldTransform) ts)
                               .fieldName()[0].toLowerCase(Locale.ENGLISH))
                   .collect(Collectors.toList())
-              : Collections.EMPTY_LIST);
+              : Collections.emptyList());
     }
 
     if (gravitinoTable.getDistribution() != null

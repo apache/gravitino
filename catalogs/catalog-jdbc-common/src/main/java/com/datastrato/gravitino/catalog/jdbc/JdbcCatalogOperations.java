@@ -38,9 +38,13 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -509,5 +513,13 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
     throw new UnsupportedOperationException(
         "Jdbc catalog doesn't support topic related operations");
+  }
+
+  public void deregisterDriver(Driver driver) throws SQLException {
+    if (driver.getClass().getClassLoader().getClass()
+        == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
+      DriverManager.deregisterDriver(driver);
+      LOG.info("Driver {} has been deregistered...", driver);
+    }
   }
 }

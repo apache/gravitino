@@ -5,9 +5,11 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -20,7 +22,6 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -36,7 +37,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TableOperationDispatcher extends OperationDispatcher implements TableCatalog {
+public class TableOperationDispatcher extends OperationDispatcher implements TableDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperationDispatcher.class);
 
@@ -134,6 +135,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a table with with reserved name `*`");
+    }
+
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
         catalogIdent,
@@ -159,7 +164,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 t ->
                     t.createTable(
                         ident,
-                        columns,
+                        applyCapabilities(columns, c.capabilities()),
                         comment,
                         updatedProperties,
                         partitions == null ? EMPTY_TRANSFORM : partitions,
@@ -223,7 +228,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     Table tempAlteredTable =
         doWithCatalog(
             catalogIdent,
-            c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),
+            c ->
+                c.doWithTableOps(
+                    t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
             NoSuchTableException.class,
             IllegalArgumentException.class);
 

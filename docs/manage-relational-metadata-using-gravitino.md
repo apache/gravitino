@@ -477,7 +477,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     },
     {
       "name": "name",
-      "type": "varchar(500)"
+      "type": "varchar(500)",
       "comment": "name column comment",
       "nullable": true,
       "autoIncrement": false,
