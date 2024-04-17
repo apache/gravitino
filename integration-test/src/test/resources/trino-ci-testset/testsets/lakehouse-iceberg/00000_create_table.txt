@@ -6,7 +6,10 @@ CREATE TABLE
    name varchar,
    salary integer
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   location = 'hdfs://%s/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb01'
+)"
 
 CREATE TABLE
 
