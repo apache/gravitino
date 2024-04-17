@@ -58,6 +58,7 @@ const MetalakeTree = props => {
       case 'messaging':
         return 'skill-icons:kafka'
       case 'fileset':
+        return 'twemoji:file-folder'
       default:
         return 'bx:book'
     }
@@ -70,7 +71,7 @@ const MetalakeTree = props => {
       case 'table': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, table] = pathArr
+          const [metalake, catalog, type, schema, table] = pathArr
           dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
         }
         break
@@ -263,6 +264,7 @@ const MetalakeTree = props => {
 
   useEffect(() => {
     dispatch(setExpandedNodes(store.expandedNodes))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.metalakeTree, dispatch])
 
   return (
