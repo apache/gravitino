@@ -8,7 +8,6 @@ package com.datastrato.gravitino.integration.test.util.spark;
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
 import org.apache.spark.sql.types.DataType;
 
-// Referred from org.apache.iceberg.spark.source.SparkMetadataColumn
 public class SparkMetadataColumn implements MetadataColumn {
   private final String name;
   private final DataType dataType;
