@@ -687,10 +687,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected void checkPartitionDirExists(SparkTableInfo table) {
     Assertions.assertTrue(table.isPartitionTable(), "Not a partition table");
-    String tableLocation = table.getTableLocation();
+    String tableLocation = getTableLocation(table);
     String partitionExpression = getPartitionExpression(table, "/").replace("'", "");
     Path partitionPath = new Path(tableLocation, partitionExpression);
     checkDirExists(partitionPath);
+  }
+
+  protected String getTableLocation(SparkTableInfo table) {
+    return table.getTableLocation();
   }
 
   protected void checkDirExists(Path dir) {

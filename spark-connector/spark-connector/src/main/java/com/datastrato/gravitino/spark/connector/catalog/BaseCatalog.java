@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
-import static com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants.GRAVITINO_HIVE_PROVIDER;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -76,6 +74,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
+
+  protected abstract boolean supportsBucketTransfrom();
 
   /**
    * Create a specific Spark catalog, mainly used to create Spark table.
@@ -168,13 +168,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
     String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
-    boolean isHiveProvider =
-        GRAVITINO_HIVE_PROVIDER.equalsIgnoreCase(gravitinoCatalogClient.provider());
-
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         SparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
     com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
-        SparkTransformConverter.toGravitinoPartitionings(transforms, isHiveProvider);
+        SparkTransformConverter.toGravitinoPartitionings(transforms, supportsBucketTransfrom());
 
     try {
       com.datastrato.gravitino.rel.Table table =
