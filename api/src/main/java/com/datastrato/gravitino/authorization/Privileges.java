@@ -24,10 +24,7 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESET
 import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LOAD_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.LOAD_SCHEMA;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LOAD_TABLE;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LOAD_TOPIC;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
@@ -84,8 +81,6 @@ public class Privileges {
         // Table
       case LIST_TABLE:
         return ListTable.get();
-      case LOAD_TABLE:
-        return LoadTable.get();
       case CREATE_TABLE:
         return CreateTable.get();
       case ALTER_TABLE:
@@ -100,8 +95,6 @@ public class Privileges {
         // Fileset
       case LIST_FILESET:
         return ListFileset.get();
-      case LOAD_FILESET:
-        return LoadFileset.get();
       case CREATE_FILESET:
         return CreateFileset.get();
       case ALTER_FILESET:
@@ -116,8 +109,6 @@ public class Privileges {
         // Topic
       case LIST_TOPIC:
         return ListTopic.get();
-      case LOAD_TOPIC:
-        return LoadTopic.get();
       case CREATE_TOPIC:
         return CreateTopic.get();
       case DROP_TOPIC:
@@ -396,29 +387,6 @@ public class Privileges {
     }
   }
 
-  /** The privilege to load a table. */
-  public static class LoadTable implements Privilege {
-
-    private static final LoadTable INSTANCE = new LoadTable();
-
-    /** @return The instance of the privilege. */
-    public static LoadTable get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return LOAD_TABLE;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "load table";
-    }
-  }
-
   /** The privilege to alter a table. */
   public static class AlterTable implements Privilege {
 
@@ -564,30 +532,6 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "list fileset";
-    }
-  }
-
-  /** The privilege to load a fileset. */
-  public static class LoadFileset implements Privilege {
-    private static final LoadFileset INSTANCE = new LoadFileset();
-
-    private LoadFileset() {}
-
-    /** @return The instance of the privilege. */
-    public static LoadFileset get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return LOAD_FILESET;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "load fileset";
     }
   }
 
@@ -738,30 +682,6 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "list topic";
-    }
-  }
-
-  /** The privilege to load a topic. */
-  public static class LoadTopic implements Privilege {
-    private static final LoadTopic INSTANCE = new LoadTopic();
-
-    private LoadTopic() {}
-
-    /** @return The instance of the privilege. */
-    public static LoadTopic get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return LOAD_TOPIC;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "load topic";
     }
   }
 

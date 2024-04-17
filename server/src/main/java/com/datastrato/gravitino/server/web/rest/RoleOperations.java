@@ -24,7 +24,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -44,44 +44,66 @@ import org.slf4j.LoggerFactory;
 public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
 
-  private static final String PRIVILEGE_ERROR_MSG = "%s shouldn't bind the privilege %s";
-  private static final String UNSUPPORTED_ERROR_MSG = "%s uses an unsupported catalog type";
-  private static final List<Privilege> CATALOG_PRIVILEGES =
-      Lists.newArrayList(
+  private static final String UNSUPPORTED_ERROR_MSG = "%s is an unsupported catalog type";
+  private static final List<Privilege> CATALOG_PRIVILEGES_EXCEPT_FOR_LIST =
+      ImmutableList.of(
+          Privileges.LoadCatalog.get(),
           Privileges.LoadCatalog.get(),
           Privileges.AlterCatalog.get(),
           Privileges.CreateCatalog.get(),
           Privileges.DropCatalog.get());
-  private static final List<Privilege> SCHEMA_PRIVILEGES =
-      Lists.newArrayList(
+  private static final List<Privilege> CATALOGS_PRIVILEGES =
+      ImmutableList.<Privilege>builder()
+          .addAll(CATALOG_PRIVILEGES_EXCEPT_FOR_LIST)
+          .add(Privileges.ListCatalog.get())
+          .build();
+  private static final List<Privilege> SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST =
+      ImmutableList.of(
           Privileges.LoadSchema.get(),
           Privileges.AlterSchema.get(),
           Privileges.CreateSchema.get(),
           Privileges.DropSchema.get());
-  private static final List<Privilege> TABLE_PRIVILEGES =
-      Lists.newArrayList(
-          Privileges.LoadTable.get(),
+  private static final List<Privilege> SCHEMA_PRIVILEGES =
+      ImmutableList.<Privilege>builder()
+          .addAll(SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST)
+          .add(Privileges.ListSchema.get())
+          .build();
+  private static final List<Privilege> TABLE_PRIVILEGES_EXCEPT_FOR_LIST =
+      ImmutableList.of(
           Privileges.AlterTable.get(),
           Privileges.CreateTable.get(),
           Privileges.DropTable.get(),
           Privileges.ReadTable.get(),
           Privileges.WriteTable.get());
-  private static final List<Privilege> FILESET_PRIVILEGES =
-      Lists.newArrayList(
-          Privileges.LoadFileset.get(),
+  private static final List<Privilege> TABLE_PRIVILEGES =
+      ImmutableList.<Privilege>builder()
+          .addAll(TABLE_PRIVILEGES_EXCEPT_FOR_LIST)
+          .add(Privileges.ListTable.get())
+          .build();
+  private static final List<Privilege> FILESET_PRIVILEGES_EXCEPT_FOR_LIST =
+      ImmutableList.of(
           Privileges.AlterFileset.get(),
           Privileges.CreateFileset.get(),
           Privileges.DropFileset.get(),
           Privileges.ReadFileset.get(),
           Privileges.WriteFileset.get());
-  private static final List<Privilege> TOPIC_PRIVILEGES =
-      Lists.newArrayList(
-          Privileges.LoadTopic.get(),
+  private static final List<Privilege> FILESET_PRIVILEGES =
+      ImmutableList.<Privilege>builder()
+          .addAll(FILESET_PRIVILEGES_EXCEPT_FOR_LIST)
+          .add(Privileges.ListFileset.get())
+          .build();
+  private static final List<Privilege> TOPIC_PRIVILEGES_EXCEPT_FOR_LIST =
+      ImmutableList.of(
           Privileges.AlterTopic.get(),
           Privileges.CreateTopic.get(),
           Privileges.DropTopic.get(),
           Privileges.ReadTopic.get(),
           Privileges.WriteTopic.get());
+  private static final List<Privilege> TOPIC_PRIVILEGES =
+      ImmutableList.<Privilege>builder()
+          .addAll(TOPIC_PRIVILEGES_EXCEPT_FOR_LIST)
+          .add(Privileges.ListTopic.get())
+          .build();
 
   private final AccessControlManager accessControlManager;
   private final CatalogManager catalogManager;
@@ -141,118 +163,107 @@ public class RoleOperations {
   }
 
   /**
-   * If you want to use the list operation, you should have the privilege of all the entities. So
-   * only `*` has the privilege to list catalogs. Catalog has the privilege to list schemas. You can
-   * choose two levels privilege: own level and children level. For example, one schema can be bind
-   * the privilege to load a schema for own level, it can be bind the privilege to load a table at
-   * the same time. But for `*`, it can't bind the privilege of schemas. Because Gravitino avoids
-   * granting too many privileges to `*`.
+   * * There are 6 kinds of entities for the privileges: <br>
+   * `*` has all the catalog operation privileges. <br>
+   * `catalog` has the catalog operation privileges except for list operation and all the schema
+   * operation privileges. <br>
+   * `catalog.schema` has the schema operation privileges except for list operation and all the
+   * table/topic/fileset privileges. <br>
+   * `catalog.schema.table` has the table operation privileges except for list operation. <br>
+   * `catalog.schema.topic` has the topic operation privileges except for list operation. <br>
+   * `catalog.schema.fileset` has the fileset operation privileges except for list operation. <br>
+   * The entity can only add the children entity privilege of list operation.
    */
   @VisibleForTesting
   void checkSecurableObjectPrivileges(String metalake, RoleCreateRequest request) {
     SecurableObject securableObject = SecurableObjects.parse(request.getSecurableObject());
     List<Privilege> privileges =
         request.getPrivileges().stream().map(Privileges::fromString).collect(Collectors.toList());
-    if (securableObject.parent() == null) {
-      if ("*".equals(securableObject.name())) {
-        for (Privilege privilege : privileges) {
-          if (!CATALOG_PRIVILEGES.contains(privilege)
-              && !Privileges.ListCatalog.get().equals(privilege)) {
-            throw new IllegalArgumentException(
-                String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-          }
-        }
-      } else {
-        for (Privilege privilege : privileges) {
-          if (!CATALOG_PRIVILEGES.contains(privilege)
-              && !Privileges.ListSchema.get().equals(privilege)
-              && !SCHEMA_PRIVILEGES.contains(privilege)) {
-            throw new IllegalArgumentException(
-                String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-          }
-        }
-      }
-    } else {
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalake, getCatalogName(securableObject));
-
-      Catalog catalog =
-          TreeLockUtils.doWithTreeLock(
-              ident, LockType.READ, () -> catalogManager.loadCatalog(ident));
-
-      Catalog.Type type = catalog.type();
-
-      if (isSchema(securableObject)) {
-        for (Privilege privilege : privileges) {
-          checkSchemaPrivileges(securableObject, type, privilege);
-        }
-
-      } else {
-        for (Privilege privilege : privileges) {
-          checkEntityPrivileges(securableObject, type, privilege);
-        }
+    List<Privilege> supportedPrivileges = getEntitySupportedPrivileges(metalake, securableObject);
+    for (Privilege privilege : privileges) {
+      if (!supportedPrivileges.contains(privilege)) {
+        throw new IllegalArgumentException(
+            String.format("%s shouldn't bind the privilege %s", securableObject, privilege));
       }
     }
   }
 
-  private static void checkSchemaPrivileges(
-      SecurableObject securableObject, Catalog.Type type, Privilege privilege) {
+  private List<Privilege> getEntitySupportedPrivileges(
+      String metalake, SecurableObject securableObject) {
+    if (isAllCatalogs(securableObject)) {
+      return ImmutableList.<Privilege>builder().addAll(CATALOGS_PRIVILEGES).build();
+    }
+
+    if (isSingleCatalog(securableObject)) {
+      return ImmutableList.<Privilege>builder()
+          .addAll(CATALOG_PRIVILEGES_EXCEPT_FOR_LIST)
+          .addAll(SCHEMA_PRIVILEGES)
+          .build();
+    }
+
+    NameIdentifier ident = NameIdentifier.ofCatalog(metalake, getCatalogName(securableObject));
+
+    Catalog catalog =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> catalogManager.loadCatalog(ident));
+
+    Catalog.Type type = catalog.type();
+
+    if (isSchema(securableObject)) {
+      return ImmutableList.<Privilege>builder()
+          .addAll(SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST)
+          .addAll(getLeavesEntityPrivileges(type))
+          .build();
+    }
+
+    return getLeavesEntityPrivilegesExceptForList(type);
+  }
+
+  private List<Privilege> getLeavesEntityPrivileges(Catalog.Type type) {
     switch (type) {
       case FILESET:
-        if (!FILESET_PRIVILEGES.contains(privilege)
-            && !Privileges.ListFileset.get().equals(privilege)
-            && !SCHEMA_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return FILESET_PRIVILEGES;
 
       case RELATIONAL:
-        if (!TABLE_PRIVILEGES.contains(privilege)
-            && !Privileges.ListTable.get().equals(privilege)
-            && !SCHEMA_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return TABLE_PRIVILEGES;
 
       case MESSAGING:
-        if (!TOPIC_PRIVILEGES.contains(privilege)
-            && !Privileges.ListTopic.get().equals(privilege)
-            && !SCHEMA_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return TOPIC_PRIVILEGES;
 
       default:
-        throw new IllegalArgumentException(String.format(UNSUPPORTED_ERROR_MSG, securableObject));
+        throw new IllegalArgumentException(String.format(UNSUPPORTED_ERROR_MSG, type));
     }
   }
 
-  private static void checkEntityPrivileges(
-      SecurableObject securableObject, Catalog.Type type, Privilege privilege) {
+  private List<Privilege> getLeavesEntityPrivilegesExceptForList(Catalog.Type type) {
     switch (type) {
       case FILESET:
-        if (!FILESET_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return FILESET_PRIVILEGES_EXCEPT_FOR_LIST;
+
       case RELATIONAL:
-        if (!TABLE_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return TABLE_PRIVILEGES_EXCEPT_FOR_LIST;
+
       case MESSAGING:
-        if (!TOPIC_PRIVILEGES.contains(privilege)) {
-          throw new IllegalArgumentException(
-              String.format(PRIVILEGE_ERROR_MSG, securableObject, privilege));
-        }
-        break;
+        return TOPIC_PRIVILEGES_EXCEPT_FOR_LIST;
+
       default:
-        throw new IllegalArgumentException(String.format(UNSUPPORTED_ERROR_MSG, securableObject));
+        throw new IllegalArgumentException(String.format(UNSUPPORTED_ERROR_MSG, type));
     }
+  }
+
+  private boolean isAllCatalogs(SecurableObject securableObject) {
+    if (securableObject.parent() == null && "*".equals(securableObject.name())) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private boolean isSingleCatalog(SecurableObject securableObject) {
+    if (securableObject.parent() == null && !"*".equals(securableObject.name())) {
+      return true;
+    }
+
+    return false;
   }
 
   private static boolean isSchema(SecurableObject securableObject) {

@@ -43,8 +43,6 @@ public interface Privilege {
     DROP_SCHEMA,
     /** The privilege to list tables. */
     LIST_TABLE,
-    /** The privilege to load a table. */
-    LOAD_TABLE,
     /** The privilege to alter a table. */
     ALTER_TABLE,
     /** The privilege to create a table. */
@@ -57,8 +55,6 @@ public interface Privilege {
     WRITE_TABLE,
     /** The privilege to list filesets. */
     LIST_FILESET,
-    /** The privilege to load a fileset. */
-    LOAD_FILESET,
     /** The privilege to alter a fileset. */
     ALTER_FILESET,
     /** The privilege to create a fileset. */
@@ -71,8 +67,6 @@ public interface Privilege {
     WRITE_FILESET,
     /** The privilege to list topics. */
     LIST_TOPIC,
-    /** The privilege to load a topic. */
-    LOAD_TOPIC,
     /** The privilege to create a topic. */
     CREATE_TOPIC,
     /** The privilege to drop a topic. */

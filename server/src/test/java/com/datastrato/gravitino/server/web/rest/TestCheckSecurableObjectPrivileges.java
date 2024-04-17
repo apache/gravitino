@@ -146,7 +146,6 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListTable.get().name().toString(),
-                Privileges.LoadTable.get().name().toString(),
                 Privileges.AlterTable.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
@@ -161,7 +160,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadTopic.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadTopic.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -171,7 +170,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadFileset.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadFileset.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -186,7 +185,6 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListFileset.get().name().toString(),
-                Privileges.LoadFileset.get().name().toString(),
                 Privileges.AlterFileset.get().name().toString(),
                 Privileges.CreateFileset.get().name().toString(),
                 Privileges.DropFileset.get().name().toString(),
@@ -201,7 +199,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadTable.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadTable.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -211,7 +209,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadTopic.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadTopic.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -226,7 +224,6 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListTopic.get().name().toString(),
-                Privileges.LoadTopic.get().name().toString(),
                 Privileges.AlterTopic.get().name().toString(),
                 Privileges.CreateTopic.get().name().toString(),
                 Privileges.DropTopic.get().name().toString(),
@@ -241,7 +238,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadTable.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadTable.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -251,7 +248,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.LoadFileset.get().name().toString()),
+            Lists.newArrayList(Privileges.ReadFileset.get().name().toString()),
             SecurableObjects.ofSchema(catalogObject, "schema1").toString());
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -273,7 +270,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadTable.get().name().toString(),
+                Privileges.ReadTable.get().name().toString(),
                 Privileges.AlterTable.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
@@ -311,7 +308,6 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadTopic.get().name().toString(),
                 Privileges.AlterTopic.get().name().toString(),
                 Privileges.CreateTopic.get().name().toString(),
                 Privileges.DropTopic.get().name().toString(),
@@ -349,7 +345,6 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadFileset.get().name().toString(),
                 Privileges.AlterFileset.get().name().toString(),
                 Privileges.CreateFileset.get().name().toString(),
                 Privileges.DropFileset.get().name().toString(),
