@@ -37,7 +37,6 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
@@ -79,7 +78,21 @@ public class HTTPClient implements RESTClient {
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
   private final AuthDataProvider authDataProvider;
-  private volatile Function<HTTPClient, Void> beforeConnectHandle;
+
+  // Handle to be executed before connecting to the server.
+  private Runnable beforeConnectHandle;
+  // Handle status
+  enum HandleStatus {
+    // The handle has not been executed yet.
+    Start,
+    // The handle has been executed successfully.
+    Finished,
+    // The handle is currently running.
+    Running,
+  }
+
+  // The status of the handle.
+  private volatile HandleStatus handleStatus = HandleStatus.Start;
 
   /**
    * Constructs an instance of HTTPClient with the provided information.
@@ -95,7 +108,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
-      Function<HTTPClient, Void> beforeConnectHandle) {
+      Runnable beforeConnectHandle) {
     this.uri = uri;
     this.mapper = objectMapper;
 
@@ -110,6 +123,10 @@ public class HTTPClient implements RESTClient {
 
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
+
+    if (beforeConnectHandle == null) {
+      handleStatus = HandleStatus.Finished;
+    }
     this.beforeConnectHandle = beforeConnectHandle;
   }
 
@@ -320,28 +337,8 @@ public class HTTPClient implements RESTClient {
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
 
-    // beforeConnectHandle is a pre-connection handler that needs to be executed before the first
-    // HTTP request.
-    // During execution, beforeConnectHandle must be unloaded to prevent recursive calls.
-    // After beforeConnectHandle executes successfully, other requests can be processed normally.
-    // If an exception occurs during the execution of beforeConnectHandle,
-    // likely due to a network issue, beforeConnectHandle needs to be reloaded to ensure
-    // it can be successfully executed once the connection is restored.
-    // Double-checking is used to avoid unnecessary locking overhead after a successful connection
-    if (beforeConnectHandle != null) {
-      synchronized (this) {
-        if (beforeConnectHandle != null) {
-          Function<HTTPClient, Void> handle = beforeConnectHandle;
-          beforeConnectHandle = null;
-          try {
-            handle.apply(this);
-          } catch (Exception e) {
-            // The beforeConnectHandle will continue processing until it succeeds.
-            beforeConnectHandle = handle;
-            throw e;
-          }
-        }
-      }
+    if (handleStatus != HandleStatus.Finished) {
+      performPreConnectHandle();
     }
 
     if (path.startsWith("/")) {
@@ -410,6 +407,28 @@ public class HTTPClient implements RESTClient {
       }
     } catch (IOException e) {
       throw new RESTException(e, "Error occurred while processing %s request", method);
+    }
+  }
+
+  synchronized void performPreConnectHandle() {
+    // beforeConnectHandle is a pre-connection handler that needs to be executed before the first
+    // HTTP request.
+    // During execution, beforeConnectHandle must be unloaded to prevent recursive calls.
+    // After beforeConnectHandle executes successfully, other requests can be processed normally.
+    // If an exception occurs during the execution of beforeConnectHandle,
+    // likely due to a network issue, beforeConnectHandle needs to be reloaded to ensure
+    // it can be successfully executed once the connection is restored.
+    // Double-checking is used to avoid unnecessary locking overhead after a successful connection
+    if (handleStatus == HandleStatus.Start) {
+      handleStatus = HandleStatus.Running;
+      try {
+        beforeConnectHandle.run();
+        handleStatus = HandleStatus.Finished;
+      } catch (Exception e) {
+        // The beforeConnectHandle will continue processing until it succeeds.
+        handleStatus = HandleStatus.Start;
+        throw e;
+      }
     }
   }
 
@@ -685,7 +704,7 @@ public class HTTPClient implements RESTClient {
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
     private AuthDataProvider authDataProvider;
-    private Function<HTTPClient, Void> beforeConnectHandle;
+    private Runnable beforeConnectHandle;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -744,7 +763,7 @@ public class HTTPClient implements RESTClient {
      * @param beforeConnectHandle The handle run before connect to the server .
      * @return This Builder instance for method chaining.
      */
-    public Builder withPreConnectHandle(Function<HTTPClient, Void> beforeConnectHandle) {
+    public Builder withPreConnectHandle(Runnable beforeConnectHandle) {
       this.beforeConnectHandle = beforeConnectHandle;
       return this;
     }

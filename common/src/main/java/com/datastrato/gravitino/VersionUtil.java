@@ -12,9 +12,12 @@ import java.util.Properties;
 /** Retrieve the version and build information from the building process */
 public class VersionUtil {
 
-  private static volatile VersionInfo versionInfo;
+  private static volatile VersionUtil INSTANCE;
 
-  private static void init() {
+  private VersionInfo versionInfo;
+  private VersionDTO versionDTO;
+
+  private VersionUtil() {
     Properties projectProperties = new Properties();
     try {
       VersionInfo currentVersionInfo = new VersionInfo();
@@ -23,24 +26,34 @@ public class VersionUtil {
       currentVersionInfo.version = projectProperties.getProperty("project.version");
       currentVersionInfo.compileDate = projectProperties.getProperty("compile.date");
       currentVersionInfo.gitCommit = projectProperties.getProperty("git.commit.id");
+
       versionInfo = currentVersionInfo;
+      versionDTO =
+          new VersionDTO(
+              currentVersionInfo.version,
+              currentVersionInfo.compileDate,
+              currentVersionInfo.gitCommit);
     } catch (IOException e) {
       throw new GravitinoRuntimeException(e, "Failed to get Gravitino version");
     }
   }
+
+  /** @return the instance of VersionUtil */
+  public static VersionUtil getInstance() {
+    if (INSTANCE != null) {
+      return INSTANCE;
+    }
+    return new VersionUtil();
+  }
+
   /** @return the current versionInfo */
   public static VersionInfo getCurrentVersion() {
-    if (versionInfo != null) {
-      return versionInfo;
-    }
-    init();
-    return versionInfo;
+    return getInstance().versionInfo;
   }
 
   /** @return the current version DTO */
   public static VersionDTO getCurrentVersionDTO() {
-    VersionInfo versionInfo = getCurrentVersion();
-    return new VersionDTO(versionInfo.version, versionInfo.compileDate, versionInfo.gitCommit);
+    return getInstance().versionDTO;
   }
 
   /** Store version information */

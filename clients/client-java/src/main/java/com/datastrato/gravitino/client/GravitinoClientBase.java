@@ -55,11 +55,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
-              .withPreConnectHandle(
-                  (client) -> {
-                    checkVersion();
-                    return null;
-                  })
+              .withPreConnectHandle(this::checkVersion)
               .build();
 
     } else {
@@ -78,7 +74,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @throws GravitinoRuntimeException If the client version is greater than the server version.
    */
   public void checkVersion() {
-    GravitinoVersion serverVersion = getVersion();
+    GravitinoVersion serverVersion = serverVersion();
     GravitinoVersion clientVersion = clientVersion();
     if (clientVersion.compareTo(serverVersion) > 0) {
       throw new GravitinoRuntimeException(
@@ -123,7 +119,17 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @return A GravitinoVersion instance representing the version of the Gravitino API.
    */
+  @Deprecated
   public GravitinoVersion getVersion() {
+    return serverVersion();
+  }
+
+  /**
+   * Retrieves the server version of the Gravitino server.
+   *
+   * @return A GravitinoVersion instance representing the server version of the Gravitino API.
+   */
+  public GravitinoVersion serverVersion() {
     VersionResponse resp =
         restClient.get(
             "api/version",

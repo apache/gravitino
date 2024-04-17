@@ -246,7 +246,7 @@ public class TestGravitinoClient extends TestBase {
 
     VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
     buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
-    GravitinoVersion gravitinoVersion = client.getVersion();
+    GravitinoVersion gravitinoVersion = client.serverVersion();
 
     Assertions.assertEquals(version, gravitinoVersion.version());
     Assertions.assertEquals(date, gravitinoVersion.compileDate());
@@ -310,7 +310,7 @@ public class TestGravitinoClient extends TestBase {
 
     Assertions.assertDoesNotThrow(
         () -> {
-          GravitinoVersion version = client.getVersion();
+          GravitinoVersion version = client.serverVersion();
           VersionUtil.VersionInfo currentVersion = VersionUtil.getCurrentVersion();
           Assertions.assertEquals(currentVersion.version, version.version());
           Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
