@@ -579,8 +579,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     // Create a new catalog class instance or reuse the old one.
-    BaseCatalog<?> catalog =
-        oldWrapper != null ? oldWrapper.catalog : createCatalogInstance(classLoader, provider);
+    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
     catalog.withCatalogConf(conf).withCatalogEntity(entity);
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
