@@ -459,7 +459,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         CatalogWrapper updateCatalogWrapper =
             catalogCache.get(
                 updatedCatalog.nameIdentifier(),
-                id -> createCatalogWrapper(updatedCatalog, catalogWrapper.classLoader));
+                id -> createCatalogWrapper(updatedCatalog, catalogWrapper));
         return updateCatalogWrapper.catalog;
       } catch (Exception e) {
         // If we failed to create the new catalog wrapper, we should close the class loader
@@ -558,14 +558,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
-  private CatalogWrapper createCatalogWrapper(
-      CatalogEntity entity, IsolatedClassLoader reusedClassLoader) {
+  private CatalogWrapper createCatalogWrapper(CatalogEntity entity, CatalogWrapper oldWrapper) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     IsolatedClassLoader classLoader;
-    if (reusedClassLoader != null) {
-      classLoader = reusedClassLoader;
+    if (oldWrapper != null) {
+      classLoader = oldWrapper.classLoader;
     } else {
       if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
         String pkgPath = buildPkgPath(conf, provider);
@@ -579,8 +578,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       }
     }
 
-    // Load Catalog class instance
-    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
+    // Create a new catalog class instance or reuse the old one.
+    BaseCatalog<?> catalog =
+        oldWrapper != null ? oldWrapper.catalog : createCatalogInstance(classLoader, provider);
     catalog.withCatalogConf(conf).withCatalogEntity(entity);
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
