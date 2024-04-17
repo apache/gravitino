@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.VersionUtil;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
@@ -98,7 +98,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @return A GravitinoVersion instance representing the version of the Gravitino client.
    */
   public GravitinoVersion clientVersion() {
-    return new GravitinoVersion(VersionUtil.getCurrentVersionDTO());
+    return new GravitinoVersion(Version.getCurrentVersionDTO());
   }
 
   /**

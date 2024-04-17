@@ -6,7 +6,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.VersionUtil;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.VersionDTO;
@@ -256,7 +256,7 @@ public class TestGravitinoClient extends TestBase {
   @Test
   public void testGetClientVersion() {
     GravitinoVersion version = client.clientVersion();
-    VersionUtil.VersionInfo currentVersion = VersionUtil.getCurrentVersion();
+    Version.VersionInfo currentVersion = Version.getCurrentVersion();
 
     Assertions.assertEquals(currentVersion.version, version.version());
     Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
@@ -278,7 +278,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testCheckVersionSuccess() throws JsonProcessingException {
-    VersionResponse resp = new VersionResponse(VersionUtil.getCurrentVersionDTO());
+    VersionResponse resp = new VersionResponse(Version.getCurrentVersionDTO());
     buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
 
     // check the client version is equal to server version
@@ -297,7 +297,7 @@ public class TestGravitinoClient extends TestBase {
 
   @Test
   public void testUnusedDTOAttribute() throws JsonProcessingException {
-    VersionResponse resp = new VersionResponse(VersionUtil.getCurrentVersionDTO());
+    VersionResponse resp = new VersionResponse(Version.getCurrentVersionDTO());
 
     HttpRequest mockRequest = HttpRequest.request("/api/version").withMethod(Method.GET.name());
     HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
@@ -311,7 +311,7 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertDoesNotThrow(
         () -> {
           GravitinoVersion version = client.serverVersion();
-          VersionUtil.VersionInfo currentVersion = VersionUtil.getCurrentVersion();
+          Version.VersionInfo currentVersion = Version.getCurrentVersion();
           Assertions.assertEquals(currentVersion.version, version.version());
           Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
           Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());

@@ -7,7 +7,7 @@ package com.datastrato.gravitino.filesystem.hadoop;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.VersionUtil;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -112,7 +112,7 @@ public abstract class GravitinoMockServerBase {
           Method.GET,
           "/api/version",
           null,
-          new VersionResponse(VersionUtil.getCurrentVersionDTO()),
+          new VersionResponse(Version.getCurrentVersionDTO()),
           HttpStatus.SC_OK);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);

@@ -10,19 +10,19 @@ import java.io.IOException;
 import java.util.Properties;
 
 /** Retrieve the version and build information from the building process */
-public class VersionUtil {
+public class Version {
 
-  private static volatile VersionUtil INSTANCE;
+  private static volatile Version INSTANCE = new Version();
 
   private VersionInfo versionInfo;
   private VersionDTO versionDTO;
 
-  private VersionUtil() {
+  private Version() {
     Properties projectProperties = new Properties();
     try {
       VersionInfo currentVersionInfo = new VersionInfo();
       projectProperties.load(
-          VersionUtil.class.getClassLoader().getResourceAsStream("project.properties"));
+          Version.class.getClassLoader().getResourceAsStream("project.properties"));
       currentVersionInfo.version = projectProperties.getProperty("project.version");
       currentVersionInfo.compileDate = projectProperties.getProperty("compile.date");
       currentVersionInfo.gitCommit = projectProperties.getProperty("git.commit.id");
@@ -38,24 +38,14 @@ public class VersionUtil {
     }
   }
 
-  /** @return the instance of VersionUtil */
-  public static VersionUtil getInstance() {
-    if (INSTANCE != null) {
-      return INSTANCE;
-    }
-
-    INSTANCE = new VersionUtil();
-    return INSTANCE;
-  }
-
   /** @return the current versionInfo */
   public static VersionInfo getCurrentVersion() {
-    return getInstance().versionInfo;
+    return INSTANCE.versionInfo;
   }
 
   /** @return the current version DTO */
   public static VersionDTO getCurrentVersionDTO() {
-    return getInstance().versionDTO;
+    return INSTANCE.versionDTO;
   }
 
   /** Store version information */
