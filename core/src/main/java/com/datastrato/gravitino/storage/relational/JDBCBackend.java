@@ -24,7 +24,6 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
-import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
@@ -238,34 +237,9 @@ public class JDBCBackend implements RelationalBackend {
         return 0;
 
       case FILESET:
-        // Get the current version of all filesets.
-        List<FilesetVersionPO> filesetCurVersions =
-            FilesetMetaService.getInstance()
-                .getFilesetVersionPOsByRetentionCount(versionRetentionCount);
-
-        // Delete old versions that are older than or equal to (currentVersion -
-        // versionRetentionCount).
-        int totalDeletedCount = 0;
-        for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
-          long versionRetentionLine =
-              filesetVersionPO.getVersion().longValue() - versionRetentionCount;
-          int deletedCount =
-              FilesetMetaService.getInstance()
-                  .deleteFilesetVersionsByRetentionLine(
-                      filesetVersionPO.getFilesetId(),
-                      versionRetentionLine,
-                      GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          totalDeletedCount += deletedCount;
-
-          // Log the deletion by current fileset version.
-          LOG.info(
-              "Physically delete filesetVersions count: {} which versions are older than or equal to"
-                  + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
-              deletedCount,
-              versionRetentionLine,
-              filesetVersionPO);
-        }
-        return totalDeletedCount;
+        return FilesetMetaService.getInstance()
+            .deleteFilesetVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       default:
         throw new IllegalArgumentException(

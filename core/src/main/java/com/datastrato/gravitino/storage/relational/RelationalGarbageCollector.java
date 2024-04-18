@@ -25,7 +25,6 @@ public final class RelationalGarbageCollector implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(RelationalGarbageCollector.class);
   private final RelationalBackend backend;
 
-  private final Config config;
   private final long storeDeleteAfterTimeMillis;
   private final long versionRetentionCount;
 
@@ -42,9 +41,8 @@ public final class RelationalGarbageCollector implements Closeable {
 
   public RelationalGarbageCollector(RelationalBackend backend, Config config) {
     this.backend = backend;
-    this.config = config;
-    storeDeleteAfterTimeMillis = this.config.get(STORE_DELETE_AFTER_TIME);
-    versionRetentionCount = this.config.get(VERSION_RETENTION_COUNT);
+    storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
+    versionRetentionCount = config.get(VERSION_RETENTION_COUNT);
   }
 
   public void start() {

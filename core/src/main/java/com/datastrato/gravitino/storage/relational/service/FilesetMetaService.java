@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The service class for fileset metadata and version info. It provides the basic database
@@ -29,6 +31,8 @@ import java.util.function.Function;
  */
 public class FilesetMetaService {
   private static final FilesetMetaService INSTANCE = new FilesetMetaService();
+
+  private static final Logger LOG = LoggerFactory.getLogger(FilesetMetaService.class);
 
   public static FilesetMetaService getInstance() {
     return INSTANCE;
@@ -49,12 +53,6 @@ public class FilesetMetaService {
           filesetName);
     }
     return filesetPO;
-  }
-
-  public List<FilesetVersionPO> getFilesetVersionPOsByRetentionCount(Long versionRetentionCount) {
-    return SessionUtils.getWithoutCommit(
-        FilesetVersionMapper.class,
-        mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
   }
 
   public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
@@ -236,12 +234,35 @@ public class FilesetMetaService {
     return filesetDeletedCount + filesetVersionDeletedCount;
   }
 
-  public Integer deleteFilesetVersionsByRetentionLine(
-      Long filesetId, Long versionRetentionLine, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        FilesetVersionMapper.class,
-        mapper ->
-            mapper.deleteFilesetVersionsByRetentionLine(filesetId, versionRetentionLine, limit));
+  public Integer deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
+    // Get the current version of all filesets.
+    List<FilesetVersionPO> filesetCurVersions =
+        SessionUtils.getWithoutCommit(
+            FilesetVersionMapper.class,
+            mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
+
+    // Delete old versions that are older than or equal to (currentVersion -
+    // versionRetentionCount).
+    int totalDeletedCount = 0;
+    for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
+      long versionRetentionLine = filesetVersionPO.getVersion().longValue() - versionRetentionCount;
+      int deletedCount =
+          SessionUtils.doWithCommitAndFetchResult(
+              FilesetVersionMapper.class,
+              mapper ->
+                  mapper.deleteFilesetVersionsByRetentionLine(
+                      filesetVersionPO.getFilesetId(), versionRetentionLine, limit));
+      totalDeletedCount += deletedCount;
+
+      // Log the deletion by current fileset version.
+      LOG.info(
+          "Physically delete filesetVersions count: {} which versions are older than or equal to"
+              + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
+          deletedCount,
+          versionRetentionLine,
+          filesetVersionPO);
+    }
+    return totalDeletedCount;
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
