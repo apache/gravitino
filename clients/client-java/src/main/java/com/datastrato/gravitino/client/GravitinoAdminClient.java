@@ -40,9 +40,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param headers The base header for Gravitino API.
    */
-  private GravitinoAdminClient(String uri, AuthDataProvider authDataProvider) {
-    super(uri, authDataProvider);
+  private GravitinoAdminClient(
+      String uri, AuthDataProvider authDataProvider, Map<String, String> headers) {
+    super(uri, authDataProvider, headers);
   }
 
   /**
@@ -188,7 +190,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
 
-      return new GravitinoAdminClient(uri, authDataProvider);
+      return new GravitinoAdminClient(uri, authDataProvider, headers);
     }
   }
 }

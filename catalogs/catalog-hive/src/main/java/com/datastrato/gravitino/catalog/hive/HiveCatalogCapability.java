@@ -16,4 +16,13 @@ public class HiveCatalogCapability implements Capability {
         "The NOT NULL constraint for column is only supported since Hive 3.0, "
             + "but the current Gravitino Hive catalog only supports Hive 2.x.");
   }
+
+  @Override
+  public CapabilityResult columnDefaultValue() {
+    // The DEFAULT constraint for column is supported since Hive3.0, see
+    // https://issues.apache.org/jira/browse/HIVE-18726
+    return CapabilityResult.unsupported(
+        "The DEFAULT constraint for column is only supported since Hive 3.0, "
+            + "but the current Gravitino Hive catalog only supports Hive 2.x.");
+  }
 }

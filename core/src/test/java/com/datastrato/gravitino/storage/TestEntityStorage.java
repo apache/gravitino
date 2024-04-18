@@ -23,6 +23,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
@@ -1969,5 +1970,92 @@ public class TestEntityStorage {
                 TableEntity.class,
                 Entity.EntityType.TABLE,
                 (e) -> e));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testOptimizedDeleteForKv(String type) throws IOException {
+    if ("relational".equalsIgnoreCase(type)) {
+      return;
+    }
+
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      if (store instanceof RelationalEntityStore) {
+        prepareJdbcTable();
+      }
+
+      BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);
+      CatalogEntity catalogCopy =
+          createCatalog(2L, Namespace.of("metalake"), "catalogCopy", auditInfo);
+
+      SchemaEntity schemaEntity =
+          createSchemaEntity(1L, Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      SchemaEntity schemaEntity2 =
+          createSchemaEntity(2L, Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+
+      TableEntity table =
+          createTableEntity(
+              1L, Namespace.of("metalake", "catalog", "schema1"), "the same", auditInfo);
+      FilesetEntity filesetEntity =
+          createFilesetEntity(
+              1L, Namespace.of("metalake", "catalog", "schema2"), "the same", auditInfo);
+
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schemaEntity);
+      store.put(schemaEntity2);
+      store.put(table);
+      store.put(filesetEntity);
+
+      Assertions.assertDoesNotThrow(
+          () -> store.get(schemaEntity2.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
+      Assertions.assertDoesNotThrow(
+          () -> store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      // Test delete with the cascade or not
+      Assertions.assertThrows(
+          Exception.class, () -> store.delete(schemaEntity.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertDoesNotThrow(
+          () -> store.delete(schemaEntity.nameIdentifier(), EntityType.SCHEMA, true));
+
+      Assertions.assertDoesNotThrow(
+          () -> store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      // Put the same schema back and see whether the deleted table exists or not
+      store.put(schemaEntity);
+      Assertions.assertDoesNotThrow(
+          () -> store.get(schemaEntity.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
+      Assertions.assertThrows(
+          Exception.class,
+          () -> store.get(table.nameIdentifier(), EntityType.TABLE, TableEntity.class));
+      Assertions.assertDoesNotThrow(
+          () -> store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      store.put(table);
+      Assertions.assertDoesNotThrow(
+          () -> store.get(schemaEntity.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
+      Assertions.assertDoesNotThrow(
+          () -> store.get(table.nameIdentifier(), EntityType.TABLE, TableEntity.class));
+      Assertions.assertDoesNotThrow(
+          () -> store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      store.delete(table.nameIdentifier(), EntityType.TABLE);
+      FilesetEntity filesetEntity1 =
+          createFilesetEntity(
+              1L, Namespace.of("metalake", "catalog", "schema1"), "the same", auditInfo);
+      store.put(filesetEntity1);
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(filesetEntity1.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+    }
   }
 }
