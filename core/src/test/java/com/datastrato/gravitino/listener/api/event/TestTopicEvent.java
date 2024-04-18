@@ -48,7 +48,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testCreateTopic() {
+  void testCreateTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.createTopic(identifier, topic.comment(), null, topic.properties());
     Event event = dummyEventListener.popEvent();
@@ -59,7 +59,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testLoadTopic() {
+  void testLoadTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.loadTopic(identifier);
     Event event = dummyEventListener.popEvent();
@@ -70,7 +70,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testAlterTopic() {
+  void testAlterTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     TopicChange topicChange = TopicChange.setProperty("a", "b");
     dispatcher.alterTopic(identifier, topicChange);
@@ -84,7 +84,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testDropTopic() {
+  void testDropTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.dropTopic(identifier);
     Event event = dummyEventListener.popEvent();
@@ -94,7 +94,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testListTopic() {
+  void testListTopicEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTopics(namespace);
     Event event = dummyEventListener.popEvent();
