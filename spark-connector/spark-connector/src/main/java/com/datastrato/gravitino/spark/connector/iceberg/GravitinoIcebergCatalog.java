@@ -7,6 +7,7 @@ package com.datastrato.gravitino.spark.connector.iceberg;
 
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
@@ -31,11 +32,6 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * function management tailored to the needs of Iceberg tables.
  */
 public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCatalog {
-
-  @Override
-  protected boolean supportsBucketTransfrom() {
-    return true;
-  }
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -74,13 +70,20 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
-    return new SparkIcebergTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter) {
+    return new SparkIcebergTable(
+        identifier, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
   }
 
   @Override
   protected PropertiesConverter getPropertiesConverter() {
     return new IcebergPropertiesConverter();
+  }
+
+  @Override
+  protected SparkTransformConverter getSparkTransformConverter() {
+    return new SparkTransformConverter(true);
   }
 
   @Override

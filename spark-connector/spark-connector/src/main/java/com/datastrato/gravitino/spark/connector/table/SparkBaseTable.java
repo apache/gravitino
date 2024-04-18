@@ -47,16 +47,19 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   private TableCatalog sparkCatalog;
   private Table lazySparkTable;
   private PropertiesConverter propertiesConverter;
+  private SparkTransformConverter sparkTransformConverter;
 
   public SparkBaseTable(
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter) {
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.sparkCatalog = sparkCatalog;
     this.propertiesConverter = propertiesConverter;
+    this.sparkTransformConverter = sparkTransformConverter;
   }
 
   @Override
@@ -127,7 +130,7 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
         gravitinoTable.partitioning();
     Distribution distribution = gravitinoTable.distribution();
     SortOrder[] sortOrders = gravitinoTable.sortOrder();
-    return SparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
+    return sparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
   }
 
   protected Table getSparkTable() {

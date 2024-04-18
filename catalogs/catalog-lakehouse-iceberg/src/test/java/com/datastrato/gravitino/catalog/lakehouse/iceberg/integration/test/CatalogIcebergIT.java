@@ -992,6 +992,26 @@ public class CatalogIcebergIT extends AbstractIT {
         loadTable);
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
 
+    // Create a data table for Distributions.NONE and set field name
+    Distribution hash = Distributions.hash(0, NamedReference.field(ICEBERG_COL_NAME1));
+    IllegalArgumentException illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  hash,
+                  sortOrders);
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Iceberg's Distribution Mode.HASH does not support set expressions."));
+
     distribution = Distributions.RANGE;
     // Create a data table for Distributions.hash
     tableCatalog.createTable(
@@ -1019,7 +1039,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
     // Create a data table for Distributions.range and set field name
     Distribution of = Distributions.of(Strategy.RANGE, 0, NamedReference.field(ICEBERG_COL_NAME1));
-    IllegalArgumentException illegalArgumentException =
+    illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
             () -> {
