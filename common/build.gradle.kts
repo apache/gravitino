@@ -98,6 +98,6 @@ tasks {
   }
 
   clean {
-    delete(file("$propertiesFile").parentFile)
+    delete("$propertiesFile")
   }
 }
