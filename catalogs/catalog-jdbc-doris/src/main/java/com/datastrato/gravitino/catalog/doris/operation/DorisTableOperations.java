@@ -249,6 +249,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
+    getTableStatus(connection, databaseName, tableName);
 
     if (StringUtils.isNotEmpty(tableBuilder.comment())) {
       return;
@@ -271,6 +272,28 @@ public class DorisTableOperations extends JdbcTableOperations {
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  protected void getTableStatus(Connection connection, String databaseName, String tableName) {
+    LOG.info("=======================");
+    // sql is `SHOW ALTER TABLE COLUMN`
+    String sql = String.format("SHOW ALTER TABLE COLUMN WHERE TableName = '%s'", tableName);
+
+    try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery()) {
+      while (resultSet.next()) {
+        String line = "";
+        for (int i = 1; i <= resultSet.getMetaData().getColumnCount(); i++) {
+          line +=
+              String.format(
+                  "[%s] %s ", resultSet.getMetaData().getColumnName(i), resultSet.getString(i));
+        }
+        LOG.info("Test: " + line);
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+    LOG.info("++++++++++++++++++++++++++");
   }
 
   @Override
