@@ -22,7 +22,7 @@ import org.mockserver.model.Parameter;
 
 public abstract class TestBase {
 
-  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
+  protected static final ObjectMapper MAPPER = JsonUtils.objectMapper();
 
   protected static ClientAndServer mockServer;
 
@@ -32,7 +32,8 @@ public abstract class TestBase {
   public static void setUp() throws Exception {
     mockServer = ClientAndServer.startClientAndServer(0);
     int port = mockServer.getLocalPort();
-    client = GravitinoAdminClient.builder("http://127.0.0.1:" + port).build();
+    client =
+        GravitinoAdminClient.builder("http://127.0.0.1:" + port).withVersionCheckDisabled().build();
   }
 
   @AfterAll
