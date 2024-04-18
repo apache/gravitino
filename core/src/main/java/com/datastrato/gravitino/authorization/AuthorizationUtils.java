@@ -240,5 +240,4 @@ public class AuthorizationUtils {
   private static boolean isSchema(SecurableObject securableObject) {
     return securableObject.parent().parent() == null;
   }
-
 }
