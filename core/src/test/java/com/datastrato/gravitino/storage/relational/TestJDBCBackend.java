@@ -29,6 +29,7 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.collect.ImmutableMap;
@@ -465,5 +466,17 @@ public class TestJDBCBackend {
         .withProperties(ImmutableMap.of("key", "value"))
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  public static UserEntity createUserEntity(
+          Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return UserEntity.builder()
+            .withId(id)
+            .withName(name)
+            .withNamespace(namespace)
+            .withRoleNames(null)
+            .withRoleIds(null)
+            .withAuditInfo(auditInfo)
+            .build();
   }
 }

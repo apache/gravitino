@@ -10,6 +10,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
@@ -68,9 +69,9 @@ public class UserMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<String> roleNames = RoleMetaService.getInstance().listRoleNameByUserId(userPO.getUserId());
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
 
-    return POConverters.fromUserPO(userPO, roleNames, identifier.namespace());
+    return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
   public void insertUser(UserEntity userEntity, boolean overwritten) {

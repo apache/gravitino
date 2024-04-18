@@ -26,7 +26,6 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.utils.Executable;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -205,7 +204,7 @@ public class TestMemoryEntityStore {
             .withName("user")
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList())
+            .withRoleNames(null)
             .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();

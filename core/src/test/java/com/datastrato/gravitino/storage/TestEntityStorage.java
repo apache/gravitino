@@ -28,6 +28,7 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
@@ -276,14 +277,11 @@ public class TestEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "topic1"),
                   Entity.EntityType.TOPIC,
                   TopicEntity.class));
+
       Assertions.assertDoesNotThrow(
           () ->
               store.get(
-                  NameIdentifier.of(
-                      "metalake",
-                      CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                      UserEntity.USER_SCHEMA_NAME,
-                      "user1"),
+                  AuthorizationUtils.ofUser("metalake", "user1"),
                   Entity.EntityType.USER,
                   UserEntity.class));
     }
@@ -329,11 +327,7 @@ public class TestEntityStorage {
       Assertions.assertDoesNotThrow(
           () ->
               store.get(
-                  NameIdentifier.of(
-                      "metalake",
-                      CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME,
-                      UserEntity.USER_SCHEMA_NAME,
-                      "user1"),
+                  AuthorizationUtils.ofUser("metalake", "user1"),
                   Entity.EntityType.USER,
                   UserEntity.class));
       destroy(type);
@@ -1194,7 +1188,7 @@ public class TestEntityStorage {
             Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(Lists.newArrayList())
+        .withRoleNames(null)
         .build();
   }
 

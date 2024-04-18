@@ -47,13 +47,13 @@ public class UserRoleRelPO {
     if (!(o instanceof UserRoleRelPO)) {
       return false;
     }
-    UserRoleRelPO tablePO = (UserRoleRelPO) o;
-    return Objects.equal(getUserId(), tablePO.getUserId())
-        && Objects.equal(getRoleId(), tablePO.getRoleId())
-        && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
-        && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+    UserRoleRelPO userRoleRelPO = (UserRoleRelPO) o;
+    return Objects.equal(getUserId(), userRoleRelPO.getUserId())
+        && Objects.equal(getRoleId(), userRoleRelPO.getRoleId())
+        && Objects.equal(getAuditInfo(), userRoleRelPO.getAuditInfo())
+        && Objects.equal(getCurrentVersion(), userRoleRelPO.getCurrentVersion())
+        && Objects.equal(getLastVersion(), userRoleRelPO.getLastVersion())
+        && Objects.equal(getDeletedAt(), userRoleRelPO.getDeletedAt());
   }
 
   @Override

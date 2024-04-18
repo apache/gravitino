@@ -6,7 +6,6 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.UserEntity;
-import com.google.common.collect.Lists;
 import java.util.Collection;
 
 public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
@@ -37,8 +36,7 @@ public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
             .withId(user.getId())
             .withName(user.getName())
             .withNamespace(namespace)
-            .withAuditInfo(new AuditInfoSerDe().deserialize(user.getAuditInfo(), namespace))
-            .withRoles(Lists.newArrayList());
+            .withAuditInfo(new AuditInfoSerDe().deserialize(user.getAuditInfo(), namespace));
 
     if (user.getRoleNamesCount() > 0) {
       builder.withRoleNames(user.getRoleNamesList());

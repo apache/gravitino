@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
+import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import java.util.List;
 
@@ -35,8 +36,8 @@ public class RoleMetaService {
     return roleId;
   }
 
-  public List<String> listRoleNameByUserId(Long userId) {
+  public List<RolePO> listRolesByUserId(Long userId) {
     return SessionUtils.getWithoutCommit(
-        RoleMetaMapper.class, mapper -> mapper.listRoleNameByUserId(userId));
+        RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
   }
 }

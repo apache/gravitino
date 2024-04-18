@@ -6,6 +6,9 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import java.util.List;
+
+import com.datastrato.gravitino.storage.relational.po.RolePO;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -30,7 +33,11 @@ public interface RoleMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("roleName") String name);
 
   @Select(
-      "SELECT ro.role_name as roleName"
+      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
+              + " ro.metalake_id as metalakeId, ro.properties as properties,"
+                + " ro.securable_object as securableObject, ro.privileges as privileges,"
+                + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
+              + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
@@ -38,5 +45,24 @@ public interface RoleMetaMapper {
           + " re ON ro.role_id = re.role_id"
           + " WHERE re.user_id = #{userId}"
           + " AND ro.deleted_at = 0 AND re.deleted_at = 0")
-  List<String> listRoleNameByUserId(@Param("userId") Long userId);
+  List<RolePO> listRolesByUserId(@Param("userId") Long userId);
+
+  @Insert(
+          "INSERT INTO "
+                  + ROLE_TABLE_NAME
+                  + "(role_id, role_name,"
+                    + " metalake_id, properties,"
+                    + " securable_object, privileges,"
+                    + " audit_info, current_version, last_version, deleted_at)"
+                  + " VALUES("
+                  + " #{roleMeta.userId},"
+                  + " #{roleMeta.userName},"
+                  + " #{roleMeta.metalakeId},"
+                  + " #{roleMeta.auditInfo},"
+                  + " #{roleMeta.currentVersion},"
+                  + " #{roleMeta.lastVersion},"
+                  + " #{roleMeta.deletedAt}"
+                  + " )")
+  void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
+
 }

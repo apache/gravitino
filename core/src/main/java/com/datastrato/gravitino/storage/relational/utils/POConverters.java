@@ -22,6 +22,7 @@ import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
@@ -641,15 +642,19 @@ public class POConverters {
    * Convert {@link UserPO} to {@link UserEntity}
    *
    * @param userPO UserPo object to be converted
+   * @param rolePOs list of rolePO
    * @param namespace Namespace object to be associated with the user
    * @return UserEntity object from UserPO object
    */
-  public static UserEntity fromUserPO(UserPO userPO, List<String> roles, Namespace namespace) {
+  public static UserEntity fromUserPO(UserPO userPO, List<RolePO> rolePOs, Namespace namespace) {
     try {
-      return UserEntity.builder()
+      List<String> roleNames = rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
+      List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
+       return UserEntity.builder()
           .withId(userPO.getUserId())
           .withName(userPO.getUserName())
-          .withRoles(roles)
+          .withRoleNames(roleNames.isEmpty() ? null : roleNames)
+               .withRoleIds(roleIds.isEmpty() ? null : roleIds)
           .withNamespace(namespace)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
