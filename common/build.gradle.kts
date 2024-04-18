@@ -57,29 +57,31 @@ fun getGitCommitId(): String {
 
 val propertiesFile = "src/main/resources/project.properties"
 val writeProjectPropertiesFile = tasks.register("writeProjectPropertiesFile") {
-  val propertiesFile = file(propertiesFile)
-  if (propertiesFile.exists()) {
-    propertiesFile.delete()
-  }
+  doFirst() {
+    val propertiesFile = file(propertiesFile)
+    if (propertiesFile.exists()) {
+      propertiesFile.delete()
+    }
 
-  val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
-  val compileDate = dateFormat.format(Date())
-  val projectVersion = project.version.toString()
-  val commitId = getGitCommitId()
+    val compileDate = dateFormat.format(Date())
+    val projectVersion = project.version.toString()
+    val commitId = getGitCommitId()
 
-  propertiesFile.parentFile.mkdirs()
-  propertiesFile.createNewFile()
-  propertiesFile.writer().use { writer ->
-    writer.write(
-      "#\n" +
-        "# Copyright 2023 Datastrato Pvt Ltd.\n" +
-        "# This software is licensed under the Apache License version 2.\n" +
-        "#\n"
-    )
-    writer.write("project.version=$projectVersion\n")
-    writer.write("compile.date=$compileDate\n")
-    writer.write("git.commit.id=$commitId\n")
+    propertiesFile.parentFile.mkdirs()
+    propertiesFile.createNewFile()
+    propertiesFile.writer().use { writer ->
+      writer.write(
+        "#\n" +
+          "# Copyright 2023 Datastrato Pvt Ltd.\n" +
+          "# This software is licensed under the Apache License version 2.\n" +
+          "#\n"
+      )
+      writer.write("project.version=$projectVersion\n")
+      writer.write("compile.date=$compileDate\n")
+      writer.write("git.commit.id=$commitId\n")
+    }
   }
 }
 
