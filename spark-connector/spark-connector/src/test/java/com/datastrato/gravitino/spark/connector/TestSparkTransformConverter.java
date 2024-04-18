@@ -254,8 +254,7 @@ public class TestSparkTransformConverter {
         SparkTransformConverter.createSparkYearsTransform(NamedReference.field("date")),
         Transforms.year("date"));
     sparkToGravitinoPartitionTransformMaps.put(
-        SparkTransformConverter.createSparkTruncateTransform(
-            "truncate", 10, new String[] {"package"}),
+        SparkTransformConverter.createSparkTruncateTransform(10, new String[] {"package"}),
         Transforms.truncate(10, "package"));
   }
 }
