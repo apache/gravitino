@@ -7,6 +7,7 @@ package com.datastrato.gravitino.server.authentication;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auth.SignatureAlgorithmFamilyType;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.base.Preconditions;
@@ -38,6 +39,11 @@ class OAuth2TokenAuthenticator implements Authenticator {
   private long allowSkewSeconds;
   private Key defaultSigningKey;
   private String serviceAudience;
+
+  @Override
+  public String name() {
+    return AuthenticatorType.OAUTH.name().toLowerCase();
+  }
 
   @Override
   public boolean isDataFromToken() {

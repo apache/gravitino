@@ -12,6 +12,12 @@ public final class AuthConstants {
   /** The HTTP header used to pass the authentication token. */
   public static final String HTTP_HEADER_AUTHORIZATION = "Authorization";
 
+  /**
+   * The HTTP header used to pass the authentication type. If this value is empty, then simple will
+   * be used by default
+   */
+  public static final String HTTP_HEADER_AUTHORIZATION_TYPE = "Authorization-Type";
+
   /** The name of BEARER header used to pass the authentication token. */
   public static final String AUTHORIZATION_BEARER_HEADER = "Bearer ";
 

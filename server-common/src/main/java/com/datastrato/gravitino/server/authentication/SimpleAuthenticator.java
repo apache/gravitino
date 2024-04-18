@@ -8,6 +8,7 @@ package com.datastrato.gravitino.server.authentication;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Base64;
@@ -20,6 +21,11 @@ import org.apache.commons.lang3.StringUtils;
 class SimpleAuthenticator implements Authenticator {
 
   private final Principal ANONYMOUS_PRINCIPAL = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
+
+  @Override
+  public String name() {
+    return AuthenticatorType.SIMPLE.name().toLowerCase();
+  }
 
   @Override
   public boolean isDataFromToken() {

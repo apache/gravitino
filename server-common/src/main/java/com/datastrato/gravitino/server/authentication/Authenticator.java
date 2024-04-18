@@ -12,6 +12,13 @@ import java.security.Principal;
 public interface Authenticator {
 
   /**
+   * The name of Authenticator. Such as simple, oauth, kerberos. The name should be lowercase.
+   *
+   * @return The name of the Authenticator.
+   */
+  String name();
+
+  /**
    * Judge whether the data used to authenticate is from the token.
    *
    * @return true, if the data used to authenticate is from the token, Otherwise, it's false.

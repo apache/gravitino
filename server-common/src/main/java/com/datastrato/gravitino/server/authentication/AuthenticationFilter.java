@@ -5,12 +5,17 @@
 package com.datastrato.gravitino.server.authentication;
 
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Enumeration;
+import java.util.Map;
+import java.util.Optional;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -22,15 +27,20 @@ import javax.servlet.http.HttpServletResponse;
 
 public class AuthenticationFilter implements Filter {
 
-  private final Authenticator filterAuthenticator;
+  private final Map<String, Authenticator> filterAuthenticators = Maps.newHashMap();
 
   public AuthenticationFilter() {
-    filterAuthenticator = null;
+    Authenticator[] authenticators = ServerAuthenticator.getInstance().authenticators();
+    for (Authenticator authenticator : authenticators) {
+      filterAuthenticators.put(authenticator.name(), authenticator);
+    }
   }
 
   @VisibleForTesting
-  AuthenticationFilter(Authenticator authenticator) {
-    this.filterAuthenticator = authenticator;
+  AuthenticationFilter(Authenticator... authenticators) {
+    for (Authenticator authenticator : authenticators) {
+      filterAuthenticators.put(authenticator.name(), authenticator);
+    }
   }
 
   @Override
@@ -40,13 +50,14 @@ public class AuthenticationFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     try {
-      Authenticator authenticator;
-      if (filterAuthenticator == null) {
-        authenticator = ServerAuthenticator.getInstance().authenticator();
-      } else {
-        authenticator = filterAuthenticator;
-      }
       HttpServletRequest req = (HttpServletRequest) request;
+      String authenticatorType =
+          Optional.ofNullable(req.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE))
+              .orElse(AuthenticatorType.SIMPLE.name().toLowerCase());
+      Authenticator authenticator =
+          Preconditions.checkNotNull(
+              filterAuthenticators.get(authenticatorType), "The Authenticator should not be null");
+
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
       byte[] authData = null;
       if (headerData.hasMoreElements()) {

@@ -31,6 +31,7 @@ public class TestAuthenticationFilter {
   public void testDoFilterNormal() throws ServletException, IOException {
 
     Authenticator authenticator = mock(Authenticator.class);
+    when(authenticator.name()).thenReturn("simple");
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -46,6 +47,7 @@ public class TestAuthenticationFilter {
   @Test
   public void testDoFilterWithException() throws ServletException, IOException {
     Authenticator authenticator = mock(Authenticator.class);
+    when(authenticator.name()).thenReturn("simple");
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -57,5 +59,41 @@ public class TestAuthenticationFilter {
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+  }
+
+  @Test
+  public void testDoFilterInMultiAuth() throws ServletException, IOException {
+    FilterChain mockChain = mock(FilterChain.class);
+
+    Authenticator authenticator1 = mock(Authenticator.class);
+    Authenticator authenticator2 = mock(Authenticator.class);
+    when(authenticator1.name()).thenReturn("simple");
+    when(authenticator2.name()).thenReturn("oauth");
+    when(authenticator1.isDataFromToken()).thenReturn(true);
+    when(authenticator1.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+
+    AuthenticationFilter filter = new AuthenticationFilter(authenticator1, authenticator2);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+
+    // verify simple authenticator by default.
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
+
+    // verify simple authenticator
+    when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("simple");
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
+
+    // verify oauth authenticator
+    when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("oauth");
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
   }
 }

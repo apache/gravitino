@@ -14,6 +14,7 @@ package com.datastrato.gravitino.server.authentication;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.base.Splitter;
@@ -87,6 +88,11 @@ public class KerberosAuthenticator implements Authenticator {
     } catch (PrivilegedActionException ex) {
       throw new RuntimeException(ex);
     }
+  }
+
+  @Override
+  public String name() {
+    return AuthenticatorType.KERBEROS.name().toLowerCase();
   }
 
   @Override
