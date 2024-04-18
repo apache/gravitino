@@ -101,13 +101,24 @@ public class GravitinoEnv {
 
   /**
    * This method is used for testing purposes only to set the access manager for test in package
-   * `com.datastrato.gravitino.server.web.rest`.
+   * `com.datastrato.gravitino.server.web.rest` and `com.datastrato.gravitino.authorization`.
    *
    * @param accessControlManager The access control manager to be set.
    */
   @VisibleForTesting
   public void setAccessControlManager(AccessControlManager accessControlManager) {
     this.accessControlManager = accessControlManager;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the entity store for test in package
+   * `com.datastrato.gravitino.authorization`.
+   *
+   * @param entityStore The entity store to be set.
+   */
+  @VisibleForTesting
+  public void setEntityStore(EntityStore entityStore) {
+    this.entityStore = entityStore;
   }
 
   /**
