@@ -9,12 +9,11 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.Map;
 
 public class TestTopicStandardizedDispatcher extends TestTopicOperationDispatcher {
   private static TopicStandardizedDispatcher topicStandardizedDispatcher;
@@ -31,11 +30,13 @@ public class TestTopicStandardizedDispatcher extends TestTopicOperationDispatche
   public void testNameCaseInsensitive() {
     Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    schemaStandardizedDispatcher.createSchema(
+        NameIdentifier.of(topicNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topicNAME");
-    Topic createdTopic = topicStandardizedDispatcher.createTopic(topicIdent, "comment", null, props);
+    Topic createdTopic =
+        topicStandardizedDispatcher.createTopic(topicIdent, "comment", null, props);
     Assertions.assertEquals(topicIdent.name().toLowerCase(), createdTopic.name());
 
     // test case-insensitive in loading

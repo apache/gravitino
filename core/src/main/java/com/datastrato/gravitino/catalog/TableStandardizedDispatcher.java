@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -17,10 +19,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-
 import java.util.Map;
-
-import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 
 public class TableStandardizedDispatcher implements TableDispatcher {
 
@@ -33,7 +32,8 @@ public class TableStandardizedDispatcher implements TableDispatcher {
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace = applyCapabilities(namespace, Capability.Scope.TABLE, capability);
+    Namespace standardizedNamespace =
+        applyCapabilities(namespace, Capability.Scope.TABLE, capability);
     NameIdentifier[] identifiers = dispatcher.listTables(standardizedNamespace);
     return applyCapabilities(identifiers, Capability.Scope.TABLE, capability);
   }
@@ -67,7 +67,8 @@ public class TableStandardizedDispatcher implements TableDispatcher {
   }
 
   @Override
-  public Table alterTable(NameIdentifier ident, TableChange... changes) throws NoSuchTableException, IllegalArgumentException {
+  public Table alterTable(NameIdentifier ident, TableChange... changes)
+      throws NoSuchTableException, IllegalArgumentException {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return dispatcher.alterTable(
         applyCapabilities(ident, Capability.Scope.TABLE, capability),

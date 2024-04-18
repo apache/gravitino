@@ -10,13 +10,12 @@ import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.google.common.collect.ImmutableMap;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispatcher {
   private static FilesetStandardizedDispatcher filesetStandardizedDispatcher;
@@ -33,7 +32,8 @@ public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispa
   public void testNameCaseInsensitive() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema112");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+    schemaStandardizedDispatcher.createSchema(
+        NameIdentifier.of(filesetNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "filesetNAME");
@@ -73,5 +73,4 @@ public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispa
             NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase())));
     Assertions.assertFalse(filesetStandardizedDispatcher.filesetExists(filesetIdent));
   }
-
 }

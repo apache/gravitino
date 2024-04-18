@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -13,10 +15,7 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-
 import java.util.Map;
-
-import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 
 public class SchemaStandardizedDispatcher implements SchemaDispatcher {
 
@@ -29,7 +28,8 @@ public class SchemaStandardizedDispatcher implements SchemaDispatcher {
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace = applyCapabilities(namespace, Capability.Scope.SCHEMA, capability);
+    Namespace standardizedNamespace =
+        applyCapabilities(namespace, Capability.Scope.SCHEMA, capability);
     NameIdentifier[] identifiers = dispatcher.listSchemas(standardizedNamespace);
     return applyCapabilities(identifiers, Capability.Scope.SCHEMA, capability);
   }

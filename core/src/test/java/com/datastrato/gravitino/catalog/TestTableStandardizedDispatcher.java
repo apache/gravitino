@@ -23,13 +23,12 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 public class TestTableStandardizedDispatcher extends TestTableOperationDispatcher {
   private static TableStandardizedDispatcher tableStandardizedDispatcher;
@@ -46,14 +45,15 @@ public class TestTableStandardizedDispatcher extends TestTableOperationDispatche
   public void testNameCaseInsensitive() {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    schemaStandardizedDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "tableNAME");
     Column[] columns =
         new Column[] {
-            TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
-            TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
         };
     Transform[] transforms = new Transform[] {Transforms.identity(columns[0].name())};
     Distribution distribution =

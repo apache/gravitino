@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -12,10 +14,7 @@ import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
-
 import java.util.Map;
-
-import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 
 public class FilesetStandardizedDispatcher implements FilesetDispatcher {
 
@@ -25,11 +24,11 @@ public class FilesetStandardizedDispatcher implements FilesetDispatcher {
     this.dispatcher = dispatcher;
   }
 
-
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace = applyCapabilities(namespace, Capability.Scope.FILESET, capability);
+    Namespace standardizedNamespace =
+        applyCapabilities(namespace, Capability.Scope.FILESET, capability);
     NameIdentifier[] identifiers = dispatcher.listFilesets(standardizedNamespace);
     return applyCapabilities(identifiers, Capability.Scope.FILESET, capability);
   }
@@ -57,7 +56,8 @@ public class FilesetStandardizedDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes) throws NoSuchFilesetException, IllegalArgumentException {
+  public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
+      throws NoSuchFilesetException, IllegalArgumentException {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return dispatcher.alterFileset(
         applyCapabilities(ident, Capability.Scope.FILESET, capability),

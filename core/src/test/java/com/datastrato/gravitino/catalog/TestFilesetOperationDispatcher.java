@@ -9,12 +9,10 @@ import static com.datastrato.gravitino.connector.BasePropertiesMetadata.GRAVITIN
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;

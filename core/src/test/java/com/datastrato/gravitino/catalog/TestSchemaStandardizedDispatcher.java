@@ -9,12 +9,11 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.Arrays;
 
 public class TestSchemaStandardizedDispatcher extends TestSchemaOperationDispatcher {
   private static SchemaStandardizedDispatcher schemaStandardizedDispatcher;
@@ -30,7 +29,8 @@ public class TestSchemaStandardizedDispatcher extends TestSchemaOperationDispatc
     // test case-insensitive in creation
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schemaNAME");
     Schema createdSchema =
-        schemaStandardizedDispatcher.createSchema(schemaIdent, null, ImmutableMap.of("k1", "v1", "k2", "v2"));
+        schemaStandardizedDispatcher.createSchema(
+            schemaIdent, null, ImmutableMap.of("k1", "v1", "k2", "v2"));
     Assertions.assertEquals(schemaIdent.name().toLowerCase(), createdSchema.name());
 
     // test case-insensitive in loading
@@ -38,7 +38,8 @@ public class TestSchemaStandardizedDispatcher extends TestSchemaOperationDispatc
     Assertions.assertEquals(schemaIdent.name().toLowerCase(), loadSchema.name());
 
     // test case-insensitive in listing
-    NameIdentifier[] schemas = schemaStandardizedDispatcher.listSchemas(Namespace.of(metalake, catalog));
+    NameIdentifier[] schemas =
+        schemaStandardizedDispatcher.listSchemas(Namespace.of(metalake, catalog));
     Arrays.stream(schemas).forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
 
     // test case-insensitive in altering
@@ -53,6 +54,4 @@ public class TestSchemaStandardizedDispatcher extends TestSchemaOperationDispatc
             NameIdentifier.of(schemaIdent.namespace(), schemaIdent.name().toLowerCase()), false));
     Assertions.assertFalse(schemaStandardizedDispatcher.schemaExists(schemaIdent));
   }
-
-
 }

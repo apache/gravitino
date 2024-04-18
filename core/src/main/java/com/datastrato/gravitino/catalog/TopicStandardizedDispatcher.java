@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -13,10 +15,7 @@ import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.messaging.DataLayout;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
-
 import java.util.Map;
-
-import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 
 public class TopicStandardizedDispatcher implements TopicDispatcher {
 
@@ -29,7 +28,8 @@ public class TopicStandardizedDispatcher implements TopicDispatcher {
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
     Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace = applyCapabilities(namespace, Capability.Scope.TOPIC, capability);
+    Namespace standardizedNamespace =
+        applyCapabilities(namespace, Capability.Scope.TOPIC, capability);
     NameIdentifier[] identifiers = dispatcher.listTopics(standardizedNamespace);
     return applyCapabilities(identifiers, Capability.Scope.TOPIC, capability);
   }
@@ -45,12 +45,16 @@ public class TopicStandardizedDispatcher implements TopicDispatcher {
   }
 
   @Override
-  public Topic createTopic(NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties) throws NoSuchSchemaException, TopicAlreadyExistsException {
-    return dispatcher.createTopic(standardizeNameIdentifier(ident), comment, dataLayout, properties);
+  public Topic createTopic(
+      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      throws NoSuchSchemaException, TopicAlreadyExistsException {
+    return dispatcher.createTopic(
+        standardizeNameIdentifier(ident), comment, dataLayout, properties);
   }
 
   @Override
-  public Topic alterTopic(NameIdentifier ident, TopicChange... changes) throws NoSuchTopicException, IllegalArgumentException {
+  public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
+      throws NoSuchTopicException, IllegalArgumentException {
     return dispatcher.alterTopic(standardizeNameIdentifier(ident), changes);
   }
 
