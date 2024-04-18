@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -13,11 +14,16 @@ import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
@@ -69,8 +75,7 @@ public class CapabilityHelpers {
     Namespace namespace = ident.namespace();
     namespace = applyCapabilities(namespace, scope, capabilities);
 
-    String name = applyCaseSensitiveOnName(scope, ident.name(), capabilities);
-    applyNameSpecification(scope, name, capabilities);
+    String name = applyCapabilitiesOnName(scope, ident.name(), capabilities);
     return NameIdentifier.of(namespace, name);
   }
 
@@ -81,8 +86,8 @@ public class CapabilityHelpers {
   }
 
   public static Distribution applyCapabilities(Distribution distribution, Capability capabilities) {
-    applyCapabilities(distribution.expressions(), capabilities);
-    return distribution;
+    Expression[] expressions = applyCapabilities(distribution.expressions(), capabilities);
+    return Distributions.of(distribution.strategy(), distribution.number(), expressions);
   }
 
   public static SortOrder[] applyCapabilities(SortOrder[] sortOrders, Capability capabilities) {
@@ -105,33 +110,82 @@ public class CapabilityHelpers {
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC) {
       String schema = namespace.level(namespace.length() - 1);
-      schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
-      applyNameSpecification(Capability.Scope.SCHEMA, schema, capabilities);
+      schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
     }
     return namespace;
   }
 
   private static Index applyCapabilities(Index index, Capability capabilities) {
-    String[][] fieldNames = index.fieldNames();
-    for (String[] fieldName : fieldNames) {
-      String[] sensitiveOnColumnName = applyCaseSensitiveOnColumnName(fieldName, capabilities);
-      fieldName[0] = sensitiveOnColumnName[0];
-      applyNameSpecification(Capability.Scope.COLUMN, sensitiveOnColumnName[0], capabilities);
+    return Indexes.of(
+        index.type(), index.name(), applyCapabilities(index.fieldNames(), capabilities));
+  }
+
+  private static String[][] applyCapabilities(String[][] fieldNames, Capability capabilities) {
+    String[][] standardizeFieldNames = new String[fieldNames.length][];
+    for (int i = 0; i < standardizeFieldNames.length; i++) {
+      standardizeFieldNames[i] = applyCapabilities(fieldNames[i], capabilities);
     }
-    return index;
+    return standardizeFieldNames;
+  }
+
+  private static String[] applyCapabilities(String[] fieldName, Capability capabilities) {
+    String[] sensitiveOnColumnName = applyCaseSensitiveOnColumnName(fieldName, capabilities);
+    applyNameSpecification(Capability.Scope.COLUMN, sensitiveOnColumnName[0], capabilities);
+    return sensitiveOnColumnName;
   }
 
   private static Transform applyCapabilities(Transform transform, Capability capabilities) {
-    for (Expression arg : transform.arguments()) {
-      applyCapabilities(arg, capabilities);
+    if (transform instanceof Transform.SingleFieldTransform) {
+      String[] standardizeFieldName =
+          applyCapabilities(((Transform.SingleFieldTransform) transform).fieldName(), capabilities);
+      switch (transform.name()) {
+        case NAME_OF_IDENTITY:
+          return Transforms.identity(standardizeFieldName);
+        case Transforms.NAME_OF_YEAR:
+          return Transforms.year(standardizeFieldName);
+        case Transforms.NAME_OF_MONTH:
+          return Transforms.month(standardizeFieldName);
+        case Transforms.NAME_OF_DAY:
+          return Transforms.day(standardizeFieldName);
+        case Transforms.NAME_OF_HOUR:
+          return Transforms.hour(standardizeFieldName);
+        default:
+          throw new IllegalArgumentException("Unsupported transform: " + transform.name());
+      }
+
+    } else if (transform instanceof Transforms.BucketTransform) {
+      Transforms.BucketTransform bucketTransform = (Transforms.BucketTransform) transform;
+      return Transforms.bucket(
+          bucketTransform.numBuckets(),
+          applyCapabilities(bucketTransform.fieldNames(), capabilities));
+
+    } else if (transform instanceof Transforms.TruncateTransform) {
+      Transforms.TruncateTransform truncateTransform = (Transforms.TruncateTransform) transform;
+      return Transforms.truncate(
+          truncateTransform.width(),
+          applyCapabilities(truncateTransform.fieldName(), capabilities));
+
+    } else if (transform instanceof Transforms.ListTransform) {
+      return Transforms.list(
+          applyCapabilities(((Transforms.ListTransform) transform).fieldNames(), capabilities));
+
+    } else if (transform instanceof Transforms.RangeTransform) {
+      return Transforms.range(
+          applyCapabilities(((Transforms.RangeTransform) transform).fieldName(), capabilities));
+
+    } else if (transform instanceof Transforms.ApplyTransform) {
+      return Transforms.apply(
+          transform.name(), applyCapabilities(transform.arguments(), capabilities));
+
+    } else {
+      throw new IllegalArgumentException("Unsupported transform: " + transform.name());
     }
-    return transform;
   }
 
   private static SortOrder applyCapabilities(SortOrder sortOrder, Capability capabilities) {
-    applyCapabilities(sortOrder.expression(), capabilities);
-    return sortOrder;
+    Expression expression = applyCapabilities(sortOrder.expression(), capabilities);
+    return SortOrders.of(expression, sortOrder.direction(), sortOrder.nullOrdering());
   }
 
   private static Expression[] applyCapabilities(Expression[] expressions, Capability capabilities) {
@@ -143,12 +197,14 @@ public class CapabilityHelpers {
   private static Expression applyCapabilities(Expression expression, Capability capabilities) {
     if (expression instanceof NamedReference.FieldReference) {
       NamedReference.FieldReference ref = (NamedReference.FieldReference) expression;
-      String[] fieldName = applyCaseSensitiveOnColumnName(ref.fieldName(), capabilities);
-      ref.fieldName()[0] = fieldName[0];
-      applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
-    }
-    for (Expression child : expression.children()) {
-      applyCapabilities(child, capabilities);
+      String[] fieldName = applyCapabilities(ref.fieldName(), capabilities);
+      return NamedReference.field(fieldName);
+
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression functionExpression = (FunctionExpression) expression;
+      return FunctionExpression.of(
+          functionExpression.functionName(),
+          applyCapabilities(functionExpression.arguments(), capabilities));
     }
     return expression;
   }
@@ -172,6 +228,9 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+    applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
+
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
 
@@ -184,11 +243,37 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.RenameColumn) {
       return applyCapabilities((TableChange.RenameColumn) change, capabilities);
 
+    } else if (change instanceof TableChange.DeleteColumn) {
+      return TableChange.deleteColumn(fieldName, ((TableChange.DeleteColumn) change).getIfExists());
+
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      return TableChange.updateColumnAutoIncrement(
+          fieldName, ((TableChange.UpdateColumnAutoIncrement) change).isAutoIncrement());
+
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      return TableChange.updateColumnComment(
+          fieldName, ((TableChange.UpdateColumnComment) change).getNewComment());
+
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      TableChange.UpdateColumnPosition updateColumnPosition =
+          (TableChange.UpdateColumnPosition) change;
+      if (updateColumnPosition.getPosition() instanceof TableChange.After) {
+        TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
+        String afterFieldName =
+            applyCaseSensitiveOnName(
+                Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
+        applyNameSpecification(Capability.Scope.COLUMN, afterFieldName, capabilities);
+        return TableChange.updateColumnPosition(
+            fieldName, TableChange.ColumnPosition.after(afterFieldName));
+      }
+      return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
+
+    } else if (change instanceof TableChange.UpdateColumnType) {
+      return TableChange.updateColumnType(
+          fieldName, ((TableChange.UpdateColumnType) change).getNewDataType());
+
     } else {
-      String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-      change.fieldName()[0] = fieldName[0];
-      applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
-      return change;
+      throw new IllegalArgumentException("Unsupported column change: " + change);
     }
   }
 
@@ -205,8 +290,11 @@ public class CapabilityHelpers {
                 addColumn.getDefaultValue()),
             capabilities);
 
+    String[] standardizeFieldName =
+        Arrays.copyOf(addColumn.fieldName(), addColumn.fieldName().length);
+    standardizeFieldName[0] = appliedColumn.name();
     return TableChange.addColumn(
-        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        standardizeFieldName,
         appliedColumn.dataType(),
         appliedColumn.comment(),
         addColumn.getPosition(),
@@ -242,14 +330,10 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
-      applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
-      newName =
-          applyCaseSensitiveOnName(
-              Capability.Scope.COLUMN, renameColumn.getNewName(), capabilities);
-      applyNameSpecification(Capability.Scope.COLUMN, newName, capabilities);
+      newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);
     }
     return TableChange.renameColumn(fieldName, newName);
   }
@@ -257,15 +341,21 @@ public class CapabilityHelpers {
   private static Column applyCapabilities(Column column, Capability capabilities) {
     applyColumnNotNull(column, capabilities);
     applyColumnDefaultValue(column, capabilities);
-    applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
 
     return Column.of(
-        applyCaseSensitiveOnName(Capability.Scope.COLUMN, column.name(), capabilities),
+        applyCapabilitiesOnName(Capability.Scope.COLUMN, column.name(), capabilities),
         column.dataType(),
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
         column.defaultValue());
+  }
+
+  private static String applyCapabilitiesOnName(
+      Capability.Scope scope, String name, Capability capabilities) {
+    String standardizeName = applyCaseSensitiveOnName(scope, name, capabilities);
+    applyNameSpecification(scope, standardizeName, capabilities);
+    return standardizeName;
   }
 
   private static String applyCaseSensitiveOnName(
