@@ -15,7 +15,7 @@ import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -110,7 +110,7 @@ public class TestRole extends TestBase {
   }
 
   @Test
-  public void testLoadRoles() throws Exception {
+  public void testGetRoles() throws Exception {
     String roleName = "role";
     String rolePath = withSlash(String.format(API_METALAKES_ROLES_PATH, metalakeName, roleName));
 
@@ -118,7 +118,7 @@ public class TestRole extends TestBase {
     RoleResponse roleResponse = new RoleResponse(mockRole);
     buildMockResource(Method.GET, rolePath, null, roleResponse, SC_OK);
 
-    Role loadedRole = client.loadRole(metalakeName, roleName);
+    Role loadedRole = client.getRole(metalakeName, roleName);
     Assertions.assertNotNull(loadedRole);
     assertRole(mockRole, loadedRole);
 
@@ -128,7 +128,7 @@ public class TestRole extends TestBase {
     buildMockResource(Method.GET, rolePath, null, errResp1, SC_NOT_FOUND);
     Exception ex =
         Assertions.assertThrows(
-            NoSuchRoleException.class, () -> client.loadRole(metalakeName, roleName));
+            NoSuchRoleException.class, () -> client.getRole(metalakeName, roleName));
     Assertions.assertEquals("role not found", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -137,34 +137,35 @@ public class TestRole extends TestBase {
     buildMockResource(Method.GET, rolePath, null, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.loadRole(metalakeName, roleName));
+            NoSuchMetalakeException.class, () -> client.getRole(metalakeName, roleName));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, rolePath, null, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.loadRole(metalakeName, roleName), "internal error");
+        RuntimeException.class, () -> client.getRole(metalakeName, roleName), "internal error");
   }
 
   @Test
-  public void testDropRoles() throws Exception {
+  public void testDeleteRoles() throws Exception {
     String roleName = "role";
     String rolePath = withSlash(String.format(API_METALAKES_ROLES_PATH, metalakeName, roleName));
 
-    DropResponse dropResponse = new DropResponse(true);
-    buildMockResource(Method.DELETE, rolePath, null, dropResponse, SC_OK);
+    DeleteResponse deleteResponse = new DeleteResponse(true);
+    buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
 
-    Assertions.assertTrue(client.dropRole(metalakeName, roleName));
+    Assertions.assertTrue(client.deleteRole(metalakeName, roleName));
 
-    dropResponse = new DropResponse(false);
-    buildMockResource(Method.DELETE, rolePath, null, dropResponse, SC_OK);
-    Assertions.assertFalse(client.dropRole(metalakeName, roleName));
+    deleteResponse = new DeleteResponse(false);
+    buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
+    Assertions.assertFalse(client.deleteRole(metalakeName, roleName));
 
     // test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, rolePath, null, errResp, SC_SERVER_ERROR);
-    Assertions.assertThrows(RuntimeException.class, () -> client.dropRole(metalakeName, roleName));
+    Assertions.assertThrows(
+        RuntimeException.class, () -> client.deleteRole(metalakeName, roleName));
   }
 
   private RoleDTO mockRoleDTO(String name) {

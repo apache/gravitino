@@ -256,7 +256,7 @@ public class TestAccessControlManagerForPermissions {
     entityStore.put(roleEntity, true);
     Assertions.assertTrue(accessControlManager.grantRoleToUser(METALAKE, anotherRole, USER));
     Assertions.assertTrue(accessControlManager.grantRoleToGroup(METALAKE, anotherRole, GROUP));
-    accessControlManager.dropRole(METALAKE, anotherRole);
+    accessControlManager.deleteRole(METALAKE, anotherRole);
     Group group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
   }
