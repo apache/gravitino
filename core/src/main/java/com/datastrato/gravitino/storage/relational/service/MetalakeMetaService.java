@@ -187,11 +187,11 @@ public class MetalakeMetaService {
     return true;
   }
 
-  public void deleteMetalakeMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
+  public int deleteMetalakeMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
         MetalakeMetaMapper.class,
         mapper -> {
-          mapper.deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
         });
   }
 }

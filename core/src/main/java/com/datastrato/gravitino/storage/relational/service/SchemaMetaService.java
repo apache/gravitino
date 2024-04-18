@@ -215,11 +215,11 @@ public class SchemaMetaService {
     return true;
   }
 
-  public void deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
+  public int deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
         mapper -> {
-          mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
         });
   }
 

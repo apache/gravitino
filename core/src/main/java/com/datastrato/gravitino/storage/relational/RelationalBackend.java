@@ -97,15 +97,19 @@ public interface RelationalBackend extends Closeable {
    * Permanent deletes the legacy data that has been marked as deleted before the given legacy
    * timeline.
    *
+   * @param entityType The type of the entity.
    * @param legacyTimeLine The time before which the data has been marked as deleted.
+   * @return The count of the deleted data.
    */
-  void hardDeleteLegacyData(long legacyTimeLine);
+  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine);
 
   /**
    * Permanent deletes the old version data that is older than or equal to the given version
    * retention count.
    *
+   * @param entityType The type of the entity.
    * @param versionRetentionCount The count of versions to retain.
+   * @return The count of the deleted data.
    */
-  void hardDeleteOldVersionData(long versionRetentionCount);
+  int hardDeleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount);
 }

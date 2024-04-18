@@ -176,11 +176,11 @@ public class TopicMetaService {
     return true;
   }
 
-  public void deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
+  public int deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
         TopicMetaMapper.class,
         mapper -> {
-          mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
         });
   }
 

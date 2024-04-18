@@ -558,7 +558,9 @@ public class TestJDBCBackend {
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
 
     // meta data hard delete
-    backend.hardDeleteLegacyData(Instant.now().toEpochMilli() + 1000);
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
+    }
     assertFalse(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
     assertFalse(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
     assertFalse(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
@@ -569,7 +571,9 @@ public class TestJDBCBackend {
 
     // hard delete for old version fileset
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
-    backend.hardDeleteOldVersionData(1);
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteOldVersionData(entityType, 1);
+    }
     assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
   }
 

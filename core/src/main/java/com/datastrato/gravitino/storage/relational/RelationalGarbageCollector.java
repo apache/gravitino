@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
@@ -25,6 +26,8 @@ public final class RelationalGarbageCollector implements Closeable {
   private final RelationalBackend backend;
 
   private final Config config;
+  private final long storeDeleteAfterTimeMillis;
+  private final long versionRetentionCount;
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -40,10 +43,12 @@ public final class RelationalGarbageCollector implements Closeable {
   public RelationalGarbageCollector(RelationalBackend backend, Config config) {
     this.backend = backend;
     this.config = config;
+    storeDeleteAfterTimeMillis = this.config.get(STORE_DELETE_AFTER_TIME);
+    versionRetentionCount = this.config.get(VERSION_RETENTION_COUNT);
   }
 
   public void start() {
-    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    long dateTimeLineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
     // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
@@ -57,11 +62,21 @@ public final class RelationalGarbageCollector implements Closeable {
 
     try {
       LOG.info("Start to collect and delete legacy data by thread {}", threadId);
-      long legacyTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
-      backend.hardDeleteLegacyData(legacyTimeLine);
+      long legacyTimeLine = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
+      for (Entity.EntityType entityType : Entity.EntityType.values()) {
+        long deletedCount = Long.MAX_VALUE;
+        while (deletedCount > 0) {
+          deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeLine);
+        }
+      }
 
       LOG.info("Start to collect and delete old version data by thread {}", threadId);
-      backend.hardDeleteOldVersionData(config.get(VERSION_RETENTION_COUNT));
+      for (Entity.EntityType entityType : Entity.EntityType.values()) {
+        long deletedCount = Long.MAX_VALUE;
+        while (deletedCount > 0) {
+          deletedCount = backend.hardDeleteOldVersionData(entityType, versionRetentionCount);
+        }
+      }
     } catch (Exception e) {
       LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
     } finally {

@@ -220,17 +220,20 @@ public class FilesetMetaService {
     return true;
   }
 
-  public void deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
-        FilesetMetaMapper.class,
-        mapper -> {
-          mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
-        });
-    SessionUtils.doWithCommit(
-        FilesetVersionMapper.class,
-        mapper -> {
-          mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
-        });
+  public int deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    int filesetDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            FilesetMetaMapper.class,
+            mapper -> {
+              return mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
+            });
+    int filesetVersionDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            FilesetVersionMapper.class,
+            mapper -> {
+              return mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
+            });
+    return filesetDeletedCount + filesetVersionDeletedCount;
   }
 
   public Integer deleteFilesetVersionsByRetentionLine(

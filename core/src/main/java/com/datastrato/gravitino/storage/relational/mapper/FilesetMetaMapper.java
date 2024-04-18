@@ -219,7 +219,7 @@ public interface FilesetMetaMapper {
   @Delete(
       "DELETE FROM "
           + META_TABLE_NAME
-          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
   Integer deleteFilesetMetasByLegacyTimeLine(
       @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }

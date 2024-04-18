@@ -175,108 +175,101 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public void hardDeleteLegacyData(long legacyTimeLine) {
+  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
     LOG.info(
-        "Try to physically delete legacy data that has been marked deleted before {}",
+        "Try to physically delete {} legacy data that has been marked deleted before {}",
+        entityType,
         legacyTimeLine);
 
-    for (Entity.EntityType entityType : Entity.EntityType.values()) {
-      switch (entityType) {
-        case METALAKE:
-          MetalakeMetaService.getInstance()
-              .deleteMetalakeMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
-        case CATALOG:
-          CatalogMetaService.getInstance()
-              .deleteCatalogMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
-        case SCHEMA:
-          SchemaMetaService.getInstance()
-              .deleteSchemaMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
-        case TABLE:
-          TableMetaService.getInstance()
-              .deleteTableMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
-        case FILESET:
-          FilesetMetaService.getInstance()
-              .deleteFilesetAndVersionMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
-        case TOPIC:
-          TopicMetaService.getInstance()
-              .deleteTopicMetasByLegacyTimeLine(
-                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-          break;
+    switch (entityType) {
+      case METALAKE:
+        return MetalakeMetaService.getInstance()
+            .deleteMetalakeMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case CATALOG:
+        return CatalogMetaService.getInstance()
+            .deleteCatalogMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case SCHEMA:
+        return SchemaMetaService.getInstance()
+            .deleteSchemaMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TABLE:
+        return TableMetaService.getInstance()
+            .deleteTableMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case FILESET:
+        return FilesetMetaService.getInstance()
+            .deleteFilesetAndVersionMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TOPIC:
+        return TopicMetaService.getInstance()
+            .deleteTopicMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
-        case COLUMN:
-        case USER:
-        case GROUP:
-        case AUDIT:
-        case ROLE:
-          continue;
-          // TODO: Implement hard delete logic for these entity types.
+      case COLUMN:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        return 0;
+        // TODO: Implement hard delete logic for these entity types.
 
-        default:
-          throw new IllegalArgumentException(
-              "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
-      }
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
     }
   }
 
   @Override
-  public void hardDeleteOldVersionData(long versionRetentionCount) {
-    for (Entity.EntityType entityType : Entity.EntityType.values()) {
-      switch (entityType) {
-        case METALAKE:
-        case CATALOG:
-        case SCHEMA:
-        case TABLE:
-        case COLUMN:
-        case TOPIC:
-        case USER:
-        case GROUP:
-        case AUDIT:
-        case ROLE:
-          // These entity types have not implemented multi-versions, so we can skip.
-          continue;
+  public int hardDeleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
+    switch (entityType) {
+      case METALAKE:
+      case CATALOG:
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case TOPIC:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        // These entity types have not implemented multi-versions, so we can skip.
+        return 0;
 
-        case FILESET:
-          // Get the current version of all filesets.
-          List<FilesetVersionPO> filesetCurVersions =
+      case FILESET:
+        // Get the current version of all filesets.
+        List<FilesetVersionPO> filesetCurVersions =
+            FilesetMetaService.getInstance()
+                .getFilesetVersionPOsByRetentionCount(versionRetentionCount);
+
+        // Delete old versions that are older than or equal to (currentVersion -
+        // versionRetentionCount).
+        int totalDeletedCount = 0;
+        for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
+          long versionRetentionLine =
+              filesetVersionPO.getVersion().longValue() - versionRetentionCount;
+          int deletedCount =
               FilesetMetaService.getInstance()
-                  .getFilesetVersionPOsByRetentionCount(versionRetentionCount);
+                  .deleteFilesetVersionsByRetentionLine(
+                      filesetVersionPO.getFilesetId(),
+                      versionRetentionLine,
+                      GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+          totalDeletedCount += deletedCount;
 
-          // Delete old versions that are older than or equal to (currentVersion -
-          // versionRetentionCount).
-          for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
-            long versionRetentionLine =
-                filesetVersionPO.getVersion().longValue() - versionRetentionCount;
-            int deletedCount =
-                FilesetMetaService.getInstance()
-                    .deleteFilesetVersionsByRetentionLine(
-                        filesetVersionPO.getFilesetId(),
-                        versionRetentionLine,
-                        GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+          // Log the deletion by current fileset version.
+          LOG.info(
+              "Physically delete filesetVersions count: {} which versions are older than or equal to"
+                  + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
+              deletedCount,
+              versionRetentionLine,
+              filesetVersionPO);
+        }
+        return totalDeletedCount;
 
-            // Log the deletion by current fileset version.
-            LOG.info(
-                "Physically delete filesetVersions count: {} which versions are older than or equal to"
-                    + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
-                deletedCount,
-                versionRetentionLine,
-                filesetVersionPO);
-          }
-          break;
-
-        default:
-          throw new IllegalArgumentException(
-              "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
-      }
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
     }
   }
 

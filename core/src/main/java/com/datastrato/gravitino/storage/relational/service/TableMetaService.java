@@ -163,11 +163,11 @@ public class TableMetaService {
     return true;
   }
 
-  public void deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
+  public int deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
         mapper -> {
-          mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
         });
   }
 

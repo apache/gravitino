@@ -210,11 +210,11 @@ public class CatalogMetaService {
     return true;
   }
 
-  public void deleteCatalogMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
-    SessionUtils.doWithCommit(
+  public int deleteCatalogMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
         CatalogMetaMapper.class,
         mapper -> {
-          mapper.deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
         });
   }
 }
