@@ -174,6 +174,14 @@ public class AuthorizationUtils {
     return false;
   }
 
+  public static String getCatalogName(SecurableObject securableObject) {
+    if (securableObject.parent() == null) {
+      return securableObject.name();
+    }
+
+    return getCatalogName(securableObject.parent());
+  }
+
   private static List<Privilege> getLeavesEntityPrivilegesExceptForList(Catalog.Type type) {
     switch (type) {
       case FILESET:
@@ -233,11 +241,4 @@ public class AuthorizationUtils {
     return securableObject.parent().parent() == null;
   }
 
-  public static String getCatalogName(SecurableObject securableObject) {
-    if (securableObject.parent() == null) {
-      return securableObject.name();
-    }
-
-    return getCatalogName(securableObject.parent());
-  }
 }
