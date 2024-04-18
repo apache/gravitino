@@ -58,7 +58,7 @@ public class SparkTransformConverter {
   }
 
   @Getter
-  public class DistributionAndSortOrdersInfo {
+  public static class DistributionAndSortOrdersInfo {
     private Distribution distribution;
     private SortOrder[] sortOrders;
 
