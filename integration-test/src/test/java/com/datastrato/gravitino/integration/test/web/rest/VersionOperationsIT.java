@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 public class VersionOperationsIT extends AbstractIT {
   @Test
   public void testGetVersion() {
-    GravitinoVersion gravitinoVersion = client.getVersion();
+    GravitinoVersion gravitinoVersion = client.serverVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
     if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
