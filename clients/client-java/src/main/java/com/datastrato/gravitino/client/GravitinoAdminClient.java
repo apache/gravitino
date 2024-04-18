@@ -56,7 +56,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
-  private static final String API_METALAKE_ADMIN_PATH = "api/admins/%s";
+  private static final String API_ADMIN_PATH = "api/admins/%s";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -324,7 +324,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     UserResponse resp =
         restClient.post(
-            String.format(API_METALAKE_ADMIN_PATH, ""),
+            String.format(API_ADMIN_PATH, ""),
             req,
             UserResponse.class,
             Collections.emptyMap(),
@@ -344,7 +344,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   public boolean removeMetalakeAdmin(String user) {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKE_ADMIN_PATH, user),
+            String.format(API_ADMIN_PATH, user),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
