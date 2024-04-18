@@ -12,7 +12,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
@@ -46,6 +45,7 @@ class PermissionManager {
     try {
       RoleEntity roleEntity = roleManager.getRole(metalake, role);
 
+      AtomicBoolean granted = new AtomicBoolean(true);
       store.update(
           AuthorizationUtils.ofUser(metalake, user),
           UserEntity.class,
@@ -58,12 +58,17 @@ class PermissionManager {
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
             if (roleNames.contains(roleEntity.name())) {
-              throw new RoleAlreadyExistsException(
-                  "Role %s already exists in the user %s of the metalake %s", role, user, metalake);
+              granted.set(false);
+              LOG.warn(
+                  "Failed to grant, role {} already exists in the user {} of metalake {}",
+                  role,
+                  user,
+                  metalake);
+            } else {
+              roleNames.add(roleEntity.name());
+              roleIds.add(roleEntity.id());
             }
 
-            roleNames.add(roleEntity.name());
-            roleIds.add(roleEntity.id());
             AuditInfo auditInfo =
                 AuditInfo.builder()
                     .withCreator(userEntity.auditInfo().creator())
@@ -81,7 +86,7 @@ class PermissionManager {
                 .withAuditInfo(auditInfo)
                 .build();
           });
-      return true;
+      return granted.get();
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
@@ -100,6 +105,7 @@ class PermissionManager {
     try {
       RoleEntity roleEntity = roleManager.getRole(metalake, role);
 
+      AtomicBoolean granted = new AtomicBoolean(true);
       store.update(
           AuthorizationUtils.ofGroup(metalake, group),
           GroupEntity.class,
@@ -111,9 +117,15 @@ class PermissionManager {
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
             if (roleNames.contains(roleEntity.name())) {
-              throw new RoleAlreadyExistsException(
-                  "Role %s already exists in the group %s of the metalake %s",
-                  role, group, metalake);
+              granted.set(false);
+              LOG.warn(
+                  "Failed to grant, role {} already exists in the group {} of metalake {}",
+                  role,
+                  group,
+                  metalake);
+            } else {
+              roleNames.add(roleEntity.name());
+              roleIds.add(roleEntity.id());
             }
 
             AuditInfo auditInfo =
@@ -124,8 +136,6 @@ class PermissionManager {
                     .withLastModifiedTime(Instant.now())
                     .build();
 
-            roleNames.add(roleEntity.name());
-            roleIds.add(roleEntity.id());
             return GroupEntity.builder()
                 .withId(groupEntity.id())
                 .withNamespace(groupEntity.namespace())
@@ -135,7 +145,7 @@ class PermissionManager {
                 .withAuditInfo(auditInfo)
                 .build();
           });
-      return true;
+      return granted.get();
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);

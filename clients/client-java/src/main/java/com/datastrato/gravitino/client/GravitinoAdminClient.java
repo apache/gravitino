@@ -18,13 +18,16 @@ import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
+import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.GrantResponse;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
+import com.datastrato.gravitino.dto.responses.RevokeResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
@@ -58,6 +61,10 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
   private static final String API_ADMIN_PATH = "api/admins/%s";
+  private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
+  private static final String PERMISSION_USER_PATH = "users/%s/roles/%s";
+  private static final String PERMISSION_GROUP_PATH = "groups/%s/roles/%s";
+  private static final String BLANK_PLACE_HOLDER = "";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -203,7 +210,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     UserResponse resp =
         restClient.post(
-            String.format(API_METALAKES_USERS_PATH, metalake, ""),
+            String.format(API_METALAKES_USERS_PATH, metalake, BLANK_PLACE_HOLDER),
             req,
             UserResponse.class,
             Collections.emptyMap(),
@@ -218,7 +225,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param metalake The Metalake of the User.
    * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` only when there's no such user,
+   * @return True if the User was successfully removed, false only when there's no such user,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the User encounters storage issues.
@@ -275,7 +282,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     GroupResponse resp =
         restClient.post(
-            String.format(API_METALAKES_GROUPS_PATH, metalake, ""),
+            String.format(API_METALAKES_GROUPS_PATH, metalake, BLANK_PLACE_HOLDER),
             req,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -290,7 +297,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param metalake The Metalake of the Group.
    * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` only when there's no such group,
+   * @return True if the Group was successfully removed, false only when there's no such group,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the Group encounters storage issues.
@@ -344,7 +351,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     UserResponse resp =
         restClient.post(
-            String.format(API_ADMIN_PATH, ""),
+            String.format(API_ADMIN_PATH, BLANK_PLACE_HOLDER),
             req,
             UserResponse.class,
             Collections.emptyMap(),
@@ -358,7 +365,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * Removes a metalake admin.
    *
    * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` only when there's no such metalake
+   * @return True if the User was successfully removed, false only when there's no such metalake
    *     admin, otherwise it will throw an exception.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
@@ -402,7 +409,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
-   * @return `true` if the Role was successfully deleted, `false` only when there's no such role,
+   * @return True if the Role was successfully deleted, false only when there's no such role,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If deleting the Role encounters storage issues.
@@ -452,7 +459,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     RoleResponse resp =
         restClient.post(
-            String.format(API_METALAKES_ROLES_PATH, metalake, ""),
+            String.format(API_METALAKES_ROLES_PATH, metalake, BLANK_PLACE_HOLDER),
             req,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -460,6 +467,105 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     resp.validate();
 
     return resp.getRole();
+  }
+  /**
+   * Grant a role to a user.
+   *
+   * @param metalake The metalake of the User.
+   * @param user The name of the User.
+   * @param role The name of the Role.
+   * @return True if the User was successfully granted, false only when there exists a role in the
+   *     user,otherwise it will throw an exception.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting a role to a user encounters storage issues.
+   */
+  public boolean grantRoleToUser(String metalake, String role, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    return grantInternal(metalake, PERMISSION_USER_PATH, role, user);
+  }
+
+  /**
+   * Grant a role to a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group THe name of the Group.
+   * @param role The name of the Role.
+   * @return True if the Group was successfully granted, false only when there exists a role in the
+   *     group,otherwise it will throw an exception.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting a role to a group encounters storage issues.
+   */
+  public boolean grantRoleToGroup(String metalake, String role, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    return grantInternal(metalake, PERMISSION_GROUP_PATH, role, group);
+  }
+
+  /**
+   * Revoke a role from a user.
+   *
+   * @param metalake The metalake of the User.
+   * @param user The name of the User.
+   * @param role The name of the Role.
+   * @return True if the User was successfully revoked, false only when there's no such role in the
+   *     user,otherwise it will throw an exception.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking a role from a user encounters storage issues.
+   */
+  public boolean revokeRoleFromUser(String metalake, String role, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    return revokeInternal(metalake, PERMISSION_USER_PATH, role, user);
+  }
+
+  /**
+   * Revoke a role from a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group The name of the Group.
+   * @param role The name of the Role.
+   * @return True if the Group was successfully revoked, false only when there's no such role in the
+   *     group,otherwise it will throw an exception.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking a role from a group encounters storage issues.
+   */
+  public boolean revokeRoleFromGroup(String metalake, String role, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    return revokeInternal(metalake, PERMISSION_GROUP_PATH, role, group);
+  }
+
+  private boolean grantInternal(String metalake, String path, String role, String name) {
+    RoleGrantRequest request = new RoleGrantRequest(role);
+
+    GrantResponse resp =
+        restClient.post(
+            String.format(
+                API_PERMISSION_PATH, metalake, String.format(path, name, BLANK_PLACE_HOLDER)),
+            request,
+            GrantResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.granted();
+  }
+
+  private boolean revokeInternal(String metalake, String pattern, String role, String name) {
+    RevokeResponse resp =
+        restClient.delete(
+            String.format(API_PERMISSION_PATH, metalake, String.format(pattern, name, role)),
+            RevokeResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.revoked();
   }
 
   /**

@@ -13,7 +13,6 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.GroupEntity;
@@ -128,10 +127,8 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertEquals(1, user.roles().size());
     Assertions.assertEquals(ROLE, user.roles().get(0));
 
-    // Throw RoleAlreadyExistsException
-    Assertions.assertThrows(
-        RoleAlreadyExistsException.class,
-        () -> accessControlManager.grantRoleToUser(METALAKE, ROLE, USER));
+    // Test with a role which exists
+    Assertions.assertFalse(accessControlManager.grantRoleToUser(METALAKE, ROLE, USER));
 
     // Throw NoSuchMetalakeException
     Assertions.assertThrows(
@@ -191,10 +188,8 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertEquals(1, group.roles().size());
     Assertions.assertEquals(ROLE, group.roles().get(0));
 
-    // Throw RoleAlreadyExistsException
-    Assertions.assertThrows(
-        RoleAlreadyExistsException.class,
-        () -> accessControlManager.grantRoleToGroup(METALAKE, ROLE, GROUP));
+    // Test with a role which exists
+    Assertions.assertFalse(accessControlManager.grantRoleToGroup(METALAKE, ROLE, GROUP));
 
     // Throw NoSuchMetalakeException
     Assertions.assertThrows(
