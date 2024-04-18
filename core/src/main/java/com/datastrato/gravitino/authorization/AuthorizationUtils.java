@@ -34,22 +34,26 @@ public class AuthorizationUtils {
           Privileges.AlterCatalog.get(),
           Privileges.CreateCatalog.get(),
           Privileges.DropCatalog.get());
+
   private static final List<Privilege> CATALOGS_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(CATALOG_PRIVILEGES_EXCEPT_FOR_LIST)
           .add(Privileges.ListCatalog.get())
           .build();
+
   private static final List<Privilege> SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
           Privileges.LoadSchema.get(),
           Privileges.AlterSchema.get(),
           Privileges.CreateSchema.get(),
           Privileges.DropSchema.get());
+
   private static final List<Privilege> SCHEMA_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST)
           .add(Privileges.ListSchema.get())
           .build();
+
   private static final List<Privilege> TABLE_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
           Privileges.AlterTable.get(),
@@ -57,11 +61,13 @@ public class AuthorizationUtils {
           Privileges.DropTable.get(),
           Privileges.ReadTable.get(),
           Privileges.WriteTable.get());
+
   private static final List<Privilege> TABLE_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(TABLE_PRIVILEGES_EXCEPT_FOR_LIST)
           .add(Privileges.ListTable.get())
           .build();
+
   private static final List<Privilege> FILESET_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
           Privileges.AlterFileset.get(),
@@ -69,11 +75,13 @@ public class AuthorizationUtils {
           Privileges.DropFileset.get(),
           Privileges.ReadFileset.get(),
           Privileges.WriteFileset.get());
+
   private static final List<Privilege> FILESET_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(FILESET_PRIVILEGES_EXCEPT_FOR_LIST)
           .add(Privileges.ListFileset.get())
           .build();
+
   private static final List<Privilege> TOPIC_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
           Privileges.AlterTopic.get(),
@@ -81,6 +89,7 @@ public class AuthorizationUtils {
           Privileges.DropTopic.get(),
           Privileges.ReadTopic.get(),
           Privileges.WriteTopic.get());
+
   private static final List<Privilege> TOPIC_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(TOPIC_PRIVILEGES_EXCEPT_FOR_LIST)
@@ -88,6 +97,7 @@ public class AuthorizationUtils {
           .build();
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
+
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private AuthorizationUtils() {}
