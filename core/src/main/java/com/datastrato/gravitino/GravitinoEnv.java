@@ -18,6 +18,8 @@ import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TableEventDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
+import com.datastrato.gravitino.catalog.TopicEventDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
 import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.EventListenerManager;
@@ -55,7 +57,7 @@ public class GravitinoEnv {
 
   private FilesetDispatcher filesetDispatcher;
 
-  private TopicOperationDispatcher topicOperationDispatcher;
+  private TopicDispatcher topicDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -160,8 +162,9 @@ public class GravitinoEnv {
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetOperationDispatcher);
-    this.topicOperationDispatcher =
+    TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicOperationDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
@@ -236,12 +239,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the TopicOperationDispatcher associated with the Gravitino environment.
+   * Get the TopicDispatcher associated with the Gravitino environment.
    *
-   * @return The TopicOperationDispatcher instance.
+   * @return The TopicDispatcher instance.
    */
-  public TopicOperationDispatcher topicOperationDispatcher() {
-    return topicOperationDispatcher;
+  public TopicDispatcher topicDispatcher() {
+    return topicDispatcher;
   }
 
   /**

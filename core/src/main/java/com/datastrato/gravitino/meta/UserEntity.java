@@ -147,6 +147,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     UserEntity that = (UserEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
+        && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(roleNames, that.roleNames)
         && Objects.equals(roleIds, that.roleIds);
