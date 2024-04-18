@@ -221,6 +221,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
     resp.validate();
+
     return resp.removed();
   }
 
@@ -286,6 +287,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
     resp.validate();
+
     return resp.removed();
   }
 
@@ -349,6 +351,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
     resp.validate();
+
     return resp.removed();
   }
 
@@ -389,6 +392,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
     resp.validate();
+
     return resp.dropped();
   }
 
