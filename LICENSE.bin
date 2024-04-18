@@ -392,6 +392,7 @@
    Janino Common Compiler
    Protocol Buffers
    Treelayout
+   Kyligence/kylinpy
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
