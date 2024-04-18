@@ -78,7 +78,7 @@ public class SparkTransformConverter {
               if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
-              } else if (transform instanceof BucketTransform && supportsBucketTransfrom) {
+              } else if (transform instanceof BucketTransform) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =
@@ -160,7 +160,7 @@ public class SparkTransformConverter {
                           String.join(ConnectorConstants.DOT, identityTransform.fieldName())));
                 } else if (transform instanceof Transforms.HourTransform) {
                   Transforms.HourTransform hourTransform = (Transforms.HourTransform) transform;
-                  sparkTransforms.add(createSparkHoursTransform(hourTransform.fieldName()));
+                  sparkTransforms.add(createSparkHoursTransform(hourTransform.references()[0]));
                 } else if (transform instanceof Transforms.BucketTransform) {
                   isBucketTransform.set(true);
                   Transforms.BucketTransform bucketTransform =
@@ -173,13 +173,13 @@ public class SparkTransformConverter {
                   sparkTransforms.add(createSparkBucketTransform(numBuckets, fieldNames));
                 } else if (transform instanceof Transforms.DayTransform) {
                   Transforms.DayTransform dayTransform = (Transforms.DayTransform) transform;
-                  sparkTransforms.add(createSparkDaysTransform(dayTransform.fieldName()));
+                  sparkTransforms.add(createSparkDaysTransform(dayTransform.references()[0]));
                 } else if (transform instanceof Transforms.MonthTransform) {
                   Transforms.MonthTransform monthTransform = (Transforms.MonthTransform) transform;
-                  sparkTransforms.add(createSparkMonthsTransform(monthTransform.fieldName()));
+                  sparkTransforms.add(createSparkMonthsTransform(monthTransform.references()[0]));
                 } else if (transform instanceof Transforms.YearTransform) {
                   Transforms.YearTransform yearTransform = (Transforms.YearTransform) transform;
-                  sparkTransforms.add(createSparkYearsTransform(yearTransform.fieldName()));
+                  sparkTransforms.add(createSparkYearsTransform(yearTransform.references()[0]));
                 } else if (transform instanceof Transforms.TruncateTransform) {
                   Transforms.TruncateTransform truncateTransform =
                       (Transforms.TruncateTransform) transform;
@@ -290,28 +290,28 @@ public class SparkTransformConverter {
     return IdentityTransform.apply(Expressions.column(columnName));
   }
 
-  public static HoursTransform createSparkHoursTransform(String[] fieldName) {
+  public static HoursTransform createSparkHoursTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.hours(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
   public static BucketTransform createSparkBucketTransform(int numBuckets, String[] fieldNames) {
     return LogicalExpressions.bucket(numBuckets, createSparkNamedReference(fieldNames));
   }
 
-  public static DaysTransform createSparkDaysTransform(String[] fieldName) {
+  public static DaysTransform createSparkDaysTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.days(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
-  public static MonthsTransform createSparkMonthsTransform(String[] fieldName) {
+  public static MonthsTransform createSparkMonthsTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.months(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
-  public static YearsTransform createSparkYearsTransform(String[] FieldName) {
+  public static YearsTransform createSparkYearsTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.years(
-        Expressions.column(String.join(ConnectorConstants.DOT, FieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
   public static org.apache.spark.sql.connector.expressions.Transform createSparkTruncateTransform(

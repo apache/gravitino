@@ -32,13 +32,13 @@ public class SparkTableInfoChecker {
   private enum CheckField {
     NAME,
     COLUMN,
-    PARTITION,
+    IDENTITY_PARTITION,
     BUCKET,
-    HOUR,
-    DAY,
-    MONTH,
-    YEAR,
-    TRUNCATE,
+    HOUR_PARTITION,
+    DAY_PARTITION,
+    MONTH_PARTITION,
+    YEAR_PARTITION,
+    TRUNCATE_PARTITION,
     COMMENT,
     TABLE_PROPERTY,
   }
@@ -62,7 +62,7 @@ public class SparkTableInfoChecker {
               SparkTransformConverter.createSparkIdentityTransform(columnName);
           this.expectedTableInfo.addPartition(identityTransform);
         });
-    this.checkFields.add(CheckField.PARTITION);
+    this.checkFields.add(CheckField.IDENTITY_PARTITION);
     return this;
   }
 
@@ -86,28 +86,28 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withHourPartition(List<String> partitionColumns) {
     Transform hourTransform = Expressions.hours(partitionColumns.get(0));
     this.expectedTableInfo.setHourPartition(hourTransform);
-    this.checkFields.add(CheckField.HOUR);
+    this.checkFields.add(CheckField.HOUR_PARTITION);
     return this;
   }
 
   public SparkTableInfoChecker withDayPartition(List<String> partitionColumns) {
     Transform dayTransform = Expressions.days(partitionColumns.get(0));
     this.expectedTableInfo.setDayPartition(dayTransform);
-    this.checkFields.add(CheckField.DAY);
+    this.checkFields.add(CheckField.DAY_PARTITION);
     return this;
   }
 
   public SparkTableInfoChecker withMonthPartition(List<String> partitionColumns) {
     Transform monthTransform = Expressions.months(partitionColumns.get(0));
     this.expectedTableInfo.setMonthPartition(monthTransform);
-    this.checkFields.add(CheckField.MONTH);
+    this.checkFields.add(CheckField.MONTH_PARTITION);
     return this;
   }
 
   public SparkTableInfoChecker withYearPartition(List<String> partitionColumns) {
     Transform yearTransform = Expressions.years(partitionColumns.get(0));
     this.expectedTableInfo.setYearPartition(yearTransform);
-    this.checkFields.add(CheckField.YEAR);
+    this.checkFields.add(CheckField.YEAR_PARTITION);
     return this;
   }
 
@@ -116,7 +116,7 @@ public class SparkTableInfoChecker {
         Expressions.apply(
             "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));
     this.expectedTableInfo.setTruncatePartition(truncateTransform);
-    this.checkFields.add(CheckField.TRUNCATE);
+    this.checkFields.add(CheckField.TRUNCATE_PARTITION);
     return this;
   }
 
@@ -145,30 +145,30 @@ public class SparkTableInfoChecker {
                   Assertions.assertEquals(
                       expectedTableInfo.getColumns(), realTableInfo.getColumns());
                   break;
-                case PARTITION:
+                case IDENTITY_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getPartitions(), realTableInfo.getPartitions());
                   break;
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
                   break;
-                case HOUR:
+                case HOUR_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getHourPartition(), realTableInfo.getHourPartition());
                   break;
-                case DAY:
+                case DAY_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getDayPartition(), realTableInfo.getDayPartition());
                   break;
-                case MONTH:
+                case MONTH_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getMonthPartition(), realTableInfo.getMonthPartition());
                   break;
-                case YEAR:
+                case YEAR_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getYearPartition(), realTableInfo.getYearPartition());
                   break;
-                case TRUNCATE:
+                case TRUNCATE_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getTruncatePartition(),
                       realTableInfo.getTruncatePartition());

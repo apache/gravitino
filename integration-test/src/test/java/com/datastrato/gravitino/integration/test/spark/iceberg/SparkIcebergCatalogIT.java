@@ -29,13 +29,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogIT extends SparkCommonIT {
 
-  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
-    return Arrays.asList(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
-        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
-  }
-
   @Override
   protected String getCatalogName() {
     return "iceberg";
@@ -279,6 +272,17 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     checkDirExists(partitionPath);
   }
 
+  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
+    return Arrays.asList(
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
+  }
+
+  /**
+   * Here we build a new `createIcebergSql` String for creating a table with a field of timestamp
+   * type to create the year/month,etc partitions
+   */
   private String getCreateIcebergSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
