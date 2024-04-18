@@ -218,7 +218,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  public boolean removeUser(String metalake, String user) {
+  public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
             String.format(API_METALAKES_USERS_PATH, metalake, user),

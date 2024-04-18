@@ -53,7 +53,8 @@ public class AccessControlManager {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addUser(String metalake, String user) throws UserAlreadyExistsException {
+  public User addUser(String metalake, String user)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
     return doWithNonAdminLock(() -> userGroupManager.addUser(metalake, user));
   }
 
@@ -67,7 +68,7 @@ public class AccessControlManager {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  public boolean removeUser(String metalake, String user) {
+  public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return doWithNonAdminLock(() -> userGroupManager.removeUser(metalake, user));
   }
 
@@ -81,7 +82,8 @@ public class AccessControlManager {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
-  public User getUser(String metalake, String user) throws NoSuchUserException {
+  public User getUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
     return doWithNonAdminLock(() -> userGroupManager.getUser(metalake, user));
   }
 
@@ -95,7 +97,8 @@ public class AccessControlManager {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
-  public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+  public Group addGroup(String metalake, String group)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return doWithNonAdminLock(() -> userGroupManager.addGroup(metalake, group));
   }
 
@@ -200,7 +203,7 @@ public class AccessControlManager {
    * @throws UserAlreadyExistsException If a metalake admin with the same name already exists.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user) {
+  public User addMetalakeAdmin(String user) throws UserAlreadyExistsException {
     return doWithAdminLock(() -> adminManager.addMetalakeAdmin(user));
   }
 
