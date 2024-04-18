@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.kafka;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import java.util.Map;
@@ -23,6 +24,11 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
   protected CatalogOperations newOps(Map<String, String> config) {
     KafkaCatalogOperations ops = new KafkaCatalogOperations();
     return ops;
+  }
+
+  @Override
+  protected Capability newCapability() {
+    return new KafkaCatalogCapability();
   }
 
   @Override
