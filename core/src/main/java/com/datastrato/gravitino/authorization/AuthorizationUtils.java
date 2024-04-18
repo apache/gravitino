@@ -158,6 +158,22 @@ public class AuthorizationUtils {
     }
   }
 
+  public static boolean isAllCatalogs(SecurableObject securableObject) {
+    if (securableObject.parent() == null && "*".equals(securableObject.name())) {
+      return true;
+    }
+
+    return false;
+  }
+
+  public static boolean isSingleCatalog(SecurableObject securableObject) {
+    if (securableObject.parent() == null && !"*".equals(securableObject.name())) {
+      return true;
+    }
+
+    return false;
+  }
+
   private static List<Privilege> getLeavesEntityPrivilegesExceptForList(Catalog.Type type) {
     switch (type) {
       case FILESET:
@@ -211,22 +227,6 @@ public class AuthorizationUtils {
       default:
         throw new IllegalArgumentException(String.format(UNSUPPORTED_ERROR_MSG, type));
     }
-  }
-
-  public static boolean isAllCatalogs(SecurableObject securableObject) {
-    if (securableObject.parent() == null && "*".equals(securableObject.name())) {
-      return true;
-    }
-
-    return false;
-  }
-
-  public static boolean isSingleCatalog(SecurableObject securableObject) {
-    if (securableObject.parent() == null && !"*".equals(securableObject.name())) {
-      return true;
-    }
-
-    return false;
   }
 
   private static boolean isSchema(SecurableObject securableObject) {
