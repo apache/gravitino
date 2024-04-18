@@ -374,10 +374,10 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
-   * @return The loading Role instance.
+   * @return The getting Role instance.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If loading the Role encounters storage issues.
+   * @throws RuntimeException If getting the Role encounters storage issues.
    */
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
