@@ -21,7 +21,6 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.time.Instant;
@@ -29,7 +28,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SchemaOperationDispatcher extends OperationDispatcher implements SupportsSchemas {
+public class SchemaOperationDispatcher extends OperationDispatcher implements SchemaDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 

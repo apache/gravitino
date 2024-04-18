@@ -85,12 +85,12 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<String> partitionColumns =
         propertyMap.containsKey(ICEBERG_PARTITIONING_PROPERTY)
             ? (List<String>) propertyMap.get(ICEBERG_PARTITIONING_PROPERTY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
 
     List<String> sortColumns =
         propertyMap.containsKey(ICEBERG_SORTED_BY_PROPERTY)
             ? (List<String>) propertyMap.get(ICEBERG_SORTED_BY_PROPERTY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
 
     Map<String, String> properties =
         toGravitinoTableProperties(
@@ -153,7 +153,7 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
               ? Arrays.stream(gravitinoTable.getPartitioning())
                   .map(ts -> ((Transform.SingleFieldTransform) ts).fieldName()[0])
                   .collect(Collectors.toList())
-              : Collections.EMPTY_LIST);
+              : Collections.emptyList());
     }
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getSortOrders())) {

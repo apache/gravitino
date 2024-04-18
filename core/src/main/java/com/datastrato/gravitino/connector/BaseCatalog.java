@@ -77,7 +77,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   @Evolving
   protected Capability newCapability() {
-    return new Capability() {};
+    return Capability.DEFAULT;
   }
 
   /**
