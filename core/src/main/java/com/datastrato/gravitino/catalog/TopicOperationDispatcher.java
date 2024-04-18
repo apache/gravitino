@@ -19,7 +19,6 @@ import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.messaging.DataLayout;
 import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -31,7 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TopicOperationDispatcher extends OperationDispatcher implements TopicCatalog {
+public class TopicOperationDispatcher extends OperationDispatcher implements TopicDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperationDispatcher.class);
 
   /**

@@ -15,12 +15,11 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptor;
-import com.datastrato.gravitino.spark.connector.GravitinoCatalogAdaptorFactory;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -47,11 +46,18 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * GravitinoCatalog is the class registered to Spark CatalogManager, it's lazy loaded which means
- * Spark connector loads GravitinoCatalog when it's used. It will create different Spark Tables from
- * different Gravitino catalogs.
+ * BaseCatalog acts as the foundational class for Spark CatalogManager registration, enabling
+ * seamless integration of various data source catalogs within Spark's ecosystem. This class is
+ * pivotal in bridging Spark with diverse data sources, ensuring a unified approach to data
+ * management and manipulation across the platform.
+ *
+ * <p>This class implements essential interfaces for the table and namespace management. Subclasses
+ * can extend BaseCatalog to implement more specific interfaces tailored to the needs of different
+ * data sources. Its lazy loading design ensures that instances of BaseCatalog are created only when
+ * needed, optimizing resource utilization and minimizing the overhead associated with
+ * initialization.
  */
-public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
+public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
   // Iceberg.
@@ -63,13 +69,45 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   private final String metalakeName;
   private String catalogName;
   private final GravitinoCatalogManager gravitinoCatalogManager;
-  // Different catalog use GravitinoCatalogAdaptor to adapt to GravitinoCatalog
-  private GravitinoCatalogAdaptor gravitinoAdaptor;
 
-  public GravitinoCatalog() {
+  protected BaseCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
     metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
+
+  /**
+   * Create a specific Spark catalog, mainly used to create Spark table.
+   *
+   * @param name catalog name
+   * @param options catalog options from configuration
+   * @param properties catalog properties from Gravitino
+   * @return a specific Spark catalog
+   */
+  protected abstract TableCatalog createAndInitSparkCatalog(
+      String name, CaseInsensitiveStringMap options, Map<String, String> properties);
+
+  /**
+   * Create a specific Spark table, combined with gravitinoTable to do DML operations and
+   * sparkCatalog to do IO operations.
+   *
+   * @param identifier Spark's table identifier
+   * @param gravitinoTable Gravitino table to do DDL operations
+   * @param sparkCatalog specific Spark catalog to do IO operations
+   * @param propertiesConverter transform properties between Gravitino and Spark
+   * @return a specific Spark table
+   */
+  protected abstract SparkBaseTable createSparkTable(
+      Identifier identifier,
+      com.datastrato.gravitino.rel.Table gravitinoTable,
+      TableCatalog sparkCatalog,
+      PropertiesConverter propertiesConverter);
+
+  /**
+   * Get a PropertiesConverter to transform properties between Gravitino and Spark.
+   *
+   * @return an PropertiesConverter
+   */
+  protected abstract PropertiesConverter getPropertiesConverter();
 
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
@@ -78,11 +116,9 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
     String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    this.gravitinoAdaptor = GravitinoCatalogAdaptorFactory.createGravitinoAdaptor(provider);
     this.sparkCatalog =
-        gravitinoAdaptor.createAndInitSparkCatalog(
-            name, options, gravitinoCatalogClient.properties());
-    this.propertiesConverter = gravitinoAdaptor.getPropertiesConverter();
+        createAndInitSparkCatalog(name, options, gravitinoCatalogClient.properties());
+    this.propertiesConverter = getPropertiesConverter();
   }
 
   @Override
@@ -147,7 +183,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
                   partitionings,
                   distributionAndSortOrdersInfo.getDistribution(),
                   distributionAndSortOrdersInfo.getSortOrders());
-      return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
+      return createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());
     } catch (com.datastrato.gravitino.exceptions.TableAlreadyExistsException e) {
@@ -164,7 +200,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
               .asTableCatalog()
               .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
       // Will create a catalog specific table
-      return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
+      return createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -182,7 +218,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
     com.datastrato.gravitino.rel.TableChange[] gravitinoTableChanges =
         Arrays.stream(changes)
-            .map(GravitinoCatalog::transformTableChange)
+            .map(BaseCatalog::transformTableChange)
             .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
     try {
       com.datastrato.gravitino.rel.Table table =
@@ -191,7 +227,7 @@ public class GravitinoCatalog implements TableCatalog, SupportsNamespaces {
               .alterTable(
                   NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
                   gravitinoTableChanges);
-      return gravitinoAdaptor.createSparkTable(ident, table, sparkCatalog, propertiesConverter);
+      return createSparkTable(ident, table, sparkCatalog, propertiesConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }

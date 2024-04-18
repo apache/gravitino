@@ -109,6 +109,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     TableEntity baseTable = (TableEntity) o;
     return Objects.equal(id, baseTable.id)
         && Objects.equal(name, baseTable.name)
+        && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo);
   }
 

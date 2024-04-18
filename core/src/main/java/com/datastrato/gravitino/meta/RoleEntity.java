@@ -152,6 +152,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     RoleEntity that = (RoleEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
+        && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
         && Objects.equals(securableObject, that.securableObject)
@@ -234,7 +235,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @param securableObject The securable object of the role entity.
      * @return The builder instance.
      */
-    public Builder securableObject(SecurableObject securableObject) {
+    public Builder withSecurableObject(SecurableObject securableObject) {
       roleEntity.securableObject = securableObject;
       return this;
     }
