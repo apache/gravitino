@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class DummyEventListener implements EventListenerPlugin {
   Map<String, String> properties;
