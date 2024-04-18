@@ -21,7 +21,6 @@ import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
-import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
@@ -278,7 +277,7 @@ public class TestRoleOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
-    DeleteResponse deleteResponse2 = resp2.readEntity(DropResponse.class);
+    DeleteResponse deleteResponse2 = resp2.readEntity(DeleteResponse.class);
     Assertions.assertEquals(0, deleteResponse2.getCode());
     Assertions.assertFalse(deleteResponse2.deleted());
 
