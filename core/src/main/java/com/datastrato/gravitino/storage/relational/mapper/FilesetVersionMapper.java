@@ -109,7 +109,7 @@ public interface FilesetVersionMapper {
       @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 
   @Select(
-      "SELECT id, fileset_id as filesetId,"
+      "SELECT fileset_id as filesetId,"
           + " Max(version) as version, deleted_at as deletedAt,"
           + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
           + " storage_location as storageLocation"

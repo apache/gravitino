@@ -176,6 +176,14 @@ public class TopicMetaService {
     return true;
   }
 
+  public void deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    SessionUtils.doWithCommit(
+        TopicMetaMapper.class,
+        mapper -> {
+          mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
+
   private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(

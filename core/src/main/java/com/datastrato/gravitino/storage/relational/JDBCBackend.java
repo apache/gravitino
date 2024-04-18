@@ -207,14 +207,19 @@ public class JDBCBackend implements RelationalBackend {
               .deleteFilesetAndVersionMetasByLegacyTimeLine(
                   legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
           break;
+        case TOPIC:
+          TopicMetaService.getInstance()
+              .deleteTopicMetasByLegacyTimeLine(
+                  legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+          break;
 
         case COLUMN:
-        case TOPIC:
         case USER:
         case GROUP:
         case AUDIT:
+        case ROLE:
           continue;
-          // TODO: Implement the delete logic for these entity types.
+          // TODO: Implement hard delete logic for these entity types.
 
         default:
           throw new IllegalArgumentException(
@@ -236,6 +241,7 @@ public class JDBCBackend implements RelationalBackend {
         case USER:
         case GROUP:
         case AUDIT:
+        case ROLE:
           // These entity types have not implemented multi-versions, so we can skip.
           continue;
 
@@ -259,7 +265,8 @@ public class JDBCBackend implements RelationalBackend {
 
             // Log the deletion by current fileset version.
             LOG.info(
-                "Physically deleted count: {} which fileset version is older than or equal to versionRetentionLine: {} by current FilesetVersion: {}.",
+                "Physically delete filesetVersions count: {} which versions are older than or equal to"
+                    + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
                 deletedCount,
                 versionRetentionLine,
                 filesetVersionPO);

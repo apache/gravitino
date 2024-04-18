@@ -12,7 +12,10 @@ import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_US
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
@@ -41,6 +44,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -394,6 +398,248 @@ public class TestJDBCBackend {
                 e -> createTopicEntity(topicCopy.id(), topicCopy.namespace(), "topic", auditInfo)));
   }
 
+  @Test
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // meta data creation
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofCatalog("metalake"),
+            "catalog",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofSchema("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofTable("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofFileset("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofFileset("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
+
+    // update fileset properties and version
+    FilesetEntity filesetV2 =
+        createFilesetEntity(
+            fileset.id(),
+            Namespace.ofFileset("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    filesetV2.properties().put("version", "2");
+    backend.update(fileset.nameIdentifier(), Entity.EntityType.FILESET, e -> filesetV2);
+
+    // another meta data creation
+    BaseMetalake anotherMetaLake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "another-metalake", auditInfo);
+    backend.insert(anotherMetaLake, false);
+
+    CatalogEntity anotherCatalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofCatalog("another-metalake"),
+            "another-catalog",
+            auditInfo);
+    backend.insert(anotherCatalog, false);
+
+    SchemaEntity anotherSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofSchema("another-metalake", "another-catalog"),
+            "another-schema",
+            auditInfo);
+    backend.insert(anotherSchema, false);
+
+    FilesetEntity anotherFileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            "anotherFileset",
+            auditInfo);
+    backend.insert(anotherFileset, false);
+
+    FilesetEntity anotherFilesetV2 =
+        createFilesetEntity(
+            anotherFileset.id(),
+            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            "anotherFileset",
+            auditInfo);
+    anotherFilesetV2.properties().put("version", "2");
+    backend.update(
+        anotherFileset.nameIdentifier(), Entity.EntityType.FILESET, e -> anotherFilesetV2);
+
+    FilesetEntity anotherFilesetV3 =
+        createFilesetEntity(
+            anotherFileset.id(),
+            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            "anotherFileset",
+            auditInfo);
+    anotherFilesetV3.properties().put("version", "3");
+    backend.update(
+        anotherFileset.nameIdentifier(), Entity.EntityType.FILESET, e -> anotherFilesetV3);
+
+    // meta data list
+    List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
+    assertTrue(metaLakes.contains(metalake));
+
+    List<CatalogEntity> catalogs = backend.list(catalog.namespace(), Entity.EntityType.CATALOG);
+    assertTrue(catalogs.contains(catalog));
+
+    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA);
+    assertTrue(schemas.contains(schema));
+
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE);
+    assertTrue(tables.contains(table));
+
+    List<FilesetEntity> filesets = backend.list(fileset.namespace(), Entity.EntityType.FILESET);
+    assertFalse(filesets.contains(fileset));
+    assertTrue(filesets.contains(filesetV2));
+    assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
+
+    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC);
+    assertTrue(topics.contains(topic));
+
+    // meta data soft delete
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+
+    // check existence after soft delete
+    assertFalse(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertTrue(backend.exists(anotherMetaLake.nameIdentifier(), Entity.EntityType.METALAKE));
+
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertTrue(backend.exists(anotherCatalog.nameIdentifier(), Entity.EntityType.CATALOG));
+
+    assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(anotherSchema.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    assertFalse(backend.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+    assertTrue(backend.exists(anotherFileset.nameIdentifier(), Entity.EntityType.FILESET));
+
+    assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+    assertFalse(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
+
+    // check legacy record after soft delete
+    assertTrue(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
+    assertTrue(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
+    assertTrue(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
+    assertTrue(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
+    assertTrue(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
+    assertTrue(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
+    assertEquals(2, listFilesetVersions(fileset.id()).size());
+    assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+
+    // meta data hard delete
+    backend.hardDeleteLegacyData(Instant.now().toEpochMilli() + 1000);
+    assertFalse(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
+    assertFalse(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
+    assertFalse(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
+    assertFalse(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
+    assertFalse(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
+    assertFalse(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
+    assertEquals(0, listFilesetVersions(fileset.id()).size());
+
+    // hard delete for old version fileset
+    assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+    backend.hardDeleteOldVersionData(1);
+    assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
+  }
+
+  private boolean legacyRecordExistsInDB(Long id, Entity.EntityType entityType) {
+    String tableName;
+    String idColumnName;
+
+    switch (entityType) {
+      case METALAKE:
+        tableName = "metalake_meta";
+        idColumnName = "metalake_id";
+        break;
+      case CATALOG:
+        tableName = "catalog_meta";
+        idColumnName = "catalog_id";
+        break;
+      case SCHEMA:
+        tableName = "schema_meta";
+        idColumnName = "schema_id";
+        break;
+      case TABLE:
+        tableName = "table_meta";
+        idColumnName = "table_id";
+        break;
+      case FILESET:
+        tableName = "fileset_meta";
+        idColumnName = "fileset_id";
+        break;
+      case TOPIC:
+        tableName = "topic_meta";
+        idColumnName = "topic_id";
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
+    }
+
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT * FROM %s WHERE %s = %d AND deleted_at != 0",
+                    tableName, idColumnName, id))) {
+      return rs.next();
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private List<Integer> listFilesetVersions(Long filesetId) {
+    List<Integer> versions = new ArrayList<>();
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT version FROM fileset_version_info WHERE fileset_id = %d", filesetId))) {
+      while (rs.next()) {
+        versions.add(rs.getInt("version"));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return versions;
+  }
+
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
     return BaseMetalake.builder()
         .withId(id)
@@ -450,7 +696,7 @@ public class TestJDBCBackend {
         .withFilesetType(Fileset.Type.MANAGED)
         .withStorageLocation("/tmp")
         .withComment("")
-        .withProperties(null)
+        .withProperties(new HashMap<>())
         .withAuditInfo(auditInfo)
         .build();
   }
