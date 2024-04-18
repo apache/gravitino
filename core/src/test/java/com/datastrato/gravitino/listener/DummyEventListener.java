@@ -11,8 +11,10 @@ import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.junit.jupiter.api.Assertions;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class DummyEventListener implements EventListenerPlugin {
   Map<String, String> properties;
@@ -46,14 +48,9 @@ public class DummyEventListener implements EventListenerPlugin {
 
   public static class DummyAsyncEventListener extends DummyEventListener {
     public List<Event> tryGetEvents() {
-      Instant waitTime = Instant.now().plusSeconds(20);
-      while (getEvents().size() == 0 && Instant.now().isBefore(waitTime)) {
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
+      Awaitility.await().atMost(20, TimeUnit.SECONDS).pollInterval(10, TimeUnit.MILLISECONDS).until(
+          ()-> getEvents().size() > 0
+      );
       return getEvents();
     }
 

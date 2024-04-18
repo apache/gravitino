@@ -59,7 +59,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testCreateTable() {
+  void testCreateTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.createTable(
         identifier,
@@ -78,7 +78,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testLoadTable() {
+  void testLoadTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.loadTable(identifier);
     Event event = dummyEventListener.popEvent();
@@ -89,7 +89,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testAlterTable() {
+  void testAlterTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     TableChange change = TableChange.setProperty("a", "b");
     dispatcher.alterTable(identifier, change);
@@ -103,7 +103,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testDropTable() {
+  void testDropTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.dropTable(identifier);
     Event event = dummyEventListener.popEvent();
@@ -113,7 +113,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testPurgeTable() {
+  void testPurgeTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.purgeTable(identifier);
     Event event = dummyEventListener.popEvent();
@@ -123,7 +123,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testListTable() {
+  void testListTableEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTables(namespace);
     Event event = dummyEventListener.popEvent();
@@ -133,7 +133,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testCreateTableFailure() {
+  void testCreateTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -156,7 +156,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testLoadTableFailure() {
+  void testLoadTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadTable(identifier));
@@ -168,7 +168,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testAlterTableFailure() {
+  void testAlterTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     TableChange change = TableChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
@@ -183,7 +183,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testDropTableFailure() {
+  void testDropTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropTable(identifier));
@@ -195,7 +195,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testPurgeTableFailure() {
+  void testPurgeTableFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.purgeTable(identifier));
@@ -207,7 +207,7 @@ public class TestTableEvent {
   }
 
   @Test
-  void testListTableFailure() {
+  void testListTableFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listTables(namespace));

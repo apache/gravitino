@@ -104,7 +104,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testCreateTopicFailure() {
+  void testCreateTopicFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -118,7 +118,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testLoadTopicFailure() {
+  void testLoadTopicFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadTopic(identifier));
@@ -130,7 +130,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testAlterTopicFailure() {
+  void testAlterTopicFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     TopicChange topicChange = TopicChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
@@ -146,7 +146,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testDropTopicFailure() {
+  void testDropTopicFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropTopic(identifier));
@@ -158,7 +158,7 @@ public class TestTopicEvent {
   }
 
   @Test
-  void testListTopicFailure() {
+  void testListTopicFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listTopics(namespace));

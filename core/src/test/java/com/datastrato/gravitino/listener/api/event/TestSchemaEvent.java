@@ -49,7 +49,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testCreateSchema() {
+  void testCreateSchemaEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     dispatcher.createSchema(identifier, "", ImmutableMap.of());
     Event event = dummyEventListener.popEvent();
@@ -60,7 +60,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testLoadSchema() {
+  void testLoadSchemaEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     dispatcher.loadSchema(identifier);
     Event event = dummyEventListener.popEvent();
@@ -71,7 +71,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testListSchema() {
+  void testListSchemaEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listSchemas(namespace);
     Event event = dummyEventListener.popEvent();
@@ -80,7 +80,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testAlterSchema() {
+  void testAlterSchemaEvent() {
     SchemaChange schemaChange = SchemaChange.setProperty("a", "b");
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     dispatcher.alterSchema(identifier, schemaChange);
@@ -96,7 +96,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testDropSchema() {
+  void testDropSchemaEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     dispatcher.dropSchema(identifier, true);
     Event event = dummyEventListener.popEvent();
@@ -107,7 +107,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testCreateSchemaFailure() {
+  void testCreateSchemaFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -121,7 +121,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testLoadSchemaFailure() {
+  void testLoadSchemaFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadSchema(identifier));
@@ -133,7 +133,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testAlterSchemaFailure() {
+  void testAlterSchemaFailureEvent() {
     // alter schema
     SchemaChange schemaChange = SchemaChange.setProperty("a", "b");
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
@@ -150,7 +150,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testDropSchemaFailure() {
+  void testDropSchemaFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropSchema(identifier, true));
@@ -163,7 +163,7 @@ public class TestSchemaEvent {
   }
 
   @Test
-  void testListSchemaFailure() {
+  void testListSchemaFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listSchemas(namespace));

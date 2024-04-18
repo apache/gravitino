@@ -47,7 +47,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testCreateCatalog() {
+  void testCreateCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.createCatalog(
         identifier, catalog.type(), catalog.provider(), catalog.comment(), catalog.properties());
@@ -59,7 +59,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testLoadCatalog() {
+  void testLoadCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.loadCatalog(identifier);
     Event event = dummyEventListener.popEvent();
@@ -70,7 +70,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testAlterCatalog() {
+  void testAlterCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     CatalogChange catalogChange = CatalogChange.setProperty("a", "b");
     dispatcher.alterCatalog(identifier, catalogChange);
@@ -85,7 +85,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testDropCatalog() {
+  void testDropCatalogEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     dispatcher.dropCatalog(identifier);
     Event event = dummyEventListener.popEvent();
@@ -95,7 +95,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testListCatalog() {
+  void testListCatalogEvent() {
     Namespace namespace = Namespace.of("metalake");
     dispatcher.listCatalogs(namespace);
     Event event = dummyEventListener.popEvent();
@@ -105,7 +105,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testListCatalogInfo() {
+  void testListCatalogInfoEvent() {
     Namespace namespace = Namespace.of("metalake");
     dispatcher.listCatalogsInfo(namespace);
     Event event = dummyEventListener.popEvent();
@@ -115,7 +115,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testCreateCatalogFailure() {
+  void testCreateCatalogFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -136,7 +136,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testLoadCatalogFailure() {
+  void testLoadCatalogFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadCatalog(identifier));
@@ -148,7 +148,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testAlterCatalogFailure() {
+  void testAlterCatalogFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog");
     CatalogChange catalogChange = CatalogChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
@@ -165,7 +165,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testDropCatalogFailure() {
+  void testDropCatalogFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropCatalog(identifier));
@@ -177,7 +177,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testListCatalogFailure() {
+  void testListCatalogFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listCatalogs(namespace));
@@ -189,7 +189,7 @@ public class TestCatalogEvent {
   }
 
   @Test
-  void testListCatalogInfoFailure() {
+  void testListCatalogInfoFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listCatalogsInfo(namespace));

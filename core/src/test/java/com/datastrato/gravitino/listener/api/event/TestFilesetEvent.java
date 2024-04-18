@@ -47,7 +47,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testCreateFileset() {
+  void testCreateFilesetEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", fileset.name());
     dispatcher.createFileset(
         identifier,
@@ -63,7 +63,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testLoadFileset() {
+  void testLoadFilesetEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", fileset.name());
     dispatcher.loadFileset(identifier);
     Event event = dummyEventListener.popEvent();
@@ -74,7 +74,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testAlterFileset() {
+  void testAlterFilesetEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", fileset.name());
     FilesetChange change = FilesetChange.setProperty("a", "b");
     dispatcher.alterFileset(identifier, change);
@@ -88,7 +88,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testDropFileset() {
+  void testDropFilesetEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", fileset.name());
     dispatcher.dropFileset(identifier);
     Event event = dummyEventListener.popEvent();
@@ -98,7 +98,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testListFileset() {
+  void testListFilesetEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listFilesets(namespace);
     Event event = dummyEventListener.popEvent();
@@ -108,7 +108,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testCreateSchemaFailure() {
+  void testCreateSchemaFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -129,7 +129,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testLoadFilesetFailure() {
+  void testLoadFilesetFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadFileset(identifier));
@@ -141,7 +141,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testAlterFilesetFailure() {
+  void testAlterFilesetFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
     FilesetChange change = FilesetChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
@@ -156,7 +156,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testDropFilesetFailure() {
+  void testDropFilesetFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropFileset(identifier));
@@ -168,7 +168,7 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testListFilesetFailure() {
+  void testListFilesetFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listFilesets(namespace));
