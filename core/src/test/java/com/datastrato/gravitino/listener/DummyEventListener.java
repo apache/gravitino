@@ -7,7 +7,6 @@ package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.listener.api.EventListenerPlugin;
 import com.datastrato.gravitino.listener.api.event.Event;
-import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -48,9 +47,10 @@ public class DummyEventListener implements EventListenerPlugin {
 
   public static class DummyAsyncEventListener extends DummyEventListener {
     public List<Event> tryGetEvents() {
-      Awaitility.await().atMost(20, TimeUnit.SECONDS).pollInterval(10, TimeUnit.MILLISECONDS).until(
-          ()-> getEvents().size() > 0
-      );
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .pollInterval(10, TimeUnit.MILLISECONDS)
+          .until(() -> getEvents().size() > 0);
       return getEvents();
     }
 
