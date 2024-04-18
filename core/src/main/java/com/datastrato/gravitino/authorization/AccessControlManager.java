@@ -14,6 +14,7 @@ import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.Executable;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 
@@ -30,13 +31,15 @@ public class AccessControlManager {
   private final UserGroupManager userGroupManager;
   private final AdminManager adminManager;
   private final RoleManager roleManager;
+  private final PermissionManager permissionManager;
   private final Object adminOperationLock = new Object();
   private final Object nonAdminOperationLock = new Object();
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
-    this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.adminManager = new AdminManager(store, idGenerator, config);
-    this.roleManager = new RoleManager(store, idGenerator);
+    this.roleManager = new RoleManager(store, idGenerator, config);
+    this.userGroupManager = new UserGroupManager(store, idGenerator, roleManager);
+    this.permissionManager = new PermissionManager(store, roleManager);
   }
 
   /**
@@ -106,13 +109,77 @@ public class AccessControlManager {
    * Gets a Group.
    *
    * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
+   * @param group The name of the Group.
    * @return The getting Group instance.
    * @throws NoSuchGroupException If the Group with the given identifier does not exist.
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
   public Group getGroup(String metalake, String group) throws NoSuchGroupException {
     return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
+  }
+
+  /**
+   * Grant a role to a user.
+   *
+   * @param metalake The metalake of the User.
+   * @param user The name of the User.
+   * @return true` if the User was successfully granted, `false` otherwise.
+   * @throws NoSuchUserException If the User with the given identifier does not exist.
+   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
+   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
+   *     User.
+   * @throws RuntimeException If granting a role to a user encounters storage issues.
+   */
+  public boolean grantRoleToUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> permissionManager.grantRoleToUser(metalake, role, user));
+  }
+
+  /**
+   * Grant a role to a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group THe name of the Group.
+   * @return true` if the Group was successfully granted, `false` otherwise.
+   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
+   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
+   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
+   *     Group.
+   * @throws RuntimeException If granting a role to a group encounters storage issues.
+   */
+  public boolean grantRoleToGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> permissionManager.grantRoleToGroup(metalake, role, group));
+  }
+
+  /**
+   * Revoke a role from a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group The name of the Group.
+   * @return true` if the Group was successfully revoked, `false` otherwise.
+   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
+   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
+   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
+   *     Group.
+   * @throws RuntimeException If revoking a role from a group encounters storage issues.
+   */
+  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
+    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromGroup(metalake, role, group));
+  }
+
+  /**
+   * Revoke a role from a user.
+   *
+   * @param metalake The metalake of the User.
+   * @param user The name of the User.
+   * @return true` if the User was successfully revoked, `false` otherwise.
+   * @throws NoSuchUserException If the User with the given identifier does not exist.
+   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
+   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
+   *     User.
+   * @throws RuntimeException If revoking a role from a user encounters storage issues.
+   */
+  public boolean revokeRoleFromUser(String metalake, String role, String user) {
+    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromUser(metalake, role, user));
   }
 
   /**
@@ -204,6 +271,11 @@ public class AccessControlManager {
    */
   public boolean dropRole(String metalake, String role) {
     return doWithNonAdminLock(() -> roleManager.dropRole(metalake, role));
+  }
+
+  @VisibleForTesting
+  RoleManager getRoleManager() {
+    return roleManager;
   }
 
   private <R, E extends Exception> R doWithNonAdminLock(Executable<R, E> executable) throws E {

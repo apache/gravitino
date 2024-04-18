@@ -33,6 +33,7 @@ dependencies {
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.h2db)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

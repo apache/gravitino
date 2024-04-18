@@ -23,7 +23,7 @@ public final class ListFilesetEvent extends FilesetEvent {
    *     contextual information, identifying the scope and boundaries of the listing operation.
    */
   public ListFilesetEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.toString()));
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 

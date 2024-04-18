@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -38,13 +39,6 @@ import org.junit.jupiter.api.TestInstance;
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogIT extends SparkCommonIT {
-
-  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
-    return Arrays.asList(
-        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
-        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
-  }
 
   @Override
   protected String getCatalogName() {
@@ -289,6 +283,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     checkDirExists(partitionPath);
   }
 
+
   @Test
   void testMetadataColumns() {
     String tableName = "test_metadata_columns";
@@ -301,10 +296,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
   }
 
@@ -320,10 +315,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
@@ -331,7 +326,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String expectedMetadata = "0,a";
     String getMetadataSQL =
-        String.format("SELECT _spec_id, _partition FROM %s ORDER BY _spec_id", tableName);
+            String.format("SELECT _spec_id, _partition FROM %s ORDER BY _spec_id", tableName);
     List<String> queryResult = getTableMetadata(getMetadataSQL);
     Assertions.assertEquals(1, queryResult.size());
     Assertions.assertEquals(expectedMetadata, queryResult.get(0));
@@ -349,10 +344,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     List<Integer> ids = new ArrayList<>();
@@ -360,11 +355,11 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
       ids.add(id);
     }
     Dataset<Row> df =
-        getSparkSession()
-            .createDataset(ids, Encoders.INT())
-            .withColumnRenamed("value", "id")
-            .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
-            .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
+            getSparkSession()
+                    .createDataset(ids, Encoders.INT())
+                    .withColumnRenamed("value", "id")
+                    .withColumn("name", new Column(Literal.create("a", DataTypes.StringType)))
+                    .withColumn("age", new Column(Literal.create(1, DataTypes.IntegerType)));
     df.coalesce(1).writeTo(tableName).append();
 
     Assertions.assertEquals(200, getSparkSession().table(tableName).count());
@@ -387,13 +382,13 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     metadataColumns[1] =
-        new SparkMetadataColumn(
-            "_partition", DataTypes.createStructType(new StructField[] {}), true);
+            new SparkMetadataColumn(
+                    "_partition", DataTypes.createStructType(new StructField[] {}), true);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
@@ -417,10 +412,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
@@ -444,10 +439,10 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleTableColumn())
-            .withMetadataColumns(metadataColumns);
+            SparkTableInfoChecker.create()
+                    .withName(tableName)
+                    .withColumns(getSimpleTableColumn())
+                    .withMetadataColumns(metadataColumns);
     checker.check(tableInfo);
 
     String insertData = String.format("INSERT into %s values(2,'a', 1);", tableName);
@@ -464,6 +459,17 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(0, queryResult1.size());
   }
 
+  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
+    return Arrays.asList(
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
+  }
+
+  /**
+   * Here we build a new `createIcebergSql` String for creating a table with a field of timestamp
+   * type to create the year/month,etc partitions
+   */
   private String getCreateIcebergSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",

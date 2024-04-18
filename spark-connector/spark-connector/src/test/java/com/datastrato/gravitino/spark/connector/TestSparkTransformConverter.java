@@ -42,23 +42,14 @@ public class TestSparkTransformConverter {
 
   @Test
   void testPartition() {
-    sparkToGravitinoPartitionTransformMaps.forEach(
-        (sparkTransform, gravitinoTransform) -> {
-          Transform[] gravitinoPartitionings =
-              SparkTransformConverter.toGravitinoPartitionings(
-                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform},
-                  true);
-          Assertions.assertTrue(
-              gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
-          Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
-        });
+    SparkTransformConverter sparkTransformConverterWithoutSupportsBucketPart =
+        new SparkTransformConverter(false);
 
     sparkToGravitinoPartitionTransformMaps.forEach(
         (sparkTransform, gravitinoTransform) -> {
           Transform[] gravitinoPartitionings =
-              SparkTransformConverter.toGravitinoPartitionings(
-                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform},
-                  false);
+              sparkTransformConverterWithoutSupportsBucketPart.toGravitinoPartitionings(
+                  new org.apache.spark.sql.connector.expressions.Transform[] {sparkTransform});
           if (sparkTransform instanceof BucketTransform) {
             Assertions.assertTrue(
                 gravitinoPartitionings != null && gravitinoPartitionings.length == 0);
@@ -66,14 +57,15 @@ public class TestSparkTransformConverter {
             Assertions.assertTrue(
                 gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
             Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
-            Assertions.assertFalse(gravitinoPartitionings[0] instanceof Transforms.BucketTransform);
           }
         });
 
+    SparkTransformConverter sparkTransformConverterWithSupportsBucketPart =
+        new SparkTransformConverter(true);
     sparkToGravitinoPartitionTransformMaps.forEach(
         (sparkTransform, gravitinoTransform) -> {
           org.apache.spark.sql.connector.expressions.Transform[] sparkTransforms =
-              SparkTransformConverter.toSparkTransform(
+              sparkTransformConverterWithSupportsBucketPart.toSparkTransform(
                   new Transform[] {gravitinoTransform}, null, null);
           Assertions.assertTrue(sparkTransforms.length == 1);
           Assertions.assertEquals(sparkTransform, sparkTransforms[0]);
@@ -82,12 +74,13 @@ public class TestSparkTransformConverter {
 
   @Test
   void testGravitinoToSparkDistributionWithoutSortOrder() {
+    SparkTransformConverter sparkTransformConverter = new SparkTransformConverter(false);
     int bucketNum = 16;
     String[][] columnNames = createGravitinoFieldReferenceNames("a", "b.c");
     Distribution gravitinoDistribution = createHashDistribution(bucketNum, columnNames);
 
     org.apache.spark.sql.connector.expressions.Transform[] sparkTransforms =
-        SparkTransformConverter.toSparkTransform(null, gravitinoDistribution, null);
+        sparkTransformConverter.toSparkTransform(null, gravitinoDistribution, null);
     Assertions.assertTrue(sparkTransforms != null && sparkTransforms.length == 1);
     Assertions.assertTrue(sparkTransforms[0] instanceof BucketTransform);
     BucketTransform bucket = (BucketTransform) sparkTransforms[0];
@@ -99,42 +92,56 @@ public class TestSparkTransformConverter {
     Assertions.assertArrayEquals(columnNames, columns);
 
     // none and null distribution
-    sparkTransforms = SparkTransformConverter.toSparkTransform(null, null, null);
+    sparkTransforms = sparkTransformConverter.toSparkTransform(null, null, null);
     Assertions.assertEquals(0, sparkTransforms.length);
-    sparkTransforms = SparkTransformConverter.toSparkTransform(null, Distributions.NONE, null);
+    sparkTransforms = sparkTransformConverter.toSparkTransform(null, Distributions.NONE, null);
     Assertions.assertEquals(0, sparkTransforms.length);
 
     // range and even distribution
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
-        () -> SparkTransformConverter.toSparkTransform(null, Distributions.RANGE, null));
+        () -> sparkTransformConverter.toSparkTransform(null, Distributions.RANGE, null));
     Distribution evenDistribution = Distributions.even(bucketNum, NamedReference.field(""));
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
-        () -> SparkTransformConverter.toSparkTransform(null, evenDistribution, null));
+        () -> sparkTransformConverter.toSparkTransform(null, evenDistribution, null));
   }
 
   @Test
   void testSparkToGravitinoDistributionWithoutSortOrder() {
+    SparkTransformConverter sparkTransformConverter = new SparkTransformConverter(false);
     int bucketNum = 16;
     String[] sparkFieldReferences = new String[] {"a", "b.c"};
 
     org.apache.spark.sql.connector.expressions.Transform sparkBucket =
         Expressions.bucket(bucketNum, sparkFieldReferences);
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
-        SparkTransformConverter.toGravitinoDistributionAndSortOrders(
+        sparkTransformConverter.toGravitinoDistributionAndSortOrders(
             new org.apache.spark.sql.connector.expressions.Transform[] {sparkBucket});
 
-    Assertions.assertNull(distributionAndSortOrdersInfo.getSortOrders());
+    Assertions.assertNotNull(distributionAndSortOrdersInfo.getSortOrders());
+    Assertions.assertEquals(0, distributionAndSortOrdersInfo.getSortOrders().length);
 
     Distribution distribution = distributionAndSortOrdersInfo.getDistribution();
     String[][] gravitinoFieldReferences = createGravitinoFieldReferenceNames(sparkFieldReferences);
     Assertions.assertEquals(
         createHashDistribution(bucketNum, gravitinoFieldReferences), distribution);
+
+    sparkTransformConverter = new SparkTransformConverter(true);
+
+    distributionAndSortOrdersInfo =
+        sparkTransformConverter.toGravitinoDistributionAndSortOrders(
+            new org.apache.spark.sql.connector.expressions.Transform[] {sparkBucket});
+    Assertions.assertNotNull(distributionAndSortOrdersInfo.getSortOrders());
+    Assertions.assertEquals(0, distributionAndSortOrdersInfo.getSortOrders().length);
+    Assertions.assertNotNull(distributionAndSortOrdersInfo.getDistribution());
+    Assertions.assertEquals(Distributions.NONE, distributionAndSortOrdersInfo.getDistribution());
   }
 
   @Test
   void testSparkToGravitinoDistributionWithSortOrder() {
+    SparkTransformConverter sparkTransformConverter = new SparkTransformConverter(false);
+
     int bucketNum = 16;
     String[][] bucketColumnNames = createGravitinoFieldReferenceNames("a", "b.c");
     String[][] sortColumnNames = createGravitinoFieldReferenceNames("f", "m.n");
@@ -145,7 +152,7 @@ public class TestSparkTransformConverter {
             createSparkFieldReference(sortColumnNames));
 
     DistributionAndSortOrdersInfo distributionAndSortOrders =
-        SparkTransformConverter.toGravitinoDistributionAndSortOrders(
+        sparkTransformConverter.toGravitinoDistributionAndSortOrders(
             new org.apache.spark.sql.connector.expressions.Transform[] {sortedBucketTransform});
     Assertions.assertEquals(
         createHashDistribution(bucketNum, bucketColumnNames),
@@ -154,10 +161,21 @@ public class TestSparkTransformConverter {
     SortOrder[] sortOrders =
         createSortOrders(sortColumnNames, ConnectorConstants.SPARK_DEFAULT_SORT_DIRECTION);
     Assertions.assertArrayEquals(sortOrders, distributionAndSortOrders.getSortOrders());
+
+    sparkTransformConverter = new SparkTransformConverter(true);
+
+    distributionAndSortOrders =
+        sparkTransformConverter.toGravitinoDistributionAndSortOrders(
+            new org.apache.spark.sql.connector.expressions.Transform[] {sortedBucketTransform});
+    Assertions.assertNotNull(distributionAndSortOrders.getSortOrders());
+    Assertions.assertEquals(0, distributionAndSortOrders.getSortOrders().length);
+    Assertions.assertNotNull(distributionAndSortOrders.getDistribution());
+    Assertions.assertEquals(Distributions.NONE, distributionAndSortOrders.getDistribution());
   }
 
   @Test
   void testGravitinoToSparkDistributionWithSortOrder() {
+    SparkTransformConverter sparkTransformConverter = new SparkTransformConverter(false);
     int bucketNum = 16;
     String[][] bucketColumnNames = createGravitinoFieldReferenceNames("a", "b.c");
     String[][] sortColumnNames = createGravitinoFieldReferenceNames("f", "m.n");
@@ -166,7 +184,7 @@ public class TestSparkTransformConverter {
         createSortOrders(sortColumnNames, ConnectorConstants.SPARK_DEFAULT_SORT_DIRECTION);
 
     org.apache.spark.sql.connector.expressions.Transform[] transforms =
-        SparkTransformConverter.toSparkTransform(null, distribution, sortOrders);
+        sparkTransformConverter.toSparkTransform(null, distribution, sortOrders);
     Assertions.assertTrue(transforms.length == 1);
     Assertions.assertTrue(transforms[0] instanceof SortedBucketTransform);
 
@@ -224,16 +242,16 @@ public class TestSparkTransformConverter {
         SparkTransformConverter.createSparkBucketTransform(10, new String[] {"a"}),
         Transforms.bucket(10, new String[] {"a"}));
     sparkToGravitinoPartitionTransformMaps.put(
-        SparkTransformConverter.createSparkHoursTransform(new String[] {"date"}),
+        SparkTransformConverter.createSparkHoursTransform(NamedReference.field("date")),
         Transforms.hour("date"));
     sparkToGravitinoPartitionTransformMaps.put(
-        SparkTransformConverter.createSparkDaysTransform(new String[] {"date"}),
+        SparkTransformConverter.createSparkDaysTransform(NamedReference.field("date")),
         Transforms.day("date"));
     sparkToGravitinoPartitionTransformMaps.put(
-        SparkTransformConverter.createSparkMonthsTransform(new String[] {"date"}),
+        SparkTransformConverter.createSparkMonthsTransform(NamedReference.field("date")),
         Transforms.month("date"));
     sparkToGravitinoPartitionTransformMaps.put(
-        SparkTransformConverter.createSparkYearsTransform(new String[] {"date"}),
+        SparkTransformConverter.createSparkYearsTransform(NamedReference.field("date")),
         Transforms.year("date"));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkTruncateTransform(
