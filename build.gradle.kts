@@ -267,7 +267,8 @@ subprojects {
           "-Xlint:fallthrough",
           "-Xlint:finally",
           "-Xlint:overrides",
-          "-Xlint:static"
+          "-Xlint:static",
+          "-Werror"
         )
       )
     }

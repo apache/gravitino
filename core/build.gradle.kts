@@ -30,6 +30,8 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  compileOnly(libs.servlet) // fix error-prone compile error
+
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 

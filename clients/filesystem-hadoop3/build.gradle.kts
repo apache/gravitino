@@ -14,7 +14,7 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.caffeine)
 
-  testCompileOnly(project(":core"))
+  testCompileOnly(project(":core")) // fix error-prone compile error
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jwt)
