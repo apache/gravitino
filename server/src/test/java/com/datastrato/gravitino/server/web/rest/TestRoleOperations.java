@@ -268,7 +268,7 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(0, deleteResponse.getCode());
     Assertions.assertTrue(deleteResponse.deleted());
 
-    // Test when failed to drop role
+    // Test when failed to delete role
     when(manager.deleteRole(any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/roles/role1")

@@ -333,8 +333,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @throws UserAlreadyExistsException If a metalake admin with the same name already exists.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
+  public User addMetalakeAdmin(String user) throws UserAlreadyExistsException {
     UserAddRequest req = new UserAddRequest(user);
     req.validate();
 
@@ -356,7 +355,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param user The name of the User.
    * @return `true` if the User was successfully removed, `false` only when there's no such metalake
    *     admin, otherwise it will throw an exception.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeMetalakeAdmin(String user) {
