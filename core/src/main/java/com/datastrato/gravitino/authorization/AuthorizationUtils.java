@@ -27,6 +27,8 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
 
   private static final String UNSUPPORTED_ERROR_MSG = "%s is an unsupported catalog type";
+=======
+>>>>>>> c1ff0c94 (fix style)
   private static final List<Privilege> CATALOG_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
           Privileges.LoadCatalog.get(),
