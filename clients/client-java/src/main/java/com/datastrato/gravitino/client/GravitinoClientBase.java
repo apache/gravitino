@@ -61,7 +61,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
-              .withPreConnectHandle(this::checkVersion)
+              .withPreConnectHandler(this::checkVersion)
               .withHeaders(headers)
               .build();
 

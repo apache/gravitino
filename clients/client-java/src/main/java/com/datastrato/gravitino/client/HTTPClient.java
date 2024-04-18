@@ -756,7 +756,7 @@ public class HTTPClient implements RESTClient {
      * @param beforeConnectHandler The handle run before connect to the server .
      * @return This Builder instance for method chaining.
      */
-    public Builder withPreConnectHandle(Runnable beforeConnectHandler) {
+    public Builder withPreConnectHandler(Runnable beforeConnectHandler) {
       this.beforeConnectHandler = beforeConnectHandler;
       return this;
     }
