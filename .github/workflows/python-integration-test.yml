@@ -57,18 +57,25 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
       - name: Python Client Integration Test
         id: integrationTest
+        env:
+          START_EXTERNAL_GRAVITINO: true
         run: |
-          #./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-          #for pythonVersion in "3.8" "3.9" "3.10" "3.11"
-          #do
-          #  ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :client:client-python:integrationTest
-          #done
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+
+          for pythonVersion in "3.8" "3.9" "3.10" "3.11"
+          do
+            echo "Use Python version ${pythonVersion} to test the Python client."
+            # Start Gravitino server and set the environment variable `START_EXTERNAL_GRAVITINO: true`
+            ./distribution/package/bin/gravitino.sh start
+
+            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :client:client-python:test
+
+            # Stop Gravitino server and clean database
+            ./distribution/package/bin/gravitino.sh stop
+            rm -rf ./distribution/package/data
+          done
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
