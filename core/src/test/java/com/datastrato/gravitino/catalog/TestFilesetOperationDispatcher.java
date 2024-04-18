@@ -21,8 +21,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
-  private static FilesetOperationDispatcher filesetOperationDispatcher;
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
+  static FilesetOperationDispatcher filesetOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
@@ -145,50 +145,5 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
 
     boolean dropped = filesetOperationDispatcher.dropFileset(filesetIdent1);
     Assertions.assertTrue(dropped);
-  }
-
-  @Test
-  public void testNameCaseInsensitive() {
-    Namespace filesetNs = Namespace.of(metalake, catalog, "schema112");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
-
-    // test case-insensitive in creation
-    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "filesetNAME");
-    Fileset createdFileset =
-        filesetOperationDispatcher.createFileset(
-            filesetIdent, "comment", Fileset.Type.MANAGED, "fileset41", props);
-    Assertions.assertEquals(filesetIdent.name().toLowerCase(), createdFileset.name());
-
-    // test case-insensitive in loading
-    Fileset loadedFileset = filesetOperationDispatcher.loadFileset(filesetIdent);
-    Assertions.assertEquals(filesetIdent.name().toLowerCase(), loadedFileset.name());
-
-    // test case-insensitive in listing
-    NameIdentifier[] filesets = filesetOperationDispatcher.listFilesets(filesetNs);
-    Arrays.stream(filesets).forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
-
-    // test case-insensitive in altering
-    Fileset alteredFileset =
-        filesetOperationDispatcher.alterFileset(
-            NameIdentifier.of(filesetNs, filesetIdent.name().toLowerCase()),
-            FilesetChange.setProperty("k2", "v2"));
-    Assertions.assertEquals(filesetIdent.name().toLowerCase(), alteredFileset.name());
-
-    Exception exception =
-        Assertions.assertThrows(
-            FilesetAlreadyExistsException.class,
-            () ->
-                filesetOperationDispatcher.alterFileset(
-                    NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase()),
-                    FilesetChange.rename(filesetIdent.name().toUpperCase())));
-    Assertions.assertEquals(
-        "Fileset metalake.catalog.schema112.filesetname already exists", exception.getMessage());
-
-    // test case-insensitive in dropping
-    Assertions.assertTrue(
-        filesetOperationDispatcher.dropFileset(
-            NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase())));
-    Assertions.assertFalse(filesetOperationDispatcher.filesetExists(filesetIdent));
   }
 }

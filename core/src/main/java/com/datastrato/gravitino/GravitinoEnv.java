@@ -12,15 +12,19 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.FilesetStandardizedDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaEventDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaStandardizedDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TableEventDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableStandardizedDispatcher;
 import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.catalog.TopicEventDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicStandardizedDispatcher;
 import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.EventListenerManager;
 import com.datastrato.gravitino.lock.LockManager;
@@ -155,16 +159,27 @@ public class GravitinoEnv {
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
+    SchemaStandardizedDispatcher schemaStandardizedDispatcher =
+        new SchemaStandardizedDispatcher(schemaOperationDispatcher);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaStandardizedDispatcher);
+
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
+    TableStandardizedDispatcher tableStandardizedDispatcher =
+        new TableStandardizedDispatcher(tableOperationDispatcher);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableStandardizedDispatcher);
+
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetOperationDispatcher);
+    FilesetStandardizedDispatcher filesetStandardizedDispatcher =
+        new FilesetStandardizedDispatcher(filesetOperationDispatcher);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetStandardizedDispatcher);
+
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicOperationDispatcher);
+    TopicStandardizedDispatcher topicStandardizedDispatcher =
+        new TopicStandardizedDispatcher(topicOperationDispatcher);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicStandardizedDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);

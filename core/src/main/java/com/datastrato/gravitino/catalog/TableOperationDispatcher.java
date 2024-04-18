@@ -15,7 +15,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -64,14 +63,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    return doWithStandardizedList(
-        namespace,
-        Capability.Scope.TABLE,
-        standardizeNamespace ->
-            doWithCatalog(
-                getCatalogIdentifier(NameIdentifier.of(standardizeNamespace.levels())),
-                c -> c.doWithTableOps(t -> t.listTables(standardizeNamespace)),
-                NoSuchSchemaException.class),
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        c -> c.doWithTableOps(t -> t.listTables(namespace)),
         NoSuchSchemaException.class);
   }
 
@@ -84,43 +78,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return doWithStandardizedIdent(
-        ident,
-        Capability.Scope.TABLE,
-        standardizedIdent -> {
-          NameIdentifier catalogIdentifier = getCatalogIdentifier(standardizedIdent);
-          Table table =
-              doWithCatalog(
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
+    Table table =
+        doWithCatalog(
+            catalogIdentifier,
+            c -> c.doWithTableOps(t -> t.loadTable(ident)),
+            NoSuchTableException.class);
+
+    StringIdentifier stringId = getStringIdFromProperties(table.properties());
+    // Case 1: The table is not created by Gravitino.
+    if (stringId == null) {
+      return EntityCombinedTable.of(table)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
                   catalogIdentifier,
-                  c -> c.doWithTableOps(t -> t.loadTable(standardizedIdent)),
-                  NoSuchTableException.class);
+                  HasPropertyMetadata::tablePropertiesMetadata,
+                  table.properties()));
+    }
 
-          StringIdentifier stringId = getStringIdFromProperties(table.properties());
-          // Case 1: The table is not created by Gravitino.
-          if (stringId == null) {
-            return EntityCombinedTable.of(table)
-                .withHiddenPropertiesSet(
-                    getHiddenPropertyNames(
-                        catalogIdentifier,
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        table.properties()));
-          }
+    TableEntity tableEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TABLE, TableEntity.class),
+            "GET",
+            stringId.id());
 
-          TableEntity tableEntity =
-              operateOnEntity(
-                  standardizedIdent,
-                  identifier -> store.get(identifier, TABLE, TableEntity.class),
-                  "GET",
-                  stringId.id());
-
-          return EntityCombinedTable.of(table, tableEntity)
-              .withHiddenPropertiesSet(
-                  getHiddenPropertyNames(
-                      catalogIdentifier,
-                      HasPropertyMetadata::tablePropertiesMetadata,
-                      table.properties()));
-        },
-        NoSuchTableException.class);
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdentifier,
+                HasPropertyMetadata::tablePropertiesMetadata,
+                table.properties()));
   }
 
   /**
@@ -147,97 +135,78 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return doWithStandardizedIdent(
-        ident,
-        Capability.Scope.TABLE,
-        standardizedIdent -> {
-          if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(standardizedIdent.name())) {
-            throw new IllegalArgumentException("Can't create a table with with reserved name `*`");
-          }
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a table with with reserved name `*`");
+    }
 
-          NameIdentifier catalogIdent = getCatalogIdentifier(standardizedIdent);
-          doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithPropertiesMeta(
-                      p -> {
-                        validatePropertyForCreate(p.tablePropertiesMetadata(), properties);
-                        return null;
-                      }),
-              IllegalArgumentException.class);
-          long uid = idGenerator.nextId();
-          // Add StringIdentifier to the properties, the specific catalog will handle this
-          // StringIdentifier to make sure only when the operation is successful, the related
-          // TableEntity will be visible.
-          StringIdentifier stringId = StringIdentifier.fromId(uid);
-          Map<String, String> updatedProperties =
-              StringIdentifier.newPropertiesWithId(stringId, properties);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  validatePropertyForCreate(p.tablePropertiesMetadata(), properties);
+                  return null;
+                }),
+        IllegalArgumentException.class);
+    long uid = idGenerator.nextId();
+    // Add StringIdentifier to the properties, the specific catalog will handle this
+    // StringIdentifier to make sure only when the operation is successful, the related
+    // TableEntity will be visible.
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    Map<String, String> updatedProperties =
+        StringIdentifier.newPropertiesWithId(stringId, properties);
 
-          doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithTableOps(
-                      t ->
-                          t.createTable(
-                              standardizedIdent,
-                              applyCapabilities(columns, c.capabilities()),
-                              comment,
-                              updatedProperties,
-                              applyCapabilities(
-                                  (partitions == null ? EMPTY_TRANSFORM : partitions),
-                                  c.capabilities()),
-                              applyCapabilities(
-                                  (distribution == null ? Distributions.NONE : distribution),
-                                  c.capabilities()),
-                              applyCapabilities(
-                                  (sortOrders == null ? new SortOrder[0] : sortOrders),
-                                  c.capabilities()),
-                              applyCapabilities(
-                                  (indexes == null ? Indexes.EMPTY_INDEXES : indexes),
-                                  c.capabilities()))),
-              NoSuchSchemaException.class,
-              TableAlreadyExistsException.class);
-
-          // Retrieve the Table again to obtain some values generated by underlying catalog
-          Table table =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.loadTable(standardizedIdent)),
-                  NoSuchTableException.class);
-
-          TableEntity tableEntity =
-              TableEntity.builder()
-                  .withId(uid)
-                  .withName(standardizedIdent.name())
-                  .withNamespace(standardizedIdent.namespace())
-                  .withAuditInfo(
-                      AuditInfo.builder()
-                          .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                          .withCreateTime(Instant.now())
-                          .build())
-                  .build();
-
-          try {
-            store.put(tableEntity, true /* overwrite */);
-          } catch (Exception e) {
-            LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", standardizedIdent, e);
-            return EntityCombinedTable.of(table)
-                .withHiddenPropertiesSet(
-                    getHiddenPropertyNames(
-                        catalogIdent,
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        table.properties()));
-          }
-
-          return EntityCombinedTable.of(table, tableEntity)
-              .withHiddenPropertiesSet(
-                  getHiddenPropertyNames(
-                      catalogIdent,
-                      HasPropertyMetadata::tablePropertiesMetadata,
-                      table.properties()));
-        },
+    doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithTableOps(
+                t ->
+                    t.createTable(
+                        ident,
+                        applyCapabilities(columns, c.capabilities()),
+                        comment,
+                        updatedProperties,
+                        partitions == null ? EMPTY_TRANSFORM : partitions,
+                        distribution == null ? Distributions.NONE : distribution,
+                        sortOrders == null ? new SortOrder[0] : sortOrders,
+                        indexes == null ? Indexes.EMPTY_INDEXES : indexes)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
+
+    // Retrieve the Table again to obtain some values generated by underlying catalog
+    Table table =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithTableOps(t -> t.loadTable(ident)),
+            NoSuchTableException.class);
+
+    TableEntity tableEntity =
+        TableEntity.builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(tableEntity, true /* overwrite */);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
+      return EntityCombinedTable.of(table)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+    }
+
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
   }
 
   /**
@@ -253,90 +222,77 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    return doWithStandardizedIdent(
-        ident,
-        Capability.Scope.TABLE,
-        standardizedIdent -> {
-          validateAlterProperties(
-              standardizedIdent, HasPropertyMetadata::tablePropertiesMetadata, changes);
+    validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
 
-          NameIdentifier catalogIdent = getCatalogIdentifier(standardizedIdent);
-          Table tempAlteredTable =
-              doWithCatalog(
-                  catalogIdent,
-                  c ->
-                      c.doWithTableOps(
-                          t ->
-                              t.alterTable(
-                                  standardizedIdent, applyCapabilities(c.capabilities(), changes))),
-                  NoSuchTableException.class,
-                  IllegalArgumentException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    Table tempAlteredTable =
+        doWithCatalog(
+            catalogIdent,
+            c ->
+                c.doWithTableOps(
+                    t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
+            NoSuchTableException.class,
+            IllegalArgumentException.class);
 
-          // Retrieve the Table again to obtain some values generated by underlying catalog
-          Table alteredTable =
-              doWithCatalog(
-                  catalogIdent,
-                  c ->
-                      c.doWithTableOps(
-                          t ->
-                              t.loadTable(
-                                  NameIdentifier.of(
-                                      standardizedIdent.namespace(), tempAlteredTable.name()))),
-                  NoSuchTableException.class);
+    // Retrieve the Table again to obtain some values generated by underlying catalog
+    Table alteredTable =
+        doWithCatalog(
+            catalogIdent,
+            c ->
+                c.doWithTableOps(
+                    t ->
+                        t.loadTable(NameIdentifier.of(ident.namespace(), tempAlteredTable.name()))),
+            NoSuchTableException.class);
 
-          StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
-          // Case 1: The table is not created by Gravitino.
-          if (stringId == null) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenPropertiesSet(
-                    getHiddenPropertyNames(
-                        getCatalogIdentifier(standardizedIdent),
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        alteredTable.properties()));
-          }
+    StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
+    // Case 1: The table is not created by Gravitino.
+    if (stringId == null) {
+      return EntityCombinedTable.of(alteredTable)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  getCatalogIdentifier(ident),
+                  HasPropertyMetadata::tablePropertiesMetadata,
+                  alteredTable.properties()));
+    }
 
-          TableEntity updatedTableEntity =
-              operateOnEntity(
-                  standardizedIdent,
-                  id ->
-                      store.update(
-                          id,
-                          TableEntity.class,
-                          TABLE,
-                          tableEntity -> {
-                            String newName =
-                                Arrays.stream(changes)
-                                    .filter(c -> c instanceof TableChange.RenameTable)
-                                    .map(c -> ((TableChange.RenameTable) c).getNewName())
-                                    .reduce((c1, c2) -> c2)
-                                    .orElse(tableEntity.name());
+    TableEntity updatedTableEntity =
+        operateOnEntity(
+            ident,
+            id ->
+                store.update(
+                    id,
+                    TableEntity.class,
+                    TABLE,
+                    tableEntity -> {
+                      String newName =
+                          Arrays.stream(changes)
+                              .filter(c -> c instanceof TableChange.RenameTable)
+                              .map(c -> ((TableChange.RenameTable) c).getNewName())
+                              .reduce((c1, c2) -> c2)
+                              .orElse(tableEntity.name());
 
-                            return TableEntity.builder()
-                                .withId(tableEntity.id())
-                                .withName(newName)
-                                .withNamespace(standardizedIdent.namespace())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(tableEntity.auditInfo().creator())
-                                        .withCreateTime(tableEntity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build();
-                          }),
-                  "UPDATE",
-                  stringId.id());
+                      return TableEntity.builder()
+                          .withId(tableEntity.id())
+                          .withName(newName)
+                          .withNamespace(ident.namespace())
+                          .withAuditInfo(
+                              AuditInfo.builder()
+                                  .withCreator(tableEntity.auditInfo().creator())
+                                  .withCreateTime(tableEntity.auditInfo().createTime())
+                                  .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                                  .withLastModifiedTime(Instant.now())
+                                  .build())
+                          .build();
+                    }),
+            "UPDATE",
+            stringId.id());
 
-          return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-              .withHiddenPropertiesSet(
-                  getHiddenPropertyNames(
-                      getCatalogIdentifier(standardizedIdent),
-                      HasPropertyMetadata::tablePropertiesMetadata,
-                      alteredTable.properties()));
-        },
-        NoSuchTableException.class,
-        IllegalArgumentException.class);
+    return EntityCombinedTable.of(alteredTable, updatedTableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                getCatalogIdentifier(ident),
+                HasPropertyMetadata::tablePropertiesMetadata,
+                alteredTable.properties()));
   }
 
   /**
@@ -349,29 +305,23 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return doWithStandardizedIdent(
-        ident,
-        Capability.Scope.TABLE,
-        standardizedIdent -> {
-          boolean dropped =
-              doWithCatalog(
-                  getCatalogIdentifier(standardizedIdent),
-                  c -> c.doWithTableOps(t -> t.dropTable(standardizedIdent)),
-                  NoSuchTableException.class);
+    boolean dropped =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.dropTable(ident)),
+            NoSuchTableException.class);
 
-          if (!dropped) {
-            return false;
-          }
+    if (!dropped) {
+      return false;
+    }
 
-          try {
-            store.delete(standardizedIdent, TABLE);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
+    try {
+      store.delete(ident, TABLE);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
 
-          return true;
-        },
-        NoSuchTableException.class);
+    return true;
   }
 
   /**
@@ -389,30 +339,23 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return doWithStandardizedIdent(
-        ident,
-        Capability.Scope.TABLE,
-        standardizedIdent -> {
-          boolean purged =
-              doWithCatalog(
-                  getCatalogIdentifier(standardizedIdent),
-                  c -> c.doWithTableOps(t -> t.purgeTable(standardizedIdent)),
-                  NoSuchTableException.class,
-                  UnsupportedOperationException.class);
+    boolean purged =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+            NoSuchTableException.class,
+            UnsupportedOperationException.class);
 
-          if (!purged) {
-            return false;
-          }
+    if (!purged) {
+      return false;
+    }
 
-          try {
-            store.delete(standardizedIdent, TABLE);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
+    try {
+      store.delete(ident, TABLE);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
 
-          return true;
-        },
-        NoSuchTableException.class,
-        UnsupportedOperationException.class);
+    return true;
   }
 }

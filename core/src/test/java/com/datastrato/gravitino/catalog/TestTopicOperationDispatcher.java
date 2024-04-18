@@ -30,8 +30,8 @@ import org.junit.jupiter.api.Test;
 
 public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
-  private static TopicOperationDispatcher topicOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
+  static TopicOperationDispatcher topicOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
@@ -200,38 +200,5 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
-  }
-
-  @Test
-  public void testNameCaseInsensitive() {
-    Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
-
-    // test case-insensitive in creation
-    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topicNAME");
-    Topic createdTopic = topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
-    Assertions.assertEquals(topicIdent.name().toLowerCase(), createdTopic.name());
-
-    // test case-insensitive in loading
-    Topic loadedTopic = topicOperationDispatcher.loadTopic(topicIdent);
-    Assertions.assertEquals(topicIdent.name().toLowerCase(), loadedTopic.name());
-
-    // test case-insensitive in listing
-    NameIdentifier[] idents = topicOperationDispatcher.listTopics(topicNs);
-    Assertions.assertEquals(1, idents.length);
-
-    // test case-insensitive in altering
-    Topic alteredTopic =
-        topicOperationDispatcher.alterTopic(
-            NameIdentifier.of(topicNs, topicIdent.name().toLowerCase()),
-            TopicChange.setProperty("k2", "v2"));
-    Assertions.assertEquals(topicIdent.name().toLowerCase(), alteredTopic.name());
-
-    // test case-insensitive in dropping
-    Assertions.assertTrue(
-        topicOperationDispatcher.dropTopic(
-            NameIdentifier.of(topicNs, topicIdent.name().toUpperCase())));
-    Assertions.assertFalse(topicOperationDispatcher.topicExists(topicIdent));
   }
 }

@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
-  private static SchemaOperationDispatcher dispatcher;
+  static SchemaOperationDispatcher dispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
@@ -195,34 +195,5 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
-  }
-
-  @Test
-  public void testNameCaseInsensitive() {
-    // test case-insensitive in creation
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schemaNAME");
-    Schema createdSchema =
-        dispatcher.createSchema(schemaIdent, null, ImmutableMap.of("k1", "v1", "k2", "v2"));
-    Assertions.assertEquals(schemaIdent.name().toLowerCase(), createdSchema.name());
-
-    // test case-insensitive in loading
-    Schema loadSchema = dispatcher.loadSchema(schemaIdent);
-    Assertions.assertEquals(schemaIdent.name().toLowerCase(), loadSchema.name());
-
-    // test case-insensitive in listing
-    NameIdentifier[] schemas = dispatcher.listSchemas(Namespace.of(metalake, catalog));
-    Arrays.stream(schemas).forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
-
-    // test case-insensitive in altering
-    Schema alteredSchema =
-        dispatcher.alterSchema(
-            schemaIdent, SchemaChange.setProperty("k2", "v2"), SchemaChange.removeProperty("k1"));
-    Assertions.assertEquals(schemaIdent.name().toLowerCase(), alteredSchema.name());
-
-    // test case-insensitive in dropping
-    Assertions.assertTrue(
-        dispatcher.dropSchema(
-            NameIdentifier.of(schemaIdent.namespace(), schemaIdent.name().toLowerCase()), false));
-    Assertions.assertFalse(dispatcher.schemaExists(schemaIdent));
   }
 }
