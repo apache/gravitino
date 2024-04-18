@@ -18,7 +18,7 @@ public final class ListSchemaFailureEvent extends SchemaFailureEvent {
   private final Namespace namespace;
 
   public ListSchemaFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.toString()), exception);
+    super(user, NameIdentifier.of(namespace.levels()), exception);
     this.namespace = namespace;
   }
 

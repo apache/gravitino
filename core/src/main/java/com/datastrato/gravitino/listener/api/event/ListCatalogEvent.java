@@ -21,7 +21,7 @@ public final class ListCatalogEvent extends CatalogEvent {
    * @param namespace The namespace from which catalogs were listed.
    */
   public ListCatalogEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.toString()));
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 
