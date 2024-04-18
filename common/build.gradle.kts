@@ -93,7 +93,7 @@ tasks {
     }
 
     from("src/main/resources") {
-      include("project.properties")
+      include("project.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
   }
 
