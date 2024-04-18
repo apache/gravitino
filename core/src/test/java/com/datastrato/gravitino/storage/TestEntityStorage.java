@@ -1194,7 +1194,7 @@ public class TestEntityStorage {
             Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Lists.newArrayList())
+        .withRoleNames(Lists.newArrayList())
         .build();
   }
 
@@ -1205,7 +1205,7 @@ public class TestEntityStorage {
             Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Lists.newArrayList())
+        .withRoleNames(Lists.newArrayList())
         .build();
   }
 

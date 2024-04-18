@@ -20,7 +20,11 @@ public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
             .setAuditInfo(new AuditInfoSerDe().serialize(userEntity.auditInfo()));
 
     if (isCollectionNotEmpty(userEntity.roles())) {
-      builder.addAllRoles(userEntity.roles());
+      builder.addAllRoleNames(userEntity.roles());
+    }
+
+    if (isCollectionNotEmpty(userEntity.roleIds())) {
+      builder.addAllRoleIds(userEntity.roleIds());
     }
 
     return builder.build();
@@ -36,8 +40,12 @@ public class UserEntitySerDe implements ProtoSerDe<UserEntity, User> {
             .withAuditInfo(new AuditInfoSerDe().deserialize(user.getAuditInfo(), namespace))
             .withRoles(Lists.newArrayList());
 
-    if (user.getRolesCount() > 0) {
-      builder.withRoles(user.getRolesList());
+    if (user.getRoleNamesCount() > 0) {
+      builder.withRoleNames(user.getRoleNamesList());
+    }
+
+    if (user.getRoleIdsCount() > 0) {
+      builder.withRoleIds(user.getRoleIdsList());
     }
 
     return builder.build();

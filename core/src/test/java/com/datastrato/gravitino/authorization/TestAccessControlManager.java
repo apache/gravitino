@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -39,12 +40,12 @@ public class TestAccessControlManager {
 
   private static Config config;
 
-  private static String metalake = "metalake";
+  private static String METALAKE = "metalake";
 
   private static BaseMetalake metalakeEntity =
       BaseMetalake.builder()
           .withId(1L)
-          .withName(metalake)
+          .withName(METALAKE)
           .withAuditInfo(
               AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .withVersion(SchemaVersion.V_0_1)
@@ -62,6 +63,8 @@ public class TestAccessControlManager {
     entityStore.put(metalakeEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
+    GravitinoEnv.getInstance().setEntityStore(entityStore);
+    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
   }
 
   @AfterAll
@@ -241,7 +244,14 @@ public class TestAccessControlManager {
 
     accessControlManager.createRole(
         "metalake", "loadRole", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
+
+    Role cachedRole = accessControlManager.loadRole("metalake", "loadRole");
+    accessControlManager.getRoleManager().getCache().invalidateAll();
     Role role = accessControlManager.loadRole("metalake", "loadRole");
+
+    // Verify the cached roleEntity is correct
+    Assertions.assertEquals(role, cachedRole);
+
     Assertions.assertEquals("loadRole", role.name());
     testProperties(props, role.properties());
 
