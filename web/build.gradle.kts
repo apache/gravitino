@@ -52,6 +52,7 @@ tasks {
   }
 
   clean {
+    delete(".gradle")
     delete(".node")
     delete("build")
     delete(".next")
