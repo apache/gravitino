@@ -17,7 +17,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
@@ -48,6 +47,17 @@ import scala.collection.JavaConverters;
  */
 public class SparkTransformConverter {
 
+  /**
+   * supportsBucketPartition is used to indicate whether a dataSource supports bucket partition. For
+   * example, iceberg supports bucket partition. We use true to indicate that bucket partition are
+   * supported and false to indicate that it is not supported
+   */
+  private final boolean supportsBucketPartition;
+
+  public SparkTransformConverter(boolean supportsBucketPartition) {
+    this.supportsBucketPartition = supportsBucketPartition;
+  }
+
   @Getter
   public static class DistributionAndSortOrdersInfo {
     private Distribution distribution;
@@ -64,21 +74,20 @@ public class SparkTransformConverter {
     }
   }
 
-  public static Transform[] toGravitinoPartitionings(
-      org.apache.spark.sql.connector.expressions.Transform[] transforms,
-      boolean supportsBucketTransfrom) {
+  public Transform[] toGravitinoPartitionings(
+      org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
       return Transforms.EMPTY_TRANSFORM;
     }
 
     return Arrays.stream(transforms)
-        .filter(transform -> !(transform instanceof SortedBucketTransform))
+        .filter(this::isPartitionTransform)
         .map(
             transform -> {
               if (transform instanceof IdentityTransform) {
                 IdentityTransform identityTransform = (IdentityTransform) transform;
                 return Transforms.identity(identityTransform.reference().fieldNames());
-              } else if (transform instanceof BucketTransform && supportsBucketTransfrom) {
+              } else if (transform instanceof BucketTransform) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 int numBuckets = (int) bucketTransform.numBuckets().value();
                 String[][] fieldNames =
@@ -100,9 +109,13 @@ public class SparkTransformConverter {
                 return Transforms.year(yearsTransform.reference().fieldNames());
               } else if (transform instanceof ApplyTransform
                   && "truncate".equals(transform.name())) {
+                Preconditions.checkArgument(
+                    transform.references().length == 1,
+                    "Truncate transform should have only one reference");
                 return Transforms.truncate(
                     findWidth(transform),
-                    String.join(ConnectorConstants.DOT, transform.references()[0].fieldNames()));
+                    getFieldNameFromGravitinoNamedReference(
+                        (NamedReference) toGravitinoNamedReference(transform.references()[0])));
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());
@@ -111,7 +124,7 @@ public class SparkTransformConverter {
         .toArray(Transform[]::new);
   }
 
-  public static DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
+  public DistributionAndSortOrdersInfo toGravitinoDistributionAndSortOrders(
       org.apache.spark.sql.connector.expressions.Transform[] transforms) {
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         new DistributionAndSortOrdersInfo();
@@ -120,7 +133,7 @@ public class SparkTransformConverter {
     }
 
     Arrays.stream(transforms)
-        .filter(transform -> isBucketTransform(transform))
+        .filter(transform -> !isPartitionTransform(transform))
         .forEach(
             transform -> {
               if (transform instanceof SortedBucketTransform) {
@@ -139,30 +152,41 @@ public class SparkTransformConverter {
               }
             });
 
+    if (distributionAndSortOrdersInfo.getDistribution() == null) {
+      distributionAndSortOrdersInfo.setDistribution(Distributions.NONE);
+    }
+    if (distributionAndSortOrdersInfo.getSortOrders() == null) {
+      distributionAndSortOrdersInfo.setSortOrders(new SortOrder[0]);
+    }
     return distributionAndSortOrdersInfo;
   }
 
-  public static org.apache.spark.sql.connector.expressions.Transform[] toSparkTransform(
+  public org.apache.spark.sql.connector.expressions.Transform[] toSparkTransform(
       com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrder) {
-    AtomicBoolean isBucketTransform = new AtomicBoolean(false);
     List<org.apache.spark.sql.connector.expressions.Transform> sparkTransforms = new ArrayList<>();
     if (ArrayUtils.isNotEmpty(partitions)) {
       Arrays.stream(partitions)
           .forEach(
               transform -> {
                 if (transform instanceof Transforms.IdentityTransform) {
+                  Preconditions.checkArgument(
+                      transform.references().length == 1,
+                      "Identity transform should have only one reference");
                   Transforms.IdentityTransform identityTransform =
                       (Transforms.IdentityTransform) transform;
                   sparkTransforms.add(
                       createSparkIdentityTransform(
-                          String.join(ConnectorConstants.DOT, identityTransform.fieldName())));
+                          getFieldNameFromGravitinoNamedReference(
+                              identityTransform.references()[0])));
                 } else if (transform instanceof Transforms.HourTransform) {
+                  Preconditions.checkArgument(
+                      transform.references().length == 1,
+                      "Hour transform should have only one reference");
                   Transforms.HourTransform hourTransform = (Transforms.HourTransform) transform;
-                  sparkTransforms.add(createSparkHoursTransform(hourTransform.fieldName()));
+                  sparkTransforms.add(createSparkHoursTransform(hourTransform.references()[0]));
                 } else if (transform instanceof Transforms.BucketTransform) {
-                  isBucketTransform.set(true);
                   Transforms.BucketTransform bucketTransform =
                       (Transforms.BucketTransform) transform;
                   int numBuckets = bucketTransform.numBuckets();
@@ -172,20 +196,29 @@ public class SparkTransformConverter {
                           .toArray(String[]::new);
                   sparkTransforms.add(createSparkBucketTransform(numBuckets, fieldNames));
                 } else if (transform instanceof Transforms.DayTransform) {
+                  Preconditions.checkArgument(
+                      transform.references().length == 1,
+                      "Day transform should have only one reference");
                   Transforms.DayTransform dayTransform = (Transforms.DayTransform) transform;
-                  sparkTransforms.add(createSparkDaysTransform(dayTransform.fieldName()));
+                  sparkTransforms.add(createSparkDaysTransform(dayTransform.references()[0]));
                 } else if (transform instanceof Transforms.MonthTransform) {
+                  Preconditions.checkArgument(
+                      transform.references().length == 1,
+                      "Month transform should have only one reference");
                   Transforms.MonthTransform monthTransform = (Transforms.MonthTransform) transform;
-                  sparkTransforms.add(createSparkMonthsTransform(monthTransform.fieldName()));
+                  sparkTransforms.add(createSparkMonthsTransform(monthTransform.references()[0]));
                 } else if (transform instanceof Transforms.YearTransform) {
+                  Preconditions.checkArgument(
+                      transform.references().length == 1,
+                      "Year transform should have only one reference");
                   Transforms.YearTransform yearTransform = (Transforms.YearTransform) transform;
-                  sparkTransforms.add(createSparkYearsTransform(yearTransform.fieldName()));
+                  sparkTransforms.add(createSparkYearsTransform(yearTransform.references()[0]));
                 } else if (transform instanceof Transforms.TruncateTransform) {
                   Transforms.TruncateTransform truncateTransform =
                       (Transforms.TruncateTransform) transform;
                   int width = truncateTransform.width();
                   String[] fieldName = truncateTransform.fieldName();
-                  sparkTransforms.add(createSparkTruncateTransform("truncate", width, fieldName));
+                  sparkTransforms.add(createSparkTruncateTransform(width, fieldName));
                 } else {
                   throw new UnsupportedOperationException(
                       "Doesn't support Gravitino partition: "
@@ -196,7 +229,7 @@ public class SparkTransformConverter {
               });
     }
 
-    if (!isBucketTransform.get()) {
+    if (!supportsBucketPartition) {
       org.apache.spark.sql.connector.expressions.Transform bucketTransform =
           toSparkBucketTransform(distribution, sortOrder);
       if (bucketTransform != null) {
@@ -275,8 +308,13 @@ public class SparkTransformConverter {
   private static Expression[] toGravitinoNamedReference(
       List<org.apache.spark.sql.connector.expressions.NamedReference> sparkNamedReferences) {
     return sparkNamedReferences.stream()
-        .map(sparkReference -> NamedReference.field(sparkReference.fieldNames()))
+        .map(SparkTransformConverter::toGravitinoNamedReference)
         .toArray(Expression[]::new);
+  }
+
+  private static Expression toGravitinoNamedReference(
+      org.apache.spark.sql.connector.expressions.NamedReference sparkNamedReference) {
+    return NamedReference.field(sparkNamedReference.fieldNames());
   }
 
   public static org.apache.spark.sql.connector.expressions.Transform createSortBucketTransform(
@@ -290,34 +328,34 @@ public class SparkTransformConverter {
     return IdentityTransform.apply(Expressions.column(columnName));
   }
 
-  public static HoursTransform createSparkHoursTransform(String[] fieldName) {
+  public static HoursTransform createSparkHoursTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.hours(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
   public static BucketTransform createSparkBucketTransform(int numBuckets, String[] fieldNames) {
     return LogicalExpressions.bucket(numBuckets, createSparkNamedReference(fieldNames));
   }
 
-  public static DaysTransform createSparkDaysTransform(String[] fieldName) {
+  public static DaysTransform createSparkDaysTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.days(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
-  public static MonthsTransform createSparkMonthsTransform(String[] fieldName) {
+  public static MonthsTransform createSparkMonthsTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.months(
-        Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
-  public static YearsTransform createSparkYearsTransform(String[] FieldName) {
+  public static YearsTransform createSparkYearsTransform(NamedReference gravitinoNamedReference) {
     return LogicalExpressions.years(
-        Expressions.column(String.join(ConnectorConstants.DOT, FieldName)));
+        Expressions.column(getFieldNameFromGravitinoNamedReference(gravitinoNamedReference)));
   }
 
   public static org.apache.spark.sql.connector.expressions.Transform createSparkTruncateTransform(
-      String functionName, int width, String[] fieldName) {
+      int width, String[] fieldName) {
     return Expressions.apply(
-        functionName,
+        "truncate",
         Expressions.literal(width),
         Expressions.column(String.join(ConnectorConstants.DOT, fieldName)));
   }
@@ -335,9 +373,15 @@ public class SparkTransformConverter {
     return String.join(ConnectorConstants.DOT, gravitinoNamedReference.fieldName());
   }
 
-  private static boolean isBucketTransform(
+  private boolean isPartitionTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
-    return transform instanceof BucketTransform || transform instanceof SortedBucketTransform;
+    if (supportsBucketPartition) {
+      Preconditions.checkArgument(
+          !(transform instanceof SortedBucketTransform),
+          "Spark doesn't support SortedBucketTransform as partition transform");
+      return true;
+    }
+    return !(transform instanceof BucketTransform || transform instanceof SortedBucketTransform);
   }
 
   // Referred from org.apache.iceberg.spark.Spark3Util

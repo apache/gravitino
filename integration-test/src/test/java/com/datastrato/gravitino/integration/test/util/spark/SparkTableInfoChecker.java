@@ -32,13 +32,13 @@ public class SparkTableInfoChecker {
   private enum CheckField {
     NAME,
     COLUMN,
-    PARTITION,
+    IDENTITY_PARTITION,
     BUCKET,
-    HOUR,
-    DAY,
-    MONTH,
-    YEAR,
-    TRUNCATE,
+    HOUR_PARTITION,
+    DAY_PARTITION,
+    MONTH_PARTITION,
+    YEAR_PARTITION,
+    TRUNCATE_PARTITION,
     METADATACOLUMN,
     COMMENT,
     TABLE_PROPERTY,
@@ -69,7 +69,7 @@ public class SparkTableInfoChecker {
               SparkTransformConverter.createSparkIdentityTransform(columnName);
           this.expectedTableInfo.addPartition(identityTransform);
         });
-    this.checkFields.add(CheckField.PARTITION);
+    this.checkFields.add(CheckField.IDENTITY_PARTITION);
     return this;
   }
 
@@ -90,40 +90,40 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-  public SparkTableInfoChecker withHourPartition(List<String> partitionColumns) {
-    Transform hourTransform = Expressions.hours(partitionColumns.get(0));
-    this.expectedTableInfo.setHourPartition(hourTransform);
-    this.checkFields.add(CheckField.HOUR);
+  public SparkTableInfoChecker withHourPartition(String partitionColumn) {
+    Transform hourTransform = Expressions.hours(partitionColumn);
+    this.expectedTableInfo.addHourPartition(hourTransform);
+    this.checkFields.add(CheckField.HOUR_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withDayPartition(List<String> partitionColumns) {
-    Transform dayTransform = Expressions.days(partitionColumns.get(0));
-    this.expectedTableInfo.setDayPartition(dayTransform);
-    this.checkFields.add(CheckField.DAY);
+  public SparkTableInfoChecker withDayPartition(String partitionColumn) {
+    Transform dayTransform = Expressions.days(partitionColumn);
+    this.expectedTableInfo.addDayPartition(dayTransform);
+    this.checkFields.add(CheckField.DAY_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withMonthPartition(List<String> partitionColumns) {
-    Transform monthTransform = Expressions.months(partitionColumns.get(0));
-    this.expectedTableInfo.setMonthPartition(monthTransform);
-    this.checkFields.add(CheckField.MONTH);
+  public SparkTableInfoChecker withMonthPartition(String partitionColumn) {
+    Transform monthTransform = Expressions.months(partitionColumn);
+    this.expectedTableInfo.addMonthPartition(monthTransform);
+    this.checkFields.add(CheckField.MONTH_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withYearPartition(List<String> partitionColumns) {
-    Transform yearTransform = Expressions.years(partitionColumns.get(0));
-    this.expectedTableInfo.setYearPartition(yearTransform);
-    this.checkFields.add(CheckField.YEAR);
+  public SparkTableInfoChecker withYearPartition(String partitionColumn) {
+    Transform yearTransform = Expressions.years(partitionColumn);
+    this.expectedTableInfo.addYearPartition(yearTransform);
+    this.checkFields.add(CheckField.YEAR_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withTruncatePartition(int width, List<String> partitionColumns) {
+  public SparkTableInfoChecker withTruncatePartition(int width, String partitionColumn) {
     Transform truncateTransform =
         Expressions.apply(
-            "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));
-    this.expectedTableInfo.setTruncatePartition(truncateTransform);
-    this.checkFields.add(CheckField.TRUNCATE);
+            "truncate", Expressions.literal(width), Expressions.column(partitionColumn));
+    this.expectedTableInfo.addTruncatePartition(truncateTransform);
+    this.checkFields.add(CheckField.TRUNCATE_PARTITION);
     return this;
   }
 
@@ -152,50 +152,54 @@ public class SparkTableInfoChecker {
                   Assertions.assertEquals(
                       expectedTableInfo.getColumns(), realTableInfo.getColumns());
                   break;
-                case PARTITION:
+                case IDENTITY_PARTITION:
                   Assertions.assertEquals(
                       expectedTableInfo.getPartitions(), realTableInfo.getPartitions());
                   break;
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
                   break;
-                case HOUR:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getHourPartition(), realTableInfo.getHourPartition());
+                case HOUR_PARTITION:
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getHourPartitions().toArray(),
+                      realTableInfo.getHourPartitions().toArray());
                   break;
-                case DAY:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getDayPartition(), realTableInfo.getDayPartition());
+                case DAY_PARTITION:
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getDayPartitions().toArray(),
+                      realTableInfo.getDayPartitions().toArray());
                   break;
-                case MONTH:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getMonthPartition(), realTableInfo.getMonthPartition());
+                case MONTH_PARTITION:
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getMonthPartitions().toArray(),
+                      realTableInfo.getMonthPartitions().toArray());
                   break;
-                case YEAR:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getYearPartition(), realTableInfo.getYearPartition());
+                case YEAR_PARTITION:
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getYearPartitions().toArray(),
+                      realTableInfo.getYearPartitions().toArray());
                   break;
-                case TRUNCATE:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getTruncatePartition(),
-                      realTableInfo.getTruncatePartition());
+                case TRUNCATE_PARTITION:
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getTruncatePartitions().toArray(),
+                      realTableInfo.getTruncatePartitions().toArray());
                   break;
-                case METADATACOLUMN:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getMetadataColumns().length,
-                      realTableInfo.getMetadataColumns().length);
-                  for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
-                    Assertions.assertEquals(
-                        expectedTableInfo.getMetadataColumns()[i].name(),
-                        realTableInfo.getMetadataColumns()[i].name());
-                    Assertions.assertEquals(
-                        expectedTableInfo.getMetadataColumns()[i].dataType(),
-                        realTableInfo.getMetadataColumns()[i].dataType());
-                    Assertions.assertEquals(
-                        expectedTableInfo.getMetadataColumns()[i].isNullable(),
-                        realTableInfo.getMetadataColumns()[i].isNullable());
-                  }
-                  break;
+                  case METADATACOLUMN:
+                      Assertions.assertEquals(
+                              expectedTableInfo.getMetadataColumns().length,
+                              realTableInfo.getMetadataColumns().length);
+                      for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
+                          Assertions.assertEquals(
+                                  expectedTableInfo.getMetadataColumns()[i].name(),
+                                  realTableInfo.getMetadataColumns()[i].name());
+                          Assertions.assertEquals(
+                                  expectedTableInfo.getMetadataColumns()[i].dataType(),
+                                  realTableInfo.getMetadataColumns()[i].dataType());
+                          Assertions.assertEquals(
+                                  expectedTableInfo.getMetadataColumns()[i].isNullable(),
+                                  realTableInfo.getMetadataColumns()[i].isNullable());
+                      }
+                      break;
                 case COMMENT:
                   Assertions.assertEquals(
                       expectedTableInfo.getComment(), realTableInfo.getComment());
