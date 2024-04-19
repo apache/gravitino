@@ -20,7 +20,6 @@ import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,7 +56,7 @@ public class UserMetaService {
     Long userId =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserIdBySchemaIdAndName(metalakeId, userName));
+            mapper -> mapper.selectUserIdByMetalakeIdAndName(metalakeId, userName));
 
     if (userId == null) {
       throw new NoSuchEntityException(
@@ -178,8 +177,6 @@ public class UserMetaService {
         newEntity.id(),
         oldUserEntity.id());
 
-    int oldRoleSize = oldUserEntity.roleNames() == null ? 0 : oldUserEntity.roleNames().size();
-    int newRoleSie = newEntity.roleNames() == null ? 0 : newEntity.roleNames().size();
     Set<Long> oldRoleIds =
         oldUserEntity.roleIds() == null
             ? Sets.newHashSet()
@@ -187,9 +184,11 @@ public class UserMetaService {
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
-    if (newRoleSie > oldRoleSize) {
-      List<Long> insertRoleIds = new ArrayList<>(Sets.difference(newRoleIds, oldRoleIds));
+    Set<Long> grantRoleIds = Sets.difference(newRoleIds, oldRoleIds);
+    Set<Long> revokeRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
+    if (!grantRoleIds.isEmpty()) {
+      List<Long> insertRoleIds = Lists.newArrayList(grantRoleIds);
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -212,8 +211,8 @@ public class UserMetaService {
       }
     }
 
-    if (newRoleSie < oldRoleSize) {
-      List<Long> deleteId = new ArrayList<>(Sets.difference(oldRoleIds, newRoleIds));
+    if (!revokeRoleIds.isEmpty()) {
+      List<Long> deleteRoleIds = Lists.newArrayList(revokeRoleIds);
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -226,7 +225,7 @@ public class UserMetaService {
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
                     mapper ->
-                        mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteId)));
+                        mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteRoleIds)));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());

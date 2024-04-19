@@ -72,7 +72,7 @@ public class Indexes {
      * @param name The name of the index
      * @param fieldNames The field names under the table contained in the index.
      */
-    public IndexImpl(IndexType indexType, String name, String[][] fieldNames) {
+    private IndexImpl(IndexType indexType, String name, String[][] fieldNames) {
       this.indexType = indexType;
       this.name = name;
       this.fieldNames = fieldNames;

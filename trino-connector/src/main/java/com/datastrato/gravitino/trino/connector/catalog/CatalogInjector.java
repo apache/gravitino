@@ -336,7 +336,7 @@ public class CatalogInjector {
       LOG.error(
           "Create internal catalog connector {} failed. Connector properties: {} ",
           connectorName,
-          properties.toString(),
+          properties,
           e);
       throw new TrinoException(GRAVITINO_CREATE_INNER_CONNECTOR_FAILED, e);
     }

@@ -255,7 +255,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
-    String comment = "";
+    StringBuilder comment = new StringBuilder();
     String sql =
         "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
@@ -264,10 +264,10 @@ public class DorisTableOperations extends JdbcTableOperations {
 
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         while (resultSet.next()) {
-          comment += resultSet.getString("TABLE_COMMENT");
+          comment.append(resultSet.getString("TABLE_COMMENT"));
         }
       }
-      tableBuilder.withComment(comment);
+      tableBuilder.withComment(comment.toString());
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }

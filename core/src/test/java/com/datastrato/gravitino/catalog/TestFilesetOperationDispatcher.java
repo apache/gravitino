@@ -19,8 +19,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
-  private static FilesetOperationDispatcher filesetOperationDispatcher;
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
+  static FilesetOperationDispatcher filesetOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {

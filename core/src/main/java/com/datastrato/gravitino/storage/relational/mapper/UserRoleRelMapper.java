@@ -20,12 +20,13 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface UserRoleRelMapper {
-  String TABLE_NAME = "user_role_rel";
+  String RELATION_TABLE_NAME = "user_role_rel";
+  String USER_TABLE_NAME = "user_meta";
 
   @Insert({
     "<script>",
     "INSERT INTO "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -45,7 +46,7 @@ public interface UserRoleRelMapper {
   @Insert({
     "<script>",
     "INSERT INTO "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -72,7 +73,7 @@ public interface UserRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
   void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
@@ -80,7 +81,7 @@ public interface UserRoleRelMapper {
   @Update({
     "<script>",
     "UPDATE "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
         + " WHERE user_id = #{userId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
@@ -91,4 +92,14 @@ public interface UserRoleRelMapper {
   })
   void softDeleteUserRoleRelByUserAndRoles(
       @Param("userId") Long userId, @Param("roleIds") List<Long> roleIds);
+
+  @Update(
+      "UPDATE "
+          + RELATION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE user_id IN (SELECT user_id FROM "
+          + USER_TABLE_NAME
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
+          + " AND deleted_at = 0")
+  void softDeleteUserRoleRelByMetalakeId(Long metalakeId);
 }

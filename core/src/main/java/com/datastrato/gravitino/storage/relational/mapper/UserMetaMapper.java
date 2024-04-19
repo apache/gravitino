@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.UserPO;
+import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -27,7 +28,7 @@ public interface UserMetaMapper {
           + TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
           + " AND deleted_at = 0")
-  Long selectUserIdBySchemaIdAndName(
+  Long selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
   @Select(

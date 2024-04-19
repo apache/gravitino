@@ -32,6 +32,7 @@ public class TestTable extends BaseTable {
       table.distribution = distribution;
       table.sortOrders = sortOrders;
       table.partitioning = partitioning;
+      table.indexes = indexes;
       return table;
     }
   }

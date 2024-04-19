@@ -167,6 +167,7 @@ public class TestCatalogOperations
     Map<String, String> newProps =
         table.properties() != null ? Maps.newHashMap(table.properties()) : Maps.newHashMap();
 
+    NameIdentifier newIdent = ident;
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         newProps.put(
@@ -174,6 +175,12 @@ public class TestCatalogOperations
             ((TableChange.SetProperty) change).getValue());
       } else if (change instanceof TableChange.RemoveProperty) {
         newProps.remove(((TableChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof TableChange.RenameTable) {
+        String newName = ((TableChange.RenameTable) change).getNewName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (tables.containsKey(newIdent)) {
+          throw new TableAlreadyExistsException("Table %s already exists", ident);
+        }
       } else {
         throw new IllegalArgumentException("Unsupported table change: " + change);
       }
@@ -181,23 +188,19 @@ public class TestCatalogOperations
 
     TestTable updatedTable =
         TestTable.builder()
-            .withName(ident.name())
+            .withName(newIdent.name())
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
             .withColumns(table.columns())
             .withPartitioning(table.partitioning())
+            .withDistribution(table.distribution())
+            .withSortOrders(table.sortOrder())
+            .withIndexes(table.index())
             .build();
 
     tables.put(ident, updatedTable);
-    return TestTable.builder()
-        .withName(ident.name())
-        .withComment(table.comment())
-        .withProperties(new HashMap<>(newProps))
-        .withAuditInfo(updatedAuditInfo)
-        .withColumns(table.columns())
-        .withPartitioning(table.partitioning())
-        .build();
+    return updatedTable;
   }
 
   @Override
@@ -440,8 +443,11 @@ public class TestCatalogOperations
             .withStorageLocation(storageLocation)
             .build();
 
-    if (tables.containsKey(ident)) {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    if (filesets.containsKey(ident)) {
       throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+    } else if (!schemas.containsKey(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
     } else {
       filesets.put(ident, fileset);
     }
@@ -467,6 +473,7 @@ public class TestCatalogOperations
     TestFileset fileset = filesets.get(ident);
     Map<String, String> newProps =
         fileset.properties() != null ? Maps.newHashMap(fileset.properties()) : Maps.newHashMap();
+    NameIdentifier newIdent = ident;
 
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
@@ -475,6 +482,13 @@ public class TestCatalogOperations
             ((FilesetChange.SetProperty) change).getValue());
       } else if (change instanceof FilesetChange.RemoveProperty) {
         newProps.remove(((FilesetChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof FilesetChange.RenameFileset) {
+        String newName = ((FilesetChange.RenameFileset) change).getNewName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (filesets.containsKey(newIdent)) {
+          throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+        }
+        filesets.remove(ident);
       } else {
         throw new IllegalArgumentException("Unsupported fileset change: " + change);
       }
@@ -482,14 +496,14 @@ public class TestCatalogOperations
 
     TestFileset updatedFileset =
         TestFileset.builder()
-            .withName(ident.name())
+            .withName(newIdent.name())
             .withComment(fileset.comment())
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
             .withType(fileset.type())
             .withStorageLocation(fileset.storageLocation())
             .build();
-    filesets.put(ident, updatedFileset);
+    filesets.put(newIdent, updatedFileset);
     return updatedFileset;
   }
 
