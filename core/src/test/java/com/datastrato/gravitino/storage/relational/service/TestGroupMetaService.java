@@ -464,14 +464,14 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
             Lists.newArrayList("role1", "role2"));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
             Lists.newArrayList("role3"));
@@ -480,10 +480,10 @@ class TestGroupMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(
         group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
-    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(group1.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group1.id()).size());
     Assertions.assertEquals(
         group2.name(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).name());
-    Assertions.assertEquals(1, roleMetaService.listRolesByUserId(group2.id()).size());
+    Assertions.assertEquals(1, roleMetaService.listRolesByGroupId(group2.id()).size());
 
     // delete metalake without cascade
     Assertions.assertTrue(
@@ -495,8 +495,8 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> groupMetaService.getGroupByIdentifier(group2.nameIdentifier()));
-    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(group1.id()).size());
-    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(group2.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group2.id()).size());
   }
 
   @Test
@@ -534,14 +534,14 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
             Lists.newArrayList("role1", "role2"));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
             Lists.newArrayList("role3"));
