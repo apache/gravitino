@@ -64,7 +64,7 @@ public class TestCreateGravitinoConnector {
     TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
     queryRunner.installPlugin(gravitinoPlugin);
 
-    // test create two connector and set gravitino.simplify-catalog-names = true
+    // test create two connector and set gravitino.simplify-catalog-names = false
     {
       // create a gravitino connector named gravitino using metalake test
       HashMap<String, String> properties = new HashMap<>();
