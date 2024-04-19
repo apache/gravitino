@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -110,14 +111,12 @@ public interface FilesetVersionMapper {
 
   @Select(
       "SELECT fileset_id as filesetId,"
-          + " Max(version) as version, deleted_at as deletedAt,"
-          + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
-          + " storage_location as storageLocation"
+          + " Max(version) as version"
           + " FROM "
           + VERSION_TABLE_NAME
           + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
           + " GROUP BY fileset_id")
-  List<FilesetVersionPO> selectFilesetVersionsByRetentionCount(
+  List<Pair<Long, Long>> selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount);
 
   @Update(

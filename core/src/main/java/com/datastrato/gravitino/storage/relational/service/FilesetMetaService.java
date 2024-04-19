@@ -13,7 +13,6 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
-import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -22,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,7 +236,7 @@ public class FilesetMetaService {
 
   public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
     // get the current version of all filesets.
-    List<FilesetVersionPO> filesetCurVersions =
+    List<Pair<Long, Long>> filesetCurVersions =
         SessionUtils.getWithoutCommit(
             FilesetVersionMapper.class,
             mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
@@ -244,23 +244,24 @@ public class FilesetMetaService {
     // soft delete old versions that are older than or equal to (currentVersion -
     // versionRetentionCount).
     int totalDeletedCount = 0;
-    for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
-      long versionRetentionLine = filesetVersionPO.getVersion().longValue() - versionRetentionCount;
+    for (Pair<Long, Long> filesetCurVersion : filesetCurVersions) {
+      long versionRetentionLine = filesetCurVersion.getValue() - versionRetentionCount;
       int deletedCount =
           SessionUtils.doWithCommitAndFetchResult(
               FilesetVersionMapper.class,
               mapper ->
                   mapper.softDeleteFilesetVersionsByRetentionLine(
-                      filesetVersionPO.getFilesetId(), versionRetentionLine, limit));
+                      filesetCurVersion.getKey(), versionRetentionLine, limit));
       totalDeletedCount += deletedCount;
 
       // log the deletion by current fileset version.
       LOG.info(
           "Soft delete filesetVersions count: {} which versions are older than or equal to"
-              + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
+              + " versionRetentionLine: {}, the current filesetId and version is: <{}, {}>.",
           deletedCount,
           versionRetentionLine,
-          filesetVersionPO);
+          filesetCurVersion.getKey(),
+          filesetCurVersion.getValue());
     }
     return totalDeletedCount;
   }
