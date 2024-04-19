@@ -252,7 +252,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected void correctJdbcTableFields(
-      Connection connection, String tableName, JdbcTable.Builder tableBuilder) throws SQLException {
+      Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
+      throws SQLException {
     if (StringUtils.isEmpty(tableBuilder.comment())) {
       // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
       LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");

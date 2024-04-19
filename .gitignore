@@ -35,7 +35,7 @@ out/**
 *.ipr
 
 distribution
-server/src/main/resources/project.properties
+common/src/main/resources/project.properties
 
 dev/docker/*/packages
 docs/build

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.TopicEntity;
 
 public class TopicEntitySerDe implements ProtoSerDe<TopicEntity, Topic> {
@@ -28,12 +29,13 @@ public class TopicEntitySerDe implements ProtoSerDe<TopicEntity, Topic> {
   }
 
   @Override
-  public TopicEntity deserialize(Topic p) {
+  public TopicEntity deserialize(Topic p, Namespace namespace) {
     TopicEntity.Builder builder =
         TopicEntity.builder()
             .withId(p.getId())
             .withName(p.getName())
-            .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
+            .withNamespace(namespace)
+            .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());

@@ -4,10 +4,15 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link SecurableObject}. */
 public class SecurableObjects {
+
+  private static final Splitter DOT = Splitter.on('.');
 
   /**
    * Create the {@link SecurableObject} with the given names.
@@ -185,5 +190,24 @@ public class SecurableObjects {
       return Objects.equals(parent, otherSecurableObject.parent())
           && Objects.equals(name, otherSecurableObject.name());
     }
+  }
+
+  /**
+   * Create a {@link SecurableObject} from the given identifier string.
+   *
+   * @param securableObjectIdentifier The identifier string
+   * @return The created {@link SecurableObject}
+   */
+  public static SecurableObject parse(String securableObjectIdentifier) {
+    if ("*".equals(securableObjectIdentifier)) {
+      return SecurableObjects.ofAllCatalogs();
+    }
+
+    if (StringUtils.isBlank(securableObjectIdentifier)) {
+      throw new IllegalArgumentException("securable object identifier can't be blank");
+    }
+
+    Iterable<String> parts = DOT.split(securableObjectIdentifier);
+    return SecurableObjects.of(Iterables.toArray(parts, String.class));
   }
 }

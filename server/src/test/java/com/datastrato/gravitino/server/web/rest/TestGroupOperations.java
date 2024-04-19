@@ -230,7 +230,7 @@ public class TestGroupOperations extends JerseyTest {
     return GroupEntity.builder()
         .withId(1L)
         .withName(group)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

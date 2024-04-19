@@ -600,6 +600,94 @@ export const getTableDetails = createAsyncThunk(
 
     const { table: resTable } = res
 
+    const { distribution, sortOrders = [], partitioning = [], indexes = [] } = resTable
+
+    const tableProps = [
+      {
+        type: 'partitioning',
+        icon: 'tabler:circle-letter-p-filled',
+        items: partitioning.map(i => {
+          let fields = i.fieldName || []
+          let sub = ''
+          let last = i.fieldName
+
+          switch (i.strategy) {
+            case 'bucket':
+              sub = `[${i.numBuckets}]`
+              fields = i.fieldNames
+              last = i.fieldNames.map(v => v[0]).join(',')
+              break
+            case 'truncate':
+              sub = `[${i.width}]`
+              break
+            case 'list':
+              fields = i.fieldNames
+              last = i.fieldNames.map(v => v[0]).join(',')
+              break
+            case 'function':
+              sub = `[${i.funcName}]`
+              fields = i.funcArgs.map(v => v.fieldName)
+              last = fields.join(',')
+              break
+            default:
+              break
+          }
+
+          return {
+            strategy: i.strategy,
+            numBuckets: i.numBuckets,
+            width: i.width,
+            funcName: i.funcName,
+            fields,
+            text: `${i.strategy}${sub}(${last})`
+          }
+        })
+      },
+      {
+        type: 'sortOrders',
+        icon: 'mdi:letter-s-circle',
+        items: sortOrders.map(i => {
+          return {
+            fields: i.sortTerm.fieldName,
+            dir: i.direction,
+            no: i.nullOrdering,
+            text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`
+          }
+        })
+      },
+      {
+        type: 'distribution',
+        icon: 'tabler:circle-letter-d-filled',
+        items: distribution.funcArgs.map(i => {
+          return {
+            fields: i.fieldName,
+            number: distribution.number,
+            strategy: distribution.strategy,
+            text:
+              distribution.strategy === ''
+                ? ``
+                : `${distribution.strategy}${
+                    distribution.number === 0 ? '' : `[${distribution.number}]`
+                  }(${i.fieldName.join(',')})`
+          }
+        })
+      },
+      {
+        type: 'indexes',
+        icon: 'mdi:letter-i-circle',
+        items: indexes.map(i => {
+          return {
+            fields: i.fieldNames,
+            name: i.name,
+            indexType: i.indexType,
+            text: `${i.name}(${i.fieldNames.join('.')})`
+          }
+        })
+      }
+    ]
+
+    dispatch(setTableProps(tableProps))
+
     if (getState().metalakes.metalakeTree.length === 0) {
       dispatch(fetchCatalogs({ metalake }))
     }
@@ -818,6 +906,7 @@ export const appMetalakesSlice = createSlice({
     metalakes: [],
     filteredMetalakes: [],
     tableData: [],
+    tableProps: [],
     catalogs: [],
     schemas: [],
     tables: [],
@@ -870,6 +959,7 @@ export const appMetalakesSlice = createSlice({
       state.loadedNodes = []
 
       state.tableData = []
+      state.tableProps = []
       state.catalogs = []
       state.schemas = []
       state.tables = []
@@ -897,6 +987,9 @@ export const appMetalakesSlice = createSlice({
     },
     removeCatalogFromTree(state, action) {
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
+    },
+    setTableProps(state, action) {
+      state.tableProps = action.payload
     },
     resetMetalakeStore(state, action) {}
   },
@@ -1032,7 +1125,8 @@ export const {
   setExpanded,
   setExpandedNodes,
   addCatalogToTree,
-  removeCatalogFromTree
+  removeCatalogFromTree,
+  setTableProps
 } = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer

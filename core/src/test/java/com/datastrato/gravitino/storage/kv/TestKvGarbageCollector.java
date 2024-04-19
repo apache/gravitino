@@ -16,6 +16,8 @@ import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createCata
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createFilesetEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createSchemaEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createTableEntity;
+import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
+import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getTransactionId;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -407,6 +409,98 @@ class TestKvGarbageCollector {
                   NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"),
                   Entity.EntityType.TABLE,
                   TableEntity.class));
+    }
+  }
+
+  @Test
+  void testIncrementalGC() throws Exception {
+    Config config = getConfig();
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      if (!(store instanceof KvEntityStore)) {
+        return;
+      }
+      KvEntityStore kvEntityStore = (KvEntityStore) store;
+
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+      BaseMetalake metalake1 = createBaseMakeLake(1L, "metalake1", auditInfo);
+      BaseMetalake metalake2 = createBaseMakeLake(2L, "metalake2", auditInfo);
+      BaseMetalake metalake3 = createBaseMakeLake(3L, "metalake3", auditInfo);
+
+      for (int i = 0; i < 10; i++) {
+        store.put(metalake1);
+        store.put(metalake2);
+        store.put(metalake3);
+
+        store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+
+        Thread.sleep(10);
+      }
+
+      store.put(metalake1);
+      store.put(metalake2);
+      store.put(metalake3);
+
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Thread.sleep(1500);
+
+      // Scan raw key-value data from storage to confirm the data is deleted
+      kvEntityStore.kvGarbageCollector.collectAndClean();
+      List<Pair<byte[], byte[]>> allData =
+          kvEntityStore.backend.scan(
+              new KvRange.KvRangeBuilder()
+                  .start("_".getBytes())
+                  .end("z".getBytes())
+                  .startInclusive(false)
+                  .endInclusive(false)
+                  .build());
+
+      Assertions.assertEquals(3, allData.size());
+
+      long transactionId =
+          getTransactionId(
+              getBinaryTransactionId(kvEntityStore.kvGarbageCollector.commitIdHasBeenCollected));
+      Assertions.assertNotEquals(1, transactionId);
+
+      for (int i = 0; i < 10; i++) {
+        store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+        store.put(metalake1);
+        store.put(metalake2);
+        store.put(metalake3);
+        Thread.sleep(10);
+      }
+      store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+
+      Thread.sleep(1500);
+      kvEntityStore.kvGarbageCollector.collectAndClean();
+
+      allData =
+          kvEntityStore.backend.scan(
+              new KvRange.KvRangeBuilder()
+                  .start("_".getBytes())
+                  .end("z".getBytes())
+                  .startInclusive(false)
+                  .endInclusive(false)
+                  .build());
+
+      Assertions.assertTrue(allData.isEmpty());
+
+      long transactionIdV2 =
+          getTransactionId(
+              getBinaryTransactionId(kvEntityStore.kvGarbageCollector.commitIdHasBeenCollected));
+      Assertions.assertTrue(transactionIdV2 > transactionId);
     }
   }
 }

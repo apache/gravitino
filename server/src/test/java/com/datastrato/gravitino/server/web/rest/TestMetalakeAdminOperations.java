@@ -147,7 +147,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     return UserEntity.builder()
         .withId(1L)
         .withName(user)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
