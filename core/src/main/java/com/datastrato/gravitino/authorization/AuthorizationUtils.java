@@ -12,13 +12,11 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
-@VisibleForTesting
 public class AuthorizationUtils {
 
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
