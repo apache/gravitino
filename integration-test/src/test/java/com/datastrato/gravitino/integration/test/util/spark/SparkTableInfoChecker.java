@@ -184,22 +184,22 @@ public class SparkTableInfoChecker {
                       expectedTableInfo.getTruncatePartitions().toArray(),
                       realTableInfo.getTruncatePartitions().toArray());
                   break;
-                  case METADATACOLUMN:
-                      Assertions.assertEquals(
-                              expectedTableInfo.getMetadataColumns().length,
-                              realTableInfo.getMetadataColumns().length);
-                      for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
-                          Assertions.assertEquals(
-                                  expectedTableInfo.getMetadataColumns()[i].name(),
-                                  realTableInfo.getMetadataColumns()[i].name());
-                          Assertions.assertEquals(
-                                  expectedTableInfo.getMetadataColumns()[i].dataType(),
-                                  realTableInfo.getMetadataColumns()[i].dataType());
-                          Assertions.assertEquals(
-                                  expectedTableInfo.getMetadataColumns()[i].isNullable(),
-                                  realTableInfo.getMetadataColumns()[i].isNullable());
-                      }
-                      break;
+                case METADATACOLUMN:
+                  Assertions.assertEquals(
+                      expectedTableInfo.getMetadataColumns().length,
+                      realTableInfo.getMetadataColumns().length);
+                  for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].name(),
+                        realTableInfo.getMetadataColumns()[i].name());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].dataType(),
+                        realTableInfo.getMetadataColumns()[i].dataType());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].isNullable(),
+                        realTableInfo.getMetadataColumns()[i].isNullable());
+                  }
+                  break;
                 case COMMENT:
                   Assertions.assertEquals(
                       expectedTableInfo.getComment(), realTableInfo.getComment());
