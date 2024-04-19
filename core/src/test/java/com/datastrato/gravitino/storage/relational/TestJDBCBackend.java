@@ -19,19 +19,25 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -464,6 +470,43 @@ public class TestJDBCBackend {
         .withComment("test comment")
         .withProperties(ImmutableMap.of("key", "value"))
         .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static UserEntity createUserEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return UserEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(null)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static UserEntity createUserEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<String> roleNames) {
+    return UserEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(roleNames)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static RoleEntity createRoleEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return RoleEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withProperties(null)
+        .withAuditInfo(auditInfo)
+        .withSecurableObject(SecurableObjects.ofAllCatalogs())
+        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.LOAD_CATALOG)))
         .build();
   }
 }
