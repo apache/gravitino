@@ -51,14 +51,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogDorisIT extends AbstractIT {
-  public static final Logger LOG = LoggerFactory.getLogger(CatalogDorisIT.class);
 
   private static final String provider = "jdbc-doris";
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
@@ -79,12 +76,12 @@ public class CatalogDorisIT extends AbstractIT {
   public String DORIS_COL_NAME2 = "doris_col_name2";
   public String DORIS_COL_NAME3 = "doris_col_name3";
 
-  // Because the creation of Schema Change is an asynchronous process, we need wait for a while
+  // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
   // DorisTableOperations.generateAlterTableSql().
-  private static final long MAX_WAIT = 30;
+  private static final long MAX_WAIT_IN_SECONDS = 30;
 
-  private static final long WAIT_INTERVAL = 1;
+  private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private GravitinoMetalake metalake;
@@ -375,8 +372,8 @@ public class CatalogDorisIT extends AbstractIT {
         TableChange.updateColumnType(new String[] {DORIS_COL_NAME3}, Types.VarCharType.of(255)));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 ITUtils.assertColumn(
@@ -390,8 +387,8 @@ public class CatalogDorisIT extends AbstractIT {
         TableChange.updateColumnComment(new String[] {DORIS_COL_NAME3}, "new_comment"));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 ITUtils.assertColumn(
@@ -404,8 +401,8 @@ public class CatalogDorisIT extends AbstractIT {
         TableChange.addColumn(
             new String[] {"col_4"}, Types.VarCharType.of(255), "col_4_comment", true));
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 Assertions.assertEquals(
@@ -423,8 +420,8 @@ public class CatalogDorisIT extends AbstractIT {
         tableIdentifier, TableChange.deleteColumn(new String[] {"col_4"}, true));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 Assertions.assertEquals(
@@ -461,8 +458,8 @@ public class CatalogDorisIT extends AbstractIT {
             Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertEquals(
@@ -481,8 +478,8 @@ public class CatalogDorisIT extends AbstractIT {
             Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertEquals(
