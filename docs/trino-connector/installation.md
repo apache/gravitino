@@ -80,7 +80,7 @@ gravitino.simplify-catalog-names=true
 - The `gravitino.name` defines which Gravitino connector is used. It must be `gravitino`.
 - The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
-- The `gravitino.simplify-catalog-names` setting omits the metalake prefix from catalog names when set to true. If you set it to true, Trino can configure only one Gravitino metalake.
+- The `gravitino.simplify-catalog-names` setting omits the metalake prefix from catalog names when set to true. 
 
 Full configurations for Gravitino connector can be seen [here](configuration.md)
 
