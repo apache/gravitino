@@ -471,7 +471,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param metalake The metalake of the User.
    * @param user The name of the User.
    * @param roles The names of the Role.
-   * @return  The Group after granted.
+   * @return The Group after granted.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
