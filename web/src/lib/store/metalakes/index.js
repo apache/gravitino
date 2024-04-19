@@ -492,10 +492,6 @@ export const fetchSchemas = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}{{${type}}}`]))
 
     return { schemas, page, init }
@@ -567,10 +563,6 @@ export const fetchTables = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -609,7 +601,7 @@ export const getTableDetails = createAsyncThunk(
         items: partitioning.map(i => {
           let fields = i.fieldName || []
           let sub = ''
-          let last = i.fieldName.join('.')
+          let last = i.fieldName
 
           switch (i.strategy) {
             case 'bucket':
@@ -680,17 +672,13 @@ export const getTableDetails = createAsyncThunk(
             fields: i.fieldNames,
             name: i.name,
             indexType: i.indexType,
-            text: `${i.name}(${i.fieldNames.join(',')})`
+            text: `${i.name}(${i.fieldNames.join('.')})`
           }
         })
       }
     ]
 
     dispatch(setTableProps(tableProps))
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
 
     dispatch(
       setExpandedNodes([
@@ -753,10 +741,6 @@ export const fetchFilesets = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -785,10 +769,6 @@ export const getFilesetDetails = createAsyncThunk(
     }
 
     const { fileset: resFileset } = res
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
 
     dispatch(
       setExpandedNodes([
@@ -851,10 +831,6 @@ export const fetchTopics = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -883,10 +859,6 @@ export const getTopicDetails = createAsyncThunk(
     }
 
     const { topic: resTopic } = res
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
 
     dispatch(
       setExpandedNodes([

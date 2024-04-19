@@ -3,6 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 import logging
+from random import random, randint
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 class TestFilesetCatalog(IntegrationTestEnv):
     catalog: Catalog = None
     metalake: GravitinoMetalake = None
-    metalake_name: str = "testMetalake"
-    catalog_name: str = "testCatalog"
-    schema_name: str = "testSchema"
-    fileset_name: str = "testFileset1"
-    fileset_alter_name: str = "testFilesetAlter"
+    metalake_name: str = "testMetalake" + str(randint(1, 100))
+    catalog_name: str = "testCatalog" + str(randint(1, 100))
+    schema_name: str = "testSchema" + str(randint(1, 100))
+    fileset_name: str = "testFileset1" + str(randint(1, 100))
+    fileset_alter_name: str = "testFilesetAlter" + str(randint(1, 100))
     provider: str = "hadoop"
 
     metalake_ident: NameIdentifier = NameIdentifier.of(metalake_name)

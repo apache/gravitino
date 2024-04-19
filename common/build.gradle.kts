@@ -56,7 +56,7 @@ fun getGitCommitId(): String {
 }
 
 val propertiesFile = "src/main/resources/project.properties"
-val writeProjectPropertiesFile = tasks.register("writeProjectPropertiesFile") {
+fun writeProjectPropertiesFile() {
   val propertiesFile = file(propertiesFile)
   if (propertiesFile.exists()) {
     propertiesFile.delete()
@@ -85,13 +85,18 @@ val writeProjectPropertiesFile = tasks.register("writeProjectPropertiesFile") {
 
 tasks {
   jar {
-    dependsOn(writeProjectPropertiesFile)
     doFirst() {
+      writeProjectPropertiesFile()
       if (!file(propertiesFile).exists()) {
         throw GradleException("$propertiesFile file not generated!")
       }
     }
+
+    from("src/main/resources") {
+      include("project.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
   }
+
   clean {
     delete("$propertiesFile")
   }
