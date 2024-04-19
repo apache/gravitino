@@ -144,7 +144,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
             FILESET_CATALOG_NAME,
             KAFKA_CATALOG_NAME,
             SCHEMA_NAME);
-    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes)); 
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
