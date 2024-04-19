@@ -5,9 +5,8 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
-import java.util.List;
-
 import com.datastrato.gravitino.storage.relational.po.RolePO;
+import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -34,10 +33,10 @@ public interface RoleMetaMapper {
 
   @Select(
       "SELECT ro.role_id as roleId, ro.role_name as roleName,"
-              + " ro.metalake_id as metalakeId, ro.properties as properties,"
-                + " ro.securable_object as securableObject, ro.privileges as privileges,"
-                + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-              + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
+          + " ro.metalake_id as metalakeId, ro.properties as properties,"
+          + " ro.securable_object as securableObject, ro.privileges as privileges,"
+          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
+          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
@@ -48,21 +47,53 @@ public interface RoleMetaMapper {
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
 
   @Insert(
-          "INSERT INTO "
-                  + ROLE_TABLE_NAME
-                  + "(role_id, role_name,"
-                    + " metalake_id, properties,"
-                    + " securable_object, privileges,"
-                    + " audit_info, current_version, last_version, deleted_at)"
-                  + " VALUES("
-                  + " #{roleMeta.userId},"
-                  + " #{roleMeta.userName},"
-                  + " #{roleMeta.metalakeId},"
-                  + " #{roleMeta.auditInfo},"
-                  + " #{roleMeta.currentVersion},"
-                  + " #{roleMeta.lastVersion},"
-                  + " #{roleMeta.deletedAt}"
-                  + " )")
+      "INSERT INTO "
+          + ROLE_TABLE_NAME
+          + "(role_id, role_name,"
+          + " metalake_id, properties,"
+          + " securable_object, privileges,"
+          + " audit_info, current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{roleMeta.roleId},"
+          + " #{roleMeta.roleName},"
+          + " #{roleMeta.metalakeId},"
+          + " #{roleMeta.properties},"
+          + " #{roleMeta.securableObject},"
+          + " #{roleMeta.privileges},"
+          + " #{roleMeta.auditInfo},"
+          + " #{roleMeta.currentVersion},"
+          + " #{roleMeta.lastVersion},"
+          + " #{roleMeta.deletedAt}"
+          + " )")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
 
+  @Insert(
+      "INSERT INTO "
+          + ROLE_TABLE_NAME
+          + "(role_id, role_name,"
+          + " metalake_id, properties,"
+          + " securable_object, privileges,"
+          + " audit_info, current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{roleMeta.roleId},"
+          + " #{roleMeta.roleName},"
+          + " #{roleMeta.metalakeId},"
+          + " #{roleMeta.properties},"
+          + " #{roleMeta.securableObject},"
+          + " #{roleMeta.privileges},"
+          + " #{roleMeta.auditInfo},"
+          + " #{roleMeta.currentVersion},"
+          + " #{roleMeta.lastVersion},"
+          + " #{roleMeta.deletedAt}"
+          + " ) ON DUPLICATE KEY UPDATE"
+          + " role_name = #{roleMeta.roleName},"
+          + " metalake_id = #{roleMeta.metalakeId},"
+          + " properties = #{roleMeta.properties},"
+          + " securable_object = #{roleMeta.securableObject},"
+          + " privileges = #{roleMeta.privileges},"
+          + " audit_info = #{roleMeta.auditInfo},"
+          + " current_version = #{roleMeta.currentVersion},"
+          + " last_version = #{roleMeta.lastVersion},"
+          + " deleted_at = #{roleMeta.deletedAt}")
+  void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
 }

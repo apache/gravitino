@@ -18,6 +18,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -26,6 +27,7 @@ import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConver
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
+import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
@@ -99,6 +101,8 @@ public class JDBCBackend implements RelationalBackend {
       TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
     } else if (e instanceof UserEntity) {
       UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
+    } else if (e instanceof RoleEntity) {
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -122,6 +126,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
       case TOPIC:
         return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
+      case USER:
+        return (E) UserMetaService.getInstance().updateUser(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);

@@ -27,7 +27,6 @@ public class RolePO {
     return roleName;
   }
 
-
   public Long getMetalakeId() {
     return metalakeId;
   }
@@ -103,7 +102,6 @@ public class RolePO {
       rolePO = new RolePO();
     }
 
-
     public Builder withRoleId(Long roleId) {
       rolePO.roleId = roleId;
       return this;
@@ -155,12 +153,12 @@ public class RolePO {
     }
 
     private void validate() {
-        Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
-        Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
+      Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
+      Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
-        Preconditions.checkArgument(rolePO.properties != null, "Properties is required");
-        Preconditions.checkArgument(rolePO.securableObject != null, "Securable object is required");
-        Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
+      Preconditions.checkArgument(rolePO.properties != null, "Properties is required");
+      Preconditions.checkArgument(rolePO.securableObject != null, "Securable object is required");
+      Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(rolePO.lastVersion != null, "Last version is required");

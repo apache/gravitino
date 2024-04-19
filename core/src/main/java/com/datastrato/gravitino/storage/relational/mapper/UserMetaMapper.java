@@ -97,4 +97,23 @@ public interface UserMetaMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @Update(
+      "UPDATE "
+          + TABLE_NAME
+          + " SET user_name = #{newUserMeta.userName},"
+          + " metalake_id = #{newUserMeta.metalakeId},"
+          + " audit_info = #{newUserMeta.auditInfo},"
+          + " current_version = #{newUserMeta.currentVersion},"
+          + " last_version = #{newUserMeta.lastVersion},"
+          + " deleted_at = #{newUserMeta.deletedAt}"
+          + " WHERE user_id = #{oldUserMeta.userId}"
+          + " AND user_name = #{oldUserMeta.userName}"
+          + " AND metalake_id = #{oldUserMeta.metalakeId}"
+          + " AND audit_info = #{oldUserMeta.auditInfo}"
+          + " AND current_version = #{oldUserMeta.currentVersion}"
+          + " AND last_version = #{oldUserMeta.lastVersion}"
+          + " AND deleted_at = 0")
+  Integer updateUserMeta(
+      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);
 }

@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
@@ -17,7 +18,14 @@ import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
@@ -88,10 +96,11 @@ public class UserMetaService {
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds =
-          userEntity.roles().stream()
+          Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
               .map(
-                  role ->
-                      RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, role))
+                  roleName ->
+                      RoleMetaService.getInstance()
+                          .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
               .collect(Collectors.toList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
@@ -128,13 +137,15 @@ public class UserMetaService {
     }
   }
 
-  public boolean deleteUser(NameIdentifier ident) {
+  public boolean deleteUser(NameIdentifier identifier) {
     Preconditions.checkArgument(
-        ident != null && !ident.namespace().isEmpty() && ident.namespace().levels().length == 3,
+        identifier != null
+            && !identifier.namespace().isEmpty()
+            && identifier.namespace().levels().length == 3,
         "The identifier should not be null and should have three level.");
     Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(ident.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, ident.name());
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -144,5 +155,75 @@ public class UserMetaService {
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)));
     return true;
+  }
+
+  public <E extends Entity & HasIdentifier> UserEntity updateUser(
+      NameIdentifier identifier, Function<E, E> updater) {
+    Preconditions.checkArgument(
+        identifier != null
+            && !identifier.namespace().isEmpty()
+            && identifier.namespace().levels().length == 3,
+        "The identifier should not be null and should have three level.");
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
+
+    UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldUserEntity.id(), newEntity.id()),
+        "The updated user entity id: %s should be same with the user entity id before: %s",
+        newEntity.id(),
+        oldUserEntity.id());
+
+    int oldRoleSize = oldUserEntity.roleNames() == null ? 0 : oldUserEntity.roleNames().size();
+    int newRoleSie = newEntity.roleNames() == null ? 0 : newEntity.roleNames().size();
+    Set<Long> oldRoleIds =
+        oldUserEntity.roleIds() == null
+            ? Sets.newHashSet()
+            : Sets.newHashSet(oldUserEntity.roleIds());
+    Set<Long> newRoleIds =
+        newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
+
+    if (newRoleSie > oldRoleSize) {
+      List<Long> insertRoleIds = new ArrayList<>(Sets.difference(newRoleIds, oldRoleIds));
+
+      try {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper ->
+                        mapper.updateUserMeta(
+                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserRoleRelMapper.class,
+                    mapper ->
+                        mapper.batchInsertUserRoleRel(
+                            POConverters.initializeUserRoleRelsPOWithVersion(
+                                newEntity, insertRoleIds))));
+      } catch (RuntimeException re) {
+        ExceptionUtils.checkSQLException(
+            re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+        throw re;
+      }
+    }
+
+    if (newRoleSie < oldRoleSize) {
+      List<Long> deleteId = new ArrayList<>(Sets.difference(oldRoleIds, newRoleIds));
+      try {
+        SessionUtils.doWithCommit(
+            UserRoleRelMapper.class,
+            mapper -> mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteId));
+      } catch (RuntimeException re) {
+        ExceptionUtils.checkSQLException(
+            re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+        throw re;
+      }
+    }
+    return newEntity;
   }
 }

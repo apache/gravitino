@@ -75,5 +75,20 @@ public interface UserRoleRelMapper {
           + TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
-  void softDeleteUserRoleRelByUserId(Long userId);
+  void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
+
+  @Update({
+    "<script>",
+    "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+        + " WHERE user_id = #{userId} AND role_id in (",
+    "<foreach collection='roleIds' item='roleId' separator=','>",
+    "#{roleId}",
+    "</foreach>",
+    ") " + "AND deleted_at = 0",
+    "</script>"
+  })
+  void softDeleteUserRoleRelByUserAndRoles(
+      @Param("userId") Long userId, @Param("roleIds") List<Long> roleIds);
 }

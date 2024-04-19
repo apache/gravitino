@@ -13,6 +13,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -639,6 +640,32 @@ public class POConverters {
   }
 
   /**
+   * Update UserPO version
+   *
+   * @param oldUserPO the old UserEntity object
+   * @param newUser the new TableEntity object
+   * @return UserPO object with updated version
+   */
+  public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
+    Long lastVersion = oldUserPO.getLastVersion();
+    // Will set the version to the last version + 1 when having some fields need be multiple version
+    Long nextVersion = lastVersion;
+    try {
+      return UserPO.builder()
+          .withUserId(oldUserPO.getUserId())
+          .withUserName(newUser.name())
+          .withMetalakeId(oldUserPO.getMetalakeId())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
    * Convert {@link UserPO} to {@link UserEntity}
    *
    * @param userPO UserPo object to be converted
@@ -648,13 +675,14 @@ public class POConverters {
    */
   public static UserEntity fromUserPO(UserPO userPO, List<RolePO> rolePOs, Namespace namespace) {
     try {
-      List<String> roleNames = rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
+      List<String> roleNames =
+          rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
       List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-       return UserEntity.builder()
+      return UserEntity.builder()
           .withId(userPO.getUserId())
           .withName(userPO.getUserName())
           .withRoleNames(roleNames.isEmpty() ? null : roleNames)
-               .withRoleIds(roleIds.isEmpty() ? null : roleIds)
+          .withRoleIds(roleIds.isEmpty() ? null : roleIds)
           .withNamespace(namespace)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
@@ -689,6 +717,33 @@ public class POConverters {
         userRoleRelPOs.add(roleRelPO);
       }
       return userRoleRelPOs;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize RolePO
+   *
+   * @param roleEntity RoleEntity object
+   * @return RolePO object with version initialized
+   */
+  public static RolePO initializeRolePOWithVersion(RoleEntity roleEntity, RolePO.Builder builder) {
+    try {
+      return builder
+          .withRoleId(roleEntity.id())
+          .withRoleName(roleEntity.name())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
+          .withSecurableObject(roleEntity.securableObject().toString())
+          .withPrivileges(
+              roleEntity.privileges().stream()
+                  .map(privilege -> privilege.name().toString())
+                  .collect(Collectors.joining(",")))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
