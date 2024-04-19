@@ -67,7 +67,7 @@ public class DorisContainer extends BaseContainer {
     }
   }
 
-  private void copyDorisLog() {
+  public void copyDorisLog() {
     try {
       // stop Doris container
       String destPath = System.getenv("IT_PROJECT_DIR");

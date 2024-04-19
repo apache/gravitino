@@ -50,6 +50,7 @@ public class TestDorisAbstractIT extends TestJdbcAbstractIT {
     if (null != CONTAINER) {
       CONTAINER.stop();
     }
+    containerSuite.getDorisContainer().copyDorisLog();
   }
 
   private static Map<String, String> getDorisCatalogProperties() {
