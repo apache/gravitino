@@ -215,9 +215,18 @@ public class UserMetaService {
     if (newRoleSie < oldRoleSize) {
       List<Long> deleteId = new ArrayList<>(Sets.difference(oldRoleIds, newRoleIds));
       try {
-        SessionUtils.doWithCommit(
-            UserRoleRelMapper.class,
-            mapper -> mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteId));
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper ->
+                        mapper.updateUserMeta(
+                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserRoleRelMapper.class,
+                    mapper ->
+                        mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteId)));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());

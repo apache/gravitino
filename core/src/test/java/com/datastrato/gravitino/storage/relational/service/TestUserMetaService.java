@@ -20,7 +20,7 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class UserMetaServiceTest extends TestJDBCBackend {
+class TestUserMetaService extends TestJDBCBackend {
 
   String metalakeName = "metalake";
 
@@ -305,7 +305,7 @@ class UserMetaServiceTest extends TestJDBCBackend {
               AuditInfo.builder()
                   .withCreator(user.auditInfo().creator())
                   .withCreateTime(user.auditInfo().createTime())
-                  .withLastModifier("updateUser")
+                  .withLastModifier("grantUser")
                   .withLastModifiedTime(Instant.now())
                   .build();
 
@@ -334,7 +334,7 @@ class UserMetaServiceTest extends TestJDBCBackend {
     Assertions.assertEquals(
         Sets.newHashSet(role1.id(), role2.id(), role3.id()), Sets.newHashSet(grantUser.roleIds()));
     Assertions.assertEquals("creator", grantUser.auditInfo().creator());
-    Assertions.assertEquals("updateUser", grantUser.auditInfo().lastModifier());
+    Assertions.assertEquals("grantUser", grantUser.auditInfo().lastModifier());
 
     // update user (revoke)
     Function<UserEntity, UserEntity> revokeUpdater =
@@ -343,7 +343,7 @@ class UserMetaServiceTest extends TestJDBCBackend {
               AuditInfo.builder()
                   .withCreator(user.auditInfo().creator())
                   .withCreateTime(user.auditInfo().createTime())
-                  .withLastModifier("updateUser")
+                  .withLastModifier("revokeUser")
                   .withLastModifiedTime(Instant.now())
                   .build();
 
@@ -372,6 +372,6 @@ class UserMetaServiceTest extends TestJDBCBackend {
     Assertions.assertEquals(
         Sets.newHashSet(role1.id(), role3.id()), Sets.newHashSet(revokeUser.roleIds()));
     Assertions.assertEquals("creator", revokeUser.auditInfo().creator());
-    Assertions.assertEquals("updateUser", revokeUser.auditInfo().lastModifier());
+    Assertions.assertEquals("revokeUser", revokeUser.auditInfo().lastModifier());
   }
 }
