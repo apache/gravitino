@@ -5,14 +5,14 @@
 
 package com.datastrato.gravitino.server.authentication;
 
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.commons.lang3.StringUtils;
 
-public interface OAuthConfig extends Configs {
+public interface OAuthConfig {
+
   String OAUTH_CONFIG_PREFIX = "gravitino.authenticator.oauth.";
 
   ConfigEntry<String> SERVICE_AUDIENCE =

@@ -108,7 +108,7 @@ class RoleManager {
     }
   }
 
-  RoleEntity loadRole(String metalake, String role) throws NoSuchRoleException {
+  RoleEntity getRole(String metalake, String role) throws NoSuchRoleException {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       return getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
@@ -118,7 +118,7 @@ class RoleManager {
     }
   }
 
-  boolean dropRole(String metalake, String role) {
+  boolean deleteRole(String metalake, String role) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);

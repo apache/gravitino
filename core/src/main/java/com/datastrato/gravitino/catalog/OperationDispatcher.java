@@ -14,6 +14,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.FilesetChange;
@@ -99,6 +100,20 @@ public abstract class OperationDispatcher {
 
       throw new RuntimeException(throwable);
     }
+  }
+
+  Capability getCatalogCapability(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
+  }
+
+  Capability getCatalogCapability(Namespace namespace) {
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
   }
 
   Set<String> getHiddenPropertyNames(

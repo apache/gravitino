@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
-  private static SchemaOperationDispatcher dispatcher;
+  static SchemaOperationDispatcher dispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
@@ -54,8 +54,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("comment", schema.comment());
     testProperties(props, schema.properties());
 
-    // Test required table properties exception
-    Map<String, String> illegalTableProperties =
+    // Test required schema properties exception
+    Map<String, String> illegalSchemaProperties =
         new HashMap<String, String>() {
           {
             put("k2", "v2");
@@ -63,14 +63,14 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         };
 
     testPropertyException(
-        () -> dispatcher.createSchema(schemaIdent, "comment", illegalTableProperties),
+        () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
         "Properties are required and must be set");
 
     // Test reserved table properties exception
-    illegalTableProperties.put(COMMENT_KEY, "table comment");
-    illegalTableProperties.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
+    illegalSchemaProperties.put(COMMENT_KEY, "table comment");
+    illegalSchemaProperties.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
     testPropertyException(
-        () -> dispatcher.createSchema(schemaIdent, "comment", illegalTableProperties),
+        () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
         "Properties are reserved and cannot be set",
         "comment",
         "gravitino.identifier");

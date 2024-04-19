@@ -117,7 +117,7 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
-  public void testAddRoleToUser() {
+  public void testGrantRoleToUser() {
     String notExist = "not-exist";
 
     User user = accessControlManager.getUser(METALAKE, USER);
@@ -153,7 +153,7 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
-  public void testRemoveRoleFromUser() {
+  public void testRevokeRoleFromUser() {
     String notExist = "not-exist";
 
     Assertions.assertTrue(accessControlManager.grantRoleToUser(METALAKE, ROLE, USER));
@@ -179,7 +179,7 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
-  public void testAddRoleToGroup() {
+  public void testGrantRoleToGroup() {
     String notExist = "not-exist";
 
     Group group = accessControlManager.getGroup(METALAKE, GROUP);
@@ -216,7 +216,7 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
-  public void testRemoveRoleFormGroup() {
+  public void testRevokeRoleFormGroup() {
     String notExist = "not-exist";
 
     Assertions.assertTrue(accessControlManager.grantRoleToGroup(METALAKE, ROLE, GROUP));
@@ -261,7 +261,7 @@ public class TestAccessControlManagerForPermissions {
     entityStore.put(roleEntity, true);
     Assertions.assertTrue(accessControlManager.grantRoleToUser(METALAKE, anotherRole, USER));
     Assertions.assertTrue(accessControlManager.grantRoleToGroup(METALAKE, anotherRole, GROUP));
-    accessControlManager.dropRole(METALAKE, anotherRole);
+    accessControlManager.deleteRole(METALAKE, anotherRole);
     Group group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
   }
