@@ -94,13 +94,16 @@ public class GroupMetaService {
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(GroupEntity, builder);
 
-      List<Long> roleIds =
-          Optional.ofNullable(GroupEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-              .map(
-                  roleName ->
-                      RoleMetaService.getInstance()
-                          .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-              .collect(Collectors.toList());
+      List<Long> roleIds = GroupEntity.roleIds();
+      if (roleIds == null) {
+        roleIds =
+            Optional.ofNullable(GroupEntity.roleNames()).orElse(Lists.newArrayList()).stream()
+                .map(
+                    roleName ->
+                        RoleMetaService.getInstance()
+                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
+                .collect(Collectors.toList());
+      }
       List<GroupRoleRelPO> groupRoleRelPOS =
           POConverters.initializeGroupRoleRelsPOWithVersion(GroupEntity, roleIds);
 
@@ -187,11 +190,10 @@ public class GroupMetaService {
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
-    Set<Long> grantRoleIds = Sets.difference(newRoleIds, oldRoleIds);
-    Set<Long> revokeRoleIds = Sets.difference(oldRoleIds, newRoleIds);
+    Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
+    Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (!grantRoleIds.isEmpty()) {
-      List<Long> insertRoleIds = Lists.newArrayList(grantRoleIds);
+    if (!insertRoleIds.isEmpty()) {
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -207,7 +209,7 @@ public class GroupMetaService {
                     mapper ->
                         mapper.batchInsertGroupRoleRel(
                             POConverters.initializeGroupRoleRelsPOWithVersion(
-                                newEntity, insertRoleIds))));
+                                newEntity, Lists.newArrayList(insertRoleIds)))));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
@@ -215,8 +217,7 @@ public class GroupMetaService {
       }
     }
 
-    if (!revokeRoleIds.isEmpty()) {
-      List<Long> deleteRoleIds = Lists.newArrayList(revokeRoleIds);
+    if (!deleteRoleIds.isEmpty()) {
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -231,7 +232,7 @@ public class GroupMetaService {
                     GroupRoleRelMapper.class,
                     mapper ->
                         mapper.softDeleteGroupRoleRelByGroupAndRoles(
-                            newEntity.id(), deleteRoleIds)));
+                            newEntity.id(), Lists.newArrayList(deleteRoleIds))));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
