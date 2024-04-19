@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 
-/** Represents a request to revoke a role from the user or the group. */
+/** Represents a request to revoke roles from the user or the group. */
 @Getter
 @EqualsAndHashCode
 @ToString

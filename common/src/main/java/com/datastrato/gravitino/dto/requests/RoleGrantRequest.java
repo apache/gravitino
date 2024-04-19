@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 
-/** Represents a request to grant a role to the user or the group. */
+/** Represents a request to grant roles to the user or the group. */
 @Getter
 @EqualsAndHashCode
 @ToString
