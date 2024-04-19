@@ -21,11 +21,11 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
 
-public class TableStandardizedDispatcher implements TableDispatcher {
+public class TableNormalizeDispatcher implements TableDispatcher {
 
   private final TableOperationDispatcher dispatcher;
 
-  public TableStandardizedDispatcher(TableOperationDispatcher dispatcher) {
+  public TableNormalizeDispatcher(TableOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -40,7 +40,7 @@ public class TableStandardizedDispatcher implements TableDispatcher {
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return dispatcher.loadTable(standardizeNameIdentifier(ident));
+    return dispatcher.loadTable(normalizeNameIdentifier(ident));
   }
 
   @Override
@@ -77,20 +77,20 @@ public class TableStandardizedDispatcher implements TableDispatcher {
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(standardizeNameIdentifier(ident));
+    return dispatcher.dropTable(normalizeNameIdentifier(ident));
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(standardizeNameIdentifier(ident));
+    return dispatcher.purgeTable(normalizeNameIdentifier(ident));
   }
 
   @Override
   public boolean tableExists(NameIdentifier ident) {
-    return dispatcher.tableExists(standardizeNameIdentifier(ident));
+    return dispatcher.tableExists(normalizeNameIdentifier(ident));
   }
 
-  private NameIdentifier standardizeNameIdentifier(NameIdentifier ident) {
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.TABLE, capability);
   }

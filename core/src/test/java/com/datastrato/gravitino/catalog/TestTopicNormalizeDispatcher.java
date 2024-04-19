@@ -15,49 +15,49 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestTopicStandardizedDispatcher extends TestTopicOperationDispatcher {
-  private static TopicStandardizedDispatcher topicStandardizedDispatcher;
-  private static SchemaStandardizedDispatcher schemaStandardizedDispatcher;
+public class TestTopicNormalizeDispatcher extends TestTopicOperationDispatcher {
+  private static TopicNormalizeDispatcher topicNormalizeDispatcher;
+  private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestTopicOperationDispatcher.initialize();
-    schemaStandardizedDispatcher = new SchemaStandardizedDispatcher(schemaOperationDispatcher);
-    topicStandardizedDispatcher = new TopicStandardizedDispatcher(topicOperationDispatcher);
+    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
+    topicNormalizeDispatcher = new TopicNormalizeDispatcher(topicOperationDispatcher);
   }
 
   @Test
   public void testNameCaseInsensitive() {
     Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(
+    schemaNormalizeDispatcher.createSchema(
         NameIdentifier.of(topicNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topicNAME");
     Topic createdTopic =
-        topicStandardizedDispatcher.createTopic(topicIdent, "comment", null, props);
+        topicNormalizeDispatcher.createTopic(topicIdent, "comment", null, props);
     Assertions.assertEquals(topicIdent.name().toLowerCase(), createdTopic.name());
 
     // test case-insensitive in loading
-    Topic loadedTopic = topicStandardizedDispatcher.loadTopic(topicIdent);
+    Topic loadedTopic = topicNormalizeDispatcher.loadTopic(topicIdent);
     Assertions.assertEquals(topicIdent.name().toLowerCase(), loadedTopic.name());
 
     // test case-insensitive in listing
-    NameIdentifier[] idents = topicStandardizedDispatcher.listTopics(topicNs);
+    NameIdentifier[] idents = topicNormalizeDispatcher.listTopics(topicNs);
     Assertions.assertEquals(1, idents.length);
 
     // test case-insensitive in altering
     Topic alteredTopic =
-        topicStandardizedDispatcher.alterTopic(
+        topicNormalizeDispatcher.alterTopic(
             NameIdentifier.of(topicNs, topicIdent.name().toLowerCase()),
             TopicChange.setProperty("k2", "v2"));
     Assertions.assertEquals(topicIdent.name().toLowerCase(), alteredTopic.name());
 
     // test case-insensitive in dropping
     Assertions.assertTrue(
-        topicStandardizedDispatcher.dropTopic(
+        topicNormalizeDispatcher.dropTopic(
             NameIdentifier.of(topicNs, topicIdent.name().toUpperCase())));
-    Assertions.assertFalse(topicStandardizedDispatcher.topicExists(topicIdent));
+    Assertions.assertFalse(topicNormalizeDispatcher.topicExists(topicIdent));
   }
 }

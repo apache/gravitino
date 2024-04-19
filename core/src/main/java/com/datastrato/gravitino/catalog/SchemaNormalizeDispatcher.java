@@ -17,11 +17,11 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import java.util.Map;
 
-public class SchemaStandardizedDispatcher implements SchemaDispatcher {
+public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   private final SchemaOperationDispatcher dispatcher;
 
-  public SchemaStandardizedDispatcher(SchemaOperationDispatcher dispatcher) {
+  public SchemaNormalizeDispatcher(SchemaOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -36,32 +36,32 @@ public class SchemaStandardizedDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean schemaExists(NameIdentifier ident) {
-    return dispatcher.schemaExists(standardizeNameIdentifier(ident));
+    return dispatcher.schemaExists(normalizeNameIdentifier(ident));
   }
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return dispatcher.createSchema(standardizeNameIdentifier(ident), comment, properties);
+    return dispatcher.createSchema(normalizeNameIdentifier(ident), comment, properties);
   }
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    return dispatcher.loadSchema(standardizeNameIdentifier(ident));
+    return dispatcher.loadSchema(normalizeNameIdentifier(ident));
   }
 
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    return dispatcher.alterSchema(standardizeNameIdentifier(ident), changes);
+    return dispatcher.alterSchema(normalizeNameIdentifier(ident), changes);
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return dispatcher.dropSchema(standardizeNameIdentifier(ident), cascade);
+    return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
   }
 
-  private NameIdentifier standardizeNameIdentifier(NameIdentifier ident) {
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.SCHEMA, capability);
   }

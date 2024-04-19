@@ -30,22 +30,22 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestTableStandardizedDispatcher extends TestTableOperationDispatcher {
-  private static TableStandardizedDispatcher tableStandardizedDispatcher;
-  private static SchemaStandardizedDispatcher schemaStandardizedDispatcher;
+public class TestTableNormalizeDispatcher extends TestTableOperationDispatcher {
+  private static TableNormalizeDispatcher tableNormalizeDispatcher;
+  private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestTableOperationDispatcher.initialize();
-    tableStandardizedDispatcher = new TableStandardizedDispatcher(tableOperationDispatcher);
-    schemaStandardizedDispatcher = new SchemaStandardizedDispatcher(schemaOperationDispatcher);
+    tableNormalizeDispatcher = new TableNormalizeDispatcher(tableOperationDispatcher);
+    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
   }
 
   @Test
   public void testNameCaseInsensitive() {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(
+    schemaNormalizeDispatcher.createSchema(
         NameIdentifier.of(tableNs.levels()), "comment", props);
 
     // test case-insensitive in creation
@@ -62,22 +62,22 @@ public class TestTableStandardizedDispatcher extends TestTableOperationDispatche
         new SortOrder[] {SortOrders.ascending(NamedReference.field(columns[0].name()))};
     Index[] indexes = new Index[] {Indexes.primary("index1", new String[][] {{columns[0].name()}})};
     Table createdTable =
-        tableStandardizedDispatcher.createTable(
+        tableNormalizeDispatcher.createTable(
             tableIdent, columns, "comment", props, transforms, distribution, sortOrders, indexes);
     assertTableCaseInsensitive(tableIdent, columns, createdTable);
 
     // test case-insensitive in loading
-    Table loadedTable = tableStandardizedDispatcher.loadTable(tableIdent);
+    Table loadedTable = tableNormalizeDispatcher.loadTable(tableIdent);
     assertTableCaseInsensitive(tableIdent, columns, loadedTable);
 
     // test case-insensitive in listing
-    NameIdentifier[] tableIdents = tableStandardizedDispatcher.listTables(tableNs);
+    NameIdentifier[] tableIdents = tableNormalizeDispatcher.listTables(tableNs);
     Arrays.stream(tableIdents)
         .forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
 
     // test case-insensitive in altering
     Table alteredTable =
-        tableStandardizedDispatcher.alterTable(
+        tableNormalizeDispatcher.alterTable(
             NameIdentifier.of(tableNs, tableIdent.name().toLowerCase()),
             TableChange.setProperty("k2", "v2"));
     assertTableCaseInsensitive(tableIdent, columns, alteredTable);
@@ -86,7 +86,7 @@ public class TestTableStandardizedDispatcher extends TestTableOperationDispatche
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
-                tableStandardizedDispatcher.alterTable(
+                tableNormalizeDispatcher.alterTable(
                     NameIdentifier.of(tableNs, tableIdent.name().toUpperCase()),
                     TableChange.rename(tableIdent.name().toUpperCase())));
     Assertions.assertEquals(
@@ -94,7 +94,7 @@ public class TestTableStandardizedDispatcher extends TestTableOperationDispatche
 
     // test case-insensitive in dropping
     Assertions.assertTrue(
-        tableStandardizedDispatcher.dropTable(
+        tableNormalizeDispatcher.dropTable(
             NameIdentifier.of(tableNs, tableIdent.name().toUpperCase())));
   }
 

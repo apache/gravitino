@@ -17,11 +17,11 @@ import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
 import java.util.Map;
 
-public class TopicStandardizedDispatcher implements TopicDispatcher {
+public class TopicNormalizeDispatcher implements TopicDispatcher {
 
   private final TopicOperationDispatcher dispatcher;
 
-  public TopicStandardizedDispatcher(TopicOperationDispatcher dispatcher) {
+  public TopicNormalizeDispatcher(TopicOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -36,12 +36,12 @@ public class TopicStandardizedDispatcher implements TopicDispatcher {
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    return dispatcher.loadTopic(standardizeNameIdentifier(ident));
+    return dispatcher.loadTopic(normalizeNameIdentifier(ident));
   }
 
   @Override
   public boolean topicExists(NameIdentifier ident) {
-    return dispatcher.topicExists(standardizeNameIdentifier(ident));
+    return dispatcher.topicExists(normalizeNameIdentifier(ident));
   }
 
   @Override
@@ -49,21 +49,21 @@ public class TopicStandardizedDispatcher implements TopicDispatcher {
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     return dispatcher.createTopic(
-        standardizeNameIdentifier(ident), comment, dataLayout, properties);
+        normalizeNameIdentifier(ident), comment, dataLayout, properties);
   }
 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    return dispatcher.alterTopic(standardizeNameIdentifier(ident), changes);
+    return dispatcher.alterTopic(normalizeNameIdentifier(ident), changes);
   }
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    return dispatcher.dropTopic(standardizeNameIdentifier(ident));
+    return dispatcher.dropTopic(normalizeNameIdentifier(ident));
   }
 
-  private NameIdentifier standardizeNameIdentifier(NameIdentifier ident) {
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.TOPIC, capability);
   }

@@ -17,42 +17,42 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispatcher {
-  private static FilesetStandardizedDispatcher filesetStandardizedDispatcher;
-  private static SchemaStandardizedDispatcher schemaStandardizedDispatcher;
+public class TestFilesetNormalizeDispatcher extends TestFilesetOperationDispatcher {
+  private static FilesetNormalizeDispatcher filesetNormalizeDispatcher;
+  private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestFilesetOperationDispatcher.initialize();
-    filesetStandardizedDispatcher = new FilesetStandardizedDispatcher(filesetOperationDispatcher);
-    schemaStandardizedDispatcher = new SchemaStandardizedDispatcher(schemaOperationDispatcher);
+    filesetNormalizeDispatcher = new FilesetNormalizeDispatcher(filesetOperationDispatcher);
+    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
   }
 
   @Test
   public void testNameCaseInsensitive() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema112");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaStandardizedDispatcher.createSchema(
+    schemaNormalizeDispatcher.createSchema(
         NameIdentifier.of(filesetNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "filesetNAME");
     Fileset createdFileset =
-        filesetStandardizedDispatcher.createFileset(
+        filesetNormalizeDispatcher.createFileset(
             filesetIdent, "comment", Fileset.Type.MANAGED, "fileset41", props);
     Assertions.assertEquals(filesetIdent.name().toLowerCase(), createdFileset.name());
 
     // test case-insensitive in loading
-    Fileset loadedFileset = filesetStandardizedDispatcher.loadFileset(filesetIdent);
+    Fileset loadedFileset = filesetNormalizeDispatcher.loadFileset(filesetIdent);
     Assertions.assertEquals(filesetIdent.name().toLowerCase(), loadedFileset.name());
 
     // test case-insensitive in listing
-    NameIdentifier[] filesets = filesetStandardizedDispatcher.listFilesets(filesetNs);
+    NameIdentifier[] filesets = filesetNormalizeDispatcher.listFilesets(filesetNs);
     Arrays.stream(filesets).forEach(s -> Assertions.assertEquals(s.name().toLowerCase(), s.name()));
 
     // test case-insensitive in altering
     Fileset alteredFileset =
-        filesetStandardizedDispatcher.alterFileset(
+        filesetNormalizeDispatcher.alterFileset(
             NameIdentifier.of(filesetNs, filesetIdent.name().toLowerCase()),
             FilesetChange.setProperty("k2", "v2"));
     Assertions.assertEquals(filesetIdent.name().toLowerCase(), alteredFileset.name());
@@ -61,7 +61,7 @@ public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispa
         Assertions.assertThrows(
             FilesetAlreadyExistsException.class,
             () ->
-                filesetStandardizedDispatcher.alterFileset(
+                filesetNormalizeDispatcher.alterFileset(
                     NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase()),
                     FilesetChange.rename(filesetIdent.name().toUpperCase())));
     Assertions.assertEquals(
@@ -69,8 +69,8 @@ public class TestFilesetStandardizedDispatcher extends TestFilesetOperationDispa
 
     // test case-insensitive in dropping
     Assertions.assertTrue(
-        filesetStandardizedDispatcher.dropFileset(
+        filesetNormalizeDispatcher.dropFileset(
             NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase())));
-    Assertions.assertFalse(filesetStandardizedDispatcher.filesetExists(filesetIdent));
+    Assertions.assertFalse(filesetNormalizeDispatcher.filesetExists(filesetIdent));
   }
 }

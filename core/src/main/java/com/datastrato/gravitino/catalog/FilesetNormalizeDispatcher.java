@@ -16,11 +16,11 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
 import java.util.Map;
 
-public class FilesetStandardizedDispatcher implements FilesetDispatcher {
+public class FilesetNormalizeDispatcher implements FilesetDispatcher {
 
   private final FilesetOperationDispatcher dispatcher;
 
-  public FilesetStandardizedDispatcher(FilesetOperationDispatcher dispatcher) {
+  public FilesetNormalizeDispatcher(FilesetOperationDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -35,12 +35,12 @@ public class FilesetStandardizedDispatcher implements FilesetDispatcher {
 
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    return dispatcher.loadFileset(standardizeNameIdentifier(ident));
+    return dispatcher.loadFileset(normalizeNameIdentifier(ident));
   }
 
   @Override
   public boolean filesetExists(NameIdentifier ident) {
-    return dispatcher.filesetExists(standardizeNameIdentifier(ident));
+    return dispatcher.filesetExists(normalizeNameIdentifier(ident));
   }
 
   @Override
@@ -52,7 +52,7 @@ public class FilesetStandardizedDispatcher implements FilesetDispatcher {
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     return dispatcher.createFileset(
-        standardizeNameIdentifier(ident), comment, type, storageLocation, properties);
+        normalizeNameIdentifier(ident), comment, type, storageLocation, properties);
   }
 
   @Override
@@ -66,10 +66,10 @@ public class FilesetStandardizedDispatcher implements FilesetDispatcher {
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    return dispatcher.dropFileset(standardizeNameIdentifier(ident));
+    return dispatcher.dropFileset(normalizeNameIdentifier(ident));
   }
 
-  private NameIdentifier standardizeNameIdentifier(NameIdentifier ident) {
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.FILESET, capability);
   }
