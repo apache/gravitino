@@ -609,7 +609,7 @@ export const getTableDetails = createAsyncThunk(
         items: partitioning.map(i => {
           let fields = i.fieldName || []
           let sub = ''
-          let last = i.fieldName.join('.')
+          let last = i.fieldName
 
           switch (i.strategy) {
             case 'bucket':
@@ -680,7 +680,7 @@ export const getTableDetails = createAsyncThunk(
             fields: i.fieldNames,
             name: i.name,
             indexType: i.indexType,
-            text: `${i.name}(${i.fieldNames.join(',')})`
+            text: `${i.name}(${i.fieldNames.join('.')})`
           }
         })
       }
