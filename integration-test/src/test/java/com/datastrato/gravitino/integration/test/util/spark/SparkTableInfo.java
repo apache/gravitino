@@ -40,11 +40,11 @@ public class SparkTableInfo {
   private Map<String, String> tableProperties;
   private List<String> unknownItems = new ArrayList<>();
   private Transform bucket;
-  private Transform hourPartition;
-  private Transform dayPartition;
-  private Transform monthPartition;
-  private Transform yearPartition;
-  private Transform truncatePartition;
+  private List<Transform> hourPartitions = new ArrayList<>();
+  private List<Transform> dayPartitions = new ArrayList<>();
+  private List<Transform> monthPartitions = new ArrayList<>();
+  private List<Transform> yearPartitions = new ArrayList<>();
+  private List<Transform> truncatePartitions = new ArrayList<>();
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
 
@@ -76,29 +76,24 @@ public class SparkTableInfo {
     this.bucket = bucket;
   }
 
-  void setHourPartition(Transform hourPartition) {
-    Assertions.assertNull(this.hourPartition, "HourPartition cannot be set repeatedly");
-    this.hourPartition = hourPartition;
+  void addHourPartition(Transform hourPartition) {
+    this.hourPartitions.add(hourPartition);
   }
 
-  void setDayPartition(Transform dayPartition) {
-    Assertions.assertNull(this.dayPartition, "DayPartition cannot be set repeatedly");
-    this.dayPartition = dayPartition;
+  void addDayPartition(Transform dayPartition) {
+    this.dayPartitions.add(dayPartition);
   }
 
-  void setMonthPartition(Transform monthPartition) {
-    Assertions.assertNull(this.monthPartition, "MonthPartition cannot be set repeatedly");
-    this.monthPartition = monthPartition;
+  void addMonthPartition(Transform monthPartition) {
+    this.monthPartitions.add(monthPartition);
   }
 
-  void setYearPartition(Transform yearPartition) {
-    Assertions.assertNull(this.yearPartition, "YearPartition cannot be set repeatedly");
-    this.yearPartition = yearPartition;
+  void addYearPartition(Transform yearPartition) {
+    this.yearPartitions.add(yearPartition);
   }
 
-  void setTruncatePartition(Transform truncate) {
-    Assertions.assertNull(this.truncatePartition, "TruncatePartition cannot be set repeatedly");
-    this.truncatePartition = truncate;
+  void addTruncatePartition(Transform truncate) {
+    this.truncatePartitions.add(truncate);
   }
 
   void addPartition(Transform partition) {
@@ -139,16 +134,16 @@ public class SparkTableInfo {
               } else if (transform instanceof IdentityTransform) {
                 sparkTableInfo.addPartition(transform);
               } else if (transform instanceof HoursTransform) {
-                sparkTableInfo.setHourPartition(transform);
+                sparkTableInfo.addHourPartition(transform);
               } else if (transform instanceof DaysTransform) {
-                sparkTableInfo.setDayPartition(transform);
+                sparkTableInfo.addDayPartition(transform);
               } else if (transform instanceof MonthsTransform) {
-                sparkTableInfo.setMonthPartition(transform);
+                sparkTableInfo.addMonthPartition(transform);
               } else if (transform instanceof YearsTransform) {
-                sparkTableInfo.setYearPartition(transform);
+                sparkTableInfo.addYearPartition(transform);
               } else if (transform instanceof ApplyTransform
                   && "truncate".equals(transform.name())) {
-                sparkTableInfo.setTruncatePartition(transform);
+                sparkTableInfo.addTruncatePartition(transform);
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());

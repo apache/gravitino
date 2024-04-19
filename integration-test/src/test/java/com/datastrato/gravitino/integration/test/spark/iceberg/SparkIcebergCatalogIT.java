@@ -176,7 +176,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withDayPartition(Collections.singletonList("ts"));
+            .withDayPartition("ts");
     checker.check(tableInfo);
 
     String insertData =
@@ -203,7 +203,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withMonthPartition(Collections.singletonList("ts"));
+            .withMonthPartition("ts");
     checker.check(tableInfo);
 
     String insertData =
@@ -230,7 +230,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withYearPartition(Collections.singletonList("ts"));
+            .withYearPartition("ts");
     checker.check(tableInfo);
 
     String insertData =
@@ -257,7 +257,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         SparkTableInfoChecker.create()
             .withName(tableName)
             .withColumns(getIcebergSimpleTableColumn())
-            .withTruncatePartition(1, Collections.singletonList("name"));
+            .withTruncatePartition(1, "name");
     checker.check(tableInfo);
 
     String insertData =

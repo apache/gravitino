@@ -83,39 +83,39 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-  public SparkTableInfoChecker withHourPartition(List<String> partitionColumns) {
-    Transform hourTransform = Expressions.hours(partitionColumns.get(0));
-    this.expectedTableInfo.setHourPartition(hourTransform);
+  public SparkTableInfoChecker withHourPartition(String partitionColumn) {
+    Transform hourTransform = Expressions.hours(partitionColumn);
+    this.expectedTableInfo.addHourPartition(hourTransform);
     this.checkFields.add(CheckField.HOUR_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withDayPartition(List<String> partitionColumns) {
-    Transform dayTransform = Expressions.days(partitionColumns.get(0));
-    this.expectedTableInfo.setDayPartition(dayTransform);
+  public SparkTableInfoChecker withDayPartition(String partitionColumn) {
+    Transform dayTransform = Expressions.days(partitionColumn);
+    this.expectedTableInfo.addDayPartition(dayTransform);
     this.checkFields.add(CheckField.DAY_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withMonthPartition(List<String> partitionColumns) {
-    Transform monthTransform = Expressions.months(partitionColumns.get(0));
-    this.expectedTableInfo.setMonthPartition(monthTransform);
+  public SparkTableInfoChecker withMonthPartition(String partitionColumn) {
+    Transform monthTransform = Expressions.months(partitionColumn);
+    this.expectedTableInfo.addMonthPartition(monthTransform);
     this.checkFields.add(CheckField.MONTH_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withYearPartition(List<String> partitionColumns) {
-    Transform yearTransform = Expressions.years(partitionColumns.get(0));
-    this.expectedTableInfo.setYearPartition(yearTransform);
+  public SparkTableInfoChecker withYearPartition(String partitionColumn) {
+    Transform yearTransform = Expressions.years(partitionColumn);
+    this.expectedTableInfo.addYearPartition(yearTransform);
     this.checkFields.add(CheckField.YEAR_PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withTruncatePartition(int width, List<String> partitionColumns) {
+  public SparkTableInfoChecker withTruncatePartition(int width, String partitionColumn) {
     Transform truncateTransform =
         Expressions.apply(
-            "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));
-    this.expectedTableInfo.setTruncatePartition(truncateTransform);
+            "truncate", Expressions.literal(width), Expressions.column(partitionColumn));
+    this.expectedTableInfo.addTruncatePartition(truncateTransform);
     this.checkFields.add(CheckField.TRUNCATE_PARTITION);
     return this;
   }
@@ -153,25 +153,29 @@ public class SparkTableInfoChecker {
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
                   break;
                 case HOUR_PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getHourPartition(), realTableInfo.getHourPartition());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getHourPartitions().toArray(),
+                      realTableInfo.getHourPartitions().toArray());
                   break;
                 case DAY_PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getDayPartition(), realTableInfo.getDayPartition());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getDayPartitions().toArray(),
+                      realTableInfo.getDayPartitions().toArray());
                   break;
                 case MONTH_PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getMonthPartition(), realTableInfo.getMonthPartition());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getMonthPartitions().toArray(),
+                      realTableInfo.getMonthPartitions().toArray());
                   break;
                 case YEAR_PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getYearPartition(), realTableInfo.getYearPartition());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getYearPartitions().toArray(),
+                      realTableInfo.getYearPartitions().toArray());
                   break;
                 case TRUNCATE_PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getTruncatePartition(),
-                      realTableInfo.getTruncatePartition());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getTruncatePartitions().toArray(),
+                      realTableInfo.getTruncatePartitions().toArray());
                   break;
                 case COMMENT:
                   Assertions.assertEquals(

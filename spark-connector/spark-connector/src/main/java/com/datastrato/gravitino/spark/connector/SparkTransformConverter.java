@@ -114,7 +114,8 @@ public class SparkTransformConverter {
                     "Truncate transform should have only one reference");
                 return Transforms.truncate(
                     findWidth(transform),
-                    String.join(ConnectorConstants.DOT, transform.references()[0].fieldNames()));
+                    getFieldNameFromGravitinoNamedReference(
+                        (NamedReference) toGravitinoNamedReference(transform.references()[0])));
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());
@@ -307,8 +308,13 @@ public class SparkTransformConverter {
   private static Expression[] toGravitinoNamedReference(
       List<org.apache.spark.sql.connector.expressions.NamedReference> sparkNamedReferences) {
     return sparkNamedReferences.stream()
-        .map(sparkReference -> NamedReference.field(sparkReference.fieldNames()))
+        .map(SparkTransformConverter::toGravitinoNamedReference)
         .toArray(Expression[]::new);
+  }
+
+  private static Expression toGravitinoNamedReference(
+      org.apache.spark.sql.connector.expressions.NamedReference sparkNamedReference) {
+    return NamedReference.field(sparkNamedReference.fieldNames());
   }
 
   public static org.apache.spark.sql.connector.expressions.Transform createSortBucketTransform(
