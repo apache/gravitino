@@ -234,9 +234,9 @@ Currently, Gravitino Virtual File System supports two kinds of authentication ty
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
-### How to use simple authentication
+### How to use authentication
 
-#### Using `simple` authentication type
+#### Using `simple` authentication
 
 First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
@@ -260,7 +260,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-#### Using OAuth authentication
+#### Using `OAuth` authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
 please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](./security.md).

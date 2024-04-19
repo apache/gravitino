@@ -25,4 +25,18 @@ public class HiveCatalogCapability implements Capability {
         "The DEFAULT constraint for column is only supported since Hive 3.0, "
             + "but the current Gravitino Hive catalog only supports Hive 2.x.");
   }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    switch (scope) {
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+        // Hive is case insensitive, see
+        // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
+        return CapabilityResult.unsupported("Hive is case insensitive.");
+      default:
+        return CapabilityResult.SUPPORTED;
+    }
+  }
 }

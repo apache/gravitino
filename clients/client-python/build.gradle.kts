@@ -26,9 +26,9 @@ fun gravitinoServer(operation: String) {
     val exitCode = process.waitFor()
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
-      println("Current docker context is: $currentContext")
+      println("Gravitino server status: $currentContext")
     } else {
-      println("checkOrbStackStatus Command execution failed with exit code $exitCode")
+      println("Gravitino server execution failed with exit code $exitCode")
     }
 }
 
@@ -39,26 +39,25 @@ tasks {
   }
 
   val test by registering(VenvTask::class) {
-    dependsOn(pipInstall)
-    venvExec = "python"
-    args = listOf("-m", "unittest")
-    workingDir = projectDir.resolve(".")
-  }
+    val skipPyClientITs = project.hasProperty("skipPyClientITs")
+    if (!skipPyClientITs) {
+      doFirst {
+        gravitinoServer("start")
+      }
 
-  val integrationTest by registering(VenvTask::class) {
-    doFirst() {
-      gravitinoServer("start")
-    }
+      dependsOn(pipInstall)
+      venvExec = "python"
+      args = listOf("-m", "unittest")
+      workingDir = projectDir.resolve(".")
+      environment = mapOf(
+        "PROJECT_VERSION" to project.version,
+        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+        "START_EXTERNAL_GRAVITINO" to "true"
+      )
 
-    dependsOn(pipInstall)
-    venvExec = "python"
-    args = listOf("-m", "unittest")
-    workingDir = projectDir.resolve(".")
-    environment = mapOf("PROJECT_VERSION" to project.version,
-      "GRADLE_START_GRAVITINO" to "True")
-
-    doLast {
-      gravitinoServer("stop")
+      doLast {
+        gravitinoServer("stop")
+      }
     }
   }
 
