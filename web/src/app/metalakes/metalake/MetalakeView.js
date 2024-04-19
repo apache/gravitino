@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 import { Box } from '@mui/material'
 
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import MetalakePageLeftBar from './MetalakePageLeftBar'
 import RightContent from './rightContent/RightContent'
@@ -32,8 +32,8 @@ import {
 const MetalakeView = () => {
   const dispatch = useAppDispatch()
   const searchParams = useSearchParams()
-
   const paramsSize = [...searchParams.keys()].length
+  const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
     const routeParams = {
@@ -54,11 +54,18 @@ const MetalakeView = () => {
       }
 
       if (paramsSize === 3 && catalog) {
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+        }
         dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, type }))
         dispatch(getCatalogDetails({ metalake, catalog, type }))
       }
 
       if (paramsSize === 4 && catalog && type && schema) {
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+          dispatch(fetchSchemas({ metalake, catalog, type }))
+        }
         switch (type) {
           case 'relational':
             dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
@@ -75,16 +82,20 @@ const MetalakeView = () => {
         dispatch(getSchemaDetails({ metalake, catalog, schema }))
       }
 
-      if (paramsSize === 5 && catalog && schema && table) {
-        dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-      }
-
-      if (paramsSize === 5 && catalog && schema && fileset) {
-        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
-      }
-
-      if (paramsSize === 5 && catalog && schema && topic) {
-        dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+      if (paramsSize === 5 && catalog && schema) {
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+          dispatch(fetchSchemas({ metalake, catalog, type }))
+        }
+        if (table) {
+          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+        }
+        if (fileset) {
+          dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+        }
+        if (topic) {
+          dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+        }
       }
     }
 

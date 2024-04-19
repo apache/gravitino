@@ -492,10 +492,6 @@ export const fetchSchemas = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}{{${type}}}`]))
 
     return { schemas, page, init }
@@ -565,10 +561,6 @@ export const fetchTables = createAsyncThunk(
           tree: getState().metalakes.metalakeTree
         })
       )
-    }
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
     }
 
     dispatch(
@@ -688,10 +680,6 @@ export const getTableDetails = createAsyncThunk(
 
     dispatch(setTableProps(tableProps))
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -753,10 +741,6 @@ export const fetchFilesets = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -785,10 +769,6 @@ export const getFilesetDetails = createAsyncThunk(
     }
 
     const { fileset: resFileset } = res
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
 
     dispatch(
       setExpandedNodes([
@@ -851,10 +831,6 @@ export const fetchTopics = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -883,10 +859,6 @@ export const getTopicDetails = createAsyncThunk(
     }
 
     const { topic: resTopic } = res
-
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
 
     dispatch(
       setExpandedNodes([
