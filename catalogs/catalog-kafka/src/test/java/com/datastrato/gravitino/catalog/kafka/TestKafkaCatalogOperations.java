@@ -188,7 +188,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", schema.comment());
-    Assertions.assertEquals(2, schema.properties().size());
+    Assertions.assertEquals(1, schema.properties().size());
   }
 
   @Test
