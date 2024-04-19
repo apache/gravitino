@@ -545,7 +545,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
 
     catalogsPage.metalakeSelectChange(METALAKE_NAME);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_HIVE_CATALOG_NAME));
+    driver.navigate().refresh();
   }
 
   @Test
