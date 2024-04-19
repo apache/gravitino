@@ -145,7 +145,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     partitionPaths.put("years", "name=a/name_trunc=a/id_bucket=4/ts_year=2024");
     partitionPaths.put("months", "name=a/name_trunc=a/id_bucket=4/ts_month=2024-01");
     partitionPaths.put("days", "name=a/name_trunc=a/id_bucket=4/ts_day=2024-01-01");
-    partitionPaths.put("hours", "name=a/name_trunc=a/id_bucket=4/ts_hour=2024-01-01-04");
+    partitionPaths.put("hours", "name=a/name_trunc=a/id_bucket=4/ts_hour=2024-01-01-12");
 
     partitionPaths
         .keySet()
