@@ -137,8 +137,7 @@ public class AccessControlManager {
    * @param metalake The metalake of the User.
    * @param user The name of the User.
    * @param roles The names of the Role.
-   * @return True if the User was successfully granted, false only when there exists a roles in the
-   *     user,otherwise it will throw an exception.
+   * @return The User after granted.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
