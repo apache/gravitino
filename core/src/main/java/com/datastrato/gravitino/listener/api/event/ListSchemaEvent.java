@@ -15,7 +15,7 @@ public final class ListSchemaEvent extends SchemaEvent {
   private final Namespace namespace;
 
   public ListSchemaEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.toString()));
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 

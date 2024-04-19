@@ -13,5 +13,6 @@ public enum OperationType {
   /** This is a special operation type that is used to get a partition from a table. */
   GET,
   ADD,
-  REMOVE
+  REMOVE,
+  DELETE
 }

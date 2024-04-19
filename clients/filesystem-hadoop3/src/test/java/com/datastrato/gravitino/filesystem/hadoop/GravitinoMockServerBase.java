@@ -7,6 +7,7 @@ package com.datastrato.gravitino.filesystem.hadoop;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -14,6 +15,7 @@ import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.FilesetResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
+import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
@@ -51,11 +53,13 @@ public abstract class GravitinoMockServerBase {
   public static void setup() {
     mockServer = ClientAndServer.startClientAndServer(0);
     port = mockServer.getLocalPort();
+    mockAPIVersion();
   }
 
   @AfterEach
   public void reset() {
     mockServer.reset();
+    mockAPIVersion();
   }
 
   @AfterAll
@@ -100,6 +104,19 @@ public abstract class GravitinoMockServerBase {
       Method method, String path, T reqBody, R respBody, int statusCode)
       throws com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
     buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
+  }
+
+  protected static void mockAPIVersion() {
+    try {
+      buildMockResource(
+          Method.GET,
+          "/api/version",
+          null,
+          new VersionResponse(Version.getCurrentVersionDTO()),
+          HttpStatus.SC_OK);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected static void mockMetalakeDTO(String name, String comment) {

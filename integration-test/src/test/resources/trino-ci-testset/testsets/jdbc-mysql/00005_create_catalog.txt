@@ -1,6 +1,6 @@
 CALL
 
-"test.gt_mysql_xxx1"
+"gt_mysql_xxx1"
 
 <QUERY_FAILED> Catalog test.gt_mysql_xxx1 already exists.
 
@@ -16,7 +16,7 @@ CALL
 
 CALL
 
-"test.gt_mysql_xxx1"
+"gt_mysql_xxx1"
 
 CALL
 

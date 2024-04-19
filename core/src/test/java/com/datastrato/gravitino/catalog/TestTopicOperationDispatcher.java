@@ -30,8 +30,8 @@ import org.junit.jupiter.api.Test;
 
 public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
-  private static TopicOperationDispatcher topicOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
+  static TopicOperationDispatcher topicOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {

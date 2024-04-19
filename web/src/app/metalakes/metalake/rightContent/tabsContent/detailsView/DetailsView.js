@@ -23,7 +23,7 @@ const DetailsView = () => {
 
   const audit = activatedItem?.audit || {}
 
-  const properties = Object.keys(activatedItem?.properties || [])
+  let properties = Object.keys(activatedItem?.properties || [])
     .filter(key => !['partition-count', 'replication-factor'].includes(key))
     .map(item => {
       return {
@@ -32,14 +32,15 @@ const DetailsView = () => {
       }
     })
   if (paramsSize === 5 && searchParams.get('topic')) {
-    properties.unshift({
-      key: 'replication-factor',
-      value: JSON.stringify(activatedItem?.properties['replication-factor'])?.replace(/^"|"$/g, '')
-    })
-    properties.unshift({
-      key: 'partition-count',
-      value: JSON.stringify(activatedItem?.properties['partition-count'])?.replace(/^"|"$/g, '')
-    })
+    const topicPros = Object.keys(activatedItem?.properties || [])
+      .filter(key => ['partition-count', 'replication-factor'].includes(key))
+      .map(item => {
+        return {
+          key: item,
+          value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
+        }
+      })
+    properties = [...topicPros, ...properties]
   }
 
   const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
@@ -70,6 +71,22 @@ const DetailsView = () => {
                 Provider
               </Typography>
               {renderFieldText({ value: activatedItem?.provider })}
+            </Grid>
+          </>
+        ) : null}
+        {paramsSize === 5 && searchParams.get('fileset') ? (
+          <>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Type
+              </Typography>
+              {renderFieldText({ value: activatedItem?.type })}
+            </Grid>
+            <Grid item xs={12} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Storage location
+              </Typography>
+              {renderFieldText({ value: activatedItem?.storageLocation })}
             </Grid>
           </>
         ) : null}

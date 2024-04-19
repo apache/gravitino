@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -39,12 +40,12 @@ public class TestAccessControlManager {
 
   private static Config config;
 
-  private static String metalake = "metalake";
+  private static String METALAKE = "metalake";
 
   private static BaseMetalake metalakeEntity =
       BaseMetalake.builder()
           .withId(1L)
-          .withName(metalake)
+          .withName(METALAKE)
           .withAuditInfo(
               AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .withVersion(SchemaVersion.V_0_1)
@@ -62,6 +63,8 @@ public class TestAccessControlManager {
     entityStore.put(metalakeEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
+    GravitinoEnv.getInstance().setEntityStore(entityStore);
+    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
   }
 
   @AfterAll
@@ -241,15 +244,21 @@ public class TestAccessControlManager {
 
     accessControlManager.createRole(
         "metalake", "loadRole", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
-    Role role = accessControlManager.loadRole("metalake", "loadRole");
+
+    Role cachedRole = accessControlManager.getRole("metalake", "loadRole");
+    accessControlManager.getRoleManager().getCache().invalidateAll();
+    Role role = accessControlManager.getRole("metalake", "loadRole");
+
+    // Verify the cached roleEntity is correct
+    Assertions.assertEquals(role, cachedRole);
+
     Assertions.assertEquals("loadRole", role.name());
     testProperties(props, role.properties());
 
     // Test load non-existed group
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchRoleException.class,
-            () -> accessControlManager.loadRole("metalake", "not-exist"));
+            NoSuchRoleException.class, () -> accessControlManager.getRole("metalake", "not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("Role not-exist does not exist"));
   }
 
@@ -261,11 +270,11 @@ public class TestAccessControlManager {
         "metalake", "testDrop", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
 
     // Test drop role
-    boolean dropped = accessControlManager.dropRole("metalake", "testDrop");
+    boolean dropped = accessControlManager.deleteRole("metalake", "testDrop");
     Assertions.assertTrue(dropped);
 
     // Test drop non-existed role
-    boolean dropped1 = accessControlManager.dropRole("metalake", "no-exist");
+    boolean dropped1 = accessControlManager.deleteRole("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
   }
 

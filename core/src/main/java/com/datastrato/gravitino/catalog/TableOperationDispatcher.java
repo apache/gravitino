@@ -164,7 +164,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 t ->
                     t.createTable(
                         ident,
-                        applyCapabilities(columns, c.capabilities()),
+                        columns,
                         comment,
                         updatedProperties,
                         partitions == null ? EMPTY_TRANSFORM : partitions,

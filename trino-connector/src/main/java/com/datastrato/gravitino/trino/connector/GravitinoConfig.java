@@ -28,7 +28,7 @@ public class GravitinoConfig {
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
           "Omit metalake prefix for catalog names",
-          "false",
+          "true",
           false);
 
   public GravitinoConfig(Map<String, String> requiredConfig) {

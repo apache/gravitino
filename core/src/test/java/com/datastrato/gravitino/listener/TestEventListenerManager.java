@@ -6,17 +6,16 @@
 package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
+import com.datastrato.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import com.datastrato.gravitino.listener.api.EventListenerPlugin;
 import com.datastrato.gravitino.listener.api.event.Event;
 import com.google.common.collect.ImmutableSet;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.Getter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -24,58 +23,6 @@ public class TestEventListenerManager {
   static class DummyEvent extends Event {
     protected DummyEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
-    }
-  }
-
-  static class DummyEventListener implements EventListenerPlugin {
-    Map<String, String> properties;
-    @Getter List<Event> events = new ArrayList<>();
-
-    @Override
-    public void init(Map<String, String> properties) {
-      this.properties = properties;
-    }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void stop() {}
-
-    @Override
-    public void onPostEvent(Event event) {
-      this.events.add(event);
-    }
-
-    @Override
-    public Mode mode() {
-      return Mode.SYNC;
-    }
-  }
-
-  static class DummyAsyncEventListener extends DummyEventListener {
-    List<Event> tryGetEvents() {
-      Instant waitTime = Instant.now().plusSeconds(20);
-      while (getEvents().size() == 0 && Instant.now().isBefore(waitTime)) {
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-      return getEvents();
-    }
-
-    @Override
-    public Mode mode() {
-      return Mode.ASYNC_SHARED;
-    }
-  }
-
-  static class DummyAsyncIsolatedEventListener extends DummyAsyncEventListener {
-    @Override
-    public Mode mode() {
-      return Mode.ASYNC_ISOLATED;
     }
   }
 

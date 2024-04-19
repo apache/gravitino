@@ -450,13 +450,15 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyShowDataItemInList(String itemName) {
+  public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
       Thread.sleep(ACTION_SLEEP_MILLIS);
-      List<WebElement> list =
-          driver.findElements(
-              By.xpath(
-                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      String xpath =
+          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
+      if (isColumnLevel) {
+        xpath = xpath + "//p";
+      }
+      List<WebElement> list = driver.findElements(By.xpath(xpath));
       List<String> texts = new ArrayList<>();
       for (WebElement element : list) {
         texts.add(element.getText());
