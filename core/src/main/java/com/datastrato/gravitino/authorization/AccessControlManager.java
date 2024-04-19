@@ -132,75 +132,72 @@ public class AccessControlManager {
   }
 
   /**
-   * Grant a role to a user.
+   * Grant roles to a user.
    *
    * @param metalake The metalake of the User.
    * @param user The name of the User.
-   * @param role The name of the Role.
-   * @return True if the User was successfully granted, false only when there exists a role in the
+   * @param roles The names of the Role.
+   * @return True if the User was successfully granted, false only when there exists a roles in the
    *     user,otherwise it will throw an exception.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If granting a role to a user encounters storage issues.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
-  public boolean grantRoleToUser(String metalake, String role, String user)
+  public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.grantRoleToUser(metalake, role, user));
+    return doWithNonAdminLock(() -> permissionManager.grantRolesToUser(metalake, roles, user));
   }
 
   /**
-   * Grant a role to a group.
-   *
-   * @param metalake The metalake of the Group.
-   * @param group THe name of the Group.
-   * @param role The name of the Role.
-   * @return True if the Group was successfully granted, false only when there exists a role in the
-   *     group,otherwise it will throw an exception.
-   * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If granting a role to a group encounters storage issues.
-   */
-  public boolean grantRoleToGroup(String metalake, String role, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.grantRoleToGroup(metalake, role, group));
-  }
-
-  /**
-   * Revoke a role from a group.
+   * Grant roles to a group.
    *
    * @param metalake The metalake of the Group.
    * @param group The name of the Group.
-   * @param role The name of the Role.
-   * @return True if the Group was successfully revoked, false only when there's no such role in the
-   *     group,otherwise it will throw an exception.
+   * @param roles The names of the Role.
+   * @return The Group after granted.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking a role from a group encounters storage issues.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
-  public boolean revokeRoleFromGroup(String metalake, String role, String group)
+  public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromGroup(metalake, role, group));
+    return doWithNonAdminLock(() -> permissionManager.grantRolesToGroup(metalake, roles, group));
   }
 
   /**
-   * Revoke a role from a user.
+   * Revoke roles from a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group The name of the Group.
+   * @param roles The name of the Role.
+   * @return The Group after revoked.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromGroup(metalake, roles, group));
+  }
+
+  /**
+   * Revoke roles from a user.
    *
    * @param metalake The metalake of the User.
    * @param user The name of the User.
-   * @param role The name of the Role.
-   * @return True if the User was successfully revoked, false only when there's no such role in the
-   *     user,otherwise it will throw an exception.
+   * @param roles The name of the Role.
+   * @return The User after revoked.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking a role from a user encounters storage issues.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
    */
-  public boolean revokeRoleFromUser(String metalake, String role, String user)
+  public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromUser(metalake, role, user));
+    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromUser(metalake, roles, user));
   }
 
   /**

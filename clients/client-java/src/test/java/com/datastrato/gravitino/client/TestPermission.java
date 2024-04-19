@@ -7,10 +7,19 @@ package com.datastrato.gravitino.client;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
+import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.User;
+import com.datastrato.gravitino.dto.AuditDTO;
+import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
+import com.datastrato.gravitino.dto.requests.RoleRevokeRequest;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.GrantResponse;
-import com.datastrato.gravitino.dto.responses.RevokeResponse;
+import com.datastrato.gravitino.dto.responses.GroupResponse;
+import com.datastrato.gravitino.dto.responses.UserResponse;
+import com.google.common.collect.Lists;
+import java.time.Instant;
+import java.util.List;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -20,8 +29,6 @@ public class TestPermission extends TestBase {
 
   private static final String metalakeName = "testMetalake";
   private static final String API_PERMISSION_PATH = "/api/metalakes/%s/permissions/%s";
-  private static final String PERMISSION_USER_PATH = "users/%s/roles/%s";
-  private static final String PERMISSION_GROUP_PATH = "groups/%s/roles/%s";
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -29,100 +36,110 @@ public class TestPermission extends TestBase {
   }
 
   @Test
-  public void testGrantRoleToUser() throws Exception {
-    String role = "role";
+  public void testGrantRolesToUser() throws Exception {
+    List<String> roles = Lists.newArrayList("role");
     String user = "user";
     String userPath =
-        String.format(
-            API_PERMISSION_PATH, metalakeName, String.format(PERMISSION_USER_PATH, user, ""));
-    RoleGrantRequest request = new RoleGrantRequest(role);
-    GrantResponse response = new GrantResponse(true);
+        String.format(API_PERMISSION_PATH, metalakeName, String.format("users/%s/grant", user));
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    UserDTO userDTO =
+        UserDTO.builder()
+            .withName("user")
+            .withRoles(Lists.newArrayList("roles"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    UserResponse response = new UserResponse(userDTO);
 
-    buildMockResource(Method.POST, userPath, request, response, SC_OK);
-    Assertions.assertTrue(client.grantRoleToUser(metalakeName, role, user));
-
-    // Test false result
-    response = new GrantResponse(false);
-    buildMockResource(Method.POST, userPath, request, response, SC_OK);
-    Assertions.assertFalse(client.grantRoleToUser(metalakeName, role, user));
+    buildMockResource(Method.PUT, userPath, request, response, SC_OK);
+    User grantedUser = client.grantRolesToUser(metalakeName, roles, user);
+    Assertions.assertEquals(grantedUser.roles(), userDTO.roles());
+    Assertions.assertEquals(grantedUser.name(), userDTO.name());
 
     // test Exception
-    ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.POST, userPath, request, errResp3, SC_SERVER_ERROR);
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.PUT, userPath, request, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.grantRoleToUser(metalakeName, role, user));
+        RuntimeException.class, () -> client.grantRolesToUser(metalakeName, roles, user));
   }
 
   @Test
-  public void testRevokeRoleFromUser() throws Exception {
-    String role = "role";
+  public void testRevokeRolesFromUser() throws Exception {
+    List<String> roles = Lists.newArrayList("role");
     String user = "user";
     String userPath =
-        String.format(
-            API_PERMISSION_PATH, metalakeName, String.format(PERMISSION_USER_PATH, user, role));
-    RevokeResponse response = new RevokeResponse(true);
+        String.format(API_PERMISSION_PATH, metalakeName, String.format("users/%s/revoke", user));
+    UserDTO userDTO =
+        UserDTO.builder()
+            .withName("user")
+            .withRoles(Lists.newArrayList())
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    UserResponse response = new UserResponse(userDTO);
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
 
-    buildMockResource(Method.DELETE, userPath, null, response, SC_OK);
-    Assertions.assertTrue(client.revokeRoleFromUser(metalakeName, role, user));
-
-    // Test false result
-    response = new RevokeResponse(false);
-    buildMockResource(Method.DELETE, userPath, null, response, SC_OK);
-    Assertions.assertFalse(client.revokeRoleFromUser(metalakeName, role, user));
+    buildMockResource(Method.PUT, userPath, request, response, SC_OK);
+    User revokedUser = client.revokeRolesFromUser(metalakeName, roles, user);
+    Assertions.assertEquals(revokedUser.roles(), userDTO.roles());
+    Assertions.assertEquals(revokedUser.name(), userDTO.name());
 
     // test Exception
-    ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.DELETE, userPath, null, errResp3, SC_SERVER_ERROR);
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.PUT, userPath, null, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.revokeRoleFromUser(metalakeName, role, user));
+        RuntimeException.class, () -> client.revokeRolesFromUser(metalakeName, roles, user));
   }
 
   @Test
-  public void testGrantRoleToGroup() throws Exception {
-    String role = "role";
+  public void testGrantRolesToGroup() throws Exception {
+    List<String> roles = Lists.newArrayList("role");
     String group = "group";
     String groupPath =
-        String.format(
-            API_PERMISSION_PATH, metalakeName, String.format(PERMISSION_GROUP_PATH, group, ""));
-    RoleGrantRequest request = new RoleGrantRequest(role);
-    GrantResponse response = new GrantResponse(true);
+        String.format(API_PERMISSION_PATH, metalakeName, String.format("groups/%s/grant", group));
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    GroupDTO groupDTO =
+        GroupDTO.builder()
+            .withName("group")
+            .withRoles(Lists.newArrayList("roles"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    GroupResponse response = new GroupResponse(groupDTO);
 
-    buildMockResource(Method.POST, groupPath, request, response, SC_OK);
-    Assertions.assertTrue(client.grantRoleToGroup(metalakeName, role, group));
-
-    // Test false result
-    response = new GrantResponse(false);
-    buildMockResource(Method.POST, groupPath, request, response, SC_OK);
-    Assertions.assertFalse(client.grantRoleToGroup(metalakeName, role, group));
+    buildMockResource(Method.PUT, groupPath, request, response, SC_OK);
+    Group grantedGroup = client.grantRolesToGroup(metalakeName, roles, group);
+    Assertions.assertEquals(grantedGroup.roles(), groupDTO.roles());
+    Assertions.assertEquals(grantedGroup.name(), groupDTO.name());
 
     // test Exception
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.POST, groupPath, request, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.grantRoleToGroup(metalakeName, role, group));
+        RuntimeException.class, () -> client.grantRolesToGroup(metalakeName, roles, group));
   }
 
   @Test
   public void testRevokeRoleFromGroup() throws Exception {
-    String role = "role";
+    List<String> roles = Lists.newArrayList("role");
     String group = "group";
     String groupPath =
-        String.format(
-            API_PERMISSION_PATH, metalakeName, String.format(PERMISSION_GROUP_PATH, group, role));
-    RevokeResponse response = new RevokeResponse(true);
+        String.format(API_PERMISSION_PATH, metalakeName, String.format("groups/%s/revoke", group));
+    GroupDTO groupDTO =
+        GroupDTO.builder()
+            .withName("group")
+            .withRoles(Lists.newArrayList())
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    GroupResponse response = new GroupResponse(groupDTO);
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
 
-    buildMockResource(Method.DELETE, groupPath, null, response, SC_OK);
-    Assertions.assertTrue(client.revokeRoleFromGroup(metalakeName, role, group));
-
-    // Test false result
-    response = new RevokeResponse(false);
-    buildMockResource(Method.DELETE, groupPath, null, response, SC_OK);
-    Assertions.assertFalse(client.revokeRoleFromGroup(metalakeName, role, group));
+    buildMockResource(Method.PUT, groupPath, request, response, SC_OK);
+    Group revokedGroup = client.revokeRolesFromGroup(metalakeName, roles, group);
+    Assertions.assertEquals(revokedGroup.roles(), groupDTO.roles());
+    Assertions.assertEquals(revokedGroup.name(), groupDTO.name());
 
     // test Exception
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, groupPath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.revokeRoleFromGroup(metalakeName, role, group));
+        RuntimeException.class, () -> client.revokeRolesFromGroup(metalakeName, roles, group));
   }
 }

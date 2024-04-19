@@ -19,15 +19,14 @@ import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
+import com.datastrato.gravitino.dto.requests.RoleRevokeRequest;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.GrantResponse;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
-import com.datastrato.gravitino.dto.responses.RevokeResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
@@ -62,8 +61,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
   private static final String API_ADMIN_PATH = "api/admins/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
-  private static final String PERMISSION_USER_PATH = "users/%s/roles/%s";
-  private static final String PERMISSION_GROUP_PATH = "groups/%s/roles/%s";
   private static final String BLANK_PLACE_HOLDER = "";
 
   /**
@@ -469,103 +466,111 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     return resp.getRole();
   }
   /**
-   * Grant a role to a user.
+   * Grant roles to a user.
    *
    * @param metalake The metalake of the User.
    * @param user The name of the User.
-   * @param role The name of the Role.
-   * @return True if the User was successfully granted, false only when there exists a role in the
-   *     user,otherwise it will throw an exception.
+   * @param roles The names of the Role.
+   * @param The Group after granted.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If granting a role to a user encounters storage issues.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
-  public boolean grantRoleToUser(String metalake, String role, String user)
+  public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return grantInternal(metalake, PERMISSION_USER_PATH, role, user);
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    UserResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, metalake, String.format("users/%s/grant", user)),
+            request,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
   }
 
   /**
-   * Grant a role to a group.
-   *
-   * @param metalake The metalake of the Group.
-   * @param group THe name of the Group.
-   * @param role The name of the Role.
-   * @return True if the Group was successfully granted, false only when there exists a role in the
-   *     group,otherwise it will throw an exception.
-   * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If granting a role to a group encounters storage issues.
-   */
-  public boolean grantRoleToGroup(String metalake, String role, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return grantInternal(metalake, PERMISSION_GROUP_PATH, role, group);
-  }
-
-  /**
-   * Revoke a role from a user.
-   *
-   * @param metalake The metalake of the User.
-   * @param user The name of the User.
-   * @param role The name of the Role.
-   * @return True if the User was successfully revoked, false only when there's no such role in the
-   *     user,otherwise it will throw an exception.
-   * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking a role from a user encounters storage issues.
-   */
-  public boolean revokeRoleFromUser(String metalake, String role, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return revokeInternal(metalake, PERMISSION_USER_PATH, role, user);
-  }
-
-  /**
-   * Revoke a role from a group.
+   * Grant roles to a group.
    *
    * @param metalake The metalake of the Group.
    * @param group The name of the Group.
-   * @param role The name of the Role.
-   * @return True if the Group was successfully revoked, false only when there's no such role in the
-   *     group,otherwise it will throw an exception.
+   * @param roles The names of the Role.
+   * @return The Group after granted.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
    * @throws NoSuchRoleException If the Role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking a role from a group encounters storage issues.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
-  public boolean revokeRoleFromGroup(String metalake, String role, String group)
+  public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return revokeInternal(metalake, PERMISSION_GROUP_PATH, role, group);
-  }
-
-  private boolean grantInternal(String metalake, String path, String role, String name) {
-    RoleGrantRequest request = new RoleGrantRequest(role);
-
-    GrantResponse resp =
-        restClient.post(
-            String.format(
-                API_PERMISSION_PATH, metalake, String.format(path, name, BLANK_PLACE_HOLDER)),
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    GroupResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, metalake, String.format("groups/%s/grant", group)),
             request,
-            GrantResponse.class,
+            GroupResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.permissionOperationErrorHandler());
     resp.validate();
 
-    return resp.granted();
+    return resp.getGroup();
   }
 
-  private boolean revokeInternal(String metalake, String pattern, String role, String name) {
-    RevokeResponse resp =
-        restClient.delete(
-            String.format(API_PERMISSION_PATH, metalake, String.format(pattern, name, role)),
-            RevokeResponse.class,
+  /**
+   * Revoke roles from a user.
+   *
+   * @param metalake The metalake of the User.
+   * @param user The name of the User.
+   * @param roles The names of the Role.
+   * @return The User after revoked.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
+   */
+  public User revokeRolesFromUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    UserResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, metalake, String.format("users/%s/revoke", user)),
+            request,
+            UserResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.permissionOperationErrorHandler());
     resp.validate();
 
-    return resp.revoked();
+    return resp.getUser();
+  }
+
+  /**
+   * Revoke roles from a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group The name of the Group.
+   * @param roles The names of the Role.
+   * @return The Group after revoked.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    GroupResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, metalake, String.format("groups/%s/revoke", group)),
+            request,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
   }
 
   /**
