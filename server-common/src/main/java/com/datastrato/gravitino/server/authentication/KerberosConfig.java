@@ -4,13 +4,12 @@
  */
 package com.datastrato.gravitino.server.authentication;
 
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import org.apache.commons.lang3.StringUtils;
 
-public interface KerberosConfig extends Configs {
+public interface KerberosConfig {
 
   String KERBEROS_CONFIG_PREFIX = "gravitino.authenticator.kerberos.";
 
