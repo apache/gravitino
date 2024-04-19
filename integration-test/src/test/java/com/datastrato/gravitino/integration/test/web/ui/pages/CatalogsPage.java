@@ -427,7 +427,7 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyEmptyCatalog() {
+  public boolean verifyEmptyTableData() {
     try {
       // Check is empty table
       boolean isNoRows = waitShowText("No rows", tableWrapper);
