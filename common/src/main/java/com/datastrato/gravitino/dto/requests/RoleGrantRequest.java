@@ -7,12 +7,12 @@ package com.datastrato.gravitino.dto.requests;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
-import org.apache.commons.lang3.StringUtils;
 
 /** Represents a request to grant a role to the user or the group. */
 @Getter
@@ -21,16 +21,16 @@ import org.apache.commons.lang3.StringUtils;
 @Builder
 @Jacksonized
 public class RoleGrantRequest implements RESTRequest {
-  @JsonProperty("roleName")
-  private final String roleName;
+  @JsonProperty("roleNames")
+  private final List<String> roleNames;
 
   /**
    * Constructor for RoleGrantRequest.
    *
-   * @param roleName The roleName for the RoleGrantRequest.
+   * @param roleNames The roleName for the RoleGrantRequest.
    */
-  public RoleGrantRequest(String roleName) {
-    this.roleName = roleName;
+  public RoleGrantRequest(List<String> roleNames) {
+    this.roleNames = roleNames;
   }
 
   /** Default constructor for RoleGrantRequest. */
@@ -41,11 +41,12 @@ public class RoleGrantRequest implements RESTRequest {
   /**
    * Validates the fields of the request.
    *
-   * @throws IllegalArgumentException if the role name is not set.
+   * @throws IllegalArgumentException if the role names is not set or empty.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(roleName), "\"roleName\" field is required and cannot be empty");
+        roleNames != null && !roleNames.isEmpty(),
+        "\"roleName\" field is required and cannot be empty");
   }
 }
