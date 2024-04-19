@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.UserPO;
-import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
