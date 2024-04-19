@@ -115,7 +115,7 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "revoke-roles-from-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "revokes-role-from-group", absolute = true)
-  public Response revokeRoleFromGroup(
+  public Response revokeRolesFromGroup(
       @PathParam("metalake") String metalake,
       @PathParam("group") String group,
       RoleRevokeRequest request) {
