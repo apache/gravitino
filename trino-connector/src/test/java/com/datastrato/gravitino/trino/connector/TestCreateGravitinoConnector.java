@@ -79,7 +79,7 @@ public class TestCreateGravitinoConnector {
       HashMap<String, String> properties = new HashMap<>();
       properties.put("gravitino.metalake", "test1");
       properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put("gravitino.simplify-catalog-names", "fase");
+      properties.put("gravitino.simplify-catalog-names", "false");
       queryRunner.createCatalog("test1", "gravitino", properties);
     }
 

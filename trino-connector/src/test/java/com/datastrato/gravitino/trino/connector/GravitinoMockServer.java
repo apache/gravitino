@@ -238,12 +238,12 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
 
                 catalogConnectorManager
-                    .getCatalogConnector(catalogConnectorManager.getFullCatalogName(catalog))
+                    .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                     .getMetadataAdapter();
                 GravitinoSchema schema = new GravitinoSchema(schemaName.name(), properties, "");
                 metadata.createSchema(null, schemaName.name(), emptyMap(), null);
@@ -267,7 +267,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 metadata.dropSchema(null, nameIdentifier.name(), cascade);
@@ -285,7 +285,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 return metadata.listSchemaNames(null).stream()
@@ -307,7 +307,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 memoryConnector.getMetadata(null, null);
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
@@ -316,7 +316,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
                 CatalogConnectorMetadataAdapter metadataAdapter =
                     catalogConnectorManager
-                        .getCatalogConnector(catalogConnectorManager.getFullCatalogName(catalog))
+                        .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                         .getMetadataAdapter();
 
                 GravitinoSchema gravitinoSchema =
@@ -361,7 +361,7 @@ public class GravitinoMockServer implements AutoCloseable {
                         tableName.schema(), tableName.table(), columns, comment, properties);
                 CatalogConnectorMetadataAdapter metadataAdapter =
                     catalogConnectorManager
-                        .getCatalogConnector(catalogConnectorManager.getFullCatalogName(catalog))
+                        .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                         .getMetadataAdapter();
                 ConnectorTableMetadata tableMetadata =
                     metadataAdapter.getTableMetadata(gravitinoTable);
@@ -370,7 +370,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 metadata.createTable(null, tableMetadata, false);
@@ -390,7 +390,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 memoryConnector.getMetadata(null, null);
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
@@ -418,7 +418,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
@@ -445,7 +445,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 return metadata.getTableHandle(
@@ -468,7 +468,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
 
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
@@ -482,7 +482,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
                 CatalogConnectorMetadataAdapter metadataAdapter =
                     catalogConnectorManager
-                        .getCatalogConnector(catalogConnectorManager.getFullCatalogName(catalog))
+                        .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                         .getMetadataAdapter();
                 GravitinoTable gravitinoTable = metadataAdapter.createTable(tableMetadata);
 
@@ -511,7 +511,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     (MemoryConnector)
                         catalogConnectorManager
                             .getCatalogConnector(
-                                catalogConnectorManager.getFullCatalogName(catalog))
+                                catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 ConnectorTableHandle tableHandle =
@@ -549,7 +549,7 @@ public class GravitinoMockServer implements AutoCloseable {
           new GravitinoColumn(fieldName, addColumn.getDataType(), -1, "", true);
       CatalogConnectorMetadataAdapter metadataAdapter =
           catalogConnectorManager
-              .getCatalogConnector(catalogConnectorManager.getFullCatalogName(catalog))
+              .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
               .getMetadataAdapter();
       metadata.addColumn(null, tableHandle, metadataAdapter.getColumnMetadata(column));
 
