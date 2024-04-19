@@ -72,7 +72,7 @@ public final class RelationalGarbageCollector implements Closeable {
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
         while (deletedCount > 0) {
-          deletedCount = backend.hardDeleteOldVersionData(entityType, versionRetentionCount);
+          deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
         }
       }
     } catch (Exception e) {

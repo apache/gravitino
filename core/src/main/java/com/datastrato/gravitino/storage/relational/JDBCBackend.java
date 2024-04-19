@@ -221,7 +221,7 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int hardDeleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
+  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
     switch (entityType) {
       case METALAKE:
       case CATALOG:

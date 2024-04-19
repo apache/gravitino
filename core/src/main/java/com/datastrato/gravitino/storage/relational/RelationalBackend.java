@@ -94,7 +94,7 @@ public interface RelationalBackend extends Closeable {
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade);
 
   /**
-   * Permanent deletes the legacy data that has been marked as deleted before the given legacy
+   * Permanently deletes the legacy data that has been marked as deleted before the given legacy
    * timeline.
    *
    * @param entityType The type of the entity.
@@ -104,12 +104,12 @@ public interface RelationalBackend extends Closeable {
   int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine);
 
   /**
-   * Permanent deletes the old version data that is older than or equal to the given version
-   * retention count.
+   * Soft deletes the old version data that is older than or equal to the given version retention
+   * count.
    *
    * @param entityType The type of the entity.
    * @param versionRetentionCount The count of versions to retain.
    * @return The count of the deleted data.
    */
-  int hardDeleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount);
+  int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount);
 }

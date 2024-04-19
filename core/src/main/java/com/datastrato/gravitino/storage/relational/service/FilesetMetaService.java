@@ -234,14 +234,14 @@ public class FilesetMetaService {
     return filesetDeletedCount + filesetVersionDeletedCount;
   }
 
-  public Integer deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
-    // Get the current version of all filesets.
+  public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
+    // get the current version of all filesets.
     List<FilesetVersionPO> filesetCurVersions =
         SessionUtils.getWithoutCommit(
             FilesetVersionMapper.class,
             mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
 
-    // Delete old versions that are older than or equal to (currentVersion -
+    // soft delete old versions that are older than or equal to (currentVersion -
     // versionRetentionCount).
     int totalDeletedCount = 0;
     for (FilesetVersionPO filesetVersionPO : filesetCurVersions) {
@@ -250,13 +250,13 @@ public class FilesetMetaService {
           SessionUtils.doWithCommitAndFetchResult(
               FilesetVersionMapper.class,
               mapper ->
-                  mapper.deleteFilesetVersionsByRetentionLine(
+                  mapper.softDeleteFilesetVersionsByRetentionLine(
                       filesetVersionPO.getFilesetId(), versionRetentionLine, limit));
       totalDeletedCount += deletedCount;
 
-      // Log the deletion by current fileset version.
+      // log the deletion by current fileset version.
       LOG.info(
-          "Physically delete filesetVersions count: {} which versions are older than or equal to"
+          "Soft delete filesetVersions count: {} which versions are older than or equal to"
               + " versionRetentionLine: {}, the current FilesetVersion is: {}.",
           deletedCount,
           versionRetentionLine,

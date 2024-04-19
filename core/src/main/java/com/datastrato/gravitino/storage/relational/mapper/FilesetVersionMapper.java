@@ -120,11 +120,12 @@ public interface FilesetVersionMapper {
   List<FilesetVersionPO> selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount);
 
-  @Delete(
-      "DELETE FROM "
+  @Update(
+      "UPDATE "
           + VERSION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}")
-  Integer deleteFilesetVersionsByRetentionLine(
+  Integer softDeleteFilesetVersionsByRetentionLine(
       @Param("filesetId") Long filesetId,
       @Param("versionRetentionLine") Long versionRetentionLine,
       @Param("limit") int limit);

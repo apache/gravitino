@@ -46,6 +46,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.apache.commons.io.IOUtils;
@@ -569,11 +570,18 @@ public class TestJDBCBackend {
     assertFalse(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
 
-    // hard delete for old version fileset
+    // soft delete for old version fileset
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
-      backend.hardDeleteOldVersionData(entityType, 1);
+      backend.deleteOldVersionData(entityType, 1);
     }
+    Map<Integer, Long> versionDeletedMap = listFilesetVersions(anotherFileset.id());
+    assertEquals(3, versionDeletedMap.size());
+    assertEquals(1, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
+    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
+
+    // hard delete for old version fileset
+    backend.hardDeleteLegacyData(Entity.EntityType.FILESET, Instant.now().toEpochMilli() + 1000);
     assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
   }
 
@@ -625,8 +633,8 @@ public class TestJDBCBackend {
     }
   }
 
-  private List<Integer> listFilesetVersions(Long filesetId) {
-    List<Integer> versions = new ArrayList<>();
+  private Map<Integer, Long> listFilesetVersions(Long filesetId) {
+    Map<Integer, Long> versionDeletedTime = new HashMap<>();
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
@@ -634,14 +642,15 @@ public class TestJDBCBackend {
         ResultSet rs =
             statement.executeQuery(
                 String.format(
-                    "SELECT version FROM fileset_version_info WHERE fileset_id = %d", filesetId))) {
+                    "SELECT version, deleted_at FROM fileset_version_info WHERE fileset_id = %d",
+                    filesetId))) {
       while (rs.next()) {
-        versions.add(rs.getInt("version"));
+        versionDeletedTime.put(rs.getInt("version"), rs.getLong("deleted_at"));
       }
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }
-    return versions;
+    return versionDeletedTime;
   }
 
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
