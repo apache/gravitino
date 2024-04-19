@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_postgresql".gt_db1;
+CREATE SCHEMA gt_postgresql.gt_db1;
 
-use "test.gt_postgresql".gt_db1;
+use gt_postgresql.gt_db1;
 
 CREATE TABLE customer (
    custkey bigint NOT NULL,
@@ -48,4 +48,4 @@ drop table customer;
 
 drop table orders;
 
-drop schema "test.gt_postgresql".gt_db1;;
+drop schema gt_postgresql.gt_db1;;
