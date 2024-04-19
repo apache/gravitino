@@ -177,12 +177,12 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
   @Test
   @Order(3)
   public void testKafkaTopicDetail() throws InterruptedException {
-    // 1. click toptic tree node
-    String topticNode =
+    // 1. click topic tree node
+    String topicNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, KAFKA_CATALOG_NAME, CATALOG_TYPE_MESSAGING, SCHEMA_NAME, TOPIC_NAME);
-    catalogsPage.clickTreeNode(topticNode);
+    catalogsPage.clickTreeNode(topicNode);
     // 2. verify show tab details
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
     // 3. verify show highlight properties

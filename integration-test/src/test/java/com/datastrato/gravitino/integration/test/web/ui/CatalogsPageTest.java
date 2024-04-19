@@ -520,7 +520,7 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(18)
-  public void testOrtherRelationaCatalogTreeNode() throws InterruptedException {
+  public void testOtherRelationaCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
