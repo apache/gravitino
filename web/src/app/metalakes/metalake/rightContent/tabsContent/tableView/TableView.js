@@ -111,10 +111,16 @@ const TableView = () => {
                 </Box>
 
                 <Box sx={{ p: 1.5, px: 4 }}>
-                  {items.map(i => {
+                  {items.map((it, idx) => {
                     return (
-                      <Typography key={i} variant='caption' color='white' className={fonts.className}>
-                        {i.text || i.fields}
+                      <Typography
+                        key={idx}
+                        variant='caption'
+                        color='white'
+                        className={fonts.className}
+                        sx={{ display: 'flex', flexDirection: 'column' }}
+                      >
+                        {it.text || it.fields}
                       </Typography>
                     )
                   })}

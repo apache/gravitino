@@ -44,7 +44,7 @@ class PermissionManager {
 
   boolean grantRoleToUser(String metalake, String role, String user) {
     try {
-      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
+      RoleEntity roleEntity = roleManager.getRole(metalake, role);
 
       store.update(
           AuthorizationUtils.ofUser(metalake, user),
@@ -98,7 +98,7 @@ class PermissionManager {
 
   boolean grantRoleToGroup(String metalake, String role, String group) {
     try {
-      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
+      RoleEntity roleEntity = roleManager.getRole(metalake, role);
 
       store.update(
           AuthorizationUtils.ofGroup(metalake, group),
@@ -152,7 +152,7 @@ class PermissionManager {
 
   boolean revokeRoleFromGroup(String metalake, String role, String group) {
     try {
-      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
+      RoleEntity roleEntity = roleManager.getRole(metalake, role);
 
       AtomicBoolean removed = new AtomicBoolean(true);
 
@@ -212,7 +212,7 @@ class PermissionManager {
 
   boolean revokeRoleFromUser(String metalake, String role, String user) {
     try {
-      RoleEntity roleEntity = roleManager.loadRole(metalake, role);
+      RoleEntity roleEntity = roleManager.getRole(metalake, role);
       AtomicBoolean removed = new AtomicBoolean(true);
 
       store.update(
