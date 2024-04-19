@@ -95,5 +95,15 @@ public class TestAuthenticationFilter {
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
+
+    // verify unknown authenticator
+    when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("unknown");
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockResponse)
+        .sendError(
+            HttpServletResponse.SC_UNAUTHORIZED,
+            "Gravitino Server only support Simple, OAuth, Kerberos authentication, [unknown] is not allowed");
   }
 }

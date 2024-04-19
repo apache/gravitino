@@ -8,7 +8,6 @@ import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -54,9 +53,12 @@ public class AuthenticationFilter implements Filter {
       String authenticatorType =
           Optional.ofNullable(req.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE))
               .orElse(AuthenticatorType.SIMPLE.name().toLowerCase());
-      Authenticator authenticator =
-          Preconditions.checkNotNull(
-              filterAuthenticators.get(authenticatorType), "The Authenticator should not be null");
+      Authenticator authenticator = filterAuthenticators.get(authenticatorType);
+      if (authenticator == null) {
+        throw new UnauthorizedException(
+            "Gravitino Server only support %s authentication, [%s] is not allowed",
+            "Simple, OAuth, Kerberos", authenticatorType);
+      }
 
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
       byte[] authData = null;
