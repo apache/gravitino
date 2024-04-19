@@ -125,7 +125,7 @@ public class MetalakePageTest extends AbstractWebIT {
   public void testRefreshPage() {
     driver.navigate().refresh();
 
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(metalakePage.verifyRefreshPage());
   }
 
