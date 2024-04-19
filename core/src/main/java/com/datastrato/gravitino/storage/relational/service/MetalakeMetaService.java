@@ -17,6 +17,7 @@ import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -184,6 +185,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    GroupRoleRelMapper.class,
+                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     GroupMetaMapper.class,
                     mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)));
       } else {
@@ -206,7 +211,15 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     UserMetaMapper.class,
-                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    GroupRoleRelMapper.class,
+                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)));
       }
     }
     return true;

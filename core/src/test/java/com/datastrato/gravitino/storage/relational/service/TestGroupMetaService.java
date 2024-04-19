@@ -379,5 +379,193 @@ class TestGroupMetaService extends TestJDBCBackend {
         Sets.newHashSet(role1.id(), role3.id()), Sets.newHashSet(revokeGroup.roleIds()));
     Assertions.assertEquals("creator", revokeGroup.auditInfo().creator());
     Assertions.assertEquals("revokeGroup", revokeGroup.auditInfo().lastModifier());
+
+    RoleEntity role4 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role4",
+            auditInfo);
+    roleMetaService.insertRole(role4, false);
+
+    // update group (grant & revoke)
+    Function<GroupEntity, GroupEntity> grantRevokeUpdater =
+        group -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(group.auditInfo().creator())
+                  .withCreateTime(group.auditInfo().createTime())
+                  .withLastModifier("grantRevokeUser")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<String> roleNames = Lists.newArrayList(group.roleNames());
+          List<Long> roleIds = Lists.newArrayList(group.roleIds());
+          roleIds.remove(roleNames.indexOf("role3"));
+          roleNames.remove("role3");
+          roleIds.add(role4.id());
+          roleNames.add(role4.name());
+
+          return GroupEntity.builder()
+              .withNamespace(group.namespace())
+              .withId(group.id())
+              .withName(group.name())
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+    Assertions.assertNotNull(
+        groupMetaService.updateGroup(group1.nameIdentifier(), grantRevokeUpdater));
+    GroupEntity grantRevokeUser =
+        GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
+    Assertions.assertEquals(group1.id(), grantRevokeUser.id());
+    Assertions.assertEquals(group1.name(), grantRevokeUser.name());
+    Assertions.assertEquals(
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeUser.roleNames()));
+    Assertions.assertEquals(
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeUser.roleIds()));
+    Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
+    Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
+  }
+
+  @Test
+  void deleteMetalake() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo);
+    RoleEntity role3 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role3",
+            auditInfo);
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+    roleMetaService.insertRole(role3, false);
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group1",
+            auditInfo,
+            Lists.newArrayList("role1", "role2"));
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group2",
+            auditInfo,
+            Lists.newArrayList("role3"));
+    groupMetaService.insertGroup(group1, false);
+    groupMetaService.insertGroup(group2, false);
+
+    Assertions.assertEquals(
+        group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(group1.id()).size());
+    Assertions.assertEquals(
+        group2.name(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).name());
+    Assertions.assertEquals(1, roleMetaService.listRolesByUserId(group2.id()).size());
+
+    // delete metalake without cascade
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group2.nameIdentifier()));
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(group1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(group2.id()).size());
+  }
+
+  @Test
+  void deleteMetalakeCascade() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo);
+    RoleEntity role3 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role3",
+            auditInfo);
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+    roleMetaService.insertRole(role3, false);
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group1",
+            auditInfo,
+            Lists.newArrayList("role1", "role2"));
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group2",
+            auditInfo,
+            Lists.newArrayList("role3"));
+    groupMetaService.insertGroup(group1, false);
+    groupMetaService.insertGroup(group2, false);
+
+    Assertions.assertEquals(
+        group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group1.id()).size());
+    Assertions.assertEquals(
+        group2.name(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).name());
+    Assertions.assertEquals(1, roleMetaService.listRolesByGroupId(group2.id()).size());
+
+    // delete metalake with cascade
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group2.nameIdentifier()));
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group2.id()).size());
   }
 }

@@ -20,7 +20,6 @@ import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -181,8 +180,6 @@ public class GroupMetaService {
         newEntity.id(),
         oldGroupEntity.id());
 
-    int oldRoleSize = oldGroupEntity.roleNames() == null ? 0 : oldGroupEntity.roleNames().size();
-    int newRoleSie = newEntity.roleNames() == null ? 0 : newEntity.roleNames().size();
     Set<Long> oldRoleIds =
         oldGroupEntity.roleIds() == null
             ? Sets.newHashSet()
@@ -190,9 +187,11 @@ public class GroupMetaService {
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
-    if (newRoleSie > oldRoleSize) {
-      List<Long> insertRoleIds = new ArrayList<>(Sets.difference(newRoleIds, oldRoleIds));
+    Set<Long> grantRoleIds = Sets.difference(newRoleIds, oldRoleIds);
+    Set<Long> revokeRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
+    if (!grantRoleIds.isEmpty()) {
+      List<Long> insertRoleIds = Lists.newArrayList(grantRoleIds);
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -216,8 +215,8 @@ public class GroupMetaService {
       }
     }
 
-    if (newRoleSie < oldRoleSize) {
-      List<Long> deleteId = new ArrayList<>(Sets.difference(oldRoleIds, newRoleIds));
+    if (!revokeRoleIds.isEmpty()) {
+      List<Long> deleteRoleIds = Lists.newArrayList(revokeRoleIds);
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -231,7 +230,8 @@ public class GroupMetaService {
                 SessionUtils.doWithoutCommit(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.softDeleteGroupRoleRelByGroupAndRoles(newEntity.id(), deleteId)));
+                        mapper.softDeleteGroupRoleRelByGroupAndRoles(
+                            newEntity.id(), deleteRoleIds)));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());

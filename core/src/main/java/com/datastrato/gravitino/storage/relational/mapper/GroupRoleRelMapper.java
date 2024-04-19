@@ -20,12 +20,13 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface GroupRoleRelMapper {
-  String TABLE_NAME = "group_role_rel";
+  String RELATION_TABLE_NAME = "group_role_rel";
+  String GROUP_TABLE_NAME = "group_meta";
 
   @Insert({
     "<script>",
     "INSERT INTO "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + "(group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -45,7 +46,7 @@ public interface GroupRoleRelMapper {
   @Insert({
     "<script>",
     "INSERT INTO "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + "(group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -72,7 +73,7 @@ public interface GroupRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE group_id = #{groupId} AND deleted_at = 0")
   void softDeleteGroupRoleRelByGroupId(@Param("groupId") Long groupId);
@@ -80,7 +81,7 @@ public interface GroupRoleRelMapper {
   @Update({
     "<script>",
     "UPDATE "
-        + TABLE_NAME
+        + RELATION_TABLE_NAME
         + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
         + " WHERE group_id = #{groupId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
@@ -91,4 +92,14 @@ public interface GroupRoleRelMapper {
   })
   void softDeleteGroupRoleRelByGroupAndRoles(
       @Param("groupId") Long groupId, @Param("roleIds") List<Long> roleIds);
+
+  @Update(
+      "UPDATE "
+          + RELATION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE group_id IN (SELECT group_id FROM "
+          + GROUP_TABLE_NAME
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
+          + " AND deleted_at = 0")
+  void softDeleteGroupRoleRelByMetalakeId(Long metalakeId);
 }
