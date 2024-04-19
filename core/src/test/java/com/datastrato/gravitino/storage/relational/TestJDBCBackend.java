@@ -28,6 +28,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -507,6 +508,30 @@ public class TestJDBCBackend {
         .withAuditInfo(auditInfo)
         .withSecurableObject(SecurableObjects.ofAllCatalogs())
         .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.LOAD_CATALOG)))
+        .build();
+  }
+
+  public static GroupEntity createGroupEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(null)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static GroupEntity createGroupEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<String> roleNames) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(roleNames)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
         .build();
   }
 }
