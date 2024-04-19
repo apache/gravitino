@@ -48,8 +48,7 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    return dispatcher.createTopic(
-        normalizeNameIdentifier(ident), comment, dataLayout, properties);
+    return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayout, properties);
   }
 
   @Override

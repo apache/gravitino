@@ -32,8 +32,7 @@ public class TestFilesetNormalizeDispatcher extends TestFilesetOperationDispatch
   public void testNameCaseInsensitive() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema112");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaNormalizeDispatcher.createSchema(
-        NameIdentifier.of(filesetNs.levels()), "comment", props);
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "filesetNAME");

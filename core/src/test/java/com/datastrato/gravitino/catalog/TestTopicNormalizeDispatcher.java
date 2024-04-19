@@ -30,13 +30,11 @@ public class TestTopicNormalizeDispatcher extends TestTopicOperationDispatcher {
   public void testNameCaseInsensitive() {
     Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaNormalizeDispatcher.createSchema(
-        NameIdentifier.of(topicNs.levels()), "comment", props);
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topicNAME");
-    Topic createdTopic =
-        topicNormalizeDispatcher.createTopic(topicIdent, "comment", null, props);
+    Topic createdTopic = topicNormalizeDispatcher.createTopic(topicIdent, "comment", null, props);
     Assertions.assertEquals(topicIdent.name().toLowerCase(), createdTopic.name());
 
     // test case-insensitive in loading

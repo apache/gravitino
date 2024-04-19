@@ -45,8 +45,7 @@ public class TestTableNormalizeDispatcher extends TestTableOperationDispatcher {
   public void testNameCaseInsensitive() {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaNormalizeDispatcher.createSchema(
-        NameIdentifier.of(tableNs.levels()), "comment", props);
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
 
     // test case-insensitive in creation
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "tableNAME");
