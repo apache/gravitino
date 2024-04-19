@@ -37,6 +37,9 @@ echo "add priority_networks = ${PRIORITY_NETWORKS} to fe.conf & be.conf"
 echo "priority_networks = ${PRIORITY_NETWORKS}" >> ${DORIS_FE_HOME}/conf/fe.conf
 echo "priority_networks = ${PRIORITY_NETWORKS}" >> ${DORIS_BE_HOME}/conf/be.conf
 echo "report_disk_state_interval_seconds = 10" >> ${DORIS_BE_HOME}/conf/be.conf
+echo "sys_log_verbose_modules=org" >> ${DORIS_FE_HOME}/conf/fe.conf
+echo "sys_log_verbose_modules=*" >> ${DORIS_BE_HOME}/conf/be.conf
+echo "sys_log_verbose_level=10" >> ${DORIS_BE_HOME}/conf/be.conf
 
 # start doris fe and be in daemon mode
 ${DORIS_FE_HOME}/bin/start_fe.sh --daemon
