@@ -58,7 +58,6 @@ public class AuthorizationUtils {
 
   private static final List<Privilege> TABLE_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
-          Privileges.AlterTable.get(),
           Privileges.CreateTable.get(),
           Privileges.DropTable.get(),
           Privileges.ReadTable.get(),
@@ -72,7 +71,6 @@ public class AuthorizationUtils {
 
   private static final List<Privilege> FILESET_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
-          Privileges.AlterFileset.get(),
           Privileges.CreateFileset.get(),
           Privileges.DropFileset.get(),
           Privileges.ReadFileset.get(),
@@ -86,7 +84,6 @@ public class AuthorizationUtils {
 
   private static final List<Privilege> TOPIC_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
-          Privileges.AlterTopic.get(),
           Privileges.CreateTopic.get(),
           Privileges.DropTopic.get(),
           Privileges.ReadTopic.get(),

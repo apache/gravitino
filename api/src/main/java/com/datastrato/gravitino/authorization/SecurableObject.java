@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.annotation.Unstable;
 import javax.annotation.Nullable;
 
 /**
@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  * For example if you want to have read table privileges of all tables of `catalog1.schema1`, " you
  * can use add `read table` privilege for `catalog1.schema1` directly
  */
-@Evolving
+@Unstable
 public interface SecurableObject {
 
   /**
@@ -36,4 +36,11 @@ public interface SecurableObject {
    * @return The name of the securable object.
    */
   String name();
+
+  /**
+   * The type of securable object
+   *
+   * @return The type of securable object.
+   */
+  SecurableObjectType securableObjectType();
 }

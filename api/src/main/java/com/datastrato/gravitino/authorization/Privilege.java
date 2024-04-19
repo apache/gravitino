@@ -4,13 +4,13 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.annotation.Unstable;
 
 /**
  * The interface of a privilege. The privilege represents the ability to execute kinds of operations
  * for kinds of entities
  */
-@Evolving
+@Unstable
 public interface Privilege {
 
   /** @return The generic name of the privilege. */
@@ -43,8 +43,6 @@ public interface Privilege {
     DROP_SCHEMA,
     /** The privilege to list tables. */
     LIST_TABLE,
-    /** The privilege to alter a table. */
-    ALTER_TABLE,
     /** The privilege to create a table. */
     CREATE_TABLE,
     /** The privilege to drop a table. */
@@ -55,8 +53,6 @@ public interface Privilege {
     WRITE_TABLE,
     /** The privilege to list filesets. */
     LIST_FILESET,
-    /** The privilege to alter a fileset. */
-    ALTER_FILESET,
     /** The privilege to create a fileset. */
     CREATE_FILESET,
     /** The privilege to drop a fileset. */
@@ -71,8 +67,6 @@ public interface Privilege {
     CREATE_TOPIC,
     /** The privilege to drop a topic. */
     DROP_TOPIC,
-    /** The privilege to alter a topic. */
-    ALTER_TOPIC,
     /** The privilege to read a topic. */
     READ_TOPIC,
     /** The privilege to write a topic. */

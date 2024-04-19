@@ -5,10 +5,7 @@
 package com.datastrato.gravitino.authorization;
 
 import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_CATALOG;
-import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_SCHEMA;
-import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_TABLE;
-import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_TOPIC;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_SCHEMA;
@@ -83,8 +80,6 @@ public class Privileges {
         return ListTable.get();
       case CREATE_TABLE:
         return CreateTable.get();
-      case ALTER_TABLE:
-        return AlterTable.get();
       case DROP_TABLE:
         return DropTable.get();
       case READ_TABLE:
@@ -97,8 +92,6 @@ public class Privileges {
         return ListFileset.get();
       case CREATE_FILESET:
         return CreateFileset.get();
-      case ALTER_FILESET:
-        return AlterFileset.get();
       case DROP_FILESET:
         return DropFileset.get();
       case READ_FILESET:
@@ -113,8 +106,6 @@ public class Privileges {
         return CreateTopic.get();
       case DROP_TOPIC:
         return DropTopic.get();
-      case ALTER_TOPIC:
-        return AlterTopic.get();
       case READ_TOPIC:
         return ReadTopic.get();
       case WRITE_TOPIC:
@@ -387,29 +378,6 @@ public class Privileges {
     }
   }
 
-  /** The privilege to alter a table. */
-  public static class AlterTable implements Privilege {
-
-    private static final AlterTable INSTANCE = new AlterTable();
-
-    /** @return The instance of the privilege. */
-    public static AlterTable get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ALTER_TABLE;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "alter table";
-    }
-  }
-
   /** The privilege to create a table. */
   public static class CreateTable implements Privilege {
 
@@ -535,31 +503,6 @@ public class Privileges {
     }
   }
 
-  /** The privilege to alter a fileset. */
-  public static class AlterFileset implements Privilege {
-
-    private static final AlterFileset INSTANCE = new AlterFileset();
-
-    private AlterFileset() {}
-
-    /** @return The instance of the privilege. */
-    public static AlterFileset get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ALTER_FILESET;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "alter fileset";
-    }
-  }
-
   /** The privilege to create a fileset. */
   public static class CreateFileset implements Privilege {
 
@@ -682,31 +625,6 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "list topic";
-    }
-  }
-
-  /** The privilege to alter a topic. */
-  public static class AlterTopic implements Privilege {
-
-    private static final AlterTopic INSTANCE = new AlterTopic();
-
-    private AlterTopic() {}
-
-    /** @return The instance of the privilege. */
-    public static AlterTopic get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ALTER_TOPIC;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "alter topic";
     }
   }
 
