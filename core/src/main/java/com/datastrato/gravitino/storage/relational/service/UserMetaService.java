@@ -94,13 +94,16 @@ public class UserMetaService {
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds =
-          Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-              .map(
-                  roleName ->
-                      RoleMetaService.getInstance()
-                          .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-              .collect(Collectors.toList());
+      List<Long> roleIds = userEntity.roleIds();
+      if (roleIds == null) {
+        roleIds =
+            Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
+                .map(
+                    roleName ->
+                        RoleMetaService.getInstance()
+                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
+                .collect(Collectors.toList());
+      }
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
