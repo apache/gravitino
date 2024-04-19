@@ -526,7 +526,7 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(17)
-  public void testRelationalCatalogTreeNode() throws InterruptedException {
+  public void testRelationalHiveCatalogTreeNode() throws InterruptedException {
     String hiveNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}",
@@ -586,6 +586,26 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(19)
+  public void testOrtherRelationaCatalogTreeNode() throws InterruptedException {
+    String icebergNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(icebergNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
+    String mysqlNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MYSQL_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(mysqlNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
+    String pgNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, PG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(pgNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
+  }
+
+  @Test
+  @Order(20)
   public void testFilesetCatalogTreeNode() throws InterruptedException {
     // 1. back to the list catalog of metalake
     catalogsPage.clickMetalakeLink(METALAKE_NAME);
@@ -651,7 +671,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(20)
+  @Order(21)
   public void testKafkaCatalogTreeNode() throws InterruptedException {
     // 1. back to the list catalog of metalake
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
@@ -719,26 +739,6 @@ public class CatalogsPageTest extends AbstractWebIT {
         catalogsPage.verifyShowPropertiesItemInList("value", "replication-factor", "1", true));
     // 10. delete topic of kafka catalog
     dropTopic(METALAKE_NAME, KAFKA_CATALOG_NAME, SCHEMA_NAME, TOPIC_NAME);
-  }
-
-  @Test
-  @Order(21)
-  public void testOrtherCatalogTreeNode() throws InterruptedException {
-    String icebergNode =
-        String.format(
-            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
-    catalogsPage.clickTreeNode(icebergNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
-    String mysqlNode =
-        String.format(
-            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MYSQL_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
-    catalogsPage.clickTreeNode(mysqlNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
-    String pgNode =
-        String.format(
-            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, PG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
-    catalogsPage.clickTreeNode(pgNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
   }
 
   @Test
