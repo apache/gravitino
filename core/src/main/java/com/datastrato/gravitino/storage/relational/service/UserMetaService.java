@@ -94,13 +94,16 @@ public class UserMetaService {
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds =
-          Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-              .map(
-                  roleName ->
-                      RoleMetaService.getInstance()
-                          .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-              .collect(Collectors.toList());
+      List<Long> roleIds = userEntity.roleIds();
+      if (roleIds == null) {
+        roleIds =
+            Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
+                .map(
+                    roleName ->
+                        RoleMetaService.getInstance()
+                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
+                .collect(Collectors.toList());
+      }
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
@@ -184,11 +187,10 @@ public class UserMetaService {
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
-    Set<Long> grantRoleIds = Sets.difference(newRoleIds, oldRoleIds);
-    Set<Long> revokeRoleIds = Sets.difference(oldRoleIds, newRoleIds);
+    Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
+    Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (!grantRoleIds.isEmpty()) {
-      List<Long> insertRoleIds = Lists.newArrayList(grantRoleIds);
+    if (!insertRoleIds.isEmpty()) {
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -203,7 +205,7 @@ public class UserMetaService {
                     mapper ->
                         mapper.batchInsertUserRoleRel(
                             POConverters.initializeUserRoleRelsPOWithVersion(
-                                newEntity, insertRoleIds))));
+                                newEntity, Lists.newArrayList(insertRoleIds)))));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
@@ -211,8 +213,7 @@ public class UserMetaService {
       }
     }
 
-    if (!revokeRoleIds.isEmpty()) {
-      List<Long> deleteRoleIds = Lists.newArrayList(revokeRoleIds);
+    if (!deleteRoleIds.isEmpty()) {
       try {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -225,7 +226,8 @@ public class UserMetaService {
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
                     mapper ->
-                        mapper.softDeleteUserRoleRelByUserAndRoles(newEntity.id(), deleteRoleIds)));
+                        mapper.softDeleteUserRoleRelByUserAndRoles(
+                            newEntity.id(), Lists.newArrayList(deleteRoleIds))));
       } catch (RuntimeException re) {
         ExceptionUtils.checkSQLException(
             re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
