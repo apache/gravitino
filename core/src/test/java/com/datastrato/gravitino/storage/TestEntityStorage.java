@@ -561,7 +561,7 @@ public class TestEntityStorage {
           user1,
           user2);
 
-      validateDeleteUser(store, user1, user2);
+      validateDeleteUser(store, user1);
 
       validateDeleteTable(store, schema2, table1, table1InSchema2);
 
@@ -583,7 +583,7 @@ public class TestEntityStorage {
           topic1,
           topic1InSchema2);
 
-      validateDeleteMetalake(store, metalake, catalogCopy);
+      validateDeleteMetalake(store, metalake, catalogCopy, user2);
 
       // Store all entities again
       // metalake
@@ -1369,8 +1369,11 @@ public class TestEntityStorage {
   }
 
   private static void validateDeleteMetalake(
-      EntityStore store, BaseMetalake metalake, CatalogEntity catalogCopy) throws IOException {
+      EntityStore store, BaseMetalake metalake, CatalogEntity catalogCopy, UserEntity user2)
+      throws IOException {
     // Now delete catalog 'catalogCopy' and metalake
+    Assertions.assertTrue(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
+
     Assertions.assertThrowsExactly(
         NonEmptyEntityException.class,
         () -> store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
@@ -1379,6 +1382,7 @@ public class TestEntityStorage {
 
     store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
     Assertions.assertFalse(store.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    Assertions.assertFalse(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
   }
 
   private static void validateDeleteCatalog(
@@ -1489,12 +1493,10 @@ public class TestEntityStorage {
         topic1New, store.get(topic1.nameIdentifier(), Entity.EntityType.TOPIC, TopicEntity.class));
   }
 
-  private void validateDeleteUser(EntityStore store, UserEntity user1, UserEntity user2)
-      throws IOException {
+  private void validateDeleteUser(EntityStore store, UserEntity user1) throws IOException {
+    Assertions.assertTrue(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertTrue(store.delete(user1.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
-    Assertions.assertEquals(
-        user2, store.get(user2.nameIdentifier(), Entity.EntityType.USER, UserEntity.class));
 
     UserEntity user =
         createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "user1", user1.auditInfo());
