@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,7 +236,7 @@ public class FilesetMetaService {
 
   public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
     // get the current version of all filesets.
-    List<Pair<Long, Long>> filesetCurVersions =
+    List<ImmutablePair<Long, Integer>> filesetCurVersions =
         SessionUtils.getWithoutCommit(
             FilesetVersionMapper.class,
             mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
@@ -244,7 +244,7 @@ public class FilesetMetaService {
     // soft delete old versions that are older than or equal to (currentVersion -
     // versionRetentionCount).
     int totalDeletedCount = 0;
-    for (Pair<Long, Long> filesetCurVersion : filesetCurVersions) {
+    for (ImmutablePair<Long, Integer> filesetCurVersion : filesetCurVersions) {
       long versionRetentionLine = filesetCurVersion.getValue() - versionRetentionCount;
       int deletedCount =
           SessionUtils.doWithCommitAndFetchResult(
