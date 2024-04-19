@@ -28,8 +28,8 @@ dependencies {
   implementation(libs.rocksdbjni)
 
   annotationProcessor(libs.lombok)
-  compileOnly(libs.lombok)
 
+  compileOnly(libs.lombok)
   compileOnly(libs.servlet) // fix error-prone compile error
 
   testAnnotationProcessor(libs.lombok)
