@@ -79,7 +79,7 @@ const MetalakeTree = props => {
       case 'fileset': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, fileset] = pathArr
+          const [metalake, catalog, type, schema, fileset] = pathArr
           dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
         }
         break
@@ -87,7 +87,7 @@ const MetalakeTree = props => {
       case 'topic': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, topic] = pathArr
+          const [metalake, catalog, type, schema, topic] = pathArr
           dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
         }
         break
