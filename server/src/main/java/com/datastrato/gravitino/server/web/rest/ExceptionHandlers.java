@@ -80,13 +80,13 @@ public class ExceptionHandlers {
   }
 
   public static Response handleUserPermissionOperationException(
-      OperationType op, String role, String parent, Exception e) {
-    return UserPermissionOperationExceptionHandler.INSTANCE.handle(op, role, parent, e);
+      OperationType op, String roles, String parent, Exception e) {
+    return UserPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
   }
 
   public static Response handleGroupPermissionOperationException(
-      OperationType op, String role, String parent, Exception e) {
-    return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, role, parent, e);
+      OperationType op, String roles, String parent, Exception e) {
+    return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -439,24 +439,26 @@ public class ExceptionHandlers {
 
   private static class GroupPermissionOperationExceptionHandler
       extends BasePermissionExceptionHandler {
+
     private static final ExceptionHandler INSTANCE = new GroupPermissionOperationExceptionHandler();
 
     @Override
     protected String getPermissionErrorMsg(
-        String role, String operation, String parent, String reason) {
+        String roles, String operation, String parent, String reason) {
       return String.format(
           "Failed to operate role(s)%s operation [%s] under group [%s], reason [%s]",
-          role, operation, parent, reason);
+          roles, operation, parent, reason);
     }
   }
 
   private abstract static class BasePermissionExceptionHandler extends BaseExceptionHandler {
+
     protected abstract String getPermissionErrorMsg(
         String role, String operation, String parent, String reason);
 
     @Override
-    public Response handle(OperationType op, String role, String parent, Exception e) {
-      String formatted = StringUtil.isBlank(role) ? "" : " [" + role + "]";
+    public Response handle(OperationType op, String roles, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(roles) ? "" : " [" + roles + "]";
       String errorMsg = getPermissionErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
@@ -467,7 +469,7 @@ public class ExceptionHandlers {
         return Utils.notFound(errorMsg, e);
 
       } else {
-        return super.handle(op, role, parent, e);
+        return super.handle(op, roles, parent, e);
       }
     }
   }
