@@ -9,13 +9,13 @@ import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYT
 import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
-import com.datastrato.gravitino.server.authentication.KerberosConfig;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -59,8 +59,7 @@ public class KerberosOperationsIT extends AbstractIT {
             .withClientPrincipal(clientPrincipal)
             .withKeyTabFile(new File(keytabFile))
             .build());
-    configs.put(
-        KerberosConfig.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
     registerCustomConfigs(configs);

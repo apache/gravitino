@@ -216,7 +216,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       LOG.info(
           "Created topic {}[id: {}] with {} partitions and replication factor {}",
           ident,
-          topicId.toString(),
+          topicId,
           createTopicsResult.numPartitions(ident.name()).get(),
           createTopicsResult.replicationFactor(ident.name()).get());
 
