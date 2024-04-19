@@ -75,7 +75,7 @@ The result is like:
 ```test
      name     | provider |                                                 properties
 --------------+----------+-------------------------------------------------------------------------------------------------------------
- gt_hive | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083}
+ gt_hive      | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083}
 ```
 
 Example:
