@@ -95,7 +95,7 @@ class PermissionManager {
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to user {} in the metalake {} due to storage issues",
-          roles,
+          StringUtils.join(roles, ","),
           user,
           metalake,
           ioe);
