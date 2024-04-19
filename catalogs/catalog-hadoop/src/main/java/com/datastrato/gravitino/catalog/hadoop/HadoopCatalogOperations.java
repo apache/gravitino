@@ -35,7 +35,6 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -224,7 +223,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             // managed fileset, Gravitino will get and store the location based on the
             // catalog/schema's location and store it to the store.
             .withStorageLocation(filesetPath.toString())
-            .withProperties(addManagedFlagToProperties(properties))
+            .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -371,7 +370,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withId(stringId.id())
             .withNamespace(ident.namespace())
             .withComment(comment)
-            .withProperties(addManagedFlagToProperties(properties))
+            .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -513,10 +512,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public void close() throws IOException {}
-
-  private Map<String, String> addManagedFlagToProperties(Map<String, String> properties) {
-    return ImmutableMap.<String, String>builder().putAll(properties).build();
-  }
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {
