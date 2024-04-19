@@ -14,6 +14,7 @@ public class HadoopCatalogCapability implements Capability {
     if (Objects.requireNonNull(scope) == Scope.SCHEMA) {
       return CapabilityResult.SUPPORTED;
     }
-    return CapabilityResult.unsupported("Hadoop catalog does not support managed storage.");
+    return CapabilityResult.unsupported(
+        String.format("Hadoop catalog does not support managed storage for %s.", scope));
   }
 }

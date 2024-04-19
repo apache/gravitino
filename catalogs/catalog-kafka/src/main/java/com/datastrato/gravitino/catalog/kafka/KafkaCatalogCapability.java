@@ -14,6 +14,7 @@ public class KafkaCatalogCapability implements Capability {
     if (Objects.requireNonNull(scope) == Scope.SCHEMA) {
       return CapabilityResult.SUPPORTED;
     }
-    return CapabilityResult.unsupported("Kafka catalog does not support managed storage.");
+    return CapabilityResult.unsupported(
+        String.format("Kafka catalog does not support managed storage for %s.", scope));
   }
 }
