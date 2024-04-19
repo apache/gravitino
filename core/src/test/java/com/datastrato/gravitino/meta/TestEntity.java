@@ -223,14 +223,14 @@ public class TestEntity {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList("role"))
+            .withRoleNames(Lists.newArrayList("role"))
             .build();
 
     Map<Field, Object> fields = testUserEntity.fields();
     Assertions.assertEquals(userId, fields.get(UserEntity.ID));
     Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLE_NAMES));
 
     UserEntity testUserEntityWithoutFields =
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
@@ -245,13 +245,13 @@ public class TestEntity {
             .withId(groupId)
             .withName(groupName)
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList("role"))
+            .withRoleNames(Lists.newArrayList("role"))
             .build();
     Map<Field, Object> fields = group.fields();
     Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
     Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLES));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLE_NAMES));
 
     GroupEntity groupWithoutFields =
         GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();

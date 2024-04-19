@@ -7,7 +7,7 @@
 
 import { Inconsolata } from 'next/font/google'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 
 import { styled, Box, Divider, List, ListItem, ListItemText, Stack, Tab, Typography } from '@mui/material'
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
@@ -163,10 +163,16 @@ const TabsContent = () => {
                             </Box>
 
                             <Box sx={{ p: 1.5, px: 4 }}>
-                              {item.items.map(i => {
+                              {item.items.map((it, idx) => {
                                 return (
-                                  <Typography key={i} variant='caption' color='white' className={fonts.className}>
-                                    {item.type === 'sortOrders' ? i.text : i.fields}
+                                  <Typography
+                                    key={idx}
+                                    variant='caption'
+                                    color='white'
+                                    className={fonts.className}
+                                    sx={{ display: 'flex', flexDirection: 'column' }}
+                                  >
+                                    {item.type === 'sortOrders' ? it.text : it.fields.join('.')}
                                   </Typography>
                                 )
                               })}
@@ -210,11 +216,16 @@ const TabsContent = () => {
                                   textOverflow: 'ellipsis'
                                 }}
                               >
-                                <Typography variant='caption' className={fonts.className}>
-                                  {item.type === 'sortOrders'
-                                    ? item.items.map(i => i.text)
-                                    : item.items.map(i => i.fields)}
-                                </Typography>
+                                {item.items.map((it, idx) => {
+                                  return (
+                                    <Fragment key={idx}>
+                                      <Typography variant='caption' className={fonts.className}>
+                                        {it.fields.join('.')}
+                                      </Typography>
+                                      {idx < item.items.length - 1 && <span>, </span>}
+                                    </Fragment>
+                                  )
+                                })}
                               </Box>
                             }
                           />

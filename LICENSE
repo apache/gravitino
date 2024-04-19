@@ -277,3 +277,10 @@
 
    Apache Arrow
    ./dev/ci/util_free_space.sh
+
+This product bundles a third-party component under the
+   MIT License.
+
+   Kyligence/kylinpy
+   ./clients/client-python/gravitino/utils/exceptions.py
+   ./clients/client-python/gravitino/utils/http_client.py

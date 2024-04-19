@@ -396,7 +396,7 @@ const CreateCatalogDialog = props => {
       setInnerProps(propsItems)
       setValue('propItems', propsItems)
     }
-  }, [open, data, setValue])
+  }, [open, data, setValue, type])
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>

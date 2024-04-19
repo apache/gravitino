@@ -256,4 +256,11 @@ public interface Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .toSequence()
           .create();
+
+  ConfigEntry<Long> ROLE_CACHE_EVICTION_INTERVAL_MS =
+      new ConfigBuilder("gravitino.authorization.roleCacheEvictionIntervalMs")
+          .doc("The interval in milliseconds to evict the role cache")
+          .version(ConfigConstants.VERSION_0_5_0)
+          .longConf()
+          .createWithDefault(60 * 60 * 1000L);
 }
