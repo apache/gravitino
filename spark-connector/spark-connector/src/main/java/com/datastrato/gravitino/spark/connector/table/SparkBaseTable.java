@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.Getter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
@@ -47,7 +48,7 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   private TableCatalog sparkCatalog;
   private Table lazySparkTable;
   private PropertiesConverter propertiesConverter;
-  private SparkTransformConverter sparkTransformConverter;
+  @Getter private SparkTransformConverter sparkTransformConverter;
 
   public SparkBaseTable(
       Identifier identifier,

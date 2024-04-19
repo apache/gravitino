@@ -48,11 +48,11 @@ import scala.collection.JavaConverters;
 public class SparkTransformConverter {
 
   /**
-   * supportsBucketPartition is used to indicate whether a dataSource supports bucket partition. For
-   * example, iceberg supports bucket partition. We use true to indicate that bucket partition are
-   * supported and false to indicate that it is not supported
+   * If supportsBucketPartition is ture, BucketTransform is transfromed to partition, and
+   * SortedBucketTransform is not supported. If false, BucketTransform and SortedBucketTransform is
+   * transformed to Distribution and SortOrder.
    */
-  private final boolean supportsBucketPartition;
+  @Getter private final boolean supportsBucketPartition;
 
   public SparkTransformConverter(boolean supportsBucketPartition) {
     this.supportsBucketPartition = supportsBucketPartition;
