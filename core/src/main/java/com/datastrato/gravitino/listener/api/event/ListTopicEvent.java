@@ -21,7 +21,7 @@ public final class ListTopicEvent extends TopicEvent {
    * @param namespace The namespace from which topics were listed.
    */
   public ListTopicEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.parse(namespace.toString()));
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 

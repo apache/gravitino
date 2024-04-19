@@ -386,7 +386,8 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item]
+            value: properties[item],
+            disabled: data.type === 'fileset' && item === 'location' && type === 'update'
           }
           propsItems.push(propItem)
         }
@@ -395,7 +396,7 @@ const CreateCatalogDialog = props => {
       setInnerProps(propsItems)
       setValue('propItems', propsItems)
     }
-  }, [open, data, setValue])
+  }, [open, data, setValue, type])
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>
@@ -552,7 +553,7 @@ const CreateCatalogDialog = props => {
                                   name='key'
                                   label='Key'
                                   value={item.key}
-                                  disabled={item.required}
+                                  disabled={item.required || item.disabled}
                                   onChange={event => handleFormChange({ index, event })}
                                   error={item.hasDuplicateKey}
                                   data-refer={`props-key-${index}`}
@@ -591,7 +592,7 @@ const CreateCatalogDialog = props => {
                                 )}
                               </Box>
 
-                              {!item.required ? (
+                              {!(item.required || item.disabled) ? (
                                 <Box sx={{ minWidth: 40 }}>
                                   <IconButton onClick={() => removeFields(index)}>
                                     <Icon icon='mdi:minus-circle-outline' />

@@ -1,6 +1,6 @@
 CALL
 
-"test.gt_hive_xxx1"
+"gt_hive_xxx1"
 
 CALL
 
@@ -8,6 +8,6 @@ CALL
 
 CALL
 
-"test.gt_hive_xxx1"
+"gt_hive_xxx1"
 
 CALL

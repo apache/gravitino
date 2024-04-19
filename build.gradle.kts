@@ -407,6 +407,7 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
+      pnpmVersion.set("9.x")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -540,7 +541,9 @@ tasks.rat {
     "**/NOTICE.*",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
-    "clients/client-python/gravitino.egg-info/*"
+    "clients/client-python/gravitino.egg-info/*",
+    "clients/client-python/gravitino/utils/exceptions.py",
+    "clients/client-python/gravitino/utils/http_client.py"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.

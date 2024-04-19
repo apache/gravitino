@@ -321,7 +321,8 @@ public class TestEntityProtoSerDe {
             .withName(userName)
             .withNamespace(userNamespace)
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList("role"))
+            .withRoleNames(Lists.newArrayList("role"))
+            .withRoleIds(Lists.newArrayList(1L))
             .build();
     byte[] userBytes = protoEntitySerDe.serialize(userEntity);
     UserEntity userEntityFromBytes =
@@ -339,6 +340,7 @@ public class TestEntityProtoSerDe {
     userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class, userNamespace);
     Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
     Assertions.assertNull(userEntityWithoutFields.roles());
+    Assertions.assertNull(userEntityWithoutFields.roleIds());
 
     // Test GroupEntity
     Namespace groupNamespace =
@@ -352,7 +354,8 @@ public class TestEntityProtoSerDe {
             .withName(groupName)
             .withNamespace(groupNamespace)
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList("role"))
+            .withRoleNames(Lists.newArrayList("role"))
+            .withRoleIds(Lists.newArrayList(1L))
             .build();
     byte[] groupBytes = protoEntitySerDe.serialize(group);
     GroupEntity groupFromBytes =
@@ -370,6 +373,7 @@ public class TestEntityProtoSerDe {
     groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class, groupNamespace);
     Assertions.assertEquals(groupWithoutFields, groupFromBytes);
     Assertions.assertNull(groupWithoutFields.roles());
+    Assertions.assertNull(groupWithoutFields.roleIds());
 
     // Test RoleEntity
     Namespace roleNamespace =

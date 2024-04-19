@@ -7,8 +7,6 @@ package com.datastrato.gravitino.authorization;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
@@ -16,6 +14,7 @@ import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -23,6 +22,8 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,39 +36,26 @@ import org.slf4j.LoggerFactory;
 class UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
-  private static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
-
-  private static final String GROUP_DOES_NOT_EXIST_MSG =
-      "Group %s does not exist in th metalake %s";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
+  private final RoleManager roleManager;
 
-  public UserGroupManager(EntityStore store, IdGenerator idGenerator) {
+  UserGroupManager(EntityStore store, IdGenerator idGenerator, RoleManager roleManager) {
     this.store = store;
     this.idGenerator = idGenerator;
+    this.roleManager = roleManager;
   }
 
-  /**
-   * Adds a new User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param name The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same identifier already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addUser(String metalake, String name) throws UserAlreadyExistsException {
+  User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
               .withName(name)
-              .withNamespace(
-                  Namespace.of(
-                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
-              .withRoles(Lists.newArrayList())
+              .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
+              .withRoleNames(Lists.newArrayList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -87,19 +75,10 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Removes a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user THe name of the User.
-   * @return `true` if the User was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  public boolean removeUser(String metalake, String user) {
-
+  boolean removeUser(String metalake, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.delete(ofUser(metalake, user), Entity.EntityType.USER);
+      AuthorizationUtils.checkMetalakeExists(metalake);
+      return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -107,48 +86,41 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a User.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @return The getting User instance.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws RuntimeException If getting the User encounters storage issues.
-   */
-  public User getUser(String metalake, String user) throws NoSuchUserException {
+  User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.get(ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+      AuthorizationUtils.checkMetalakeExists(metalake);
+      UserEntity entity =
+          store.get(
+              AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+
+      List<RoleEntity> roleEntities =
+          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
+
+      return UserEntity.builder()
+          .withId(entity.id())
+          .withName(entity.name())
+          .withAuditInfo(entity.auditInfo())
+          .withNamespace(entity.namespace())
+          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
+          .build();
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
-      throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
-  /**
-   * Adds a new Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group The name of the Group.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same identifier already exists.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  public Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+  Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
+      AuthorizationUtils.checkMetalakeExists(metalake);
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(group)
-              .withNamespace(
-                  Namespace.of(
-                      metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
-              .withRoles(Collections.emptyList())
+              .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
+              .withRoleNames(Collections.emptyList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -168,18 +140,10 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Removes a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` otherwise.
-   * @throws RuntimeException If removing the Group encounters storage issues.
-   */
-  public boolean removeGroup(String metalake, String group) {
+  boolean removeGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.delete(ofGroup(metalake, group), Entity.EntityType.GROUP);
+      AuthorizationUtils.checkMetalakeExists(metalake);
+      return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
           "Removing group {} in the metalake {} failed due to storage issues",
@@ -190,35 +154,32 @@ class UserGroupManager {
     }
   }
 
-  /**
-   * Gets a Group.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group THe name of the Group.
-   * @return The getting Group instance.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws RuntimeException If getting the Group encounters storage issues.
-   */
-  public Group getGroup(String metalake, String group) {
+  Group getGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(store, metalake);
-      return store.get(ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
+      AuthorizationUtils.checkMetalakeExists(metalake);
+
+      GroupEntity entity =
+          store.get(
+              AuthorizationUtils.ofGroup(metalake, group),
+              Entity.EntityType.GROUP,
+              GroupEntity.class);
+
+      List<RoleEntity> roleEntities =
+          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
+
+      return GroupEntity.builder()
+          .withId(entity.id())
+          .withName(entity.name())
+          .withAuditInfo(entity.auditInfo())
+          .withNamespace(entity.namespace())
+          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
+          .build();
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
-      throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+      throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
     }
-  }
-
-  private NameIdentifier ofUser(String metalake, String user) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
-  }
-
-  private NameIdentifier ofGroup(String metalake, String group) {
-    return NameIdentifier.of(
-        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, group);
   }
 }

@@ -20,7 +20,7 @@ import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
@@ -176,10 +176,10 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testLoadRole() {
+  public void testGetRole() {
     Role role = buildRole("role1");
 
-    when(manager.loadRole(any(), any())).thenReturn(role);
+    when(manager.getRole(any(), any())).thenReturn(role);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
@@ -198,7 +198,7 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(Lists.newArrayList(Privileges.LoadCatalog.get()), roleDTO.privileges());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).loadRole(any(), any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).getRole(any(), any());
     Response resp1 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -212,7 +212,7 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error")).when(manager).loadRole(any(), any());
+    doThrow(new NoSuchRoleException("mock error")).when(manager).getRole(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -226,7 +226,7 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).loadRole(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).getRole(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -254,8 +254,8 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testDropRole() {
-    when(manager.dropRole(any(), any())).thenReturn(true);
+  public void testDeleteRole() {
+    when(manager.deleteRole(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
@@ -264,12 +264,12 @@ public class TestRoleOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    DropResponse dropResponse = resp.readEntity(DropResponse.class);
-    Assertions.assertEquals(0, dropResponse.getCode());
-    Assertions.assertTrue(dropResponse.dropped());
+    DeleteResponse deleteResponse = resp.readEntity(DeleteResponse.class);
+    Assertions.assertEquals(0, deleteResponse.getCode());
+    Assertions.assertTrue(deleteResponse.deleted());
 
-    // Test when failed to drop role
-    when(manager.dropRole(any(), any())).thenReturn(false);
+    // Test when failed to delete role
+    when(manager.deleteRole(any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -277,11 +277,11 @@ public class TestRoleOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
-    DropResponse dropResponse2 = resp2.readEntity(DropResponse.class);
-    Assertions.assertEquals(0, dropResponse2.getCode());
-    Assertions.assertFalse(dropResponse2.dropped());
+    DeleteResponse deleteResponse2 = resp2.readEntity(DeleteResponse.class);
+    Assertions.assertEquals(0, deleteResponse2.getCode());
+    Assertions.assertFalse(deleteResponse2.deleted());
 
-    doThrow(new RuntimeException("mock error")).when(manager).dropRole(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).deleteRole(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)

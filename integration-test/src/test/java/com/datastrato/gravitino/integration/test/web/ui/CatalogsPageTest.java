@@ -251,7 +251,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(7)
   public void testRefreshPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     List<String> catalogsNames =
         Arrays.asList(

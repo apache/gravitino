@@ -4,7 +4,7 @@ USE
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+"CREATE TABLE gt_mysql.gt_db1.tb01 (
    f1 varchar(200),
    f2 char(20),
    f3 varbinary,
@@ -34,7 +34,7 @@ INSERT: 1 row
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_mysql"".gt_db1.tb02 (
+"CREATE TABLE gt_mysql.gt_db1.tb02 (
    f1 varchar(200) NOT NULL,
    f2 char(20) NOT NULL,
    f3 varbinary NOT NULL,
