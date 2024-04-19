@@ -12,7 +12,6 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +36,7 @@ public class AuthenticatorFactory {
 
   public static Authenticator[] createAuthenticators(Config config) {
     String configs = config.get(Configs.AUTHENTICATOR);
-    Set<String> names = SPLITTER.splitToStream(configs).collect(Collectors.toSet());
+    List<String> names = SPLITTER.splitToStream(configs).distinct().collect(Collectors.toList());
 
     List<Authenticator> authenticators = Lists.newArrayList();
     for (String name : names) {

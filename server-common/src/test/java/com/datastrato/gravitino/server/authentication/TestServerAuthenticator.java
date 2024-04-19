@@ -6,11 +6,30 @@ package com.datastrato.gravitino.server.authentication;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.auth.AuthenticatorType;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.util.Base64;
 import java.util.Locale;
+import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestServerAuthenticator {
+public class TestServerAuthenticator extends KerberosSecurityTestcase {
+
+  @BeforeEach
+  public void setup() throws Exception {
+    startMiniKdc();
+  }
+
+  @AfterEach
+  public void teardown() throws Exception {
+    stopMiniKdc();
+  }
 
   @Test
   public void testDefaultFilter() {
@@ -36,7 +55,7 @@ public class TestServerAuthenticator {
   }
 
   @Test
-  public void testMultiFilter() {
+  public void testMultiFilter() throws Exception {
     Config config = new Config(false) {};
     String authenticators =
         new StringBuilder()
@@ -48,12 +67,12 @@ public class TestServerAuthenticator {
             .append(",")
             .toString();
     config.set(OAuthConfig.AUTHENTICATOR, authenticators);
-    config.set(OAuthConfig.SERVICE_AUDIENCE, "mock service audience");
-    config.set(OAuthConfig.ALLOW_SKEW_SECONDS, 100L);
-    config.set(KerberosConfig.PRINCIPAL, "HTTP//XXX");
-    config.set(KerberosConfig.KEYTAB, "s_gravitino.keytab");
+    initOAuthConfig(config);
+    initKerberosConfig(config);
+
     ServerAuthenticator serverAuthenticator = ServerAuthenticator.getInstance();
     serverAuthenticator.initialize(config);
+
     Assertions.assertEquals(3, serverAuthenticator.authenticators().length);
     Assertions.assertEquals(
         AuthenticatorType.SIMPLE.name().toLowerCase(Locale.ROOT),
@@ -72,5 +91,30 @@ public class TestServerAuthenticator {
     config.set(OAuthConfig.AUTHENTICATOR, "inknown");
     ServerAuthenticator serverAuthenticator = ServerAuthenticator.getInstance();
     Assertions.assertThrows(RuntimeException.class, () -> serverAuthenticator.initialize(config));
+  }
+
+  private void initOAuthConfig(Config config) {
+    config.set(OAuthConfig.SERVICE_AUDIENCE, "mock service audience");
+    config.set(OAuthConfig.ALLOW_SKEW_SECONDS, 100L);
+    KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
+    String publicKey =
+        new String(
+            Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
+    config.set(OAuthConfig.DEFAULT_SIGN_KEY, publicKey);
+    config.set(OAuthConfig.DEFAULT_TOKEN_PATH, "test");
+    config.set(OAuthConfig.DEFAULT_SERVER_URI, "test");
+  }
+
+  private void initKerberosConfig(Config config) throws Exception {
+    File keytabFile = new File(KerberosTestUtils.getKeytabFile());
+    config.set(KerberosConfig.PRINCIPAL, KerberosTestUtils.getServerPrincipal());
+    config.set(KerberosConfig.KEYTAB, KerberosTestUtils.getKeytabFile());
+    String clientPrincipal = removeRealm(KerberosTestUtils.getClientPrincipal());
+    String serverPrincipal = removeRealm(KerberosTestUtils.getServerPrincipal());
+    getKdc().createPrincipal(keytabFile, clientPrincipal, serverPrincipal);
+  }
+
+  private String removeRealm(String principal) {
+    return principal.substring(0, principal.lastIndexOf("@"));
   }
 }
