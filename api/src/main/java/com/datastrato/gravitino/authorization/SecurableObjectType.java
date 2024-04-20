@@ -21,9 +21,9 @@ public enum SecurableObjectType {
   SCHEMA,
   /** A fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc. */
   FILESET,
-  /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc */
+  /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
   TABLE,
-  /** A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc */
+  /** A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc. */
   TOPIC,
   /**
    * A metalake is a concept of tenant. It means an organization. A metalake contains many data
@@ -32,7 +32,7 @@ public enum SecurableObjectType {
   METALAKE,
   /**
    * A role is used for access control. A role will indicate that it has some privileges to access
-   * some securable objects
+   * some securable objects.
    */
   ROLE
 }
