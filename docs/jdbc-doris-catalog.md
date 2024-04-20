@@ -29,6 +29,10 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
+:::note
+Doris 2.x supports more advanced metadata features such as auto-increment column. We will be adding support for it in the future.
+:::
+
 ### Catalog properties
 
 You can pass to a Doris data source any property that isn't defined by Gravitino by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
@@ -149,7 +153,7 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
