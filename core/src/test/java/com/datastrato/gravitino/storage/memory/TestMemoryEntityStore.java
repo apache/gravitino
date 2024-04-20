@@ -15,6 +15,7 @@ import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -203,7 +205,7 @@ public class TestMemoryEntityStore {
         UserEntity.builder()
             .withId(1L)
             .withName("user")
-            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
             .withAuditInfo(auditInfo)
             .withRoleNames(null)
             .build();
@@ -212,9 +214,19 @@ public class TestMemoryEntityStore {
         GroupEntity.builder()
             .withId(1L)
             .withName("group")
-            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
             .withAuditInfo(auditInfo)
             .withRoleNames(null)
+            .build();
+
+    RoleEntity roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+            .withAuditInfo(auditInfo)
+            .withPrivileges(null)
+            .withSecurableObject(null)
             .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();
@@ -228,6 +240,7 @@ public class TestMemoryEntityStore {
     store.put(filesetEntity);
     store.put(userEntity);
     store.put(groupEntity);
+    store.put(roleEntity);
 
     Metalake retrievedMetalake =
         store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -256,6 +269,10 @@ public class TestMemoryEntityStore {
     GroupEntity retrievedGroup =
         store.get(groupEntity.nameIdentifier(), EntityType.GROUP, GroupEntity.class);
     Assertions.assertEquals(groupEntity, retrievedGroup);
+
+    RoleEntity retrievedRole =
+        store.get(roleEntity.nameIdentifier(), EntityType.ROLE, RoleEntity.class);
+    Assertions.assertEquals(roleEntity, retrievedRole);
 
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
     NameIdentifier id = metalake.nameIdentifier();
