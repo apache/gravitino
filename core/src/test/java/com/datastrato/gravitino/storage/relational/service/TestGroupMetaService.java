@@ -417,16 +417,51 @@ class TestGroupMetaService extends TestJDBCBackend {
         };
     Assertions.assertNotNull(
         groupMetaService.updateGroup(group1.nameIdentifier(), grantRevokeUpdater));
-    GroupEntity grantRevokeUser =
+    GroupEntity grantRevokeGroup =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
-    Assertions.assertEquals(group1.id(), grantRevokeUser.id());
-    Assertions.assertEquals(group1.name(), grantRevokeUser.name());
+    Assertions.assertEquals(group1.id(), grantRevokeGroup.id());
+    Assertions.assertEquals(group1.name(), grantRevokeGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeUser.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeGroup.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeUser.roleIds()));
-    Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
-    Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeGroup.roleIds()));
+    Assertions.assertEquals("creator", grantRevokeGroup.auditInfo().creator());
+    Assertions.assertEquals("grantRevokeUser", grantRevokeGroup.auditInfo().lastModifier());
+
+    // no update
+    Function<GroupEntity, GroupEntity> noUpdater =
+        group -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(group.auditInfo().creator())
+                  .withCreateTime(group.auditInfo().createTime())
+                  .withLastModifier("noUpdateUser")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<String> roleNames = Lists.newArrayList(group.roleNames());
+          List<Long> roleIds = Lists.newArrayList(group.roleIds());
+
+          return GroupEntity.builder()
+              .withNamespace(group.namespace())
+              .withId(group.id())
+              .withName(group.name())
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+    Assertions.assertNotNull(groupMetaService.updateGroup(group1.nameIdentifier(), noUpdater));
+    GroupEntity noUpdaterGroup =
+        GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
+    Assertions.assertEquals(group1.id(), noUpdaterGroup.id());
+    Assertions.assertEquals(group1.name(), noUpdaterGroup.name());
+    Assertions.assertEquals(
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterGroup.roleNames()));
+    Assertions.assertEquals(
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterGroup.roleIds()));
+    Assertions.assertEquals("creator", noUpdaterGroup.auditInfo().creator());
+    Assertions.assertEquals("grantRevokeUser", noUpdaterGroup.auditInfo().lastModifier());
   }
 
   @Test

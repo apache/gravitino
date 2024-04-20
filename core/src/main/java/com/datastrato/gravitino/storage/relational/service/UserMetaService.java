@@ -193,34 +193,41 @@ public class UserMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
-    SessionUtils.doMultipleWithCommit(
-        () ->
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMeta(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () -> {
+            if (insertRoleIds.isEmpty()) {
+              return;
+            }
             SessionUtils.doWithoutCommit(
-                UserMetaMapper.class,
+                UserRoleRelMapper.class,
                 mapper ->
-                    mapper.updateUserMeta(
-                        POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
-        () -> {
-          if (insertRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.batchInsertUserRoleRel(
-                      POConverters.initializeUserRoleRelsPOWithVersion(
-                          newEntity, Lists.newArrayList(insertRoleIds))));
-        },
-        () -> {
-          if (deleteRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.softDeleteUserRoleRelByUserAndRoles(
-                      newEntity.id(), Lists.newArrayList(deleteRoleIds)));
-        });
+                    mapper.batchInsertUserRoleRel(
+                        POConverters.initializeUserRoleRelsPOWithVersion(
+                            newEntity, Lists.newArrayList(insertRoleIds))));
+          },
+          () -> {
+            if (deleteRoleIds.isEmpty()) {
+              return;
+            }
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class,
+                mapper ->
+                    mapper.softDeleteUserRoleRelByUserAndRoles(
+                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
+          });
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
     return newEntity;
   }
 }

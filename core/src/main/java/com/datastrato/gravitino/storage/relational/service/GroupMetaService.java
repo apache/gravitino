@@ -193,51 +193,43 @@ public class GroupMetaService {
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (!insertRoleIds.isEmpty()) {
-      try {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper ->
-                        mapper.updateGroupMeta(
-                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                            oldGroupPO)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper ->
-                        mapper.batchInsertGroupRoleRel(
-                            POConverters.initializeGroupRoleRelsPOWithVersion(
-                                newEntity, Lists.newArrayList(insertRoleIds)))));
-      } catch (RuntimeException re) {
-        ExceptionUtils.checkSQLException(
-            re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
-        throw re;
-      }
+    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
+      return newEntity;
     }
-
-    if (!deleteRoleIds.isEmpty()) {
-      try {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper ->
-                        mapper.updateGroupMeta(
-                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                            oldGroupPO)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper ->
-                        mapper.softDeleteGroupRoleRelByGroupAndRoles(
-                            newEntity.id(), Lists.newArrayList(deleteRoleIds))));
-      } catch (RuntimeException re) {
-        ExceptionUtils.checkSQLException(
-            re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
-        throw re;
-      }
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  GroupMetaMapper.class,
+                  mapper ->
+                      mapper.updateGroupMeta(
+                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                          oldGroupPO)),
+          () -> {
+            if (insertRoleIds.isEmpty()) {
+              return;
+            }
+            SessionUtils.doWithoutCommit(
+                GroupRoleRelMapper.class,
+                mapper ->
+                    mapper.batchInsertGroupRoleRel(
+                        POConverters.initializeGroupRoleRelsPOWithVersion(
+                            newEntity, Lists.newArrayList(insertRoleIds))));
+          },
+          () -> {
+            if (deleteRoleIds.isEmpty()) {
+              return;
+            }
+            SessionUtils.doWithoutCommit(
+                GroupRoleRelMapper.class,
+                mapper ->
+                    mapper.softDeleteGroupRoleRelByGroupAndRoles(
+                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
+          });
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
+      throw re;
     }
     return newEntity;
   }
