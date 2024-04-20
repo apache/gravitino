@@ -87,14 +87,14 @@ public interface Capability {
     /**
      * Regular expression explanation:
      *
-     * <p>^[a-zA-Z_] - Starts with a letter or an underscore
+     * <p>^[a-zA-Z_] - Starts with a letter, digit, or underscore
      *
      * <p>[a-zA-Z0-9_/=-]{0,63} - Followed by 0 to 63 characters (making the total length at most
      * 64) of letters (both cases), digits, underscores, slashes, hyphens, or equals signs
      *
      * <p>$ - End of the string
      */
-    private static final String LEGAL_PATTERN = "^[a-zA-Z_][a-zA-Z0-9_/=-]{0,63}$";
+    private static final String LEGAL_PATTERN = "^[a-zA-Z0-9_][a-zA-Z0-9_/=-]{0,63}$";
 
     @Override
     public CapabilityResult columnNotNull() {
