@@ -156,7 +156,6 @@ public class RolePO {
       Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
       Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(rolePO.properties != null, "Properties is required");
       Preconditions.checkArgument(rolePO.securableObject != null, "Securable object is required");
       Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
