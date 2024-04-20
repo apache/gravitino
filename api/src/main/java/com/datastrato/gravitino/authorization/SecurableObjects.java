@@ -6,11 +6,9 @@ package com.datastrato.gravitino.authorization;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
-
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link SecurableObject}. */
@@ -40,21 +38,28 @@ public class SecurableObjects {
     }
 
     if (names.length > 3) {
-      throw new IllegalArgumentException("Cannot create a securable object with the name length which is greater than 3");
+      throw new IllegalArgumentException(
+          "Cannot create a securable object with the name length which is greater than 3");
     }
 
-    List<SecurableObjectType> typeInDifferentLevels = Lists.newArrayList(SecurableObjectType.CATALOG, SecurableObjectType.SCHEMA);
+    List<SecurableObjectType> typeInDifferentLevels =
+        Lists.newArrayList(SecurableObjectType.CATALOG, SecurableObjectType.SCHEMA);
 
     if (names.length == 1 && type != SecurableObjectType.CATALOG) {
-      throw new IllegalArgumentException("If the length of names is 1, it must be the CATALOG type");
+      throw new IllegalArgumentException(
+          "If the length of names is 1, it must be the CATALOG type");
     }
 
     if (names.length == 2 && type != SecurableObjectType.SCHEMA) {
       throw new IllegalArgumentException("If the length of names is 2, it must be the SCHEMA type");
     }
 
-    if (names.length == 3 && type != SecurableObjectType.FILESET && type != SecurableObjectType.TABLE && type != SecurableObjectType.TOPIC) {
-      throw new IllegalArgumentException("If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+    if (names.length == 3
+        && type != SecurableObjectType.FILESET
+        && type != SecurableObjectType.TABLE
+        && type != SecurableObjectType.TOPIC) {
+      throw new IllegalArgumentException(
+          "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }
 
     if (names.length > 2) {
@@ -62,6 +67,7 @@ public class SecurableObjects {
     }
 
     SecurableObject parent = null;
+    int level = 0;
     for (String name : names) {
       if (name == null) {
         throw new IllegalArgumentException("Cannot create a securable object with null name");
@@ -77,7 +83,9 @@ public class SecurableObjects {
                 + " you can use add `read table` privilege for `catalog1.schema1` directly");
       }
 
-      parent = new SecurableObjectImpl(parent, name, type);
+      parent = new SecurableObjectImpl(parent, name, typeInDifferentLevels.get(level));
+
+      level++;
     }
 
     return parent;
@@ -176,7 +184,8 @@ public class SecurableObjects {
     }
   }
 
-  private static final SecurableObject ALL_CATALOGS = new SecurableObjectImpl( null, "*", SecurableObjectType.CATALOG);
+  private static final SecurableObject ALL_CATALOGS =
+      new SecurableObjectImpl(null, "*", SecurableObjectType.CATALOG);
 
   private static class SecurableObjectImpl implements SecurableObject {
 
@@ -206,7 +215,7 @@ public class SecurableObjects {
     }
 
     @Override
-    public SecurableObjectType securableObjectType() {
+    public SecurableObjectType type() {
       return type;
     }
 

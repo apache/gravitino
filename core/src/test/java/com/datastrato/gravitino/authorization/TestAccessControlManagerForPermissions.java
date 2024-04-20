@@ -85,7 +85,7 @@ public class TestAccessControlManagerForPermissions {
           .withName("role")
           .withProperties(Maps.newHashMap())
           .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
-          .withSecurableObject(SecurableObjects.of(CATALOG))
+          .withSecurableObject(SecurableObjects.ofCatalog(CATALOG))
           .withAuditInfo(auditInfo)
           .build();
 

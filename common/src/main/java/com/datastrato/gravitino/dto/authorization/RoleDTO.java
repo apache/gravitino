@@ -9,7 +9,6 @@ import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;

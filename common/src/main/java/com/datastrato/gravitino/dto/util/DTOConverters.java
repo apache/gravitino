@@ -404,8 +404,10 @@ public class DTOConverters {
       return (SecurableObjectDTO) securableObject;
     }
 
-    return SecurableObjectDTO.builder().withFullName(securableObject.fullName())
-            .withType(securableObject.type()).build();
+    return SecurableObjectDTO.builder()
+        .withFullName(securableObject.fullName())
+        .withType(securableObject.type())
+        .build();
   }
 
   /**

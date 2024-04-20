@@ -89,7 +89,9 @@ public class RoleOperations {
                               metalake,
                               request.getName(),
                               request.getProperties(),
-                              SecurableObjects.parse(request.getSecurableObject()),
+                              SecurableObjects.parse(
+                                  request.getSecurableObject().fullName(),
+                                  request.getSecurableObject().type()),
                               request.getPrivileges().stream()
                                   .map(Privileges::fromString)
                                   .collect(Collectors.toList()))))));
@@ -123,17 +125,37 @@ public class RoleOperations {
 
   @VisibleForTesting
   void checkSecurableObjectPrivileges(String metalake, RoleCreateRequest request) {
-    SecurableObject securableObject = SecurableObjects.parse(request.getSecurableObject());
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            request.getSecurableObject().fullName(), request.getSecurableObject().type());
     Catalog.Type type = null;
 
-    if (!AuthorizationUtils.isAllCatalogs(securableObject)) {
-      NameIdentifier ident =
-          NameIdentifier.ofCatalog(metalake, AuthorizationUtils.getCatalogName(securableObject));
+    switch (securableObject.type()) {
+      case FILESET:
+        type = Catalog.Type.FILESET;
+        break;
 
-      Catalog catalog =
-          TreeLockUtils.doWithTreeLock(
-              ident, LockType.READ, () -> catalogManager.loadCatalog(ident));
-      type = catalog.type();
+      case TOPIC:
+        type = Catalog.Type.MESSAGING;
+        break;
+
+      case TABLE:
+        type = Catalog.Type.RELATIONAL;
+        break;
+
+      case SCHEMA:
+        NameIdentifier ident =
+            NameIdentifier.ofCatalog(metalake, AuthorizationUtils.getCatalogName(securableObject));
+
+        Catalog catalog =
+            TreeLockUtils.doWithTreeLock(
+                ident, LockType.READ, () -> catalogManager.loadCatalog(ident));
+        type = catalog.type();
+        break;
+
+      case CATALOG:
+        // CATALOG doesn't need get the type of catalog.
+        break;
     }
 
     AuthorizationUtils.checkSecurableObjectPrivileges(

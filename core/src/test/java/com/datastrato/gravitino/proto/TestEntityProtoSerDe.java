@@ -386,7 +386,7 @@ public class TestEntityProtoSerDe {
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.of(catalogName))
+            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .withProperties(props)
             .build();
@@ -401,7 +401,7 @@ public class TestEntityProtoSerDe {
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.of(catalogName))
+            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
             .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
             .build();
     roleBytes = protoEntitySerDe.serialize(roleWithoutFields);

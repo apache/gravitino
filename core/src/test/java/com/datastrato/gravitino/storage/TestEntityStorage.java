@@ -1211,7 +1211,7 @@ public class TestEntityStorage {
                 metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.of("catalog"))
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();

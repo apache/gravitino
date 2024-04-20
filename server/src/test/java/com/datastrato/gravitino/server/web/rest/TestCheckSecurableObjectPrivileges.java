@@ -19,6 +19,7 @@ import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.Lists;
 import java.util.Collections;
@@ -55,7 +56,7 @@ public class TestCheckSecurableObjectPrivileges {
                 Privileges.AlterCatalog.get().name().toString(),
                 Privileges.CreateCatalog.get().name().toString(),
                 Privileges.DropCatalog.get().name().toString()),
-            SecurableObjects.ofCatalog("catalog").toString());
+            DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
@@ -65,7 +66,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListCatalog.get().name().toString()),
-            SecurableObjects.ofAllCatalogs().toString());
+            DTOConverters.toDTO(SecurableObjects.ofAllCatalogs()));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request2));
 
@@ -79,7 +80,7 @@ public class TestCheckSecurableObjectPrivileges {
                 Privileges.AlterSchema.get().name().toString(),
                 Privileges.CreateSchema.get().name().toString(),
                 Privileges.DropSchema.get().name().toString()),
-            SecurableObjects.ofCatalog("catalog1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request3));
 
@@ -89,7 +90,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListCatalog.get().name().toString()),
-            SecurableObjects.ofCatalog("catalog1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request4));
@@ -100,7 +101,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListSchema.get().name().toString()),
-            SecurableObjects.ofAllCatalogs().toString());
+            DTOConverters.toDTO(SecurableObjects.ofAllCatalogs()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request5));
@@ -123,7 +124,7 @@ public class TestCheckSecurableObjectPrivileges {
                 Privileges.AlterSchema.get().name().toString(),
                 Privileges.CreateSchema.get().name().toString(),
                 Privileges.DropSchema.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
@@ -133,7 +134,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListSchema.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "table1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "table1")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -146,12 +147,11 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListTable.get().name().toString(),
-                Privileges.AlterTable.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
                 Privileges.ReadTable.get().name().toString(),
                 Privileges.WriteTable.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request3));
 
@@ -161,7 +161,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadTopic.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request4));
@@ -171,7 +171,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadFileset.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request5));
@@ -185,12 +185,11 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListFileset.get().name().toString(),
-                Privileges.AlterFileset.get().name().toString(),
                 Privileges.CreateFileset.get().name().toString(),
                 Privileges.DropFileset.get().name().toString(),
                 Privileges.ReadFileset.get().name().toString(),
                 Privileges.WriteFileset.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request6));
 
@@ -200,7 +199,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadTable.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request7));
@@ -210,7 +209,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadTopic.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request8));
@@ -224,12 +223,11 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ListTopic.get().name().toString(),
-                Privileges.AlterTopic.get().name().toString(),
                 Privileges.CreateTopic.get().name().toString(),
                 Privileges.DropTopic.get().name().toString(),
                 Privileges.ReadTopic.get().name().toString(),
                 Privileges.WriteTopic.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request9));
 
@@ -239,7 +237,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadTable.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request10));
@@ -249,7 +247,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ReadFileset.get().name().toString()),
-            SecurableObjects.ofSchema(catalogObject, "schema1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "schema1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.checkSecurableObjectPrivileges("metalake", request11));
@@ -271,12 +269,11 @@ public class TestCheckSecurableObjectPrivileges {
             Collections.emptyMap(),
             Lists.newArrayList(
                 Privileges.ReadTable.get().name().toString(),
-                Privileges.AlterTable.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
                 Privileges.ReadTable.get().name().toString(),
                 Privileges.WriteTable.get().name().toString()),
-            SecurableObjects.ofFileset(schemaObject, "table1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofFileset(schemaObject, "table1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
@@ -286,7 +283,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListTable.get().name().toString()),
-            SecurableObjects.ofTable(schemaObject, "table1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofTable(schemaObject, "table1")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -308,12 +305,11 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.AlterTopic.get().name().toString(),
                 Privileges.CreateTopic.get().name().toString(),
                 Privileges.DropTopic.get().name().toString(),
                 Privileges.ReadTopic.get().name().toString(),
                 Privileges.WriteTopic.get().name().toString()),
-            SecurableObjects.ofTopic(schemaObject, "topic1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofTopic(schemaObject, "topic1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
@@ -323,7 +319,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListTopic.get().name().toString()),
-            SecurableObjects.ofTopic(schemaObject, "topic1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofTopic(schemaObject, "topic1")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -345,12 +341,11 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.AlterFileset.get().name().toString(),
                 Privileges.CreateFileset.get().name().toString(),
                 Privileges.DropFileset.get().name().toString(),
                 Privileges.ReadFileset.get().name().toString(),
                 Privileges.WriteFileset.get().name().toString()),
-            SecurableObjects.ofFileset(schemaObject, "fileset1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofFileset(schemaObject, "fileset1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
@@ -360,7 +355,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.ListFileset.get().name().toString()),
-            SecurableObjects.ofFileset(schemaObject, "fileset1").toString());
+            DTOConverters.toDTO(SecurableObjects.ofFileset(schemaObject, "fileset1")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,

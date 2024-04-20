@@ -11,9 +11,11 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.SecurableObjectType;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
@@ -45,7 +47,13 @@ public class TestRole extends TestBase {
     String rolePath = withSlash(String.format(API_METALAKES_ROLES_PATH, metalakeName, ""));
     RoleCreateRequest request =
         new RoleCreateRequest(
-            roleName, ImmutableMap.of("k1", "v1"), Lists.newArrayList("LOAD_CATALOG"), "catalog");
+            roleName,
+            ImmutableMap.of("k1", "v1"),
+            Lists.newArrayList("LOAD_CATALOG"),
+            SecurableObjectDTO.builder()
+                .withFullName("catalog")
+                .withType(SecurableObjectType.CATALOG)
+                .build());
 
     RoleDTO mockRole = mockRoleDTO(roleName);
     RoleResponse roleResponse = new RoleResponse(mockRole);
@@ -172,7 +180,7 @@ public class TestRole extends TestBase {
     return RoleDTO.builder()
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))
-        .withSecurableObject(SecurableObjects.of("catalog"))
+        .withSecurableObject(DTOConverters.toSecurableObject(SecurableObjects.ofCatalog("catalog")))
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

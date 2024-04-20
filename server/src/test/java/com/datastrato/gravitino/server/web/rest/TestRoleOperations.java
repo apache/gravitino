@@ -26,6 +26,7 @@ import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
@@ -108,7 +109,7 @@ public class TestRoleOperations extends JerseyTest {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(Privileges.LoadCatalog.get().name().toString()),
-            SecurableObjects.of("catalog").toString());
+            DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")));
     Role role = buildRole("role1");
 
     when(manager.createRole(any(), any(), any(), any(), any())).thenReturn(role);
@@ -127,7 +128,7 @@ public class TestRoleOperations extends JerseyTest {
 
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
-    Assertions.assertEquals(SecurableObjects.of("catalog"), roleDTO.securableObject());
+    Assertions.assertEquals(SecurableObjects.ofCatalog("catalog"), roleDTO.securableObject());
     Assertions.assertEquals(Lists.newArrayList(Privileges.LoadCatalog.get()), roleDTO.privileges());
 
     // Test to throw NoSuchMetalakeException
@@ -201,7 +202,7 @@ public class TestRoleOperations extends JerseyTest {
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertTrue(role.properties().isEmpty());
-    Assertions.assertEquals(SecurableObjects.of("catalog"), roleDTO.securableObject());
+    Assertions.assertEquals(SecurableObjects.ofCatalog("catalog"), roleDTO.securableObject());
     Assertions.assertEquals(Lists.newArrayList(Privileges.LoadCatalog.get()), roleDTO.privileges());
 
     // Test to throw NoSuchMetalakeException
@@ -254,7 +255,7 @@ public class TestRoleOperations extends JerseyTest {
         .withName(role)
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
         .withProperties(Collections.emptyMap())
-        .withSecurableObject(SecurableObjects.of("catalog"))
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
