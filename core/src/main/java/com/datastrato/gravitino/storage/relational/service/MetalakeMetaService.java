@@ -206,4 +206,12 @@ public class MetalakeMetaService {
     }
     return true;
   }
+
+  public int deleteMetalakeMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        MetalakeMetaMapper.class,
+        mapper -> {
+          return mapper.deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
 }
