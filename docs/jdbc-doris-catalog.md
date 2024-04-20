@@ -104,8 +104,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Unp
 #### Table column auto-increment
 
 :::note
-Doris does not support auto-increment column before version 2.1.0
-So, Gravitino did not support auto-increment column before version 0.5.0
+Gravitino does not support the creation of an auto-increment column for a Doris table now.
 :::
 
 
@@ -170,4 +169,5 @@ Gravitino supports these table alteration operations:
  - Schema change, such as add/modify/drop columns can be processed in batch
  - Can modify multi column comments at same time
  - You can't modify the column type and column comment at the same time
+ - The schema alteration in Doris is an asynchronous operation. You might retrieve an outdated schema if you execute a schema query immediately following the alteration. It is recommended to pause briefly following the schema alteration, and Gravitino will incorporate the schema alteration status into the schema information in the upcoming version.
 :::
