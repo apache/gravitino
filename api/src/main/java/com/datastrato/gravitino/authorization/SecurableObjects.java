@@ -221,7 +221,7 @@ public class SecurableObjects {
 
     @Override
     public int hashCode() {
-      return Objects.hash(parent, name);
+      return Objects.hash(parent, name, type);
     }
 
     @Override
@@ -241,7 +241,8 @@ public class SecurableObjects {
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
       return Objects.equals(parent, otherSecurableObject.parent())
-          && Objects.equals(name, otherSecurableObject.name());
+          && Objects.equals(name, otherSecurableObject.name())
+          && Objects.equals(type, otherSecurableObject.type());
     }
   }
 
