@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
-class AuthorizationUtils {
+public class AuthorizationUtils {
 
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
