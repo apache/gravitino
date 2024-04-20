@@ -7,9 +7,10 @@ package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
@@ -21,7 +22,7 @@ import org.junit.jupiter.api.Assertions;
  */
 public class SparkTableInfoChecker {
   private SparkTableInfo expectedTableInfo = new SparkTableInfo();
-  private List<CheckField> checkFields = new ArrayList<>();
+  private Set<CheckField> checkFields = new LinkedHashSet<>();
 
   private SparkTableInfoChecker() {}
 

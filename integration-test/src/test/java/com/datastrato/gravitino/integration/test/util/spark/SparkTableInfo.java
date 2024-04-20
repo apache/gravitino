@@ -80,7 +80,7 @@ public class SparkTableInfo {
         || partition instanceof DaysTransform
         || partition instanceof MonthsTransform
         || partition instanceof YearsTransform
-        || (partition instanceof ApplyTransform && "truncate".equals(partition.name()))) {
+        || (partition instanceof ApplyTransform && "truncate".equalsIgnoreCase(partition.name()))) {
       this.partitions.add(partition);
     } else {
       throw new NotSupportedException("Doesn't support " + partition.name());
@@ -114,16 +114,18 @@ public class SparkTableInfo {
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                sparkTableInfo.setBucket(transform);
                 if (isBucketPartition(supportsBucketPartition, transform)) {
                   sparkTableInfo.addPartition(transform);
+                } else {
+                  sparkTableInfo.setBucket(transform);
                 }
               } else if (transform instanceof IdentityTransform
                   || transform instanceof HoursTransform
                   || transform instanceof DaysTransform
                   || transform instanceof MonthsTransform
                   || transform instanceof YearsTransform
-                  || (transform instanceof ApplyTransform && "truncate".equals(transform.name()))) {
+                  || (transform instanceof ApplyTransform
+                      && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
               } else {
                 throw new NotSupportedException(

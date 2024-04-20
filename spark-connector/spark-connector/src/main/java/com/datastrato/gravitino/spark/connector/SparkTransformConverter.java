@@ -108,7 +108,7 @@ public class SparkTransformConverter {
                 YearsTransform yearsTransform = (YearsTransform) transform;
                 return Transforms.year(yearsTransform.reference().fieldNames());
               } else if (transform instanceof ApplyTransform
-                  && "truncate".equals(transform.name())) {
+                  && "truncate".equalsIgnoreCase(transform.name())) {
                 Preconditions.checkArgument(
                     transform.references().length == 1,
                     "Truncate transform should have only one reference");
