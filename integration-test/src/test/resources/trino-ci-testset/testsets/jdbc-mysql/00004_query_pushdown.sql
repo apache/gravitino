@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_mysql".gt_db1;
+CREATE SCHEMA gt_mysql.gt_db1;
 
-USE "test.gt_mysql".gt_db1;
+USE gt_mysql.gt_db1;
 
 CREATE TABLE customer (
    custkey bigint NOT NULL,
@@ -48,4 +48,4 @@ drop table customer;
 
 drop table orders;
 
-drop schema "test.gt_mysql".gt_db1;
+drop schema gt_mysql.gt_db1;

@@ -79,6 +79,16 @@ public class ExceptionHandlers {
     return TopicExceptionHandler.INSTANCE.handle(op, topic, schema, e);
   }
 
+  public static Response handleUserPermissionOperationException(
+      OperationType op, String roles, String parent, Exception e) {
+    return UserPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
+  }
+
+  public static Response handleGroupPermissionOperationException(
+      OperationType op, String roles, String parent, Exception e) {
+    return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -410,6 +420,56 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, topic, schema, e);
+      }
+    }
+  }
+
+  private static class UserPermissionOperationExceptionHandler
+      extends BasePermissionExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new UserPermissionOperationExceptionHandler();
+
+    @Override
+    protected String getPermissionErrorMsg(
+        String role, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate role(s)%s operation [%s] under user [%s], reason [%s]",
+          role, operation, parent, reason);
+    }
+  }
+
+  private static class GroupPermissionOperationExceptionHandler
+      extends BasePermissionExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new GroupPermissionOperationExceptionHandler();
+
+    @Override
+    protected String getPermissionErrorMsg(
+        String roles, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate role(s)%s operation [%s] under group [%s], reason [%s]",
+          roles, operation, parent, reason);
+    }
+  }
+
+  private abstract static class BasePermissionExceptionHandler extends BaseExceptionHandler {
+
+    protected abstract String getPermissionErrorMsg(
+        String role, String operation, String parent, String reason);
+
+    @Override
+    public Response handle(OperationType op, String roles, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(roles) ? "" : " [" + roles + "]";
+      String errorMsg = getPermissionErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else {
+        return super.handle(op, roles, parent, e);
       }
     }
   }

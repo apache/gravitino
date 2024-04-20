@@ -27,10 +27,6 @@ import java.util.Map;
 @Evolving
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
-  // "gravitino.managed.entity" is an internal and reserved property to indicate whether the
-  // entity is managed by Gravitino's own store or not.
-  public static final String GRAVITINO_MANAGED_ENTITY = "gravitino.managed.entity";
-
   private static final Map<String, PropertyEntry<?>> BASIC_PROPERTY_ENTRIES;
 
   private volatile Map<String, PropertyEntry<?>> propertyEntries;
@@ -42,11 +38,6 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
             PropertyEntry.stringReservedPropertyEntry(
                 ID_KEY,
                 "To differentiate the entities created directly by the underlying sources",
-                true),
-            PropertyEntry.booleanReservedPropertyEntry(
-                GRAVITINO_MANAGED_ENTITY,
-                "Whether the entity is managed by Gravitino's own store or not",
-                false,
                 true));
 
     BASIC_PROPERTY_ENTRIES = Maps.uniqueIndex(basicPropertyEntries, PropertyEntry::getName);

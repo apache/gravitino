@@ -58,7 +58,7 @@ public class TestGravitinoVersion {
     // test less than
     version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
-    assertTrue(version1.compareTo(version2) < 1);
+    assertTrue(version1.compareTo(version2) < 0);
 
     // test greater than
     version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");

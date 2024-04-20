@@ -23,7 +23,7 @@ const DetailsView = () => {
 
   const audit = activatedItem?.audit || {}
 
-  const properties = Object.keys(activatedItem?.properties || [])
+  let properties = Object.keys(activatedItem?.properties || [])
     .filter(key => !['partition-count', 'replication-factor'].includes(key))
     .map(item => {
       return {
@@ -32,14 +32,15 @@ const DetailsView = () => {
       }
     })
   if (paramsSize === 5 && searchParams.get('topic')) {
-    properties.unshift({
-      key: 'replication-factor',
-      value: JSON.stringify(activatedItem?.properties['replication-factor'])?.replace(/^"|"$/g, '')
-    })
-    properties.unshift({
-      key: 'partition-count',
-      value: JSON.stringify(activatedItem?.properties['partition-count'])?.replace(/^"|"$/g, '')
-    })
+    const topicPros = Object.keys(activatedItem?.properties || [])
+      .filter(key => ['partition-count', 'replication-factor'].includes(key))
+      .map(item => {
+        return {
+          key: item,
+          value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
+        }
+      })
+    properties = [...topicPros, ...properties]
   }
 
   const renderFieldText = ({ value, linkBreak = false, isDate = false }) => {
@@ -129,7 +130,7 @@ const DetailsView = () => {
             Properties
           </Typography>
 
-          <TableContainer>
+          <TableContainer data-refer='details-table-grid'>
             <Table>
               <TableHead
                 sx={{
@@ -154,7 +155,15 @@ const DetailsView = () => {
                                 : 400
                           }}
                         >
-                          {item.key}
+                          <div
+                            data-refer={
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? `props-key-${item.key}-highlight`
+                                : `props-key-${item.key}`
+                            }
+                          >
+                            {item.key}
+                          </div>
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>
@@ -166,7 +175,15 @@ const DetailsView = () => {
                                 : 400
                           }}
                         >
-                          {item.value}
+                          <div
+                            data-refer={
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? `props-value-${item.key}-highlight`
+                                : `props-value-${item.key}`
+                            }
+                          >
+                            {item.value}
+                          </div>
                         </Typography>
                       </TableCell>
                     </TableRow>

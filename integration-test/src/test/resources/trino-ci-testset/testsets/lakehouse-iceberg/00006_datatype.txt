@@ -4,7 +4,7 @@ USE
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    f1 varchar,
    f3 varbinary,
    f4 decimal(10, 3),
@@ -33,7 +33,7 @@ INSERT: 1 row
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb02 (
+"CREATE TABLE gt_iceberg.gt_db2.tb02 (
    f1 varchar NOT NULL,
    f3 varbinary NOT NULL,
    f4 decimal(10, 3) NOT NULL,
