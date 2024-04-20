@@ -267,7 +267,7 @@ public class TestEntity {
             .withName(roleName)
             .withAuditInfo(auditInfo)
             .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
             .withProperties(map)
             .build();
 
@@ -277,7 +277,7 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
     Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
     Assertions.assertEquals(
-        Lists.newArrayList(Privileges.LoadCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
+        Lists.newArrayList(Privileges.UseCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
     Assertions.assertEquals(
         SecurableObjects.ofCatalog(catalogName), fields.get(RoleEntity.SECURABLE_OBJECT));
 
@@ -287,7 +287,7 @@ public class TestEntity {
             .withName(roleName)
             .withAuditInfo(auditInfo)
             .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
   }

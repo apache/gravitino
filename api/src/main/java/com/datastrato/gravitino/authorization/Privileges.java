@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_CATALO
 import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_FILESET;
+import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_TOPIC;
@@ -16,15 +17,21 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_FILESET
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_CATALOG;
+import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_GROUP;
+import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_METALAKE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_ROLE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_USER;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESET;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_SCHEMA;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LOAD_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_SCHEMA;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_TABLE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.USE_CATALOG;
+import static com.datastrato.gravitino.authorization.Privilege.Name.USE_METALAKE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.USE_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.WRITE_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.WRITE_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.WRITE_TOPIC;
@@ -52,10 +59,10 @@ public class Privileges {
   public static Privilege fromName(Privilege.Name name) {
     switch (name) {
         // Catalog
-      case LIST_CATALOG:
-        return ListCatalog.get();
-      case LOAD_CATALOG:
-        return LoadCatalog.get();
+      case SHOW_CATALOG:
+        return ShowCatalogs.get();
+      case USE_CATALOG:
+        return UseCatalog.get();
       case CREATE_CATALOG:
         return CreateCatalog.get();
       case ALTER_CATALOG:
@@ -64,10 +71,10 @@ public class Privileges {
         return DropCatalog.get();
 
         // Schema
-      case LIST_SCHEMA:
-        return ListSchema.get();
-      case LOAD_SCHEMA:
-        return LoadSchema.get();
+      case SHOW_SCHEMA:
+        return ShowSchemas.get();
+      case USE_SCHEMA:
+        return UseSchema.get();
       case CREATE_SCHEMA:
         return CreateSchema.get();
       case ALTER_SCHEMA:
@@ -76,8 +83,8 @@ public class Privileges {
         return DropSchema.get();
 
         // Table
-      case LIST_TABLE:
-        return ListTable.get();
+      case SHOW_TABLE:
+        return ShowTables.get();
       case CREATE_TABLE:
         return CreateTable.get();
       case DROP_TABLE:
@@ -111,55 +118,71 @@ public class Privileges {
       case WRITE_TOPIC:
         return WriteTopic.get();
 
+        // Metalake
+      case USE_METALAKE:
+        return UseMetalake.get();
+      case MANAGE_METALAKE:
+        return ManageMetalake.get();
+      case CREATE_METALAKE:
+        return CreateMetalake.get();
+
+        // Access control
+      case MANAGE_USER:
+        return ManageUser.get();
+      case MANAGE_GROUP:
+        return ManageGroup.get();
+      case MANAGE_ROLE:
+        return ManageRole.get();
+
       default:
         throw new IllegalArgumentException("Don't support the privilege: " + name);
     }
   }
 
-  /** The privilege to list catalogs. */
-  public static class ListCatalog implements Privilege {
+  /** The privilege to show catalogs. */
+  public static class ShowCatalogs implements Privilege {
 
-    private static final ListCatalog INSTANCE = new ListCatalog();
+    private static final ShowCatalogs INSTANCE = new ShowCatalogs();
 
     /** @return The instance of the privilege. */
-    public static ListCatalog get() {
+    public static ShowCatalogs get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LIST_CATALOG;
+      return SHOW_CATALOG;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "list catalog";
+      return "show catalog";
     }
   }
 
-  /** The privilege to load a catalog. */
-  public static class LoadCatalog implements Privilege {
-    private static final LoadCatalog INSTANCE = new LoadCatalog();
+  /** The privilege to use a catalog. */
+  public static class UseCatalog implements Privilege {
+    private static final UseCatalog INSTANCE = new UseCatalog();
 
     /** @return The instance of the privilege. */
-    public static LoadCatalog get() {
+    public static UseCatalog get() {
       return INSTANCE;
     }
 
-    private LoadCatalog() {}
+    private UseCatalog() {}
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return Name.LOAD_CATALOG;
+      return USE_CATALOG;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "load catalog";
+      return "use catalog";
     }
   }
 
@@ -238,51 +261,51 @@ public class Privileges {
     }
   }
 
-  /** The privilege to list schemas. */
-  public static class ListSchema implements Privilege {
+  /** The privilege to show schemas. */
+  public static class ShowSchemas implements Privilege {
 
-    private static final ListSchema INSTANCE = new ListSchema();
+    private static final ShowSchemas INSTANCE = new ShowSchemas();
 
-    private ListSchema() {}
+    private ShowSchemas() {}
 
     /** @return The instance of the privilege. */
-    public static ListSchema get() {
+    public static ShowSchemas get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LIST_SCHEMA;
+      return SHOW_SCHEMA;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "list schema";
+      return "show schema";
     }
   }
 
-  /** The privilege to load a schema. */
-  public static class LoadSchema implements Privilege {
+  /** The privilege to use a schema. */
+  public static class UseSchema implements Privilege {
 
-    private static final LoadSchema INSTANCE = new LoadSchema();
+    private static final UseSchema INSTANCE = new UseSchema();
 
     /** @return The instance of the privilege. */
-    public static LoadSchema get() {
+    public static UseSchema get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LOAD_SCHEMA;
+      return USE_SCHEMA;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "load schema";
+      return "use schema";
     }
   }
 
@@ -355,26 +378,26 @@ public class Privileges {
     }
   }
 
-  /** The privilege to list tables. */
-  public static class ListTable implements Privilege {
+  /** The privilege to show tables. */
+  public static class ShowTables implements Privilege {
 
-    private static final ListTable INSTANCE = new ListTable();
+    private static final ShowTables INSTANCE = new ShowTables();
 
     /** @return The instance of the privilege. */
-    public static ListTable get() {
+    public static ShowTables get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LIST_TABLE;
+      return SHOW_TABLE;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "list table";
+      return "show table";
     }
   }
 
@@ -725,6 +748,156 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "write topic";
+    }
+  }
+
+  /** The privilege to manage a metalake. */
+  public static class ManageMetalake implements Privilege {
+
+    private static final ManageMetalake INSTANCE = new ManageMetalake();
+
+    private ManageMetalake() {}
+
+    /** @return The instance of the privilege. */
+    public static ManageMetalake get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return MANAGE_METALAKE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "manage topic";
+    }
+  }
+
+  /** The privilege to manage a metalake. */
+  public static class CreateMetalake implements Privilege {
+
+    private static final CreateMetalake INSTANCE = new CreateMetalake();
+
+    private CreateMetalake() {}
+
+    /** @return The instance of the privilege. */
+    public static CreateMetalake get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return CREATE_METALAKE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "create topic";
+    }
+  }
+
+  /** The privilege to use a metalake. */
+  public static class UseMetalake implements Privilege {
+
+    private static final UseMetalake INSTANCE = new UseMetalake();
+
+    private UseMetalake() {}
+
+    /** @return The instance of the privilege. */
+    public static UseMetalake get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return USE_METALAKE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "use metalake";
+    }
+  }
+
+  /** The privilege to manage users. */
+  public static class ManageUser implements Privilege {
+
+    private static final ManageUser INSTANCE = new ManageUser();
+
+    private ManageUser() {}
+
+    /** @return The instance of the privilege. */
+    public static ManageUser get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return MANAGE_USER;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "manage user";
+    }
+  }
+
+  /** The privilege to manage roles. */
+  public static class ManageGroup implements Privilege {
+
+    private static final ManageGroup INSTANCE = new ManageGroup();
+
+    private ManageGroup() {}
+
+    /** @return The instance of the privilege. */
+    public static ManageGroup get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return MANAGE_GROUP;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "manage group";
+    }
+  }
+
+  /** The privilege to manage roles. */
+  public static class ManageRole implements Privilege {
+
+    private static final ManageRole INSTANCE = new ManageRole();
+
+    private ManageRole() {}
+
+    /** @return The instance of the privilege. */
+    public static ManageRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return MANAGE_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "manage role";
     }
   }
 }

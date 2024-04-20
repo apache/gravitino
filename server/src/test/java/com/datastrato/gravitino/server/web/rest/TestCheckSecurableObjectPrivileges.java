@@ -52,7 +52,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadCatalog.get().name().toString(),
+                Privileges.UseCatalog.get().name().toString(),
                 Privileges.AlterCatalog.get().name().toString(),
                 Privileges.CreateCatalog.get().name().toString(),
                 Privileges.DropCatalog.get().name().toString()),
@@ -65,7 +65,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.ListCatalog.get().name().toString()),
+            Lists.newArrayList(Privileges.ShowCatalogs.get().name().toString()),
             DTOConverters.toDTO(SecurableObjects.ofAllCatalogs()));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request2));
@@ -76,7 +76,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadSchema.get().name().toString(),
+                Privileges.UseSchema.get().name().toString(),
                 Privileges.AlterSchema.get().name().toString(),
                 Privileges.CreateSchema.get().name().toString(),
                 Privileges.DropSchema.get().name().toString()),
@@ -89,7 +89,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.ListCatalog.get().name().toString()),
+            Lists.newArrayList(Privileges.ShowCatalogs.get().name().toString()),
             DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -100,7 +100,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.ListSchema.get().name().toString()),
+            Lists.newArrayList(Privileges.ShowSchemas.get().name().toString()),
             DTOConverters.toDTO(SecurableObjects.ofAllCatalogs()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -120,7 +120,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.LoadSchema.get().name().toString(),
+                Privileges.UseSchema.get().name().toString(),
                 Privileges.AlterSchema.get().name().toString(),
                 Privileges.CreateSchema.get().name().toString(),
                 Privileges.DropSchema.get().name().toString()),
@@ -133,7 +133,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.ListSchema.get().name().toString()),
+            Lists.newArrayList(Privileges.ShowSchemas.get().name().toString()),
             DTOConverters.toDTO(SecurableObjects.ofSchema(catalogObject, "table1")));
 
     Assertions.assertThrows(
@@ -146,7 +146,7 @@ public class TestCheckSecurableObjectPrivileges {
             "role",
             Collections.emptyMap(),
             Lists.newArrayList(
-                Privileges.ListTable.get().name().toString(),
+                Privileges.ShowTables.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
                 Privileges.ReadTable.get().name().toString(),
@@ -281,7 +281,7 @@ public class TestCheckSecurableObjectPrivileges {
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.ListTable.get().name().toString()),
+            Lists.newArrayList(Privileges.ShowTables.get().name().toString()),
             DTOConverters.toDTO(SecurableObjects.ofTable(schemaObject, "table1")));
 
     Assertions.assertThrows(

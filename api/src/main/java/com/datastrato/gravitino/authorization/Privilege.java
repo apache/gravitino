@@ -21,28 +21,28 @@ public interface Privilege {
 
   /** The name of this privilege. */
   enum Name {
-    /** The privilege to list catalogs. */
-    LIST_CATALOG,
-    /** The privilege to load a catalog. */
-    LOAD_CATALOG,
+    /** The privilege to show catalogs. */
+    SHOW_CATALOG,
+    /** The privilege to use a catalog. */
+    USE_CATALOG,
     /** The privilege to create a catalog. */
     CREATE_CATALOG,
     /** The privilege to alter a catalog. */
     ALTER_CATALOG,
     /** The privilege to drop a catalog. */
     DROP_CATALOG,
-    /** The privilege to list schemas. */
-    LIST_SCHEMA,
-    /** The privilege to load a schema. */
-    LOAD_SCHEMA,
+    /** The privilege to show schemas. */
+    SHOW_SCHEMA,
+    /** The privilege to use a schema. */
+    USE_SCHEMA,
     /** The privilege to create a schema. */
     CREATE_SCHEMA,
     /** The privilege to alter a schema. */
     ALTER_SCHEMA,
     /** The privilege to drop a schema. */
     DROP_SCHEMA,
-    /** The privilege to list tables. */
-    LIST_TABLE,
+    /** The privilege to show tables. */
+    SHOW_TABLE,
     /** The privilege to create a table. */
     CREATE_TABLE,
     /** The privilege to drop a table. */
@@ -70,6 +70,18 @@ public interface Privilege {
     /** The privilege to read a topic. */
     READ_TOPIC,
     /** The privilege to write a topic. */
-    WRITE_TOPIC
+    WRITE_TOPIC,
+    /** The privilege to use a metalake. */
+    USE_METALAKE,
+    /** The privilege to manage a metalake. */
+    MANAGE_METALAKE,
+    /** The privilege to create a metalake. */
+    CREATE_METALAKE,
+    /** The privilege to manage users. */
+    MANAGE_USER,
+    /** The privilege to manage groups. */
+    MANAGE_GROUP,
+    /** The privilege to manage roles. */
+    MANAGE_ROLE,
   }
 }

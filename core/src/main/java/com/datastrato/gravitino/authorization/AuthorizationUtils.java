@@ -29,8 +29,8 @@ public class AuthorizationUtils {
   private static final String UNSUPPORTED_ERROR_MSG = "%s is an unsupported catalog type";
   private static final List<Privilege> CATALOG_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
-          Privileges.LoadCatalog.get(),
-          Privileges.LoadCatalog.get(),
+          Privileges.UseCatalog.get(),
+          Privileges.UseCatalog.get(),
           Privileges.AlterCatalog.get(),
           Privileges.CreateCatalog.get(),
           Privileges.DropCatalog.get());
@@ -38,12 +38,12 @@ public class AuthorizationUtils {
   private static final List<Privilege> CATALOGS_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(CATALOG_PRIVILEGES_EXCEPT_FOR_LIST)
-          .add(Privileges.ListCatalog.get())
+          .add(Privileges.ShowCatalogs.get())
           .build();
 
   private static final List<Privilege> SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST =
       ImmutableList.of(
-          Privileges.LoadSchema.get(),
+          Privileges.UseSchema.get(),
           Privileges.AlterSchema.get(),
           Privileges.CreateSchema.get(),
           Privileges.DropSchema.get());
@@ -51,7 +51,7 @@ public class AuthorizationUtils {
   private static final List<Privilege> SCHEMA_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(SCHEMA_PRIVILEGES_EXCEPT_FOR_LIST)
-          .add(Privileges.ListSchema.get())
+          .add(Privileges.ShowSchemas.get())
           .build();
 
   private static final List<Privilege> TABLE_PRIVILEGES_EXCEPT_FOR_LIST =
@@ -64,7 +64,7 @@ public class AuthorizationUtils {
   private static final List<Privilege> TABLE_PRIVILEGES =
       ImmutableList.<Privilege>builder()
           .addAll(TABLE_PRIVILEGES_EXCEPT_FOR_LIST)
-          .add(Privileges.ListTable.get())
+          .add(Privileges.ShowTables.get())
           .build();
 
   private static final List<Privilege> FILESET_PRIVILEGES_EXCEPT_FOR_LIST =

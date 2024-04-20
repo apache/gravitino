@@ -65,7 +65,7 @@ public class TestRole extends TestBase {
             roleName,
             ImmutableMap.of("k1", "v1"),
             SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.LoadCatalog.get()));
+            Lists.newArrayList(Privileges.UseCatalog.get()));
     Assertions.assertNotNull(createdRole);
     assertRole(createdRole, mockRole);
 
@@ -83,7 +83,7 @@ public class TestRole extends TestBase {
                     roleName,
                     ImmutableMap.of("k1", "v1"),
                     SecurableObjects.ofCatalog("catalog"),
-                    Lists.newArrayList(Privileges.LoadCatalog.get())));
+                    Lists.newArrayList(Privileges.UseCatalog.get())));
     Assertions.assertEquals("role already exists", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -99,7 +99,7 @@ public class TestRole extends TestBase {
                     roleName,
                     ImmutableMap.of("k1", "v1"),
                     SecurableObjects.ofCatalog("catalog"),
-                    Lists.newArrayList(Privileges.LoadCatalog.get())));
+                    Lists.newArrayList(Privileges.UseCatalog.get())));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
@@ -113,7 +113,7 @@ public class TestRole extends TestBase {
                 roleName,
                 ImmutableMap.of("k1", "v1"),
                 SecurableObjects.ofCatalog("catalog"),
-                Lists.newArrayList(Privileges.LoadCatalog.get())),
+                Lists.newArrayList(Privileges.UseCatalog.get())),
         "internal error");
   }
 
@@ -181,7 +181,7 @@ public class TestRole extends TestBase {
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))
         .withSecurableObject(DTOConverters.toSecurableObject(SecurableObjects.ofCatalog("catalog")))
-        .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }

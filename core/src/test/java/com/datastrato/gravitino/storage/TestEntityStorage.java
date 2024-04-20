@@ -1212,7 +1212,7 @@ public class TestEntityStorage {
         .withName(name)
         .withAuditInfo(auditInfo)
         .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();
   }

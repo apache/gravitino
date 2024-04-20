@@ -268,7 +268,7 @@ public class TestResponses {
     RoleDTO role =
         RoleDTO.builder()
             .withName("role1")
-            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
             .withSecurableObject(DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")))
             .withAudit(audit)
             .build();
