@@ -52,7 +52,7 @@ something like that, all PRs should have related issues.
 3. Make sure the PR has a related issue, if not, please ask the PR author to create one; if wrong,
    please correct the PR title and description.
 4. Assign the "Assignees" to the PR author.
-5. If this PR needs to be backport to other branches, please add the corresponding labels to the
+5. If this PR needs to be backported to other branches, please add the corresponding labels to the
    PR, like "branch-0.5", "branch-0.6", etc. GitHub Actions will automatically create a backport
    PR for you.
 6. After PR is merged, please check the related issue:
@@ -65,7 +65,7 @@ something like that, all PRs should have related issues.
 ## Policy on backporting bug fixes
 
 Gravitino maintains several branches for different versions, so backporting bug fixes is a
-common and necessary operations for maintenance release. The decision point is when you have a
+common and necessary operation for maintenance release. The decision point is when you have a
 bug fix, and it's not clear whether it is worth backporting or not. Here is the general policy:
 
 For those bug fixes we should backport:
