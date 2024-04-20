@@ -134,6 +134,30 @@ public class CatalogInjector {
         // "io.trino.server.Server.trinoCatalogManager"
         // If the Trino is build with the patch
         // https://github.com/datastrato/Trino/commit/93b91791f9148c1885c5fac4d59cd5960feec685
+        //
+        // diff --git a/core/trino-main/src/main/java/io/trino/server/Server.java
+        // b/core/trino-main/src/main/java/io/trino/server/Server.java
+        // index c90c1221af..2e22061abd 100644
+        // --- a/core/trino-main/src/main/java/io/trino/server/Server.java
+        // +++ b/core/trino-main/src/main/java/io/trino/server/Server.java
+        // @@ -86,6 +86,8 @@ import static java.util.stream.Collectors.joining;
+        //
+        //  public class Server
+        //  {
+        // +    private static CatalogManager trinoCatalogManager;
+        // +
+        //      public final void start(String trinoVersion)
+        //      {
+        //          new EmbedVersion(trinoVersion).embedVersion(() -> doStart(trinoVersion)).run();
+        // @@ -140,6 +142,8 @@ public class Server
+        //
+        //              injector.getInstance(PluginInstaller.class).loadPlugins();
+        //
+        // +            trinoCatalogManager = injector.getInstance(CatalogManager.class);
+        // +
+        //              ConnectorServicesProvider connectorServicesProvider =
+        // injector.getInstance(ConnectorServicesProvider.class);
+        //              connectorServicesProvider.loadInitialCatalogs();
         Class serverClass = getClass(context.getClass().getClassLoader(), "io.trino.server.Server");
         Field trinoCatalogManagerField = serverClass.getDeclaredField("trinoCatalogManager");
         trinoCatalogManagerField.setAccessible(true);
