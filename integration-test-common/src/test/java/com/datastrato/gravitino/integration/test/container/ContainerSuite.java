@@ -212,7 +212,8 @@ public class ContainerSuite implements Closeable {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
-          KafkaContainer container = closer.register(KafkaContainer.builder().build());
+          KafkaContainer.Builder builder = KafkaContainer.builder().withNetwork(network);
+          KafkaContainer container = closer.register(builder.build());
           try {
             container.start();
           } catch (Exception e) {

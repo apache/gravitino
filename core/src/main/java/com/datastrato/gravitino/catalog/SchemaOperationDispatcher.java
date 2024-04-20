@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -104,7 +105,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             SchemaAlreadyExistsException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to store again.
-    boolean isManagedSchema = isManagedEntity(createdSchema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(createdSchema)
           .withHiddenPropertiesSet(
@@ -169,7 +170,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             NoSuchSchemaException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to load again.
-    boolean isManagedSchema = isManagedEntity(schema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
           .withHiddenPropertiesSet(
@@ -237,7 +238,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             NoSuchSchemaException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
-    boolean isManagedSchema = isManagedEntity(alteredSchema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(alteredSchema)
           .withHiddenPropertiesSet(

@@ -24,7 +24,10 @@ dependencies {
   implementation(libs.slf4j.api)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
