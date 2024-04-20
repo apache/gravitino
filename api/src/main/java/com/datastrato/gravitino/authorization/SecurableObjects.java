@@ -6,7 +6,11 @@ package com.datastrato.gravitino.authorization;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+
+import java.util.List;
 import java.util.Objects;
+
+import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link SecurableObject}. */
@@ -17,16 +21,44 @@ public class SecurableObjects {
   /**
    * Create the {@link SecurableObject} with the given names.
    *
+   * @param type The securable object type.
    * @param names The names of the securable object.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject of(String... names) {
+  public static SecurableObject of(SecurableObjectType type, String... names) {
+
     if (names == null) {
       throw new IllegalArgumentException("Cannot create a securable object with null names");
     }
 
     if (names.length == 0) {
       throw new IllegalArgumentException("Cannot create a securable object with no names");
+    }
+
+    if (type == null) {
+      throw new IllegalArgumentException("Cannot create a securable object with no type");
+    }
+
+    if (names.length > 3) {
+      throw new IllegalArgumentException("Cannot create a securable object with the name length which is greater than 3");
+    }
+
+    List<SecurableObjectType> typeInDifferentLevels = Lists.newArrayList(SecurableObjectType.CATALOG, SecurableObjectType.SCHEMA);
+
+    if (names.length == 1 && type != SecurableObjectType.CATALOG) {
+      throw new IllegalArgumentException("If the length of names is 1, it must be the CATALOG type");
+    }
+
+    if (names.length == 2 && type != SecurableObjectType.SCHEMA) {
+      throw new IllegalArgumentException("If the length of names is 2, it must be the SCHEMA type");
+    }
+
+    if (names.length == 3 && type != SecurableObjectType.FILESET && type != SecurableObjectType.TABLE && type != SecurableObjectType.TOPIC) {
+      throw new IllegalArgumentException("If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+    }
+
+    if (names.length > 2) {
+      typeInDifferentLevels.add(type);
     }
 
     SecurableObject parent = null;
@@ -45,7 +77,7 @@ public class SecurableObjects {
                 + " you can use add `read table` privilege for `catalog1.schema1` directly");
       }
 
-      parent = new SecurableObjectImpl(parent, name);
+      parent = new SecurableObjectImpl(parent, name, type);
     }
 
     return parent;
@@ -58,7 +90,7 @@ public class SecurableObjects {
    * @return The created catalog {@link SecurableObject}
    */
   public static SecurableObject ofCatalog(String catalog) {
-    return of(catalog);
+    return of(SecurableObjectType.CATALOG, catalog);
   }
 
   /**
@@ -72,7 +104,7 @@ public class SecurableObjects {
   public static SecurableObject ofSchema(SecurableObject catalog, String schema) {
     checkCatalog(catalog);
 
-    return of(catalog.name(), schema);
+    return of(SecurableObjectType.SCHEMA, catalog.name(), schema);
   }
 
   /**
@@ -85,7 +117,7 @@ public class SecurableObjects {
   public static SecurableObject ofTable(SecurableObject schema, String table) {
     checkSchema(schema);
 
-    return of(schema.parent().name(), schema.name(), table);
+    return of(SecurableObjectType.TABLE, schema.parent().name(), schema.name(), table);
   }
 
   /**
@@ -98,7 +130,7 @@ public class SecurableObjects {
   public static SecurableObject ofTopic(SecurableObject schema, String topic) {
     checkSchema(schema);
 
-    return of(schema.parent().name(), schema.name(), topic);
+    return of(SecurableObjectType.TOPIC, schema.parent().name(), schema.name(), topic);
   }
 
   /**
@@ -112,7 +144,7 @@ public class SecurableObjects {
   public static SecurableObject ofFileset(SecurableObject schema, String fileset) {
     checkSchema(schema);
 
-    return of(schema.parent().name(), schema.name(), fileset);
+    return of(SecurableObjectType.FILESET, schema.parent().name(), schema.name(), fileset);
   }
 
   /**
@@ -144,16 +176,18 @@ public class SecurableObjects {
     }
   }
 
-  private static final SecurableObject ALL_CATALOGS = new SecurableObjectImpl(null, "*");
+  private static final SecurableObject ALL_CATALOGS = new SecurableObjectImpl( null, "*", SecurableObjectType.CATALOG);
 
   private static class SecurableObjectImpl implements SecurableObject {
 
     private final SecurableObject parent;
     private final String name;
+    private final SecurableObjectType type;
 
-    SecurableObjectImpl(SecurableObject parent, String name) {
+    SecurableObjectImpl(SecurableObject parent, String name, SecurableObjectType type) {
       this.parent = parent;
       this.name = name;
+      this.type = type;
     }
 
     @Override
@@ -164,6 +198,16 @@ public class SecurableObjects {
     @Override
     public String name() {
       return name;
+    }
+
+    @Override
+    public String fullName() {
+      return toString();
+    }
+
+    @Override
+    public SecurableObjectType securableObjectType() {
+      return type;
     }
 
     @Override

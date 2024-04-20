@@ -38,6 +38,14 @@ public interface SecurableObject {
   String name();
 
   /**
+   * The full name of th securable object. If the parent isn't null, the full name will join the
+   * parent full name and the name with `.`, otherwise will return the name.
+   *
+   * @return The name of the securable object.
+   */
+  String fullName();
+
+  /**
    * The type of securable object
    *
    * @return The type of securable object.
