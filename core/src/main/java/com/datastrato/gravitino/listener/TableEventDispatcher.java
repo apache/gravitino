@@ -3,14 +3,15 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterTableEvent;
 import com.datastrato.gravitino.listener.api.event.AlterTableFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateTableEvent;
@@ -37,8 +38,8 @@ import java.util.Map;
 /**
  * {@code TableEventDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
  * table operations to the underlying catalog dispatcher but also dispatches corresponding events to
- * an {@link EventBus} after each operation is completed. This allows for event-driven workflows or
- * monitoring of table operations.
+ * an {@link com.datastrato.gravitino.listener.EventBus} after each operation is completed. This
+ * allows for event-driven workflows or monitoring of table operations.
  */
 public class TableEventDispatcher implements TableDispatcher {
   private final EventBus eventBus;
