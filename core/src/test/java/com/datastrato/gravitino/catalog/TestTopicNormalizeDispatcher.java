@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.messaging.Topic;
@@ -57,5 +59,28 @@ public class TestTopicNormalizeDispatcher extends TestTopicOperationDispatcher {
         topicNormalizeDispatcher.dropTopic(
             NameIdentifier.of(topicNs, topicIdent.name().toUpperCase())));
     Assertions.assertFalse(topicNormalizeDispatcher.topicExists(topicIdent));
+  }
+
+  @Test
+  public void testNameSpec() {
+    Namespace topicNs = Namespace.of(metalake, catalog, "testNameSpec");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, SECURABLE_ENTITY_RESERVED_NAME);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> topicNormalizeDispatcher.createTopic(topicIdent, "comment", null, props));
+    Assertions.assertEquals(
+        "The TOPIC name '*' is reserved. Illegal name: *", exception.getMessage());
+
+    NameIdentifier topicIdent2 = NameIdentifier.of(topicNs, "a?");
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> topicNormalizeDispatcher.createTopic(topicIdent2, "comment", null, props));
+    Assertions.assertEquals(
+        "The TOPIC name 'a?' is illegal. Illegal name: a?", exception.getMessage());
   }
 }

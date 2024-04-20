@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -71,5 +73,32 @@ public class TestFilesetNormalizeDispatcher extends TestFilesetOperationDispatch
         filesetNormalizeDispatcher.dropFileset(
             NameIdentifier.of(filesetNs, filesetIdent.name().toUpperCase())));
     Assertions.assertFalse(filesetNormalizeDispatcher.filesetExists(filesetIdent));
+  }
+
+  @Test
+  public void testNameSpec() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "testNameSpec");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, SECURABLE_ENTITY_RESERVED_NAME);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                filesetNormalizeDispatcher.createFileset(
+                    filesetIdent, "comment", Fileset.Type.MANAGED, "fileset41", props));
+    Assertions.assertEquals(
+        "The FILESET name '*' is reserved. Illegal name: *", exception.getMessage());
+
+    NameIdentifier filesetIdent2 = NameIdentifier.of(filesetNs, "a?");
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                filesetNormalizeDispatcher.createFileset(
+                    filesetIdent2, "comment", Fileset.Type.MANAGED, "fileset41", props));
+    Assertions.assertEquals(
+        "The FILESET name 'a?' is illegal. Illegal name: a?", exception.getMessage());
   }
 }
