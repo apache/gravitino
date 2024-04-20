@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.storage.relational;
 
+import static com.datastrato.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
@@ -18,8 +20,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
-import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -38,6 +40,8 @@ import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelp
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -46,6 +50,8 @@ import java.util.function.Function;
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
   /** Initialize the jdbc backend instance. */
   @Override
@@ -188,6 +194,80 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
+    }
+  }
+
+  @Override
+  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
+    LOG.info(
+        "Try to physically delete {} legacy data that has been marked deleted before {}",
+        entityType,
+        legacyTimeLine);
+
+    switch (entityType) {
+      case METALAKE:
+        return MetalakeMetaService.getInstance()
+            .deleteMetalakeMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case CATALOG:
+        return CatalogMetaService.getInstance()
+            .deleteCatalogMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case SCHEMA:
+        return SchemaMetaService.getInstance()
+            .deleteSchemaMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TABLE:
+        return TableMetaService.getInstance()
+            .deleteTableMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case FILESET:
+        return FilesetMetaService.getInstance()
+            .deleteFilesetAndVersionMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TOPIC:
+        return TopicMetaService.getInstance()
+            .deleteTopicMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case COLUMN:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        return 0;
+        // TODO: Implement hard delete logic for these entity types.
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
+    }
+  }
+
+  @Override
+  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
+    switch (entityType) {
+      case METALAKE:
+      case CATALOG:
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case TOPIC:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        // These entity types have not implemented multi-versions, so we can skip.
+        return 0;
+
+      case FILESET:
+        return FilesetMetaService.getInstance()
+            .deleteFilesetVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
     }
   }
 

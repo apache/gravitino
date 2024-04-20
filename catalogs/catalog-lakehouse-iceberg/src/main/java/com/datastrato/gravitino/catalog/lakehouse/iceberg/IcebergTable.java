@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
@@ -131,7 +133,8 @@ public class IcebergTable extends BaseTable {
    * @return A new IcebergTable instance.
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
-    Map<String, String> properties = table.properties();
+    Map<String, String> properties = new HashMap<>(table.properties());
+    properties.put(LOCATION, table.location());
     Schema schema = table.schema();
     Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
