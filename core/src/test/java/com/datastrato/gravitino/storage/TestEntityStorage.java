@@ -60,7 +60,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -69,7 +68,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -475,8 +473,6 @@ public class TestEntityStorage {
   @ParameterizedTest
   @MethodSource("storageProvider")
   public void testAuthorizationEntityDelete(String type) throws IOException {
-    // User, Group and Role entity only support kv store.
-    Assumptions.assumeTrue(Configs.DEFAULT_ENTITY_STORE.equals(type));
     Config config = Mockito.mock(Config.class);
     init(type, config);
 
@@ -1268,7 +1264,7 @@ public class TestEntityStorage {
         .withAuditInfo(auditInfo)
         .withSecurableObject(SecurableObjects.of("catalog"))
         .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
-        .withProperties(Collections.emptyMap())
+        .withProperties(null)
         .build();
   }
 
