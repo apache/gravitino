@@ -23,7 +23,9 @@ public enum SecurableObjectType {
   FILESET,
   /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
   TABLE,
-  /** A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc. */
+  /**
+   * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
+   */
   TOPIC,
   /**
    * A metalake is a concept of tenant. It means an organization. A metalake contains many data
