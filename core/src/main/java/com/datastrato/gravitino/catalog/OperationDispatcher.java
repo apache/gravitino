@@ -11,7 +11,6 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -28,7 +27,6 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -250,14 +248,11 @@ public abstract class OperationDispatcher {
     return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 
-  boolean isManagedEntity(Map<String, String> properties) {
-    return Optional.ofNullable(properties)
-        .map(
-            p ->
-                p.getOrDefault(
-                        BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.FALSE.toString())
-                    .equals(Boolean.TRUE.toString()))
-        .orElse(false);
+  boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
+    return doWithCatalog(
+        catalogIdent,
+        c -> c.capabilities().managedStorage(scope).supported(),
+        IllegalArgumentException.class);
   }
 
   static final class FormattedErrorMessages {
