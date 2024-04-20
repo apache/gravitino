@@ -289,15 +289,20 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
   @Override
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
+    Map<String, String> stringStringMap;
     String backend = properties.get("catalog-backend");
     switch (backend) {
       case "hive":
-        return buildHiveBackendProperties(properties);
+        stringStringMap = buildHiveBackendProperties(properties);
+        break;
       case "jdbc":
-        return buildJDBCBackendProperties(properties);
+        stringStringMap = buildHiveBackendProperties(properties);
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported backend type: " + backend);
     }
+    stringStringMap.putAll(super.gravitinoToEngineProperties(properties));
+    return stringStringMap;
   }
 
   private Map<String, String> buildHiveBackendProperties(Map<String, String> properties) {

@@ -4,7 +4,7 @@ CALL
 
 CALL
 
-"test.gt_mysql_xxx1","jdbc-mysql","{""join-pushdown.strategy"":""EAGER"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""jdbc-password"":""ds123"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""test_key"":""test_value""}"
+"test.gt_mysql_xxx1","jdbc-mysql","{""trino.bypass.join-pushdown.strategy"":""EAGER"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""jdbc-password"":""ds123"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver"",""test_key"":""test_value""}"
 
 CALL
 
@@ -12,6 +12,6 @@ CALL
 
 CALL
 
-"test.gt_mysql_xxx1","jdbc-mysql","{""join-pushdown.strategy"":""EAGER"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""jdbc-password"":""ds123"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver""}"
+"test.gt_mysql_xxx1","jdbc-mysql","{""trino.bypass.join-pushdown.strategy"":""EAGER"",""jdbc-url"":""jdbc:mysql://%/?useSSL=false"",""jdbc-user"":""trino"",""jdbc-password"":""ds123"",""jdbc-driver"":""com.mysql.cj.jdbc.Driver""}"
 
 CALL

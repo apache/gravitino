@@ -5,7 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
@@ -43,5 +46,44 @@ public class TestHiveCatalogPropertyConverter {
     // Needs to confirm whether external should be a property key for Trino.
     gravitinoHiveKeys.remove("external");
     Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBuildConnectorProperties() throws Exception {
+    String name = "test_catalog";
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("metastore.uris", "thrift://localhost:9083")
+            .put("hive.unknown-key", "1")
+            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.hive.config.resources", "/tmp/hive-site.xml, /tmp/core-site.xml")
+            .build();
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            name, "hive", "test catalog", Catalog.Type.RELATIONAL, properties);
+    HiveConnectorAdapter adapter = new HiveConnectorAdapter();
+    Map<String, Object> stringObjectMap =
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog, false));
+
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "hive");
+    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
+    // test converted properties
+    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
+
+    // test fixed properties
+    Assert.assertEquals(propertiesMap.get("hive.security"), "allow-all");
+
+    // test trino passing properties
+    Assert.assertEquals(
+        propertiesMap.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
+
+    // test unknown properties
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
   }
 }

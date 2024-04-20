@@ -5,8 +5,11 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
@@ -84,5 +87,44 @@ public class TestIcebergCatalogPropertyConverter {
         Sets.newHashSet(new IcebergTablePropertiesMetadata().propertyEntries().keySet());
 
     Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBuildConnectorProperties() throws Exception {
+    String name = "test_catalog";
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "thrift://localhost:9083")
+            .put("catalog-backend", "hive")
+            .put("warehouse", "hdfs://tmp/warehouse")
+            .put("unknown-key", "1")
+            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.table-statistics-enabled", "true")
+            .build();
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+
+    Map<String, Object> stringObjectMap =
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog, false));
+
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
+    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
+    // test converted properties
+    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
+    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "hive_metastore");
+
+    // test trino passing properties
+    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+
+    // test unknown properties
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
   }
 }
