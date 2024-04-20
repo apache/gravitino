@@ -354,7 +354,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } finally {
       if (!createSuccess) {
         try {
-          store.delete(ident, EntityType.CATALOG);
+          store.delete(ident, EntityType.CATALOG, true);
         } catch (IOException e4) {
           LOG.error("Failed to clean up catalog {}", ident, e4);
         }
