@@ -306,9 +306,9 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     // Split and process the partition specification string
     Map<String, String> partSpecMap =
         Arrays.stream(partitionSpec.split(PARTITION_NAME_DELIMITER))
-            .map(part -> part.split(PARTITION_VALUE_DELIMITER, 2))
-            .peek(
-                keyValue -> {
+            .map(
+                part -> {
+                  String[] keyValue = part.split(PARTITION_VALUE_DELIMITER, 2);
                   if (keyValue.length != 2) {
                     throw new IllegalArgumentException("Error partition format: " + partitionSpec);
                   }
@@ -316,6 +316,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                     throw new NoSuchPartitionException(
                         "Hive partition %s does not exist in Hive Metastore", partitionSpec);
                   }
+                  return keyValue;
                 })
             .collect(Collectors.toMap(keyValue -> keyValue[0], keyValue -> keyValue[1]));
 
