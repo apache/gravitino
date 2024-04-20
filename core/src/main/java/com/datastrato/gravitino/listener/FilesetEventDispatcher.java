@@ -3,16 +3,16 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterFilesetEvent;
 import com.datastrato.gravitino.listener.api.event.AlterFilesetFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateFilesetEvent;
@@ -30,8 +30,9 @@ import java.util.Map;
 /**
  * {@code FilesetEventDispatcher} is a decorator for {@link FilesetDispatcher} that not only
  * delegates fileset operations to the underlying catalog dispatcher but also dispatches
- * corresponding events to an {@link EventBus} after each operation is completed. This allows for
- * event-driven workflows or monitoring of fileset operations.
+ * corresponding events to an {@link com.datastrato.gravitino.listener.EventBus} after each
+ * operation is completed. This allows for event-driven workflows or monitoring of fileset
+ * operations.
  */
 public class FilesetEventDispatcher implements FilesetDispatcher {
   private final EventBus eventBus;

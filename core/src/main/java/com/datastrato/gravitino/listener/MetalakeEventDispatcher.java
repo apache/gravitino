@@ -3,14 +3,13 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.metalake;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterMetalakeEvent;
 import com.datastrato.gravitino.listener.api.event.AlterMetalakeFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateMetalakeEvent;
@@ -22,14 +21,16 @@ import com.datastrato.gravitino.listener.api.event.ListMetalakeFailureEvent;
 import com.datastrato.gravitino.listener.api.event.LoadMetalakeEvent;
 import com.datastrato.gravitino.listener.api.event.LoadMetalakeFailureEvent;
 import com.datastrato.gravitino.listener.api.info.MetalakeInfo;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 
 /**
  * {@code MetalakeEventDispatcher} is a decorator for {@link MetalakeDispatcher} that not only
  * delegates metalake operations to the underlying metalake dispatcher but also dispatches
- * corresponding events to an {@link EventBus} after each operation is completed. This allows for
- * event-driven workflows or monitoring of metalake operations.
+ * corresponding events to an {@link com.datastrato.gravitino.listener.EventBus} after each
+ * operation is completed. This allows for event-driven workflows or monitoring of metalake
+ * operations.
  */
 public class MetalakeEventDispatcher implements MetalakeDispatcher {
   private final EventBus eventBus;

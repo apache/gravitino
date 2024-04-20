@@ -3,16 +3,16 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterCatalogEvent;
 import com.datastrato.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateCatalogEvent;
@@ -30,8 +30,9 @@ import java.util.Map;
 /**
  * {@code CatalogEventDispatcher} is a decorator for {@link CatalogDispatcher} that not only
  * delegates catalog operations to the underlying catalog dispatcher but also dispatches
- * corresponding events to an {@link EventBus} after each operation is completed. This allows for
- * event-driven workflows or monitoring of catalog operations.
+ * corresponding events to an {@link com.datastrato.gravitino.listener.EventBus} after each
+ * operation is completed. This allows for event-driven workflows or monitoring of catalog
+ * operations.
  */
 public class CatalogEventDispatcher implements CatalogDispatcher {
   private final EventBus eventBus;
