@@ -505,7 +505,7 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofAllCatalogs())
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
         .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.USE_CATALOG)))
         .build();
   }

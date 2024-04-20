@@ -76,7 +76,7 @@ public class SecurableObjects {
       if (name.equals("*")) {
         throw new IllegalArgumentException(
             "Cannot create a securable object with `*` name. If you want to use a securable object which represents all catalogs,"
-                + " you use the method `ofAllCatalogs`."
+                + " you use the method `ofMetalake`."
                 + " If you want to create an another securable object which represents all entities,"
                 + " you can use its parent entity, For example,"
                 + " if you want to have read table privileges of all tables of `catalog1.schema1`,"
@@ -89,6 +89,16 @@ public class SecurableObjects {
     }
 
     return parent;
+  }
+
+  /**
+   * Create the metalake {@link SecurableObject} with the given metalake name.
+   *
+   * @param metalake The metalake name
+   * @return The created metalake {@link SecurableObject}
+   */
+  public static SecurableObject ofMetalake(String metalake) {
+    return of(SecurableObjectType.METALAKE, metalake);
   }
 
   /**
@@ -156,14 +166,13 @@ public class SecurableObjects {
   }
 
   /**
-   * All catalogs is a special securable object .You can give the securable object the privileges
-   * `LOAD CATALOG`, `CREATE CATALOG`, etc. It means that you can load any catalog and create any
-   * which doesn't exist.
+   * All metalakes is a special securable object .You can give the securable object the privileges
+   * `CREATE METALAKE`, etc. It means that you can create any which doesn't exist.
    *
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject ofAllCatalogs() {
-    return ALL_CATALOGS;
+  public static SecurableObject ofAllMetalakes() {
+    return ALL_METALAKES;
   }
 
   private static void checkSchema(SecurableObject schema) {
@@ -184,7 +193,7 @@ public class SecurableObjects {
     }
   }
 
-  private static final SecurableObject ALL_CATALOGS =
+  private static final SecurableObject ALL_METALAKES =
       new SecurableObjectImpl(null, "*", SecurableObjectType.CATALOG);
 
   private static class SecurableObjectImpl implements SecurableObject {
@@ -255,7 +264,10 @@ public class SecurableObjects {
    */
   public static SecurableObject parse(String securableObjectIdentifier, SecurableObjectType type) {
     if ("*".equals(securableObjectIdentifier)) {
-      return SecurableObjects.ofAllCatalogs();
+      if (type != SecurableObjectType.METALAKE) {
+        throw new IllegalArgumentException("If securable object isn't metalake, it can't be `*`");
+      }
+      return SecurableObjects.ofAllMetalakes();
     }
 
     if (StringUtils.isBlank(securableObjectIdentifier)) {
