@@ -49,7 +49,7 @@ public class TestRole extends TestBase {
         new RoleCreateRequest(
             roleName,
             ImmutableMap.of("k1", "v1"),
-            Lists.newArrayList("LOAD_CATALOG"),
+            Lists.newArrayList("USE_CATALOG"),
             SecurableObjectDTO.builder()
                 .withFullName("catalog")
                 .withType(SecurableObjectType.CATALOG)
