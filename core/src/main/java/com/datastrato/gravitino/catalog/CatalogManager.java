@@ -347,11 +347,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (Exception e3) {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
+      if (e3 instanceof RuntimeException) {
+        throw (RuntimeException) e3;
+      }
       throw new RuntimeException(e3);
     } finally {
       if (!createSuccess) {
         try {
-          store.delete(ident, EntityType.CATALOG);
+          store.delete(ident, EntityType.CATALOG, true);
         } catch (IOException e4) {
           LOG.error("Failed to clean up catalog {}", ident, e4);
         }
