@@ -296,7 +296,7 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
         stringStringMap = buildHiveBackendProperties(properties);
         break;
       case "jdbc":
-        stringStringMap = buildHiveBackendProperties(properties);
+        stringStringMap = buildJDBCBackendProperties(properties);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported backend type: " + backend);

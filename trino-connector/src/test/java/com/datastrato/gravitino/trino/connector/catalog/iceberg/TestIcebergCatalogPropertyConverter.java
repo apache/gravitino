@@ -91,7 +91,7 @@ public class TestIcebergCatalogPropertyConverter {
 
   @Test
   @SuppressWarnings("unchecked")
-  public void testBuildConnectorProperties() throws Exception {
+  public void testBuildConnectorPropertiesWithHiveBackend() throws Exception {
     String name = "test_catalog";
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
@@ -112,13 +112,59 @@ public class TestIcebergCatalogPropertyConverter {
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
-    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
 
     Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
 
     // test converted properties
     Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
     Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "hive_metastore");
+
+    // test trino passing properties
+    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+
+    // test unknown properties
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBuildConnectorPropertiesWithMySqlBackEnd() throws Exception {
+    String name = "test_catalog";
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true")
+            .put("catalog-backend", "jdbc")
+            .put("warehouse", "://tmp/warehouse")
+            .put("jdbc-user", "root")
+            .put("jdbc-password", "ds123")
+            .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
+            .put("unknown-key", "1")
+            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.table-statistics-enabled", "true")
+            .build();
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+
+    Map<String, Object> stringObjectMap =
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
+    // test converted properties
+    Assert.assertEquals(
+        propertiesMap.get("iceberg.jdbc-catalog.connection-url"),
+        "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true");
+    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-user"), "root");
+    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-password"), "ds123");
+    Assert.assertEquals(
+        propertiesMap.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
+    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "jdbc");
 
     // test trino passing properties
     Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");

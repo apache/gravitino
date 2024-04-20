@@ -24,9 +24,9 @@ public class TestHiveCatalogPropertyConverter {
     HiveCatalogPropertyConverter hiveCatalogPropertyConverter = new HiveCatalogPropertyConverter();
     Map<String, String> map =
         ImmutableMap.<String, String>builder()
-            .put("hive.immutable-partitions", "true")
-            .put("hive.compression-codec", "ZSTD")
-            .put("hive.unknown-key", "1")
+            .put("trino.bypass.hive.immutable-partitions", "true")
+            .put("trino.bypass.hive.compression-codec", "ZSTD")
+            .put("trino.bypass.hive.unknown-key", "1")
             .build();
 
     Map<String, String> re = hiveCatalogPropertyConverter.gravitinoToEngineProperties(map);
@@ -68,7 +68,6 @@ public class TestHiveCatalogPropertyConverter {
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "hive");
-    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
 
     Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
 

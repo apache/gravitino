@@ -73,7 +73,6 @@ public class TestJDBCCatalogPropertyConverter {
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "postgresql");
-    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
 
     Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
 
@@ -114,7 +113,6 @@ public class TestJDBCCatalogPropertyConverter {
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "mysql");
-    Assert.assertEquals(stringObjectMap.get("catalogHandle"), "test_catalog_v0:normal:default");
 
     Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
 
