@@ -271,9 +271,8 @@ public class TestCheckSecurableObjectPrivileges {
                 Privileges.ReadTable.get().name().toString(),
                 Privileges.CreateTable.get().name().toString(),
                 Privileges.DropTable.get().name().toString(),
-                Privileges.ReadTable.get().name().toString(),
                 Privileges.WriteTable.get().name().toString()),
-            DTOConverters.toDTO(SecurableObjects.ofFileset(schemaObject, "table1")));
+            DTOConverters.toDTO(SecurableObjects.ofTable(schemaObject, "table1")));
     Assertions.assertDoesNotThrow(
         () -> operations.checkSecurableObjectPrivileges("metalake", request1));
 
