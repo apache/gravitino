@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabiliti
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -135,10 +134,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a table with with reserved name `*`");
-    }
-
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
         catalogIdent,

@@ -14,7 +14,10 @@ CREATE TABLE
    id integer,
    name varchar
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/varchar_db2.db/tb04'
+)"
 
 DROP TABLE
 

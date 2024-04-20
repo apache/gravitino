@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestColumn;
@@ -95,6 +97,49 @@ public class TestTableNormalizeDispatcher extends TestTableOperationDispatcher {
     Assertions.assertTrue(
         tableNormalizeDispatcher.dropTable(
             NameIdentifier.of(tableNs, tableIdent.name().toUpperCase())));
+  }
+
+  @Test
+  public void testNameSpec() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "testNameSpec");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, SECURABLE_ENTITY_RESERVED_NAME);
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+        };
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableNormalizeDispatcher.createTable(tableIdent1, columns, "comment", props));
+    Assertions.assertEquals(
+        "The TABLE name '*' is reserved. Illegal name: *", exception.getMessage());
+
+    NameIdentifier tableIdent2 = NameIdentifier.of(tableNs, "a?");
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableNormalizeDispatcher.createTable(tableIdent2, columns, "comment", props));
+    Assertions.assertEquals(
+        "The TABLE name 'a?' is illegal. Illegal name: a?", exception.getMessage());
+
+    NameIdentifier tableIdent3 = NameIdentifier.of(tableNs, "abc");
+    Column[] columns1 =
+        new Column[] {
+          TestColumn.builder()
+              .withName(SECURABLE_ENTITY_RESERVED_NAME)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> tableNormalizeDispatcher.createTable(tableIdent3, columns1, "comment", props));
+    Assertions.assertEquals(
+        "The COLUMN name '*' is reserved. Illegal name: *", exception.getMessage());
   }
 
   private void assertTableCaseInsensitive(

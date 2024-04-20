@@ -208,7 +208,7 @@ public class TestMemoryEntityStore {
         UserEntity.builder()
             .withId(1L)
             .withName("user")
-            .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
             .withRoleNames(null)
             .build();

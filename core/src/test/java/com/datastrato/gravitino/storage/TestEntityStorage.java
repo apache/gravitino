@@ -18,6 +18,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
+import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
@@ -100,6 +101,7 @@ public class TestEntityStorage {
       Assertions.assertEquals(KV_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
       Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
       File dir = new File(DB_DIR);
       if (dir.exists() || !dir.isDirectory()) {
@@ -113,6 +115,8 @@ public class TestEntityStorage {
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
