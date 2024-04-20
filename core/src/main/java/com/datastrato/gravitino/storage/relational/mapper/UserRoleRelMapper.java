@@ -102,4 +102,11 @@ public interface UserRoleRelMapper {
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
           + " AND deleted_at = 0")
   void softDeleteUserRoleRelByMetalakeId(Long metalakeId);
+
+  @Update(
+      "UPDATE "
+          + RELATION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  void softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId);
 }

@@ -107,6 +107,8 @@ public class JDBCBackend implements RelationalBackend {
       RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
     } else if (e instanceof GroupEntity) {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
+    } else if (e instanceof RoleEntity) {
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -160,6 +162,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) UserMetaService.getInstance().getUserByIdentifier(ident);
       case GROUP:
         return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -185,6 +189,8 @@ public class JDBCBackend implements RelationalBackend {
         return UserMetaService.getInstance().deleteUser(ident);
       case GROUP:
         return GroupMetaService.getInstance().deleteGroup(ident);
+      case ROLE:
+        return RoleMetaService.getInstance().deleteRole(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

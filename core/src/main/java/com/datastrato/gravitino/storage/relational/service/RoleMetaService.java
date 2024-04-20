@@ -5,9 +5,12 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -24,6 +27,21 @@ public class RoleMetaService {
   }
 
   private RoleMetaService() {}
+
+  private RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
+    RolePO rolePO =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+
+    if (rolePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.ROLE.name().toLowerCase(),
+          roleName);
+    }
+    return rolePO;
+  }
 
   public Long getRoleIdByMetalakeIdAndName(Long metalakeId, String roleName) {
     Long roleId =
@@ -78,5 +96,41 @@ public class RoleMetaService {
           re, Entity.EntityType.ROLE, roleEntity.nameIdentifier().toString());
       throw re;
     }
+  }
+
+  public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
+    Preconditions.checkArgument(
+        identifier != null
+            && !identifier.namespace().isEmpty()
+            && identifier.namespace().levels().length == 3,
+        "The identifier should not be null and should have three level.");
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+
+    return POConverters.fromRolePO(rolePO, identifier.namespace());
+  }
+
+  public boolean deleteRole(NameIdentifier identifier) {
+    Preconditions.checkArgument(
+        identifier != null
+            && !identifier.namespace().isEmpty()
+            && identifier.namespace().levels().length == 3,
+        "The identifier should not be null and should have three level.");
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)));
+    return true;
   }
 }

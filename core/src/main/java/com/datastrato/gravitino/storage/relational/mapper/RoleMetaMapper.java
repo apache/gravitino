@@ -10,6 +10,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -20,9 +21,24 @@ import org.apache.ibatis.annotations.Select;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface RoleMetaMapper {
+  String USER_TABLE_NAME = "user_meta";
+  String GROUP_TABLE_NAME = "group_meta";
   String ROLE_TABLE_NAME = "role_meta";
   String USER_RELATION_TABLE_NAME = "user_role_rel";
   String GROUP_RELATION_TABLE_NAME = "group_role_rel";
+
+  @Select(
+      "SELECT role_id as roleId, role_name as roleName,"
+          + " metalake_id as metalakeId, properties as properties,"
+          + " securable_object as securableObject, privileges as privileges,"
+          + " audit_info as auditInfo, current_version as currentVersion,"
+          + " last_version as lastVersion, deleted_at as deletedAt"
+          + " FROM "
+          + ROLE_TABLE_NAME
+          + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
+          + " AND deleted_at = 0")
+  RolePO selectRoleMetaByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
 
   @Select(
       "SELECT role_id as roleId FROM "
@@ -112,4 +128,18 @@ public interface RoleMetaMapper {
           + " last_version = #{roleMeta.lastVersion},"
           + " deleted_at = #{roleMeta.deletedAt}")
   void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
+
+  @Update(
+      "UPDATE "
+          + ROLE_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  void softDeleteRoleMetaByRoleId(Long roleId);
+
+  @Update(
+      "UPDATE "
+          + ROLE_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 }
