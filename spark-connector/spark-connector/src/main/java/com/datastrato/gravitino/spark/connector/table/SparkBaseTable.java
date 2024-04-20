@@ -11,6 +11,7 @@ import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +19,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.Getter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsRead;
@@ -48,7 +48,7 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   private TableCatalog sparkCatalog;
   private Table lazySparkTable;
   private PropertiesConverter propertiesConverter;
-  @Getter private SparkTransformConverter sparkTransformConverter;
+  private SparkTransformConverter sparkTransformConverter;
 
   public SparkBaseTable(
       Identifier identifier,
@@ -143,6 +143,11 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
       }
     }
     return lazySparkTable;
+  }
+
+  @VisibleForTesting
+  public SparkTransformConverter getSparkTransformConverter() {
+    return sparkTransformConverter;
   }
 
   protected boolean isCaseSensitive() {

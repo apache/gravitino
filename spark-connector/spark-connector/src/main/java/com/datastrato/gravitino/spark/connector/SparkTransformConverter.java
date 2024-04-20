@@ -13,6 +13,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,10 +53,15 @@ public class SparkTransformConverter {
    * SortedBucketTransform is not supported. If false, BucketTransform and SortedBucketTransform is
    * transformed to Distribution and SortOrder.
    */
-  @Getter private final boolean supportsBucketPartition;
+  private final boolean supportsBucketPartition;
 
   public SparkTransformConverter(boolean supportsBucketPartition) {
     this.supportsBucketPartition = supportsBucketPartition;
+  }
+
+  @VisibleForTesting
+  public boolean isSupportsBucketPartition() {
+    return supportsBucketPartition;
   }
 
   @Getter
