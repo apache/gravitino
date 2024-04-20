@@ -38,14 +38,16 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   private static final Type INT = Types.IntegerType.get();
 
+  private static final Integer DEFAULT_BUCKET_SIZE = 2;
+
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
 
-  // Because the creation of Schema Change is an asynchronous process, we need wait for a while
+  // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
   // DorisTableOperations.generateAlterTableSql().
-  private static final long MAX_WAIT = 30;
+  private static final long MAX_WAIT_IN_SECONDS = 30;
 
-  private static final long WAIT_INTERVAL = 1;
+  private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
   @BeforeAll
   public static void startup() {
@@ -79,7 +81,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     Map<String, String> properties = new HashMap<>();
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
 
     // create table
@@ -128,7 +131,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     Map<String, String> properties = new HashMap<>();
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
 
     // create table
@@ -162,8 +166,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -209,8 +213,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     columns.add(col_4);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -234,8 +238,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_4);
     columns.add(col_3);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -254,8 +258,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_2);
     columns.add(col_3);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -293,8 +297,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     Index[] newIndexes =
         new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -309,8 +313,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.deleteIndex("k2_index", true));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -343,7 +347,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(JdbcColumn.builder().withName("col_12").withType(Types.VarCharType.of(10)).build());
     columns.add(JdbcColumn.builder().withName("col_13").withType(Types.StringType.get()).build());
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
     // create table
     TABLE_OPERATIONS.create(
@@ -395,7 +400,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     tableComment,
                     createProperties(),
                     null,
-                    Distributions.hash(32, NamedReference.field("col_1")),
+                    Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
                     Indexes.EMPTY_INDEXES);
               });
       Assertions.assertTrue(
