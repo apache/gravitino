@@ -43,14 +43,11 @@ public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
 
   private final AccessControlManager accessControlManager;
-  private final CatalogManager catalogManager;
 
   @Context private HttpServletRequest httpRequest;
 
-  @Inject
-  public RoleOperations(CatalogManager catalogManager) {
+  public RoleOperations() {
     this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
-    this.catalogManager = catalogManager;
   }
 
   @GET
@@ -77,7 +74,6 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-      checkSecurableObjectPrivileges(metalake, request);
 
       return Utils.doAs(
           httpRequest,
@@ -121,46 +117,5 @@ public class RoleOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);
     }
-  }
-
-  @VisibleForTesting
-  void checkSecurableObjectPrivileges(String metalake, RoleCreateRequest request) {
-    SecurableObject securableObject =
-        SecurableObjects.parse(
-            request.getSecurableObject().fullName(), request.getSecurableObject().type());
-    Catalog.Type type = null;
-
-    switch (securableObject.type()) {
-      case FILESET:
-        type = Catalog.Type.FILESET;
-        break;
-
-      case TOPIC:
-        type = Catalog.Type.MESSAGING;
-        break;
-
-      case TABLE:
-        type = Catalog.Type.RELATIONAL;
-        break;
-
-      case SCHEMA:
-        NameIdentifier ident =
-            NameIdentifier.ofCatalog(metalake, AuthorizationUtils.getCatalogName(securableObject));
-
-        Catalog catalog =
-            TreeLockUtils.doWithTreeLock(
-                ident, LockType.READ, () -> catalogManager.loadCatalog(ident));
-        type = catalog.type();
-        break;
-
-      case CATALOG:
-        // CATALOG doesn't need get the type of catalog.
-        break;
-    }
-
-    AuthorizationUtils.checkSecurableObjectPrivileges(
-        securableObject,
-        type,
-        request.getPrivileges().stream().map(Privileges::fromString).collect(Collectors.toList()));
   }
 }
