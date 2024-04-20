@@ -17,16 +17,16 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_FILESET
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESET;
+import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPIC;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_GROUP;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_ROLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_USER;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOG;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESET;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPIC;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_CATALOG;
@@ -60,7 +60,7 @@ public class Privileges {
     switch (name) {
         // Catalog
       case SHOW_CATALOG:
-        return ShowCatalogs.get();
+        return ShowCatalog.get();
       case USE_CATALOG:
         return UseCatalog.get();
       case CREATE_CATALOG:
@@ -72,7 +72,7 @@ public class Privileges {
 
         // Schema
       case SHOW_SCHEMA:
-        return ShowSchemas.get();
+        return ShowSchema.get();
       case USE_SCHEMA:
         return UseSchema.get();
       case CREATE_SCHEMA:
@@ -84,7 +84,7 @@ public class Privileges {
 
         // Table
       case SHOW_TABLE:
-        return ShowTables.get();
+        return ShowTable.get();
       case CREATE_TABLE:
         return CreateTable.get();
       case DROP_TABLE:
@@ -140,12 +140,12 @@ public class Privileges {
   }
 
   /** The privilege to show catalogs. */
-  public static class ShowCatalogs implements Privilege {
+  public static class ShowCatalog implements Privilege {
 
-    private static final ShowCatalogs INSTANCE = new ShowCatalogs();
+    private static final ShowCatalog INSTANCE = new ShowCatalog();
 
     /** @return The instance of the privilege. */
-    public static ShowCatalogs get() {
+    public static ShowCatalog get() {
       return INSTANCE;
     }
 
@@ -262,14 +262,14 @@ public class Privileges {
   }
 
   /** The privilege to show schemas. */
-  public static class ShowSchemas implements Privilege {
+  public static class ShowSchema implements Privilege {
 
-    private static final ShowSchemas INSTANCE = new ShowSchemas();
+    private static final ShowSchema INSTANCE = new ShowSchema();
 
-    private ShowSchemas() {}
+    private ShowSchema() {}
 
     /** @return The instance of the privilege. */
-    public static ShowSchemas get() {
+    public static ShowSchema get() {
       return INSTANCE;
     }
 
@@ -379,12 +379,12 @@ public class Privileges {
   }
 
   /** The privilege to show tables. */
-  public static class ShowTables implements Privilege {
+  public static class ShowTable implements Privilege {
 
-    private static final ShowTables INSTANCE = new ShowTables();
+    private static final ShowTable INSTANCE = new ShowTable();
 
     /** @return The instance of the privilege. */
-    public static ShowTables get() {
+    public static ShowTable get() {
       return INSTANCE;
     }
 
@@ -772,7 +772,7 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "manage topic";
+      return "manage metalake";
     }
   }
 
@@ -797,7 +797,7 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create topic";
+      return "create metalake";
     }
   }
 

@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
@@ -13,9 +12,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -24,5 +24,15 @@ public enum SecurableObjectType {
   /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc */
   TABLE,
   /** A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc */
-  TOPIC
+  TOPIC,
+  /**
+   * A metalake is a concept of tenant. It means an organization. A metalake contains many data
+   * sources
+   */
+  METALAKE,
+  /**
+   * A role is used for access control. A role will indicate that it has some privileges to access
+   * some securable objects
+   */
+  ROLE
 }
