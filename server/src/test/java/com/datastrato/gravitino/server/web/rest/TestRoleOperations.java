@@ -128,7 +128,8 @@ public class TestRoleOperations extends JerseyTest {
 
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
-    Assertions.assertEquals(SecurableObjects.ofCatalog("catalog"), roleDTO.securableObject());
+    Assertions.assertEquals(
+        SecurableObjects.ofCatalog("catalog").fullName(), roleDTO.securableObject().fullName());
     Assertions.assertEquals(Lists.newArrayList(Privileges.LoadCatalog.get()), roleDTO.privileges());
 
     // Test to throw NoSuchMetalakeException
@@ -202,7 +203,8 @@ public class TestRoleOperations extends JerseyTest {
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertTrue(role.properties().isEmpty());
-    Assertions.assertEquals(SecurableObjects.ofCatalog("catalog"), roleDTO.securableObject());
+    Assertions.assertEquals(
+        SecurableObjects.ofCatalog("catalog").fullName(), roleDTO.securableObject().fullName());
     Assertions.assertEquals(Lists.newArrayList(Privileges.LoadCatalog.get()), roleDTO.privileges());
 
     // Test to throw NoSuchMetalakeException
