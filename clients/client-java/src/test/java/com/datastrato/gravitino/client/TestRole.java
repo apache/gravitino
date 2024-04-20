@@ -190,6 +190,6 @@ public class TestRole extends TestBase {
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(expected.privileges(), actual.privileges());
     Assertions.assertEquals(
-        expected.securableObject().toString(), actual.securableObject().toString());
+        expected.securableObject().fullName(), actual.securableObject().fullName());
   }
 }
