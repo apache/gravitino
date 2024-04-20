@@ -141,6 +141,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         throw new IllegalArgumentException(
             "Invalid configuration for Kafka AdminClient: " + e.getCause().getMessage(), e);
       }
+      throw new RuntimeException("Failed to create Kafka AdminClient", e);
     }
     createDefaultSchemaIfNecessary();
   }
