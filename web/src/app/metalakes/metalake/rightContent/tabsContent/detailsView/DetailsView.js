@@ -130,7 +130,7 @@ const DetailsView = () => {
             Properties
           </Typography>
 
-          <TableContainer>
+          <TableContainer data-refer='details-table-grid'>
             <Table>
               <TableHead
                 sx={{
@@ -155,7 +155,15 @@ const DetailsView = () => {
                                 : 400
                           }}
                         >
-                          {item.key}
+                          <div
+                            data-refer={
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? `props-key-${item.key}-highlight`
+                                : `props-key-${item.key}`
+                            }
+                          >
+                            {item.key}
+                          </div>
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>
@@ -167,7 +175,15 @@ const DetailsView = () => {
                                 : 400
                           }}
                         >
-                          {item.value}
+                          <div
+                            data-refer={
+                              searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
+                                ? `props-value-${item.key}-highlight`
+                                : `props-value-${item.key}`
+                            }
+                          >
+                            {item.value}
+                          </div>
                         </Typography>
                       </TableCell>
                     </TableRow>

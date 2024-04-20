@@ -7,8 +7,8 @@ call gravitino.system.create_catalog(
     )
 );
 
-create schema "test.gt_hive2".gt_tpch;
-use "test.gt_hive2".gt_tpch;
+create schema gt_hive2.gt_tpch;
+use gt_hive2.gt_tpch;
 
 CREATE TABLE customer (
    custkey bigint,

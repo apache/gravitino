@@ -4,7 +4,7 @@ USE
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb01 (
+"CREATE TABLE gt_hive.varchar_db1.tb01 (
    id integer,
    name char(20)
 )
@@ -20,7 +20,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb02 (
+"CREATE TABLE gt_hive.varchar_db1.tb02 (
    id integer,
    name char(255)
 )
@@ -38,7 +38,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb04 (
+"CREATE TABLE gt_hive.varchar_db1.tb04 (
    id integer,
    name varchar(250)
 )
@@ -54,7 +54,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb05 (
+"CREATE TABLE gt_hive.varchar_db1.tb05 (
    id integer,
    name varchar(65535)
 )
@@ -70,7 +70,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb06 (
+"CREATE TABLE gt_hive.varchar_db1.tb06 (
    id integer,
    name char(1)
 )
@@ -86,7 +86,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_hive"".varchar_db1.tb07 (
+"CREATE TABLE gt_hive.varchar_db1.tb07 (
    id integer,
    name varchar
 )

@@ -64,7 +64,7 @@ public class TestHiveCatalogPropertyConverter {
             name, "hive", "test catalog", Catalog.Type.RELATIONAL, properties);
     HiveConnectorAdapter adapter = new HiveConnectorAdapter();
     Map<String, Object> stringObjectMap =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog, false));
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "hive");

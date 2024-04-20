@@ -7,7 +7,7 @@ call gravitino.system.create_catalog(
     )
 );
 
-select * from gravitino.system.catalog where name = 'test.gt_mysql_xxx1';
+select * from gravitino.system.catalog where name = 'gt_mysql_xxx1';
 
 call gravitino.system.alter_catalog(
     'gt_mysql_xxx1',
@@ -17,7 +17,7 @@ call gravitino.system.alter_catalog(
     )
 );
 
-select * from gravitino.system.catalog where name = 'test.gt_mysql_xxx1';
+select * from gravitino.system.catalog where name = 'gt_mysql_xxx1';
 
 call gravitino.system.alter_catalog(
     'gt_mysql_xxx1',
@@ -25,7 +25,7 @@ call gravitino.system.alter_catalog(
     array['trino.bypass.join-pushdown.strategy']
 );
 
-select * from gravitino.system.catalog where name = 'test.gt_mysql_xxx1';
+select * from gravitino.system.catalog where name = 'gt_mysql_xxx1';
 
 call gravitino.system.alter_catalog(
     catalog => 'gt_mysql_xxx1',
@@ -36,6 +36,6 @@ call gravitino.system.alter_catalog(
     remove_properties => array['test_key']
 );
 
-select * from gravitino.system.catalog where name = 'test.gt_mysql_xxx1';
+select * from gravitino.system.catalog where name = 'gt_mysql_xxx1';
 
 call gravitino.system.drop_catalog('gt_mysql_xxx1');

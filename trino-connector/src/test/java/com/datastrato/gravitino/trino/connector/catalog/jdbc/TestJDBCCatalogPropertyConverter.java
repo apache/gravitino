@@ -69,7 +69,7 @@ public class TestJDBCCatalogPropertyConverter {
     PostgreSQLConnectorAdapter adapter = new PostgreSQLConnectorAdapter();
 
     Map<String, Object> stringObjectMap =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog, false));
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "postgresql");
@@ -110,7 +110,7 @@ public class TestJDBCCatalogPropertyConverter {
     MySQLConnectorAdapter adapter = new MySQLConnectorAdapter();
 
     Map<String, Object> stringObjectMap =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog, false));
+        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
     Assert.assertEquals(stringObjectMap.get("connectorName"), "mysql");

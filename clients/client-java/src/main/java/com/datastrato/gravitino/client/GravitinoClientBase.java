@@ -15,6 +15,7 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.InlineMe;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -128,7 +129,8 @@ public abstract class GravitinoClientBase implements Closeable {
    * @return A GravitinoVersion instance representing the version of the Gravitino API.
    */
   @Deprecated
-  public GravitinoVersion getVersion() {
+  @InlineMe(replacement = "this.serverVersion()")
+  public final GravitinoVersion getVersion() {
     return serverVersion();
   }
 
