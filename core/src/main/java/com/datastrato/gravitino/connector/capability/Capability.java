@@ -94,7 +94,7 @@ public interface Capability {
      *
      * <p>$ - End of the string
      */
-    private static final String LEGAL_PATTERN = "^[a-zA-Z0-9_][a-zA-Z0-9_/=-]{0,63}$";
+    private static final String DEFAULT_NAME_PATTERN = "^[a-zA-Z0-9_][a-zA-Z0-9_/=-]{0,63}$";
 
     @Override
     public CapabilityResult columnNotNull() {
@@ -118,7 +118,7 @@ public interface Capability {
             String.format("The %s name '%s' is reserved.", scope, name));
       }
 
-      if (!name.matches(LEGAL_PATTERN)) {
+      if (!name.matches(DEFAULT_NAME_PATTERN)) {
         return CapabilityResult.unsupported(
             String.format("The %s name '%s' is illegal.", scope, name));
       }
