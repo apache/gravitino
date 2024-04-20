@@ -24,7 +24,6 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
-
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private AuthorizationUtils() {}
