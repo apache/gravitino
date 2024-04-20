@@ -50,5 +50,5 @@ public interface SecurableObject {
    *
    * @return The type of securable object.
    */
-  SecurableObjectType securableObjectType();
+  SecurableObjectType type();
 }

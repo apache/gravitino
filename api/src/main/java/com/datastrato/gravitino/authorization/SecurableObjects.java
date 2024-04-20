@@ -240,9 +240,10 @@ public class SecurableObjects {
    * Create a {@link SecurableObject} from the given identifier string.
    *
    * @param securableObjectIdentifier The identifier string
+   * @param type The securable object type.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject parse(String securableObjectIdentifier) {
+  public static SecurableObject parse(String securableObjectIdentifier, SecurableObjectType type) {
     if ("*".equals(securableObjectIdentifier)) {
       return SecurableObjects.ofAllCatalogs();
     }
@@ -252,6 +253,6 @@ public class SecurableObjects {
     }
 
     Iterable<String> parts = DOT.split(securableObjectIdentifier);
-    return SecurableObjects.of(Iterables.toArray(parts, String.class));
+    return SecurableObjects.of(type, Iterables.toArray(parts, String.class));
   }
 }

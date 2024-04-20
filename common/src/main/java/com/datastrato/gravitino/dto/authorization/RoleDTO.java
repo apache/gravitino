@@ -39,7 +39,7 @@ public class RoleDTO implements Role {
   private List<String> privileges;
 
   @JsonProperty("securableObject")
-  private String securableObject;
+  private SecurableObject securableObject;
 
   /** Default constructor for Jackson deserialization. */
   protected RoleDTO() {}
@@ -57,7 +57,7 @@ public class RoleDTO implements Role {
       String name,
       Map<String, String> properties,
       List<String> privileges,
-      String securableObject,
+      SecurableObject securableObject,
       AuditDTO audit) {
     this.name = name;
     this.audit = audit;
@@ -103,7 +103,7 @@ public class RoleDTO implements Role {
    */
   @Override
   public SecurableObject securableObject() {
-    return SecurableObjects.parse(securableObject);
+    return securableObject;
   }
 
   /** @return The audit information of the Role DTO. */
@@ -188,7 +188,7 @@ public class RoleDTO implements Role {
      * @param securableObject The securableObject of the role.
      * @return The builder instance.
      */
-    public S withSecurableObject(SecurableObject securableObject) {
+    public S withSecurableObject(SecurableObjectDTO securableObject) {
       this.securableObject = securableObject;
       return (S) this;
     }
@@ -224,7 +224,7 @@ public class RoleDTO implements Role {
               .map(Privilege::name)
               .map(Objects::toString)
               .collect(Collectors.toList()),
-          securableObject.toString(),
+          securableObject,
           audit);
     }
   }
