@@ -92,7 +92,7 @@ Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configurati
 
 Gravitino provides event listener mechanism to allow uses to capture the event provides by Gravitino server to integrate some custom operations.
 
-To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the resulting JAR in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
+To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the resulting JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
 
 | Property name                              | Description                                                                                            | Default value | Required | Since Version |
 |--------------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
