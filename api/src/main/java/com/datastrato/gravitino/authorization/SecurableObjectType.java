@@ -27,7 +27,7 @@ public enum SecurableObjectType {
   TOPIC,
   /**
    * A metalake is a concept of tenant. It means an organization. A metalake contains many data
-   * sources
+   * sources.
    */
   METALAKE,
   /**
