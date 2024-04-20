@@ -426,6 +426,40 @@ class TestUserMetaService extends TestJDBCBackend {
         Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeUser.roleIds()));
     Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
+
+    Function<UserEntity, UserEntity> noUpdater =
+        user -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(user.auditInfo().creator())
+                  .withCreateTime(user.auditInfo().createTime())
+                  .withLastModifier("noUpdateUser")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          List<String> roleNames = Lists.newArrayList(user.roleNames());
+          List<Long> roleIds = Lists.newArrayList(user.roleIds());
+
+          return UserEntity.builder()
+              .withNamespace(user.namespace())
+              .withId(user.id())
+              .withName(user.name())
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), noUpdater));
+    UserEntity noUpdaterUser =
+        UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
+    Assertions.assertEquals(user1.id(), noUpdaterUser.id());
+    Assertions.assertEquals(user1.name(), noUpdaterUser.name());
+    Assertions.assertEquals(
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterUser.roleNames()));
+    Assertions.assertEquals(
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterUser.roleIds()));
+    Assertions.assertEquals("creator", noUpdaterUser.auditInfo().creator());
+    Assertions.assertEquals("grantRevokeUser", noUpdaterUser.auditInfo().lastModifier());
   }
 
   @Test
