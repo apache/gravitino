@@ -12,7 +12,7 @@ RENAME TABLE
 
 DROP COLUMN
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    name varchar,
    salary integer
 )
@@ -23,7 +23,7 @@ WITH (
 
 RENAME COLUMN
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    s varchar,
    salary integer
 )
@@ -34,7 +34,7 @@ WITH (
 
 SET COLUMN TYPE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    s varchar,
    salary bigint
 )
@@ -45,7 +45,7 @@ WITH (
 
 COMMENT
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    s varchar,
    salary bigint
 )
@@ -56,7 +56,7 @@ WITH (
 
 COMMENT
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    s varchar COMMENT 'test column comments',
    salary bigint
 )
@@ -67,7 +67,7 @@ WITH (
 
 ADD COLUMN
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    s varchar COMMENT 'test column comments',
    salary bigint,
    city varchar COMMENT 'aaa'

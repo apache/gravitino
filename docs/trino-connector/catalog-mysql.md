@@ -90,7 +90,7 @@ The results are similar to:
  gravitino
  jmx
  system
- test.mysql_test
+ mysql_test
 (4 rows)
 
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
@@ -105,13 +105,13 @@ Other catalogs are regular user-configured Trino catalogs.
 Create a new schema named `database_01` in `test.mysql_test` catalog.
 
 ```sql
-CREATE SCHEMA "test.mysql_test".database_01;
+CREATE SCHEMA mysql_test.database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.mysql_test".database_01`.
+Create a new table named `table_01` in schema `mysql_test.database_01`.
 
 ```sql
-CREATE TABLE  "test.mysql_test".database_01.table_01
+CREATE TABLE mysql_test.database_01.table_01
 (
 name varchar,
 salary int
@@ -123,13 +123,13 @@ salary int
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO "test.mysql_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
+INSERT INTO mysql_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO "test.mysql_test".database_01.table_01 (name, salary) SELECT * FROM "test.mysql_test".database_01.table_01;
+INSERT INTO mysql_test.database_01.table_01 (name, salary) SELECT * FROM "test.mysql_test".database_01.table_01;
 ```
 
 ### Querying data
@@ -137,7 +137,7 @@ INSERT INTO "test.mysql_test".database_01.table_01 (name, salary) SELECT * FROM 
 Query the `table_01` table:
 
 ```sql
-SELECT * FROM "test.mysql_test".database_01.table_01;
+SELECT * FROM mysql_test.database_01.table_01;
 ```
 
 ### Modify a table
@@ -145,19 +145,19 @@ SELECT * FROM "test.mysql_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-ALTER TABLE "test.mysql_test".database_01.table_01 ADD COLUMN age int;
+ALTER TABLE mysql_test.database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-ALTER TABLE "test.mysql_test".database_01.table_01 DROP COLUMN age;
+ALTER TABLE mysql_test.database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE "test.mysql_test".database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
+ALTER TABLE mysql_test.database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
 ```
 
 ### DROP
@@ -165,11 +165,11 @@ ALTER TABLE "test.mysql_test".database_01.table_01 RENAME TO "test.mysql_test".d
 Drop a schema:
 
 ```sql
-DROP SCHEMA "test.mysql_test".database_01;
+DROP SCHEMA mysql_test.database_01;
 ```
 
 Drop a table:
 
 ```sql
-DROP TABLE "test.mysql_test".database_01.table_01;
+DROP TABLE mysql_test.database_01.table_01;
 ```

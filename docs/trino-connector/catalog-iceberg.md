@@ -141,7 +141,7 @@ The results are similar to:
  gravitino
  jmx
  system
- test.iceberg_test
+ iceberg_test
 (4 rows)
 
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
@@ -156,13 +156,13 @@ Other catalogs are regular user-configured Trino catalogs.
 Create a new schema named `database_01` in `test.iceberg_test` catalog.
 
 ```sql
-CREATE SCHEMA "test.iceberg_test".database_01;
+CREATE SCHEMA iceberg_test.database_01;
 ```
 
 Create a new table named `table_01` in schema `"test.iceberg_test".database_01`.
 
 ```sql
-CREATE TABLE  "test.iceberg_test".database_01.table_01
+CREATE TABLE iceberg_test.database_01.table_01
 (
 name varchar,
 salary int
@@ -177,13 +177,13 @@ salary int
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO "test.iceberg_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
+INSERT INTO iceberg_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO "test.iceberg_test".database_01.table_01 (name, salary) SELECT * FROM "test.iceberg_test".database_01.table_01;
+INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM "test.iceberg_test".database_01.table_01;
 ```
 
 ### Querying data

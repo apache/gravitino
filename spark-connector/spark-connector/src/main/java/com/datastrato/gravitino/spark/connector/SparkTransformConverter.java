@@ -13,6 +13,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,14 +49,19 @@ import scala.collection.JavaConverters;
 public class SparkTransformConverter {
 
   /**
-   * supportsBucketPartition is used to indicate whether a dataSource supports bucket partition. For
-   * example, iceberg supports bucket partition. We use true to indicate that bucket partition are
-   * supported and false to indicate that it is not supported
+   * If supportsBucketPartition is ture, BucketTransform is transfromed to partition, and
+   * SortedBucketTransform is not supported. If false, BucketTransform and SortedBucketTransform is
+   * transformed to Distribution and SortOrder.
    */
   private final boolean supportsBucketPartition;
 
   public SparkTransformConverter(boolean supportsBucketPartition) {
     this.supportsBucketPartition = supportsBucketPartition;
+  }
+
+  @VisibleForTesting
+  public boolean isSupportsBucketPartition() {
+    return supportsBucketPartition;
   }
 
   @Getter
@@ -108,7 +114,7 @@ public class SparkTransformConverter {
                 YearsTransform yearsTransform = (YearsTransform) transform;
                 return Transforms.year(yearsTransform.reference().fieldNames());
               } else if (transform instanceof ApplyTransform
-                  && "truncate".equals(transform.name())) {
+                  && "truncate".equalsIgnoreCase(transform.name())) {
                 Preconditions.checkArgument(
                     transform.references().length == 1,
                     "Truncate transform should have only one reference");

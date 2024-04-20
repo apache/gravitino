@@ -52,7 +52,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     for (GravitinoCatalog catalog : catalogs) {
       Preconditions.checkNotNull(catalog, "catalog should not be null");
 
-      VARCHAR.writeString(nameColumnBuilder, catalog.getFullName());
+      VARCHAR.writeString(nameColumnBuilder, catalog.getName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());
       try {
         VARCHAR.writeString(

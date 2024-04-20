@@ -10,7 +10,7 @@ USE
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".varchar_db2.tb04 (
+"CREATE TABLE gt_iceberg.varchar_db2.tb04 (
    id integer,
    name varchar
 )

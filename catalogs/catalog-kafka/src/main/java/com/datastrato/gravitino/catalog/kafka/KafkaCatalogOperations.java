@@ -18,7 +18,6 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
@@ -216,7 +215,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       LOG.info(
           "Created topic {}[id: {}] with {} partitions and replication factor {}",
           ident,
-          topicId.toString(),
+          topicId,
           createTopicsResult.numPartitions(ident.name()).get(),
           createTopicsResult.replicationFactor(ident.name()).get());
 
@@ -552,7 +551,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     ImmutableMap<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put(ID_KEY, StringIdentifier.fromId(uid).toString())
-            .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
             .build();
 
     SchemaEntity defaultSchema =

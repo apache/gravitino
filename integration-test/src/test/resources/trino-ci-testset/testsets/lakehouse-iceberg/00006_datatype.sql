@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_iceberg".gt_db2;
+CREATE SCHEMA gt_iceberg.gt_db2;
 
-USE "test.gt_iceberg".gt_db2;
+USE gt_iceberg.gt_db2;
 
 -- Unsupported Type: TINYINT, SMALLINT
 CREATE TABLE tb01 (
@@ -64,4 +64,4 @@ drop table tb01;
 
 drop table tb02;
 
-drop schema "test.gt_iceberg".gt_db2;
+drop schema gt_iceberg.gt_db2;

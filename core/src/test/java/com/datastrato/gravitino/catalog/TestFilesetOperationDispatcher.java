@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
-import static com.datastrato.gravitino.connector.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -19,8 +18,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
-  private static FilesetOperationDispatcher filesetOperationDispatcher;
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
+  static FilesetOperationDispatcher filesetOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
@@ -118,11 +117,10 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     testProperties(expectedProps, alteredFileset.properties());
 
     // Test immutable fileset properties
-    FilesetChange[] illegalChange =
-        new FilesetChange[] {FilesetChange.setProperty(GRAVITINO_MANAGED_ENTITY, "test")};
+    FilesetChange[] illegalChange = new FilesetChange[] {FilesetChange.setProperty(ID_KEY, "test")};
     testPropertyException(
         () -> filesetOperationDispatcher.alterFileset(filesetIdent1, illegalChange),
-        "Property gravitino.managed.entity is immutable or reserved, cannot be set");
+        "Property gravitino.identifier is immutable or reserved, cannot be set");
   }
 
   @Test

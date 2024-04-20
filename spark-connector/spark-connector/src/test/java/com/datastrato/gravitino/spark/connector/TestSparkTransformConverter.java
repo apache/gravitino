@@ -58,8 +58,17 @@ public class TestSparkTransformConverter {
           } else {
             Assertions.assertTrue(
                 gravitinoPartitionings != null && gravitinoPartitionings.length == 1);
-            Assertions.assertEquals(gravitinoTransform.name(), gravitinoPartitionings[0].name());
+            Assertions.assertEquals(gravitinoTransform, gravitinoPartitionings[0]);
           }
+        });
+
+    sparkToGravitinoPartitionTransformMaps.forEach(
+        (sparkTransform, gravitinoTransform) -> {
+          org.apache.spark.sql.connector.expressions.Transform[] sparkTransforms =
+              sparkTransformConverter.toSparkTransform(
+                  new Transform[] {gravitinoTransform}, null, null);
+          Assertions.assertEquals(1, sparkTransforms.length);
+          Assertions.assertEquals(sparkTransform, sparkTransforms[0]);
         });
   }
 
@@ -248,31 +257,31 @@ public class TestSparkTransformConverter {
         Transforms.bucket(10, new String[] {"a"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkBucketTransform(10, new String[] {"msg.a"}),
-        Transforms.bucket(10, new String[] {"msg.a"}));
+        Transforms.bucket(10, new String[] {"msg", "a"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkHoursTransform(NamedReference.field("date")),
         Transforms.hour("date"));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkHoursTransform(NamedReference.field("msg.date")),
-        Transforms.hour("msg.date"));
+        Transforms.hour(new String[] {"msg", "date"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkDaysTransform(NamedReference.field("date")),
         Transforms.day("date"));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkDaysTransform(NamedReference.field("msg.date")),
-        Transforms.day("msg.date"));
+        Transforms.day(new String[] {"msg", "date"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkMonthsTransform(NamedReference.field("date")),
         Transforms.month("date"));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkMonthsTransform(NamedReference.field("msg.date")),
-        Transforms.month("msg.date"));
+        Transforms.month(new String[] {"msg", "date"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkYearsTransform(NamedReference.field("date")),
         Transforms.year("date"));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkYearsTransform(NamedReference.field("msg.date")),
-        Transforms.year("msg.date"));
+        Transforms.year(new String[] {"msg", "date"}));
     sparkToGravitinoPartitionTransformMaps.put(
         SparkTransformConverter.createSparkTruncateTransform(10, new String[] {"package"}),
         Transforms.truncate(10, "package"));

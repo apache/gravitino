@@ -37,8 +37,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
-  private static TableOperationDispatcher tableOperationDispatcher;
-  private static SchemaOperationDispatcher schemaOperationDispatcher;
+  static TableOperationDispatcher tableOperationDispatcher;
+  static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
