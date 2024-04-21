@@ -91,11 +91,14 @@ public class SecurableObjectDTO implements SecurableObject {
      * Builds an instance of SecurableObjectDTO using the builder's properties.
      *
      * @return An instance of SecurableObjectDTO.
-     * @throws IllegalArgumentException If the full name are not set.
+     * @throws IllegalArgumentException If the full name or type are not set.
      */
     public SecurableObjectDTO build() {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(fullName), "full name cannot be null or empty");
+
+      Preconditions.checkArgument(type != null, "type cannot be null");
+
       return new SecurableObjectDTO(fullName, type);
     }
   }
