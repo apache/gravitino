@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.dto.authorization;
 
 import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjectType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;

@@ -6,7 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObjectType;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
 import java.util.stream.Collectors;
@@ -60,7 +60,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
             .withSecurableObject(
                 SecurableObjects.parse(
                     role.getSecurableObjectFullName(),
-                    SecurableObjectType.valueOf(role.getSecurableObjectType())))
+                    SecurableObject.SecurableObjectType.valueOf(role.getSecurableObjectType())))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {

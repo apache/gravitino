@@ -17,8 +17,8 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_FILESET
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESET;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESETS;
+import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPICS;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_GROUP;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_ROLE;
@@ -26,9 +26,9 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_USER;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOG;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_SCHEMA;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_TABLE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOGS;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_SCHEMAS;
+import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_TABLES;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_SCHEMA;
@@ -59,7 +59,7 @@ public class Privileges {
   public static Privilege fromName(Privilege.Name name) {
     switch (name) {
         // Catalog
-      case SHOW_CATALOG:
+      case SHOW_CATALOGS:
         return ShowCatalog.get();
       case USE_CATALOG:
         return UseCatalog.get();
@@ -71,7 +71,7 @@ public class Privileges {
         return DropCatalog.get();
 
         // Schema
-      case SHOW_SCHEMA:
+      case SHOW_SCHEMAS:
         return ShowSchema.get();
       case USE_SCHEMA:
         return UseSchema.get();
@@ -83,7 +83,7 @@ public class Privileges {
         return DropSchema.get();
 
         // Table
-      case SHOW_TABLE:
+      case SHOW_TABLES:
         return ShowTable.get();
       case CREATE_TABLE:
         return CreateTable.get();
@@ -95,7 +95,7 @@ public class Privileges {
         return WriteTable.get();
 
         // Fileset
-      case LIST_FILESET:
+      case LIST_FILESETS:
         return ListFileset.get();
       case CREATE_FILESET:
         return CreateFileset.get();
@@ -107,7 +107,7 @@ public class Privileges {
         return WriteFileset.get();
 
         // Topic
-      case LIST_TOPIC:
+      case LIST_TOPICS:
         return ListTopic.get();
       case CREATE_TOPIC:
         return CreateTopic.get();
@@ -152,7 +152,7 @@ public class Privileges {
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return SHOW_CATALOG;
+      return SHOW_CATALOGS;
     }
 
     /** @return A readable string representation for the privilege. */
@@ -276,7 +276,7 @@ public class Privileges {
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return SHOW_SCHEMA;
+      return SHOW_SCHEMAS;
     }
 
     /** @return A readable string representation for the privilege. */
@@ -391,7 +391,7 @@ public class Privileges {
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return SHOW_TABLE;
+      return SHOW_TABLES;
     }
 
     /** @return A readable string representation for the privilege. */
@@ -516,7 +516,7 @@ public class Privileges {
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LIST_FILESET;
+      return LIST_FILESETS;
     }
 
     /** @return A readable string representation for the privilege. */
@@ -641,7 +641,7 @@ public class Privileges {
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return LIST_TOPIC;
+      return LIST_TOPICS;
     }
 
     /** @return A readable string representation for the privilege. */

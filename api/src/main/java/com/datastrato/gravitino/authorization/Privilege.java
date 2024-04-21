@@ -22,7 +22,7 @@ public interface Privilege {
   /** The name of this privilege. */
   enum Name {
     /** The privilege to show catalogs. */
-    SHOW_CATALOG,
+    SHOW_CATALOGS,
     /** The privilege to use a catalog. */
     USE_CATALOG,
     /** The privilege to create a catalog. */
@@ -32,7 +32,7 @@ public interface Privilege {
     /** The privilege to drop a catalog. */
     DROP_CATALOG,
     /** The privilege to show schemas. */
-    SHOW_SCHEMA,
+    SHOW_SCHEMAS,
     /** The privilege to use a schema. */
     USE_SCHEMA,
     /** The privilege to create a schema. */
@@ -42,7 +42,7 @@ public interface Privilege {
     /** The privilege to drop a schema. */
     DROP_SCHEMA,
     /** The privilege to show tables. */
-    SHOW_TABLE,
+    SHOW_TABLES,
     /** The privilege to create a table. */
     CREATE_TABLE,
     /** The privilege to drop a table. */
@@ -52,7 +52,7 @@ public interface Privilege {
     /** The privilege to write a table. */
     WRITE_TABLE,
     /** The privilege to list filesets. */
-    LIST_FILESET,
+    LIST_FILESETS,
     /** The privilege to create a fileset. */
     CREATE_FILESET,
     /** The privilege to drop a fileset. */
@@ -62,7 +62,7 @@ public interface Privilege {
     /** The privilege to write a fileset. */
     WRITE_FILESET,
     /** The privilege to list topics. */
-    LIST_TOPIC,
+    LIST_TOPICS,
     /** The privilege to create a topic. */
     CREATE_TOPIC,
     /** The privilege to drop a topic. */
@@ -71,17 +71,17 @@ public interface Privilege {
     READ_TOPIC,
     /** The privilege to write a topic. */
     WRITE_TOPIC,
-    /** The privilege to use a metalake. */
+    /** The privilege to use a metalake, the user can load the information of the metalake. */
     USE_METALAKE,
-    /** The privilege to manage a metalake. */
+    /** The privilege to manage a metalake, including drop and alter a metalake. */
     MANAGE_METALAKE,
     /** The privilege to create a metalake. */
     CREATE_METALAKE,
-    /** The privilege to manage users. */
+    /** The privilege to manage users, including add,remove and get a user */
     MANAGE_USER,
-    /** The privilege to manage groups. */
+    /** The privilege to manage groups, including add,remove and get a group. */
     MANAGE_GROUP,
-    /** The privilege to manage roles. */
+    /** The privilege to manage roles, including create,drop,alter,grant and revoke a role. */
     MANAGE_ROLE,
   }
 }

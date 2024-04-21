@@ -11,7 +11,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
-import com.datastrato.gravitino.authorization.SecurableObjectType;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
@@ -52,7 +52,7 @@ public class TestRole extends TestBase {
             Lists.newArrayList("USE_CATALOG"),
             SecurableObjectDTO.builder()
                 .withFullName("catalog")
-                .withType(SecurableObjectType.CATALOG)
+                .withType(SecurableObject.SecurableObjectType.CATALOG)
                 .build());
 
     RoleDTO mockRole = mockRoleDTO(roleName);
