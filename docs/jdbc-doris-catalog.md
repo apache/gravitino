@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage Doris metadata.
+Gravitino provides the ability to manage Apache Doris metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
@@ -68,7 +68,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema properties
 
-- Support schema properties
+- Support schema properties, includes Doris database properties and user-defined properties.
 
 ### Schema operations
 
@@ -101,7 +101,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `String`       | `String`   |
 
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Doris doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 :::
 
@@ -114,7 +114,8 @@ Gravitino does not support the creation of an auto-increment column for a Doris 
 
 ### Table properties
 
-Doris supports table properties, and you can set them in the table properties.
+- Doris supports table properties, and you can set them in the table properties.
+- Only support Doris table properties, don't support user-defined properties.
 
 ### Table indexes
 
@@ -171,7 +172,7 @@ Gravitino supports these table alteration operations:
 :::info
  - Not all table alteration operations can be processed in batch. 
  - Schema change, such as add/modify/drop columns can be processed in batch
- - Can modify multi column comments at same time
- - You can't modify the column type and column comment at the same time
+ - Support modify multiple column comments at the same time.
+ - Don't support modify the column type and column comment at the same time
  - The schema alteration in Doris is an asynchronous operation. You might retrieve an outdated schema if you execute a schema query immediately following the alteration. It is recommended to pause briefly following the schema alteration, and Gravitino will incorporate the schema alteration status into the schema information in the upcoming version.
 :::
