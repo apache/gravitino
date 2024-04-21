@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
  * named `schema1`. The schema is in the catalog named `catalog1`. <br>
  * Similarly, `catalog1.schema1.topic1` can represent a topic.`catalog1.schema1.fileset1` can
  * represent a fileset.<br>
- * `*` can represnet all th metalakes <br>
+ * `*` can represent all th metalakes <br>
  * `metalake` can represent all the catalogs of this metalake. <br>
  * To use other securable objects which represents all entities," you can use their parent entity,
  * For example if you want to have read table privileges of all tables of `catalog1.schema1`, " you
