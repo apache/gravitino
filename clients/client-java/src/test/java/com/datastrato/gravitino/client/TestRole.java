@@ -66,6 +66,7 @@ public class TestRole extends TestBase {
             ImmutableMap.of("k1", "v1"),
             SecurableObjects.ofCatalog("catalog"),
             Lists.newArrayList(Privileges.UseCatalog.get()));
+    Assertions.assertEquals(1L, Privileges.UseCatalog.get().name().getValue());
     Assertions.assertNotNull(createdRole);
     assertRole(createdRole, mockRole);
 

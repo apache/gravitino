@@ -17,8 +17,6 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_FILESET
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_FILESETS;
-import static com.datastrato.gravitino.authorization.Privilege.Name.LIST_TOPICS;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_GROUP;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_ROLE;
@@ -26,9 +24,6 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_USER;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_CATALOGS;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_SCHEMAS;
-import static com.datastrato.gravitino.authorization.Privilege.Name.SHOW_TABLES;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_SCHEMA;
@@ -59,8 +54,6 @@ public class Privileges {
   public static Privilege fromName(Privilege.Name name) {
     switch (name) {
         // Catalog
-      case SHOW_CATALOGS:
-        return ShowCatalog.get();
       case USE_CATALOG:
         return UseCatalog.get();
       case CREATE_CATALOG:
@@ -71,8 +64,6 @@ public class Privileges {
         return DropCatalog.get();
 
         // Schema
-      case SHOW_SCHEMAS:
-        return ShowSchema.get();
       case USE_SCHEMA:
         return UseSchema.get();
       case CREATE_SCHEMA:
@@ -83,8 +74,6 @@ public class Privileges {
         return DropSchema.get();
 
         // Table
-      case SHOW_TABLES:
-        return ShowTable.get();
       case CREATE_TABLE:
         return CreateTable.get();
       case DROP_TABLE:
@@ -95,8 +84,6 @@ public class Privileges {
         return WriteTable.get();
 
         // Fileset
-      case LIST_FILESETS:
-        return ListFileset.get();
       case CREATE_FILESET:
         return CreateFileset.get();
       case DROP_FILESET:
@@ -107,8 +94,6 @@ public class Privileges {
         return WriteFileset.get();
 
         // Topic
-      case LIST_TOPICS:
-        return ListTopic.get();
       case CREATE_TOPIC:
         return CreateTopic.get();
       case DROP_TOPIC:
@@ -136,29 +121,6 @@ public class Privileges {
 
       default:
         throw new IllegalArgumentException("Don't support the privilege: " + name);
-    }
-  }
-
-  /** The privilege to show catalogs. */
-  public static class ShowCatalog implements Privilege {
-
-    private static final ShowCatalog INSTANCE = new ShowCatalog();
-
-    /** @return The instance of the privilege. */
-    public static ShowCatalog get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return SHOW_CATALOGS;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "show catalog";
     }
   }
 
@@ -261,31 +223,6 @@ public class Privileges {
     }
   }
 
-  /** The privilege to show schemas. */
-  public static class ShowSchema implements Privilege {
-
-    private static final ShowSchema INSTANCE = new ShowSchema();
-
-    private ShowSchema() {}
-
-    /** @return The instance of the privilege. */
-    public static ShowSchema get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return SHOW_SCHEMAS;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "show schema";
-    }
-  }
-
   /** The privilege to use a schema. */
   public static class UseSchema implements Privilege {
 
@@ -375,29 +312,6 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "drop schema";
-    }
-  }
-
-  /** The privilege to show tables. */
-  public static class ShowTable implements Privilege {
-
-    private static final ShowTable INSTANCE = new ShowTable();
-
-    /** @return The instance of the privilege. */
-    public static ShowTable get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return SHOW_TABLES;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "show table";
     }
   }
 
@@ -501,31 +415,6 @@ public class Privileges {
     }
   }
 
-  /** The privilege to list filesets. */
-  public static class ListFileset implements Privilege {
-
-    private static final ListFileset INSTANCE = new ListFileset();
-
-    private ListFileset() {}
-
-    /** @return The instance of the privilege. */
-    public static ListFileset get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return LIST_FILESETS;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "list fileset";
-    }
-  }
-
   /** The privilege to create a fileset. */
   public static class CreateFileset implements Privilege {
 
@@ -623,31 +512,6 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "write fileset";
-    }
-  }
-
-  /** The privilege to list topics. */
-  public static class ListTopic implements Privilege {
-
-    private static final ListTopic INSTANCE = new ListTopic();
-
-    private ListTopic() {}
-
-    /** @return The instance of the privilege. */
-    public static ListTopic get() {
-      return INSTANCE;
-    }
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return LIST_TOPICS;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "list topic";
     }
   }
 

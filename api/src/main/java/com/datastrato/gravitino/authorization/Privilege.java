@@ -21,67 +21,67 @@ public interface Privilege {
 
   /** The name of this privilege. */
   enum Name {
-    /** The privilege to show catalogs. */
-    SHOW_CATALOGS,
     /** The privilege to use a catalog. */
-    USE_CATALOG,
+    USE_CATALOG(1L),
     /** The privilege to create a catalog. */
-    CREATE_CATALOG,
+    CREATE_CATALOG(1L << 1),
     /** The privilege to alter a catalog. */
-    ALTER_CATALOG,
+    ALTER_CATALOG(1L << 2),
     /** The privilege to drop a catalog. */
-    DROP_CATALOG,
-    /** The privilege to show schemas. */
-    SHOW_SCHEMAS,
-    /** The privilege to use a schema. */
-    USE_SCHEMA,
+    DROP_CATALOG(1L << 3),
+    /** the privilege to use a schema. */
+    USE_SCHEMA(1L << 3),
     /** The privilege to create a schema. */
-    CREATE_SCHEMA,
+    CREATE_SCHEMA(1L << 4),
     /** The privilege to alter a schema. */
-    ALTER_SCHEMA,
+    ALTER_SCHEMA(1L << 5),
     /** The privilege to drop a schema. */
-    DROP_SCHEMA,
-    /** The privilege to show tables. */
-    SHOW_TABLES,
+    DROP_SCHEMA(1L << 6),
     /** The privilege to create a table. */
-    CREATE_TABLE,
+    CREATE_TABLE(1L << 7),
     /** The privilege to drop a table. */
-    DROP_TABLE,
+    DROP_TABLE(1L << 8),
     /** The privilege to read a table. */
-    READ_TABLE,
+    READ_TABLE(1L << 9),
     /** The privilege to write a table. */
-    WRITE_TABLE,
-    /** The privilege to list filesets. */
-    LIST_FILESETS,
+    WRITE_TABLE(1L << 10),
     /** The privilege to create a fileset. */
-    CREATE_FILESET,
+    CREATE_FILESET(1L << 11),
     /** The privilege to drop a fileset. */
-    DROP_FILESET,
+    DROP_FILESET(1L << 12),
     /** The privilege to read a fileset. */
-    READ_FILESET,
+    READ_FILESET(1L << 13),
     /** The privilege to write a fileset. */
-    WRITE_FILESET,
-    /** The privilege to list topics. */
-    LIST_TOPICS,
+    WRITE_FILESET(1L << 14),
     /** The privilege to create a topic. */
-    CREATE_TOPIC,
+    CREATE_TOPIC(1L << 15),
     /** The privilege to drop a topic. */
-    DROP_TOPIC,
+    DROP_TOPIC(1L << 16),
     /** The privilege to read a topic. */
-    READ_TOPIC,
+    READ_TOPIC(1L << 17),
     /** The privilege to write a topic. */
-    WRITE_TOPIC,
+    WRITE_TOPIC(1L << 18),
     /** The privilege to use a metalake, the user can load the information of the metalake. */
-    USE_METALAKE,
+    USE_METALAKE(1L << 19),
     /** The privilege to manage a metalake, including drop and alter a metalake. */
-    MANAGE_METALAKE,
+    MANAGE_METALAKE(1L << 20),
     /** The privilege to create a metalake. */
-    CREATE_METALAKE,
+    CREATE_METALAKE(1L << 21),
     /** The privilege to manage users, including add,remove and get a user */
-    MANAGE_USER,
+    MANAGE_USER(1L << 22),
     /** The privilege to manage groups, including add,remove and get a group. */
-    MANAGE_GROUP,
+    MANAGE_GROUP(1L << 23),
     /** The privilege to manage roles, including create,drop,alter,grant and revoke a role. */
-    MANAGE_ROLE,
+    MANAGE_ROLE(1L << 24);
+
+    private final long value;
+
+    Name(long value) {
+      this.value = value;
+    }
+
+    public long getValue() {
+      return value;
+    }
   }
 }
