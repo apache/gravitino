@@ -80,6 +80,11 @@ public interface Privilege {
       this.value = value;
     }
 
+    /**
+     * Return the value of Name
+     *
+     * @return The value of Name
+     */
     public long getValue() {
       return value;
     }
