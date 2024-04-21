@@ -274,7 +274,7 @@ class DTOConverters {
     }
   }
 
-  public static SecurableObjectDTO toSecurableObject(SecurableObject securableObject) {
+  static SecurableObjectDTO toSecurableObject(SecurableObject securableObject) {
     return SecurableObjectDTO.builder()
         .withFullName(securableObject.fullName())
         .withType(securableObject.type())
