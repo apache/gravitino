@@ -53,13 +53,13 @@ public interface SecurableObject {
    *
    * @return The type of securable object.
    */
-  SecurableObjectType type();
+  Type type();
 
   /**
    * The type of securable object in the Gravitino system. Every type will map one kind of the
    * entity of the underlying system.
    */
-  enum SecurableObjectType {
+  enum Type {
     /**
      * A catalog is a collection of metadata from a specific metadata source, like Apache Hive
      * catalog, Apache Iceberg catalog, JDBC catalog, etc.

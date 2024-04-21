@@ -4,12 +4,12 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.CATALOG;
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.FILESET;
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.METALAKE;
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.SCHEMA;
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.TABLE;
-import static com.datastrato.gravitino.authorization.SecurableObject.SecurableObjectType.TOPIC;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.CATALOG;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.FILESET;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.METALAKE;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.SCHEMA;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.TABLE;
+import static com.datastrato.gravitino.authorization.SecurableObject.Type.TOPIC;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

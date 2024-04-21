@@ -24,7 +24,7 @@ public class SecurableObjects {
    * @param names The names of the securable object.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject of(SecurableObject.SecurableObjectType type, String... names) {
+  public static SecurableObject of(SecurableObject.Type type, String... names) {
 
     if (names == null) {
       throw new IllegalArgumentException("Cannot create a securable object with null names");
@@ -44,28 +44,28 @@ public class SecurableObjects {
     }
 
     if (names.length == 1
-        && type != SecurableObject.SecurableObjectType.CATALOG
-        && type != SecurableObject.SecurableObjectType.METALAKE) {
+        && type != SecurableObject.Type.CATALOG
+        && type != SecurableObject.Type.METALAKE) {
       throw new IllegalArgumentException(
           "If the length of names is 1, it must be the CATALOG or METALAKE type");
     }
 
-    if (names.length == 2 && type != SecurableObject.SecurableObjectType.SCHEMA) {
+    if (names.length == 2 && type != SecurableObject.Type.SCHEMA) {
       throw new IllegalArgumentException("If the length of names is 2, it must be the SCHEMA type");
     }
 
     if (names.length == 3
-        && type != SecurableObject.SecurableObjectType.FILESET
-        && type != SecurableObject.SecurableObjectType.TABLE
-        && type != SecurableObject.SecurableObjectType.TOPIC) {
+        && type != SecurableObject.Type.FILESET
+        && type != SecurableObject.Type.TABLE
+        && type != SecurableObject.Type.TOPIC) {
       throw new IllegalArgumentException(
           "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }
 
-    List<SecurableObject.SecurableObjectType> types = Lists.newArrayList(type);
+    List<SecurableObject.Type> types = Lists.newArrayList(type);
 
     // Find all the types of the parent securable object.
-    SecurableObject.SecurableObjectType curType = type;
+    SecurableObject.Type curType = type;
     for (int parentNum = names.length - 2; parentNum >= 0; parentNum--) {
       curType = getParentSecurableObjectType(curType);
       types.add(curType);
@@ -105,7 +105,7 @@ public class SecurableObjects {
   public static SecurableObject ofMetalake(String metalake) {
     checkName(metalake);
 
-    return new SecurableObjectImpl(null, metalake, SecurableObject.SecurableObjectType.METALAKE);
+    return new SecurableObjectImpl(null, metalake, SecurableObject.Type.METALAKE);
   }
 
   /**
@@ -117,7 +117,7 @@ public class SecurableObjects {
   public static SecurableObject ofCatalog(String catalog) {
     checkName(catalog);
 
-    return new SecurableObjectImpl(null, catalog, SecurableObject.SecurableObjectType.CATALOG);
+    return new SecurableObjectImpl(null, catalog, SecurableObject.Type.CATALOG);
   }
 
   /**
@@ -132,7 +132,7 @@ public class SecurableObjects {
     checkCatalog(catalog);
     checkName(schema);
 
-    return new SecurableObjectImpl(catalog, schema, SecurableObject.SecurableObjectType.SCHEMA);
+    return new SecurableObjectImpl(catalog, schema, SecurableObject.Type.SCHEMA);
   }
 
   /**
@@ -146,7 +146,7 @@ public class SecurableObjects {
     checkSchema(schema);
     checkName(table);
 
-    return new SecurableObjectImpl(schema, table, SecurableObject.SecurableObjectType.TABLE);
+    return new SecurableObjectImpl(schema, table, SecurableObject.Type.TABLE);
   }
 
   /**
@@ -160,7 +160,7 @@ public class SecurableObjects {
     checkSchema(schema);
     checkName(topic);
 
-    return new SecurableObjectImpl(schema, topic, SecurableObject.SecurableObjectType.TOPIC);
+    return new SecurableObjectImpl(schema, topic, SecurableObject.Type.TOPIC);
   }
 
   /**
@@ -175,7 +175,7 @@ public class SecurableObjects {
     checkSchema(schema);
     checkName(fileset);
 
-    return new SecurableObjectImpl(schema, fileset, SecurableObject.SecurableObjectType.FILESET);
+    return new SecurableObjectImpl(schema, fileset, SecurableObject.Type.FILESET);
   }
 
   /**
@@ -207,15 +207,15 @@ public class SecurableObjects {
   }
 
   private static final SecurableObject ALL_METALAKES =
-      new SecurableObjectImpl(null, "*", SecurableObject.SecurableObjectType.METALAKE);
+      new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE);
 
   private static class SecurableObjectImpl implements SecurableObject {
 
     private final SecurableObject parent;
     private final String name;
-    private final SecurableObjectType type;
+    private final Type type;
 
-    SecurableObjectImpl(SecurableObject parent, String name, SecurableObjectType type) {
+    SecurableObjectImpl(SecurableObject parent, String name, Type type) {
       this.parent = parent;
       this.name = name;
       this.type = type;
@@ -237,7 +237,7 @@ public class SecurableObjects {
     }
 
     @Override
-    public SecurableObjectType type() {
+    public Type type() {
       return type;
     }
 
@@ -275,10 +275,9 @@ public class SecurableObjects {
    * @param type The securable object type.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject parse(
-      String securableObjectIdentifier, SecurableObject.SecurableObjectType type) {
+  public static SecurableObject parse(String securableObjectIdentifier, SecurableObject.Type type) {
     if ("*".equals(securableObjectIdentifier)) {
-      if (type != SecurableObject.SecurableObjectType.METALAKE) {
+      if (type != SecurableObject.Type.METALAKE) {
         throw new IllegalArgumentException("If securable object isn't metalake, it can't be `*`");
       }
       return SecurableObjects.ofAllMetalakes();
@@ -292,27 +291,26 @@ public class SecurableObjects {
     return SecurableObjects.of(type, Iterables.toArray(parts, String.class));
   }
 
-  private static SecurableObject.SecurableObjectType getParentSecurableObjectType(
-      SecurableObject.SecurableObjectType securableObjectType) {
-    switch (securableObjectType) {
+  private static SecurableObject.Type getParentSecurableObjectType(SecurableObject.Type type) {
+    switch (type) {
       case FILESET:
-        return SecurableObject.SecurableObjectType.SCHEMA;
+        return SecurableObject.Type.SCHEMA;
 
       case TOPIC:
-        return SecurableObject.SecurableObjectType.SCHEMA;
+        return SecurableObject.Type.SCHEMA;
 
       case TABLE:
-        return SecurableObject.SecurableObjectType.SCHEMA;
+        return SecurableObject.Type.SCHEMA;
 
       case SCHEMA:
-        return SecurableObject.SecurableObjectType.CATALOG;
+        return SecurableObject.Type.CATALOG;
 
       case CATALOG:
-        return SecurableObject.SecurableObjectType.METALAKE;
+        return SecurableObject.Type.METALAKE;
 
       default:
         throw new IllegalArgumentException(
-            String.format("%s can't find its parent securable object type", securableObjectType));
+            String.format("%s can't find its parent securable object type", type));
     }
   }
 

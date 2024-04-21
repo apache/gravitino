@@ -52,7 +52,7 @@ public class TestRole extends TestBase {
             Lists.newArrayList("USE_CATALOG"),
             SecurableObjectDTO.builder()
                 .withFullName("catalog")
-                .withType(SecurableObject.SecurableObjectType.CATALOG)
+                .withType(SecurableObject.Type.CATALOG)
                 .build());
 
     RoleDTO mockRole = mockRoleDTO(roleName);

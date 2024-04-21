@@ -17,7 +17,7 @@ public class SecurableObjectDTO implements SecurableObject {
   private String fullName;
 
   @JsonProperty("type")
-  private SecurableObjectType type;
+  private Type type;
 
   /** Default constructor for Jackson deserialization. */
   protected SecurableObjectDTO() {}
@@ -28,7 +28,7 @@ public class SecurableObjectDTO implements SecurableObject {
    * @param fullName The name of the Role DTO.
    * @param type The type of the securable object.
    */
-  protected SecurableObjectDTO(String fullName, SecurableObjectType type) {
+  protected SecurableObjectDTO(String fullName, Type type) {
     this.type = type;
     this.fullName = fullName;
   }
@@ -51,7 +51,7 @@ public class SecurableObjectDTO implements SecurableObject {
   }
 
   @Override
-  public SecurableObjectType type() {
+  public Type type() {
     return type;
   }
 
@@ -63,7 +63,7 @@ public class SecurableObjectDTO implements SecurableObject {
   /** Builder for {@link SecurableObjectDTO}. */
   public static class Builder {
     private String fullName;
-    private SecurableObjectType type;
+    private Type type;
 
     /**
      * Sets the full name of the securable object.
@@ -82,7 +82,7 @@ public class SecurableObjectDTO implements SecurableObject {
      * @param type The type of the securable object.
      * @return The builder instance.
      */
-    public Builder withType(SecurableObjectType type) {
+    public Builder withType(Type type) {
       this.type = type;
       return this;
     }

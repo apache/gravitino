@@ -60,7 +60,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
             .withSecurableObject(
                 SecurableObjects.parse(
                     role.getSecurableObjectFullName(),
-                    SecurableObject.SecurableObjectType.valueOf(role.getSecurableObjectType())))
+                    SecurableObject.Type.valueOf(role.getSecurableObjectType())))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {
