@@ -7,7 +7,7 @@ call gravitino.system.create_catalog(
     )
 );
 
-show catalogs like 'test.gt_mysql_xxx1';
+show catalogs like 'gt_mysql_xxx1';
 
 call gravitino.system.create_catalog(
     'gt_mysql_xxx1',
@@ -30,7 +30,7 @@ call gravitino.system.create_catalog(
 
 CALL gravitino.system.drop_catalog('gt_mysql_xxx1');
 
-show catalogs like 'test.gt_mysql_xxx1';
+show catalogs like 'gt_mysql_xxx1';
 
 CALL gravitino.system.drop_catalog('gt_mysql_xxx1');
 
@@ -45,9 +45,9 @@ call gravitino.system.create_catalog(
     )
 );
 
-show catalogs like 'test.gt_mysql_xxx1';
+show catalogs like 'gt_mysql_xxx1';
 
 CALL gravitino.system.drop_catalog(
     catalog => 'gt_mysql_xxx1', ignore_not_exist => true);
 
-show catalogs like 'test.gt_mysql_xxx1';
+show catalogs like 'gt_mysql_xxx1';

@@ -20,6 +20,8 @@ import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -90,7 +92,7 @@ public class MetalakeMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, baseMetalake.nameIdentifier().toString());
       throw re;
     }
@@ -125,7 +127,7 @@ public class MetalakeMetaService {
               MetalakeMetaMapper.class,
               mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
       throw re;
     }
@@ -170,7 +172,15 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserRoleRelMapper.class,
+                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -179,11 +189,29 @@ public class MetalakeMetaService {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", ident);
         }
-        SessionUtils.doWithCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId));
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    MetalakeMetaMapper.class,
+                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserRoleRelMapper.class,
+                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)));
       }
     }
     return true;
+  }
+
+  public int deleteMetalakeMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        MetalakeMetaMapper.class,
+        mapper -> {
+          return mapper.deleteMetalakeMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 }

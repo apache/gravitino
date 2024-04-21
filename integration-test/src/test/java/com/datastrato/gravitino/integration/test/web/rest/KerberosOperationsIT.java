@@ -5,17 +5,17 @@
 
 package com.datastrato.gravitino.integration.test.web.rest;
 
-import static com.datastrato.gravitino.server.auth.KerberosConfig.KEYTAB;
-import static com.datastrato.gravitino.server.auth.KerberosConfig.PRINCIPAL;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYTAB;
+import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
-import com.datastrato.gravitino.server.auth.KerberosConfig;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -59,8 +59,7 @@ public class KerberosOperationsIT extends AbstractIT {
             .withClientPrincipal(clientPrincipal)
             .withKeyTabFile(new File(keytabFile))
             .build());
-    configs.put(
-        KerberosConfig.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
     registerCustomConfigs(configs);
@@ -76,8 +75,7 @@ public class KerberosOperationsIT extends AbstractIT {
 
   @Test
   public void testAuthenticationApi() throws Exception {
-    GravitinoVersion gravitinoVersion = client.getVersion();
-    client.getVersion();
+    GravitinoVersion gravitinoVersion = client.serverVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
 
@@ -88,7 +86,6 @@ public class KerberosOperationsIT extends AbstractIT {
 
     // Test to re-login with the keytab
     Uninterruptibles.sleepUninterruptibly(6, TimeUnit.SECONDS);
-    client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
   }

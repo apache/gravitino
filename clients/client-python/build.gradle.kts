@@ -21,6 +21,17 @@ fun deleteCacheDir(targetDir: String) {
   }
 }
 
+fun gravitinoServer(operation: String) {
+    val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
+    val exitCode = process.waitFor()
+    if (exitCode == 0) {
+      val currentContext = process.inputStream.bufferedReader().readText()
+      println("Gravitino server status: $currentContext")
+    } else {
+      println("Gravitino server execution failed with exit code $exitCode")
+    }
+}
+
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
@@ -28,19 +39,26 @@ tasks {
   }
 
   val test by registering(VenvTask::class) {
-    dependsOn(pipInstall)
-    venvExec = "python"
-    args = listOf("-m", "unittest")
-    workingDir = projectDir.resolve(".")
-  }
+    val skipPyClientITs = project.hasProperty("skipPyClientITs")
+    if (!skipPyClientITs) {
+      doFirst {
+        gravitinoServer("start")
+      }
 
-  val integrationTest by registering(VenvTask::class) {
-    dependsOn(pipInstall)
-    venvExec = "python"
-    args = listOf("-m", "unittest", "tests/test_integration_gravitino_client.py")
-    workingDir = projectDir.resolve(".")
-    environment = mapOf("PROJECT_VERSION" to project.version,
-      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package")
+      dependsOn(pipInstall)
+      venvExec = "python"
+      args = listOf("-m", "unittest")
+      workingDir = projectDir.resolve(".")
+      environment = mapOf(
+        "PROJECT_VERSION" to project.version,
+        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+        "START_EXTERNAL_GRAVITINO" to "true"
+      )
+
+      doLast {
+        gravitinoServer("stop")
+      }
+    }
   }
 
   val build by registering(VenvTask::class) {

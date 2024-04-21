@@ -43,7 +43,7 @@ import org.mockito.Mockito;
 
 public class TestMetalakeAdminOperations extends JerseyTest {
 
-  private final AccessControlManager manager = Mockito.mock(AccessControlManager.class);
+  private static final AccessControlManager manager = Mockito.mock(AccessControlManager.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -61,6 +61,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setAccessControlManager(manager);
   }
 
   @Override
@@ -78,7 +79,6 @@ public class TestMetalakeAdminOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(AccessControlManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -147,7 +147,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     return UserEntity.builder()
         .withId(1L)
         .withName(user)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

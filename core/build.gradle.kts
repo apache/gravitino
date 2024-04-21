@@ -28,11 +28,14 @@ dependencies {
   implementation(libs.rocksdbjni)
 
   annotationProcessor(libs.lombok)
+
   compileOnly(libs.lombok)
+  compileOnly(libs.servlet) // fix error-prone compile error
 
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.h2db)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

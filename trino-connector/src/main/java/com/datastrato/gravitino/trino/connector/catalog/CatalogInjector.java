@@ -163,6 +163,7 @@ public class CatalogInjector {
         trinoCatalogManagerField.setAccessible(true);
         catalogManager = trinoCatalogManagerField.get(null);
       } catch (NoSuchFieldException e) {
+        LOG.info("The trino hasn't applied patch. try to get catalogManager from context.");
       }
 
       if (catalogManager == null) {
@@ -313,6 +314,12 @@ public class CatalogInjector {
 
             Object catalogConnector =
                 createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+            if (catalogs.containsKey(catalogName)) {
+              String message =
+                  String.format("Inject catalog failed. catalog %s already exists", catalogName);
+              LOG.error(message);
+              throw new TrinoException(GRAVITINO_CREATE_INNER_CONNECTOR_FAILED, message);
+            }
             catalogs.put(catalogName, catalogConnector);
           };
     }
@@ -370,7 +377,7 @@ public class CatalogInjector {
       LOG.error(
           "Create internal catalog connector {} failed. Connector properties: {} ",
           connectorName,
-          properties.toString(),
+          properties,
           e);
       throw new TrinoException(GRAVITINO_CREATE_INNER_CONNECTOR_FAILED, e);
     }

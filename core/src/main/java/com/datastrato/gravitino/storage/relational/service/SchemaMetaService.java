@@ -109,7 +109,7 @@ public class SchemaMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, schemaEntity.nameIdentifier().toString());
       throw re;
     }
@@ -142,7 +142,7 @@ public class SchemaMetaService {
                   mapper.updateSchemaMeta(
                       POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity), oldSchemaPO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, newEntity.nameIdentifier().toString());
       throw re;
     }
@@ -213,6 +213,14 @@ public class SchemaMetaService {
       }
     }
     return true;
+  }
+
+  public int deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        SchemaMetaMapper.class,
+        mapper -> {
+          return mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

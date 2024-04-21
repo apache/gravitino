@@ -8,57 +8,56 @@ This software is licensed under the Apache License version 2."
 ## Introduction
 
 `Fileset` is a concept brought in by Gravitino, which is a logical collection of files and
-directories, with `fileset` you can manage the non-tabular data through Gravitino. For the
-details you can see [How to manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md).
+directories, with `fileset` you can manage non-tabular data through Gravitino. For
+details, you can read [How to manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md).
 
 To use `Fileset` managed by Gravitino, Gravitino provides a virtual file system layer called
-Gravitino Virtual File System (GVFS) that is built on top of the Hadoop Compatible File System
+the Gravitino Virtual File System (GVFS) that's built on top of the Hadoop Compatible File System
 (HCFS) interface.
 
 GVFS is a virtual layer that manages the files and directories in the fileset through a virtual
 path, without needing to understand the specific storage details of the fileset. You can access
-the files or folders like below:
+the files or folders as shown below:
 
 ```text
 gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/sub_dir/
 ```
 
-Here `gvfs` is the scheme of the GVFS, `fileset` is the root directory of the GVFS and cannot be
-modified, the `${catalog_name}/${schema_name}/${fileset_name}` is the virtual path of the fileset.
-You can access the files and folders under this virtual path by concatenating the file or folder
+Here `gvfs` is the scheme of the GVFS, `fileset` is the root directory of the GVFS which can't
+modified, and `${catalog_name}/${schema_name}/${fileset_name}` is the virtual path of the fileset.
+You can access the files and folders under this virtual path by concatenating a file or folder
 name to the virtual path.
 
-The usage pattern for GVFS is exactly the same as HDFS, S3 and others, GVFS internally will manage
-the path mapping and converting automatically.
+The usage pattern for GVFS is the same as HDFS or S3. GVFS internally manages
+the path mapping and convert automatically.
 
 ## Prerequisites
 
-+ A Hadoop environment (Hadoop 3.1.0 has been tested) with HDFS running. GVFS is built against
-  Hadoop 3.1.0, it is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
++ A Hadoop environment with HDFS running. GVFS has been tested against
+  Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
   x. Please create an [issue](https://www.github.com/datastrato/gravitino/issues) if you find any
   compatibility issues.
-+ You already manage the filesets with Gravitino.
 
 ## Configuration
 
 | Configuration item                                    | Description                                                                                                                                                                                       | Default value | Required                          | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|---------------|
-| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop.Gvfs`.                                                                       | (none)        | Yes                               | 0.5.0         |
-| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class. Please configure it as `com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                           | (none)        | Yes                               | 0.5.0         |
-| `fs.gvfs.impl.disable.cache`                          | Close the Gravitino Virtual File System cache in Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No                                | 0.5.0         |
-| `fs.gravitino.server.uri`                             | The Gravitino server uri which gvfs needs to load the fileset meta.                                                                                                                               | (none)        | Yes                               | 0.5.0         |
-| `fs.gravitino.client.metalake`                        | The metalake which fileset belongs.                                                                                                                                                               | (none)        | Yes                               | 0.5.0         |
-| `fs.gravitino.client.authType`                        | The auth type to initialize the Gravitino client in Gravitino Virtual File System. Now only supports `simple` and `oauth2` auth type.                                                             | `simple`      | No                                | 0.5.0         |
-| `fs.gravitino.client.oauth2.serverUri`                | The auth server uri for the Gravitino client which using `oauth2` auth type in Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.credential`               | The auth credential for the Gravitino client which using `oauth2` auth type in Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.path`                     | The auth server path for the Gravitino client which using `oauth2` auth type in Gravitino Virtual File System. Please remove first slash (`/`) for path, which may like `oauth/token`.            | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.scope`                    | The auth scope for the Gravitino client which using `oauth2` auth type in Gravitino Virtual File System.                                                                                          | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.fileset.cache.maxCapacity`              | The cache capacity in the Gravitino Virtual File System.                                                                                                                                          | `20`          | No                                | 0.5.0         |
-| `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache evicts the element after access in the Gravitino Virtual File System. The value is in `milliseconds`.                                                            | `300000`      | No                                | 0.5.0         |
+| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class, set it to `com.datastrato.gravitino.filesystem.hadoop.Gvfs`.                                                                       | (none)        | Yes                               | 0.5.0         |
+| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class, set it to `com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                           | (none)        | Yes                               | 0.5.0         |
+| `fs.gvfs.impl.disable.cache`                          | Disable the Gravitino Virtual File System cache in the Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No                                | 0.5.0         |
+| `fs.gravitino.server.uri`                             | The Gravitino server URI which GVFS needs to load the fileset metadata.                                                                                                                               | (none)        | Yes                               | 0.5.0         |
+| `fs.gravitino.client.metalake`                        | The metalake to which the fileset belongs.                                                                                                                                                               | (none)        | Yes                               | 0.5.0         |
+| `fs.gravitino.client.authType`                        | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently only supports `simple` and `oauth2` auth types.                                                             | `simple`      | No                                | 0.5.0         |
+| `fs.gravitino.client.oauth2.serverUri`                | The auth server URI for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
+| `fs.gravitino.client.oauth2.credential`               | The auth credential for the Gravitino client when using `oauth2` auth type in the Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
+| `fs.gravitino.client.oauth2.path`                     | The auth server path for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System. Please remove the first slash `/` from the path, for example `oauth/token`.            | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
+| `fs.gravitino.client.oauth2.scope`                    | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                          | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
+| `fs.gravitino.fileset.cache.maxCapacity`              | The cache capacity of the Gravitino Virtual File System.                                                                                                                                          | `20`          | No                                | 0.5.0         |
+| `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                            | `300000`      | No                                | 0.5.0         |
 
 You can configure these properties in two ways:
 
-1. Before getting the `FileSystem` in the code, construct the `Configuration` and set the properties:
+1. Before obtaining the `FileSystem` in the code, construct a `Configuration` object and set its properties:
 
     ```java
     Configuration conf = new Configuration();
@@ -70,7 +69,7 @@ You can configure these properties in two ways:
     FileSystem fs = filesetPath.getFileSystem(conf);
     ```
 
-2. Configure these properties in the `core-site.xml` file of the Hadoop environment:
+2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
 
     ```xml
       <property>
@@ -94,16 +93,17 @@ You can configure these properties in two ways:
       </property>
     ```
 
-## How to use
+## How to use the Gravitino Virtual File System
 
-Please make sure to have the Gravitino Virtual File System runtime jar firstly, you can get it in
+First make sure to obtain the Gravitino Virtual File System runtime jar, which you can get in
 two ways:
 
-1. Download from the maven central repository: You can download the runtime jar which name is like
+1. Download from the maven central repository. You can download the runtime jar named
    `gravitino-filesystem-hadoop3-runtime-{version}.jar` from [Maven repository](https://mvnrepository.com/).
+
 2. Compile from the source code:
 
-   Download the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
+   Download or clone the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
    locally using the following command in the Gravitino source code directory:
 
     ```shell
@@ -112,28 +112,28 @@ two ways:
 
 ### Use GVFS via Hadoop shell command
 
-You can use the Hadoop shell command to operate the fileset storage. For example:
+You can use the Hadoop shell command to perform operations on the fileset storage. For example:
 
 ```shell
 # 1. Configure the hadoop `core-site.xml` configuration
-# you should put the properties above into this file
+# You should put the required properties into this file
 vi ${HADOOP_HOME}/etc/hadoop/core-site.xml
 
-# 2. Place the gvfs runtime jar into your Hadoop environment
+# 2. Place the GVFS runtime jar into your Hadoop environment
 cp gravitino-filesystem-hadoop3-runtime-{version}.jar ${HADOOP_HOME}/share/hadoop/common/lib/
 
-# 3. Complete the Kerberos authentication of the Hadoop environment (if necessary).
-# You need to ensure that the Kerberos has permission to operate the HDFS directory.
+# 3. Complete the Kerberos authentication setup of the Hadoop environment (if necessary).
+# You need to ensure that the Kerberos has permission on the HDFS directory.
 kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 # 4. Try to list the fileset
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
 ```
 
-### Use GVFS via Java code
+### Using the GVFS via Java code
 
-You can also operate the files or directories managed by fileset through Java code.
-Please make sure that your code is running in the correct Hadoop environment, and the environment
+You can also perform operations on the files or directories managed by fileset through Java code.
+Make sure that your code is using the correct Hadoop environment, and that your environment
 has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 
 For example:
@@ -149,23 +149,22 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 fs.getFileStatus(filesetPath);
 ```
 
-### Use GVFS with Apache Spark
+### Using GVFS with Apache Spark
 
-1. Add the gvfs runtime jar to the Spark environment.
+1. Add the GVFS runtime jar to the Spark environment.
 
     You can use `--packages` or `--jars` in the Spark submit shell to include the Gravitino Virtual
-    File System runtime jar, like this:
+    File System runtime jar, like so:
 
     ```shell
     ./${SPARK_HOME}/bin/spark-submit --packages com.datastrato.gravitino:filesystem-hadoop3-runtime:${version}
     ```
 
-    If you want to include Gravitino Virtual File System runtime jar in your Spark installation,
-    make sure to add it to the `${SPARK_HOME}/jars/` folder.
+    If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
 
 2. Configure the Hadoop configuration when submitting the job.
 
-    Then, you can configure the Hadoop configuration in the shell command like this:
+    You can configure in the shell command in this way:
 
     ```shell
     --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=com.datastrato.gravitino.filesystem.hadoop.Gvfs
@@ -174,12 +173,12 @@ fs.getFileStatus(filesetPath);
     --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
     ```
 
-3. Operate the fileset storage in your code.
+3. Perform operations on the fileset storage in your code.
 
-    Finally, you can operate the fileset storage in your Spark program:
+    Finally, you can access the fileset storage in your Spark program:
 
     ```scala
-    // Scala
+    // Scala code
     val spark = SparkSession.builder()
           .appName("Gvfs Example")
           .getOrCreate()
@@ -190,20 +189,20 @@ fs.getFileStatus(filesetPath);
     ```
 
 
-### Use GVFS with Tensorflow
+### Using GVFS with Tensorflow
 
-In order for tensorflow to support GVFS, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
+For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
 
-1. Add a patch and recompile tensorflow-io.
+1. First, add a patch and recompile tensorflow-io.
 
     You need to add a [patch](https://github.com/tensorflow/io/pull/1970) to support GVFS on
     tensorflow-io. Then you can follow the [tutorial](https://github.com/tensorflow/io/blob/master/docs/development.md)
     to recompile your code and release the tensorflow-io module.
 
-2. Configure the Hadoop configuration.
+2. Then you need to configure the Hadoop configuration.
 
-   You need to configure the hadoop configuration and `gravitino-filesystem-hadoop3-runtime-{version}.jar`,
-   also kerberos environment according to the [Use GVFS via Hadoop shell command](#use-gvfs-via-hadoop-shell-command) sections.
+   You need to configure the Hadoop configuration and add `gravitino-filesystem-hadoop3-runtime-{version}.jar`,
+   and set up the Kerberos environment according to the [Use GVFS via Hadoop shell command](#use-gvfs-via-hadoop-shell-command) sections.
 
    Then you need to set your environment as follows:
 
@@ -235,16 +234,16 @@ Currently, Gravitino Virtual File System supports two kinds of authentication ty
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
-### How to use
+### How to use authentication
 
-#### Use `simple` authentication type
+#### Using `simple` authentication
 
-Please make sure that your Gravitino server also configure the `simple` authentication mode firstly.
+First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
 Then, you can configure the Hadoop configuration like this:
 
 ```java
-// Simple type allows the client to use the environment variable `GRAVITINO_USER` as the user.
+// Simple type uses the environment variable `GRAVITINO_USER` as the client user.
 // If the environment variable `GRAVITINO_USER` isn't set,
 // the client uses the user of the machine that sends requests.
 System.setProperty("GRAVITINO_USER", "test");
@@ -261,9 +260,9 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-#### Use `oauth2` authentication type
+#### Using `OAuth` authentication
 
-If you want to use `oauth2` authentication type for the Gravitino client in Gravitino Virtual File System,
+If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
 please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](./security.md).
 
 Then, you can configure the Hadoop configuration like this:
@@ -274,9 +273,9 @@ conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.
 conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
-// Configure the auth type to oatuh2.
+// Configure the auth type to oauth2.
 conf.set("fs.gravitino.client.authType", "oauth2");
-// Configure the oauth conifiguration.
+// Configure the OAuth configuration.
 conf.set("fs.gravitino.client.oauth2.serverUri", "${your_oauth_server_uri}");
 conf.set("fs.gravitino.client.oauth2.credential", "${your_client_credential}");
 conf.set("fs.gravitino.client.oauth2.path", "${your_oauth_server_path}");
@@ -284,4 +283,3 @@ conf.set("fs.gravitino.client.oauth2.scope", "${your_client_scope}");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
-

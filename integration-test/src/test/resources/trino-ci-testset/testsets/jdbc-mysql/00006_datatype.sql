@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_mysql".gt_db1;
+CREATE SCHEMA gt_mysql.gt_db1;
 
-USE "test.gt_mysql".gt_db1;
+USE gt_mysql.gt_db1;
 
 -- Unsupported Type: BOOLEAN
 CREATE TABLE tb01 (
@@ -68,4 +68,4 @@ drop table tb01;
 
 drop table tb02;
 
-drop schema "test.gt_mysql".gt_db1 cascade;
+drop schema gt_mysql.gt_db1 cascade;

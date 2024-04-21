@@ -23,6 +23,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";
+  public static final String PROVIDER = "provider";
 
   public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
 
@@ -47,7 +48,14 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
                 SORT_ORDER, "Selecting a specific snapshot in a merge operation", false),
             stringReservedPropertyEntry(
                 IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false),
-            stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false));
+            stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false),
+            stringImmutablePropertyEntry(
+                PROVIDER,
+                "Iceberg provider for Iceberg table fileFormat, such as parquet, orc, avro, iceberg",
+                false,
+                null,
+                false,
+                false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 

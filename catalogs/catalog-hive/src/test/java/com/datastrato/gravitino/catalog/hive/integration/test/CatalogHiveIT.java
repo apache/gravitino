@@ -485,6 +485,52 @@ public class CatalogHiveIT extends AbstractIT {
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
+
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+
+    // test column default value
+    Column withDefault =
+        Column.of(
+            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {withDefault},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test
@@ -538,7 +584,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
     Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
-    Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
@@ -809,6 +855,118 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(2, count);
   }
 
+  @Test
+  public void testDropPartition() throws TException, InterruptedException, IOException {
+    Table createdTable = preparePartitionedTable();
+
+    // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field1 = new String[] {"hive_col_name2"};
+    String[] field2 = new String[] {"hive_col_name3"};
+    Literal<?> literal1 = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
+    Literal<?> literal2 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity =
+        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
+    IdentityPartition partitionAdded =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
+    Assertions.assertEquals(
+        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+
+    // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name());
+    Assertions.assertTrue(dropRes1);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded.name())));
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, createdTable.name()));
+    Path partitionDirectory = new Path(hiveTab.getSd().getLocation() + identity.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory), "The partition directory should not exist");
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field3 = new String[] {"hive_col_name2"};
+    String[] field4 = new String[] {"hive_col_name3"};
+    Literal<?> literal3 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal4 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity1 =
+        Partitions.identity(new String[][] {field3, field4}, new Literal<?>[] {literal3, literal4});
+    IdentityPartition partitionAdded1 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity1);
+
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
+    Assertions.assertEquals(
+        partitionAdded1.values()[0].value().toString(), partitionGot1.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded1.values()[1].value().toString(), partitionGot1.getValues().get(1));
+    Assertions.assertEquals(partitionAdded1.properties(), partitionGot1.getParameters());
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test3"
+    String[] field5 = new String[] {"hive_col_name2"};
+    String[] field6 = new String[] {"hive_col_name3"};
+    Literal<?> literal5 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal6 = Literals.stringLiteral("gravitino_it_test3");
+    Partition identity2 =
+        Partitions.identity(new String[][] {field5, field6}, new Literal<?>[] {literal5, literal6});
+    IdentityPartition partitionAdded2 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity2);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
+    Assertions.assertEquals(
+        partitionAdded2.values()[0].value().toString(), partitionGot2.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded2.values()[1].value().toString(), partitionGot2.getValues().get(1));
+    Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.getParameters());
+
+    // test drop partition "hive_col_name2=2024-01-02"
+    boolean dropRes2 = createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02");
+    Assertions.assertTrue(dropRes2);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded1.name())));
+    Path partitionDirectory1 = new Path(hiveTab.getSd().getLocation() + identity1.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory1), "The partition directory should not exist");
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded2.name())));
+    Path partitionDirectory2 = new Path(hiveTab.getSd().getLocation() + identity2.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory2), "The partition directory should not exist");
+
+    // test no-exist partition with ifExist=false
+    Assertions.assertFalse(createdTable.supportPartitions().dropPartition(partitionAdded.name()));
+  }
+
+  @Test
+  public void testPurgePartition()
+      throws InterruptedException, UnsupportedOperationException, TException {
+    Table createdTable = preparePartitionedTable();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> createdTable.supportPartitions().purgePartition("testPartition"));
+  }
+
   private Table preparePartitionedTable() throws TException, InterruptedException {
     Column[] columns = createColumns();
 
@@ -986,6 +1144,34 @@ public class CatalogHiveIT extends AbstractIT {
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"),
         "The exception message is: " + exception.getMessage());
 
+    // test alter column nullability exception
+    TableChange alterColumnNullability =
+        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(id, alterColumnNullability));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0,"
+                    + " but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: hive_col_name1"));
+
+    // test update column default value exception
+    TableChange updateDefaultValue =
+        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
@@ -1038,7 +1224,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
         actualTable.getTableType());
-    Assertions.assertEquals(tableName, actualTable.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(tableName.toLowerCase(), actualTable.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));

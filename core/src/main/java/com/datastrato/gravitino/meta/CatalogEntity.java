@@ -250,6 +250,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     CatalogEntity that = (CatalogEntity) o;
     return Objects.equal(id, that.id)
         && Objects.equal(name, that.name)
+        && Objects.equal(namespace, that.namespace)
         && type == that.type
         && Objects.equal(provider, that.provider)
         && Objects.equal(comment, that.comment)

@@ -19,7 +19,7 @@ public class GravitinoCatalog {
   private final String metalake;
   private final Catalog catalog;
 
-  public GravitinoCatalog(String metalake, Catalog catalog) {
+  public GravitinoCatalog(String metalake, Catalog catalog, boolean usingSimpleName) {
     this.metalake = metalake;
     this.catalog = catalog;
   }
@@ -32,8 +32,8 @@ public class GravitinoCatalog {
     return catalog.name();
   }
 
-  public String getFullName() {
-    return metalake + "." + catalog.name();
+  public String getMetalake() {
+    return metalake;
   }
 
   public NameIdentifier geNameIdentifier() {

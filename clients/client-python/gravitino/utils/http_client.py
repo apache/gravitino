@@ -1,8 +1,28 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+MIT License
+
+Copyright (c) 2016 Dhamu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
+import logging
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -12,6 +32,7 @@ from gravitino.typing import JSON_ro
 from gravitino.utils.exceptions import handle_error
 from gravitino.constants import TIMEOUT
 
+logger = logging.getLogger(__name__)
 
 class Response:
     def __init__(self, response):
@@ -19,6 +40,11 @@ class Response:
         self._body = response.read()
         self._headers = response.info()
         self._url = response.url
+
+        logging.basicConfig(level=logging.DEBUG)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        logger.addHandler(console_handler)
 
     @property
     def status_code(self):
@@ -102,8 +128,12 @@ class HTTPClient:
 
         if headers:
             self._update_headers(headers)
+        else:
+            headers = {'Content-Type': 'application/json', 'Accept': 'application/vnd.gravitino.v1+json'}
+            self._update_headers(headers)
+
         if json:
-            request_data = _json.dumps(json).encode("utf-8")
+            request_data = json.to_json().encode("utf-8")
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -127,6 +157,9 @@ class HTTPClient:
 
     def put(self, endpoint, json=None, **kwargs):
         return self._request("put", endpoint, json=json, **kwargs)
+
+    def close(self):
+        self._request("close")
 
 
 def unpack(path: str):
