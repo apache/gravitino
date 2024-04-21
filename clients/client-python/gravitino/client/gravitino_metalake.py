@@ -47,15 +47,7 @@ class GravitinoMetalake(MetalakeDTO):
 
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
 
-    # def __init__(self, name: str = None, comment: str = None, properties: Dict[str, str] = None, audit: AuditDTO = None,
-    #              rest_client: HTTPClient = None):
-    #     super().__init__(_name=name, _comment=comment, _properties=properties, _audit=audit)
-    #     self.rest_client = rest_client
-
-    # @classmethod
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
-        # return cls(name=metalake.name(), comment=metalake.comment(), properties=metalake.properties(),
-        #            audit=metalake.audit_info(), rest_client=client)
         super().__init__(_name=metalake.name(), _comment=metalake.comment(), _properties=metalake.properties(),
                          _audit=metalake.audit_info())
         self.rest_client = client
