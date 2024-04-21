@@ -95,7 +95,6 @@ public class TestGroupOperations extends JerseyTest {
   public void testAddGroup() {
     GroupAddRequest req = new GroupAddRequest("group1");
     Group group = buildGroup("group1");
-
     when(manager.addGroup(any(), any())).thenReturn(group);
 
     Response resp =
@@ -164,7 +163,6 @@ public class TestGroupOperations extends JerseyTest {
   @Test
   public void testGetGroup() {
     Group group = buildGroup("group1");
-
     when(manager.getGroup(any(), any())).thenReturn(group);
 
     Response resp =
@@ -226,16 +224,6 @@ public class TestGroupOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private Group buildGroup(String group) {
-    return GroupEntity.builder()
-        .withId(1L)
-        .withName(group)
-        .withRoleNames(Collections.emptyList())
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
-  }
-
   @Test
   public void testRemoveGroup() {
     when(manager.removeGroup(any(), any())).thenReturn(true);
@@ -277,5 +265,15 @@ public class TestGroupOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  private Group buildGroup(String group) {
+    return GroupEntity.builder()
+        .withId(1L)
+        .withName(group)
+        .withRoleNames(Collections.emptyList())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

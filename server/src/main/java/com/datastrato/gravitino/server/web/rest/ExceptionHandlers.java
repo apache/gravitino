@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -254,6 +255,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NoSuchMetalakeException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, metalake, parent, e);
       }
@@ -323,6 +327,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UserAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, user, metalake, e);
       }
@@ -355,6 +362,9 @@ public class ExceptionHandlers {
       } else if (e instanceof GroupAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, group, metalake, e);
       }
@@ -386,6 +396,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof RoleAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else {
         return super.handle(op, role, metalake, e);
@@ -467,6 +480,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else {
         return super.handle(op, roles, parent, e);

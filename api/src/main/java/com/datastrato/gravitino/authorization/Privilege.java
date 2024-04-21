@@ -25,6 +25,16 @@ public interface Privilege {
    */
   Condition condition();
 
+  /**
+   * Judge whether the privilege can bind to the type of securable object. Every privilege can only
+   * bind to several types of securable objects. For example, schema securable object can't bind to
+   * the privilege to create a catalog.
+   *
+   * @param type The type of securable object.
+   * @return True if the privilege can bind to the type, otherwise false.
+   */
+  boolean supportsSecurableObjectType(SecurableObject.Type type);
+
   /** The name of this privilege. */
   enum Name {
     /** The privilege to create a catalog. */

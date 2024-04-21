@@ -304,6 +304,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " create catalog";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to alter a catalog. */
@@ -347,6 +352,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " alter catalog";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE || type == SecurableObject.Type.CATALOG;
     }
   }
 
@@ -392,6 +402,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " drop catalog";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE || type == SecurableObject.Type.CATALOG;
+    }
   }
 
   /** The privilege to use a catalog. */
@@ -434,6 +449,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " use catalog";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE || type == SecurableObject.Type.CATALOG;
     }
   }
 
@@ -479,6 +499,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " use schema";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.CATALOG || type == SecurableObject.Type.SCHEMA;
+    }
   }
 
   /** The privilege to create a schema. */
@@ -522,6 +547,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " create schema";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.CATALOG;
     }
   }
 
@@ -567,6 +597,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " alter schema";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.CATALOG || type == SecurableObject.Type.SCHEMA;
+    }
   }
 
   /** The privilege to drop a schema. */
@@ -610,6 +645,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " drop schema";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.CATALOG || type == SecurableObject.Type.SCHEMA;
     }
   }
 
@@ -655,6 +695,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " create table";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA;
+    }
   }
 
   /** The privilege to drop a table. */
@@ -696,6 +741,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " drop table";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TABLE;
     }
   }
 
@@ -739,6 +789,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " read table";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TABLE;
+    }
   }
 
   /** The privilege to write a table. */
@@ -780,6 +835,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " write table";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TABLE;
     }
   }
 
@@ -823,6 +883,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " create fileset";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA;
+    }
   }
 
   /** The privilege to drop a fileset. */
@@ -864,6 +929,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " drop fileset";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.FILESET;
     }
   }
 
@@ -907,6 +977,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " read fileset";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.FILESET;
+    }
   }
 
   /** The privilege to write a fileset. */
@@ -948,6 +1023,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " write fileset";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.FILESET;
     }
   }
 
@@ -993,6 +1073,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " create topic";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA;
+    }
   }
 
   /** The privilege to drop a topic. */
@@ -1034,6 +1119,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " drop topic";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TOPIC;
     }
   }
 
@@ -1077,6 +1167,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " read topic";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TOPIC;
+    }
   }
 
   /** The privilege to write a topic. */
@@ -1118,6 +1213,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " write topic";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.SCHEMA || type == SecurableObject.Type.TOPIC;
     }
   }
 
@@ -1161,6 +1261,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " manage metalake";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to manage a metalake. */
@@ -1202,6 +1307,13 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " create metalake";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      // For users, any securable object can't bind the privilege `CREATE METALAKE`.
+      // This privilege is reserved for system.
+      return false;
     }
   }
 
@@ -1247,6 +1359,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " use metalake";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to get a user. */
@@ -1288,6 +1405,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " get user";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
     }
   }
 
@@ -1333,6 +1455,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " add user";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to remove a user. */
@@ -1374,6 +1501,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " remove user";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
     }
   }
 
@@ -1419,6 +1551,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " add group";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to remove a group. */
@@ -1462,6 +1599,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " remove group";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
     }
   }
 
@@ -1507,6 +1649,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " get group";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to create a role. */
@@ -1548,6 +1695,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " create role";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
     }
   }
 
@@ -1593,6 +1745,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " get role";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to delete a role. */
@@ -1636,6 +1793,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " delete role";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return type == SecurableObject.Type.METALAKE;
     }
   }
 
@@ -1681,6 +1843,11 @@ public class Privileges {
     public String simpleString() {
       return condition().name() + " grant role";
     }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return true;
+    }
   }
 
   /** The privilege to revoke a role from the user or the group. */
@@ -1724,6 +1891,11 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition().name() + " revoke role";
+    }
+
+    @Override
+    public boolean supportsSecurableObjectType(SecurableObject.Type type) {
+      return true;
     }
   }
 }

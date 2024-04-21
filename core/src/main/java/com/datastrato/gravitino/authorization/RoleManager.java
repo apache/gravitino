@@ -69,6 +69,8 @@ class RoleManager {
                             .setNameFormat("role-cleaner-%d")
                             .build())))
             .build();
+
+    initSystemRoles();
   }
 
   RoleEntity createRole(
@@ -77,7 +79,11 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
-    AuthorizationUtils.checkMetalakeExists(metalake);
+    if (role.startsWith(Entity.SYSTEM_RESERVED_ROLE_NAME_PREFIX)) {
+      throw new IllegalArgumentException(
+          "Can't create a role with with reserved prefix `system_role`");
+    }
+
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(idGenerator.nextId())
@@ -108,7 +114,6 @@ class RoleManager {
 
   RoleEntity getRole(String metalake, String role) throws NoSuchRoleException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       return getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
@@ -118,7 +123,6 @@ class RoleManager {
 
   boolean deleteRole(String metalake, String role) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
       cache.invalidate(ident);
 
@@ -130,7 +134,7 @@ class RoleManager {
     }
   }
 
-  private RoleEntity getRoleEntity(NameIdentifier identifier) {
+  RoleEntity getRoleEntity(NameIdentifier identifier) {
     return cache.get(
         identifier,
         id -> {
@@ -170,5 +174,54 @@ class RoleManager {
       }
     }
     return roleEntities;
+  }
+
+  void initSystemRoles() {
+    try {
+      if (!store.exists(AuthorizationUtils.ofSystemMetalakeAddUserRole(), Entity.EntityType.ROLE)) {
+        RoleEntity roleEntity =
+            RoleEntity.builder()
+                .withId(idGenerator.nextId())
+                .withName(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)
+                .withSecurableObjects(
+                    Lists.newArrayList(
+                        SecurableObjects.ofMetalake(
+                            Entity.SYSTEM_METALAKE_RESERVED_NAME,
+                            Lists.newArrayList(
+                                Privileges.AddUser.allow(), Privileges.RemoveUser.allow()))))
+                .withAuditInfo(
+                    AuditInfo.builder()
+                        .withCreator(System.getProperty("user.name"))
+                        .withCreateTime(Instant.now())
+                        .build())
+                .build();
+
+        store.put(roleEntity, false /* overwritten */);
+        cache.put(roleEntity.nameIdentifier(), roleEntity);
+      }
+
+      if (!store.exists(AuthorizationUtils.ofMetalakeCreateRole(), Entity.EntityType.ROLE)) {
+        RoleEntity roleEntity =
+            RoleEntity.builder()
+                .withId(idGenerator.nextId())
+                .withName(Entity.METALAKE_CREATE_ROLE)
+                .withSecurableObjects(
+                    Lists.newArrayList(
+                        SecurableObjects.ofAllMetalakes(
+                            Lists.newArrayList(Privileges.CreateMetalake.allow()))))
+                .withAuditInfo(
+                    AuditInfo.builder()
+                        .withCreator(System.getProperty("user.name"))
+                        .withCreateTime(Instant.now())
+                        .build())
+                .build();
+
+        store.put(roleEntity, false /* overwritten */);
+        cache.put(roleEntity.nameIdentifier(), roleEntity);
+      }
+    } catch (IOException ioe) {
+      LOG.error("Failed to init system roles due to storage issues", ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 }

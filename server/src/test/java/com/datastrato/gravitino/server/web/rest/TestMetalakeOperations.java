@@ -62,7 +62,7 @@ public class TestMetalakeOperations extends JerseyTest {
     }
   }
 
-  private MetalakeManager metalakeManager = mock(MetalakeManager.class);
+  private static final MetalakeManager metalakeManager = mock(MetalakeManager.class);
 
   @BeforeAll
   public static void setup() {
@@ -276,6 +276,7 @@ public class TestMetalakeOperations extends JerseyTest {
     updateRequests.stream()
         .map(MetalakeUpdateRequest::metalakeChange)
         .toArray(MetalakeChange[]::new);
+
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);

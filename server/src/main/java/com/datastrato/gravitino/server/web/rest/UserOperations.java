@@ -7,11 +7,16 @@ package com.datastrato.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
+import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
@@ -51,6 +56,11 @@ public class UserOperations {
   @ResponseMetered(name = "get-user", absolute = true)
   public Response getUser(@PathParam("metalake") String metalake, @PathParam("user") String user) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -68,13 +78,17 @@ public class UserOperations {
   @ResponseMetered(name = "add-user", absolute = true)
   public Response addUser(@PathParam("metalake") String metalake, UserAddRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new UserResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addUser(metalake, request.getName())))));
+          () -> {
+            User user = accessControlManager.addUser(metalake, request.getName());
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(user)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -89,6 +103,11 @@ public class UserOperations {
   public Response removeUser(
       @PathParam("metalake") String metalake, @PathParam("user") String user) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () -> {

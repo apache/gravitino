@@ -56,6 +56,7 @@ public class MetalakeAdminOperations {
                   new UserResponse(
                       DTOConverters.toDTO(
                           accessControlManager.addMetalakeAdmin(request.getName())))));
+
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.ADD, request.getName(), null, e);
     }

@@ -48,7 +48,6 @@ class UserGroupManager {
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
@@ -76,7 +75,6 @@ class UserGroupManager {
 
   boolean removeUser(String metalake, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -87,7 +85,6 @@ class UserGroupManager {
 
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       UserEntity entity =
           store.get(
               AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
@@ -113,7 +110,6 @@ class UserGroupManager {
 
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
@@ -141,7 +137,6 @@ class UserGroupManager {
 
   boolean removeGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
       return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
@@ -155,8 +150,6 @@ class UserGroupManager {
 
   Group getGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
       GroupEntity entity =
           store.get(
               AuthorizationUtils.ofGroup(metalake, group),

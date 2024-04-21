@@ -11,7 +11,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -47,7 +46,7 @@ public class TestAccessControlManagerForPermissions {
 
   private static String GROUP = "group";
 
-  private static List<String> ROLE = Lists.newArrayList("role");
+  private static List<String> ROLES = Lists.newArrayList("role");
 
   private static AuditInfo auditInfo =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -127,21 +126,16 @@ public class TestAccessControlManagerForPermissions {
     User user = accessControlManager.getUser(METALAKE, USER);
     Assertions.assertTrue(user.roles().isEmpty());
 
-    user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
+    user = accessControlManager.grantRolesToUser(METALAKE, ROLES, USER);
     Assertions.assertFalse(user.roles().isEmpty());
 
     user = accessControlManager.getUser(METALAKE, USER);
     Assertions.assertEquals(1, user.roles().size());
-    Assertions.assertEquals(ROLE, user.roles());
+    Assertions.assertEquals(ROLES, user.roles());
 
     // Test with a role which exists
-    user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
+    user = accessControlManager.grantRolesToUser(METALAKE, ROLES, USER);
     Assertions.assertEquals(1, user.roles().size());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.grantRolesToUser(notExist, ROLE, USER));
 
     // Throw NoSuchRoleException
     Assertions.assertThrows(
@@ -151,10 +145,10 @@ public class TestAccessControlManagerForPermissions {
     // Throw NoSuchUserException
     Assertions.assertThrows(
         NoSuchUserException.class,
-        () -> accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList(ROLE), notExist));
+        () -> accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList(ROLES), notExist));
 
     // Clear Resource
-    user = accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList(ROLE), USER);
+    user = accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList(ROLES), USER);
     Assertions.assertTrue(user.roles().isEmpty());
   }
 
@@ -162,16 +156,11 @@ public class TestAccessControlManagerForPermissions {
   public void testRevokeRoleFromUser() {
     String notExist = "not-exist";
 
-    User user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
+    User user = accessControlManager.grantRolesToUser(METALAKE, ROLES, USER);
     Assertions.assertFalse(user.roles().isEmpty());
 
-    user = accessControlManager.revokeRolesFromUser(METALAKE, ROLE, USER);
+    user = accessControlManager.revokeRolesFromUser(METALAKE, ROLES, USER);
     Assertions.assertTrue(user.roles().isEmpty());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.revokeRolesFromUser(notExist, ROLE, USER));
 
     // Throw NoSuchRoleException
     Assertions.assertThrows(
@@ -180,13 +169,13 @@ public class TestAccessControlManagerForPermissions {
             accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList(notExist), USER));
 
     // Remove role which doesn't exist.
-    user = accessControlManager.revokeRolesFromUser(METALAKE, ROLE, USER);
+    user = accessControlManager.revokeRolesFromUser(METALAKE, ROLES, USER);
     Assertions.assertTrue(user.roles().isEmpty());
 
     // Throw NoSuchUserException
     Assertions.assertThrows(
         NoSuchUserException.class,
-        () -> accessControlManager.revokeRolesFromUser(METALAKE, ROLE, notExist));
+        () -> accessControlManager.revokeRolesFromUser(METALAKE, ROLES, notExist));
   }
 
   @Test
@@ -196,21 +185,16 @@ public class TestAccessControlManagerForPermissions {
     Group group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
 
-    group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
+    group = accessControlManager.grantRolesToGroup(METALAKE, ROLES, GROUP);
     Assertions.assertFalse(group.roles().isEmpty());
 
     group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertEquals(1, group.roles().size());
-    Assertions.assertEquals(ROLE, group.roles());
+    Assertions.assertEquals(ROLES, group.roles());
 
     // Test with a role which exists
-    group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
+    group = accessControlManager.grantRolesToGroup(METALAKE, ROLES, GROUP);
     Assertions.assertEquals(1, group.roles().size());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.grantRolesToGroup(notExist, ROLE, GROUP));
 
     // Throw NoSuchRoleException
     Assertions.assertThrows(
@@ -221,10 +205,10 @@ public class TestAccessControlManagerForPermissions {
     // Throw NoSuchGroupException
     Assertions.assertThrows(
         NoSuchGroupException.class,
-        () -> accessControlManager.grantRolesToGroup(METALAKE, ROLE, notExist));
+        () -> accessControlManager.grantRolesToGroup(METALAKE, ROLES, notExist));
 
     // Clear Resource
-    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, GROUP);
+    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLES, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
   }
 
@@ -232,16 +216,11 @@ public class TestAccessControlManagerForPermissions {
   public void testRevokeRoleFormGroup() {
     String notExist = "not-exist";
 
-    Group group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
+    Group group = accessControlManager.grantRolesToGroup(METALAKE, ROLES, GROUP);
     Assertions.assertFalse(group.roles().isEmpty());
 
-    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, GROUP);
+    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLES, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.revokeRolesFromGroup(notExist, ROLE, GROUP));
 
     // Throw NoSuchRoleException
     Assertions.assertThrows(
@@ -251,13 +230,13 @@ public class TestAccessControlManagerForPermissions {
                 METALAKE, Lists.newArrayList(notExist), GROUP));
 
     // Remove not exist role
-    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, GROUP);
+    group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLES, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
 
     // Throw NoSuchGroupException
     Assertions.assertThrows(
         NoSuchGroupException.class,
-        () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
+        () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLES, notExist));
   }
 
   @Test

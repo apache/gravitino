@@ -7,11 +7,15 @@ package com.datastrato.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
@@ -52,6 +56,11 @@ public class GroupOperations {
   public Response getGroup(
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -69,6 +78,11 @@ public class GroupOperations {
   @ResponseMetered(name = "add-group", absolute = true)
   public Response addGroup(@PathParam("metalake") String metalake, GroupAddRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -76,6 +90,7 @@ public class GroupOperations {
                   new GroupResponse(
                       DTOConverters.toDTO(
                           accessControlManager.addGroup(metalake, request.getName())))));
+
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -90,6 +105,11 @@ public class GroupOperations {
   public Response removeGroup(
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () -> {

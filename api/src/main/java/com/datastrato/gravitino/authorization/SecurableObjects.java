@@ -105,8 +105,8 @@ public class SecurableObjects {
   /**
    * All metalakes is a special securable object .You can give the securable object the privileges
    * `CREATE METALAKE`, etc. It means that you can create any which doesn't exist. This securable
-   * object is only used for metalake admin. You can't grant any privilege to this securable object.
-   * You can't bind this securable object to any role, too.
+   * object is reserved for system. You can't grant any privilege to this securable object. You
+   * can't bind this securable object to any role, too.
    *
    * @param privileges The privileges of the all metalakes
    * @return The created {@link SecurableObject}

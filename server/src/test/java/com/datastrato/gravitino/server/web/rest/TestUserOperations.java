@@ -163,7 +163,6 @@ public class TestUserOperations extends JerseyTest {
 
   @Test
   public void testGetUser() {
-
     User user = buildUser("user1");
 
     when(manager.getUser(any(), any())).thenReturn(user);
@@ -227,16 +226,6 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private User buildUser(String user) {
-    return UserEntity.builder()
-        .withId(1L)
-        .withName(user)
-        .withRoleNames(Collections.emptyList())
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
-  }
-
   @Test
   public void testRemoveUser() {
     when(manager.removeUser(any(), any())).thenReturn(true);
@@ -278,5 +267,15 @@ public class TestUserOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  private User buildUser(String user) {
+    return UserEntity.builder()
+        .withId(1L)
+        .withName(user)
+        .withRoleNames(Collections.emptyList())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

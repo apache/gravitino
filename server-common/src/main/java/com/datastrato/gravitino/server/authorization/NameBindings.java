@@ -16,4 +16,19 @@ public class NameBindings {
   @Target({ElementType.TYPE, ElementType.METHOD})
   @Retention(RetentionPolicy.RUNTIME)
   public @interface AccessControlInterfaces {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface RoleInterface {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface MetalakeInterface {}
+
+  @NameBinding
+  @Target({ElementType.TYPE, ElementType.METHOD})
+  @Retention(RetentionPolicy.RUNTIME)
+  public @interface AdminInterface {}
 }

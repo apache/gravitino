@@ -10,9 +10,9 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
@@ -41,27 +41,27 @@ public class TestAccessControlManager {
   private static Config config;
 
   private static String METALAKE = "metalake";
-
+  private static AuditInfo auditInfo =
+      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
   private static BaseMetalake metalakeEntity =
       BaseMetalake.builder()
           .withId(1L)
           .withName(METALAKE)
-          .withAuditInfo(
-              AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withAuditInfo(auditInfo)
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
-    config.set(SERVICE_ADMINS, Lists.newArrayList("admin1", "admin2"));
+    config.set(
+        SERVICE_ADMINS, Lists.newArrayList(AuthConstants.ANONYMOUS_USER, "admin1", "admin2"));
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
     entityStore.put(metalakeEntity, true);
-
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
     GravitinoEnv.getInstance().setEntityStore(entityStore);
     GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
@@ -86,10 +86,6 @@ public class TestAccessControlManager {
     Assertions.assertEquals("testAddWithOptionalField", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
-
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
         UserAlreadyExistsException.class,
@@ -103,10 +99,6 @@ public class TestAccessControlManager {
     User user = accessControlManager.getUser("metalake", "testGet");
     Assertions.assertEquals("testGet", user.name());
 
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
-
     // Test to get non-existed user
     Throwable exception =
         Assertions.assertThrows(
@@ -117,10 +109,6 @@ public class TestAccessControlManager {
   @Test
   public void testRemoveUser() {
     accessControlManager.addUser("metalake", "testRemove");
-
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to remove user
     boolean removed = accessControlManager.removeUser("metalake", "testRemove");
@@ -142,10 +130,6 @@ public class TestAccessControlManager {
     Assertions.assertEquals("testAddWithOptionalField", group.name());
     Assertions.assertTrue(group.roles().isEmpty());
 
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
-
     // Test with GroupAlreadyExistsException
     Assertions.assertThrows(
         GroupAlreadyExistsException.class,
@@ -159,10 +143,6 @@ public class TestAccessControlManager {
     Group group = accessControlManager.getGroup("metalake", "testGet");
     Assertions.assertEquals("testGet", group.name());
 
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
-
     // Test to get non-existed group
     Throwable exception =
         Assertions.assertThrows(
@@ -172,19 +152,15 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testRemoveGroup() {
+  public void testRemoveGroup() throws IOException {
     accessControlManager.addGroup("metalake", "testRemove");
-
-    // Test with NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
 
     // Test to remove group
     boolean removed = accessControlManager.removeGroup("metalake", "testRemove");
     Assertions.assertTrue(removed);
 
     // Test to remove non-existed group
-    boolean removed1 = accessControlManager.removeUser("metalake", "no-exist");
+    boolean removed1 = accessControlManager.removeGroup("metalake", "no-exist");
     Assertions.assertFalse(removed1);
   }
 
@@ -192,7 +168,7 @@ public class TestAccessControlManager {
   public void testMetalakeAdmin() {
     User user = accessControlManager.addMetalakeAdmin("test");
     Assertions.assertEquals("test", user.name());
-    Assertions.assertTrue(user.roles().isEmpty());
+    Assertions.assertEquals(1, user.roles().size());
     Assertions.assertTrue(accessControlManager.isMetalakeAdmin("test"));
 
     // Test with UserAlreadyExistsException
@@ -245,7 +221,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testLoadRole() {
+  public void testGetRole() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
@@ -274,7 +250,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testDropRole() {
+  public void testDeleteRole() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
@@ -285,11 +261,11 @@ public class TestAccessControlManager {
             SecurableObjects.ofCatalog(
                 "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
 
-    // Test drop role
+    // Test delete role
     boolean dropped = accessControlManager.deleteRole("metalake", "testDrop");
     Assertions.assertTrue(dropped);
 
-    // Test drop non-existed role
+    // Test delete non-existed role
     boolean dropped1 = accessControlManager.deleteRole("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
   }

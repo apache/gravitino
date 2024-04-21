@@ -9,8 +9,10 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -34,6 +36,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
 
   public static final Field SECURABLE_OBJECT =
       Field.required("securable_objects", List.class, "The securable objects of the role entity.");
+
+  private static final Splitter DOT = Splitter.on('.');
 
   private Long id;
   private String name;
@@ -155,6 +159,22 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     return namespace;
   }
 
+  public boolean hasPrivilegeWithCondition(
+      SecurableObject targetObject, Privilege.Name targetPrivilege, Privilege.Condition condition) {
+    String metalake = namespace.level(0);
+    for (SecurableObject object : securableObjects) {
+      if (isSameOrParent(
+          convertInnerObject(metalake, object), convertInnerObject(metalake, targetObject))) {
+        for (Privilege privilege : object.privileges()) {
+          if (privilege.name().equals(targetPrivilege) && privilege.condition().equals(condition)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   public static Builder builder() {
     return new Builder();
   }
@@ -241,5 +261,66 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       roleEntity.validate();
       return roleEntity;
     }
+  }
+
+  private static InnerSecurableObject convertInnerObject(
+      String metalake, SecurableObject securableObject) {
+    if (SecurableObject.Type.METALAKE.equals(securableObject.type())) {
+      if ("*".equals(securableObject.name())) {
+        return ROOT;
+      } else {
+        return new InnerSecurableObject(ROOT, securableObject.name());
+      }
+    }
+
+    InnerSecurableObject currentObject = new InnerSecurableObject(ROOT, metalake);
+    List<String> names = DOT.splitToList(securableObject.fullName());
+    for (String name : names) {
+      currentObject = new InnerSecurableObject(currentObject, name);
+    }
+    return currentObject;
+  }
+
+  private static final InnerSecurableObject ROOT = new InnerSecurableObject(null, "*");
+
+  private static class InnerSecurableObject {
+    InnerSecurableObject parent;
+    String name;
+
+    InnerSecurableObject(InnerSecurableObject parent, String name) {
+      this.parent = parent;
+      this.name = name;
+    }
+
+    public InnerSecurableObject getParent() {
+      return parent;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof InnerSecurableObject)) {
+        return false;
+      }
+
+      InnerSecurableObject innerSecurableObject = (InnerSecurableObject) obj;
+      return Objects.equals(this.name, innerSecurableObject.name)
+          && Objects.equals(this.parent, innerSecurableObject.parent);
+    }
+  }
+
+  private static boolean isSameOrParent(InnerSecurableObject object, InnerSecurableObject target) {
+    if (object.equals(target)) {
+      return true;
+    }
+
+    if (target.getParent() != null) {
+      return isSameOrParent(object, target.getParent());
+    }
+
+    return false;
   }
 }

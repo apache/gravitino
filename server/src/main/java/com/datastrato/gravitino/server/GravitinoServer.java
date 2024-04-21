@@ -23,6 +23,7 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
+import com.datastrato.gravitino.server.web.filter.RoleInterfaceFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
@@ -90,7 +91,9 @@ public class GravitinoServer extends ResourceConfig {
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
 
-    if (!enableAuthorization) {
+    if (enableAuthorization) {
+      register(RoleInterfaceFilter.class);
+    } else {
       register(AccessControlNotAllowedFilter.class);
     }
 

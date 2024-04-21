@@ -7,13 +7,18 @@ package com.datastrato.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.dto.requests.RoleGrantRequest;
 import com.datastrato.gravitino.dto.requests.RoleRevokeRequest;
 import com.datastrato.gravitino.dto.responses.GroupResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
+import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.PUT;
@@ -24,6 +29,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/permissions")
 public class PermissionOperations {
 
@@ -48,6 +54,11 @@ public class PermissionOperations {
       @PathParam("user") String user,
       RoleGrantRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -72,6 +83,11 @@ public class PermissionOperations {
       @PathParam("group") String group,
       RoleGrantRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -96,6 +112,11 @@ public class PermissionOperations {
       @PathParam("user") String user,
       RoleRevokeRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -120,6 +141,11 @@ public class PermissionOperations {
       @PathParam("group") String group,
       RoleRevokeRequest request) {
     try {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.ofMetalake(metalake),
+          LockType.READ,
+          () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
       return Utils.doAs(
           httpRequest,
           () ->
