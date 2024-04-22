@@ -228,8 +228,8 @@ public class TestMemoryEntityStore {
             .withName("role")
             .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.of("catalog"))
-            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+            .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
             .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();

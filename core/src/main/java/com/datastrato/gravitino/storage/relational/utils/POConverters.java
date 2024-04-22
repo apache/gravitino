@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.relational.utils;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -781,7 +782,8 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObject(roleEntity.securableObject().toString())
+          .withSecurableObjectFullName(roleEntity.securableObject().fullName())
+          .withSecurableObjectType(roleEntity.securableObject().type().name())
           .withPrivileges(
               JsonUtils.anyFieldMapper()
                   .writeValueAsString(
@@ -889,7 +891,10 @@ public class POConverters {
                   .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {}).stream()
                   .map(Privileges::fromString)
                   .collect(Collectors.toList()))
-          .withSecurableObject(SecurableObjects.parse(rolePO.getSecurableObject()))
+          .withSecurableObject(
+              SecurableObjects.parse(
+                  rolePO.getSecurableObjectFullName(),
+                  SecurableObject.Type.valueOf(rolePO.getSecurableObjectType())))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();
