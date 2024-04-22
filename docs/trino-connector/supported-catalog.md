@@ -138,7 +138,7 @@ call gravitino.system.create_catalog(
 );
 ```
 
-The prefix `trino.bypass` is used to indicate Gravitino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
+A prefix with `trino.bypass` in the configuration key is used to indicate Gravitino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
 
 More trino connector configurations can refer to:
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)
