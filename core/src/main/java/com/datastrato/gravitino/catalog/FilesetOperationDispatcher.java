@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -100,10 +99,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a fileset with with reserved name `*`");
-    }
-
     doWithCatalog(
         catalogIdent,
         c ->

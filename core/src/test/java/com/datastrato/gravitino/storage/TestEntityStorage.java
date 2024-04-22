@@ -18,6 +18,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
+import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
@@ -28,6 +29,7 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
@@ -101,6 +103,7 @@ public class TestEntityStorage {
       Assertions.assertEquals(KV_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
       Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
       File dir = new File(DB_DIR);
       if (dir.exists() || !dir.isDirectory()) {
@@ -114,6 +117,8 @@ public class TestEntityStorage {
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
@@ -229,6 +234,8 @@ public class TestEntityStorage {
               Namespace.of("metalake", "catalog", "schema1"),
               "topic1",
               auditInfo);
+      UserEntity user1 =
+          createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "user1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -238,6 +245,7 @@ public class TestEntityStorage {
       store.put(table1);
       store.put(fileset1);
       store.put(topic1);
+      store.put(user1);
 
       Assertions.assertDoesNotThrow(
           () ->
@@ -273,6 +281,13 @@ public class TestEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "topic1"),
                   Entity.EntityType.TOPIC,
                   TopicEntity.class));
+
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  AuthorizationUtils.ofUser("metalake", "user1"),
+                  Entity.EntityType.USER,
+                  UserEntity.class));
     }
 
     // It will automatically close the store we create before, then we reopen the entity store
@@ -313,6 +328,12 @@ public class TestEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "topic1"),
                   Entity.EntityType.TOPIC,
                   TopicEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  AuthorizationUtils.ofUser("metalake", "user1"),
+                  Entity.EntityType.USER,
+                  UserEntity.class));
       destroy(type);
     }
   }
@@ -439,9 +460,9 @@ public class TestEntityStorage {
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
-      UserEntity oneUser = createUser("metalake", "oneUser", auditInfo);
+      UserEntity oneUser = createUser(1L, "metalake", "oneUser", auditInfo);
       store.put(oneUser);
-      UserEntity anotherUser = createUser("metalake", "anotherUser", auditInfo);
+      UserEntity anotherUser = createUser(2L, "metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
       GroupEntity oneGroup = createGroup("metalake", "oneGroup", auditInfo);
       store.put(oneGroup);
@@ -510,6 +531,8 @@ public class TestEntityStorage {
       TopicEntity topic1InSchema2 =
           createTopicEntity(
               2L, Namespace.of("metalake", "catalog", "schema2"), "topic1", auditInfo);
+      UserEntity user1 = createUser(1L, "metalake", "user1", auditInfo);
+      UserEntity user2 = createUser(2L, "metalake", "user2", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -523,6 +546,8 @@ public class TestEntityStorage {
       store.put(fileset1InSchema2);
       store.put(topic1);
       store.put(topic1InSchema2);
+      store.put(user1);
+      store.put(user2);
 
       validateAllEntityExist(
           metalake,
@@ -536,7 +561,11 @@ public class TestEntityStorage {
           fileset1,
           fileset1InSchema2,
           topic1,
-          topic1InSchema2);
+          topic1InSchema2,
+          user1,
+          user2);
+
+      validateDeleteUser(store, user1);
 
       validateDeleteTable(store, schema2, table1, table1InSchema2);
 
@@ -558,7 +587,7 @@ public class TestEntityStorage {
           topic1,
           topic1InSchema2);
 
-      validateDeleteMetalake(store, metalake, catalogCopy);
+      validateDeleteMetalake(store, metalake, catalogCopy, user2);
 
       // Store all entities again
       // metalake
@@ -643,6 +672,9 @@ public class TestEntityStorage {
               topic1InSchema2.name(),
               topic1InSchema2.auditInfo());
       store.put(topic1InSchema2New);
+      UserEntity userNew =
+          createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "userNew", auditInfo);
+      store.put(userNew);
 
       validateDeleteTableCascade(store, table1New);
 
@@ -654,7 +686,7 @@ public class TestEntityStorage {
 
       validateDeleteCatalogCascade(store, catalogNew, schema2New);
 
-      validateDeleteMetalakeCascade(store, metalakeNew, catalogNew, schema2New);
+      validateDeleteMetalakeCascade(store, metalakeNew, catalogNew, schema2New, userNew);
 
       destroy(type);
     }
@@ -1153,14 +1185,14 @@ public class TestEntityStorage {
         .build();
   }
 
-  private static UserEntity createUser(String metalake, String name, AuditInfo auditInfo) {
+  private static UserEntity createUser(Long id, String metalake, String name, AuditInfo auditInfo) {
     return UserEntity.builder()
-        .withId(1L)
+        .withId(id)
         .withNamespace(
             Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(Lists.newArrayList())
+        .withRoleNames(null)
         .build();
   }
 
@@ -1247,8 +1279,14 @@ public class TestEntityStorage {
   }
 
   private void validateDeleteMetalakeCascade(
-      EntityStore store, BaseMetalake metalake, CatalogEntity catalog, SchemaEntity schema2)
+      EntityStore store,
+      BaseMetalake metalake,
+      CatalogEntity catalog,
+      SchemaEntity schema2,
+      UserEntity userNew)
       throws IOException {
+    Assertions.assertTrue(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
+
     Assertions.assertTrue(
         store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true));
 
@@ -1256,6 +1294,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     Assertions.assertFalse(store.exists(schema2.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertFalse(store.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    Assertions.assertFalse(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
   }
 
   private void validateDeleteCatalogCascade(
@@ -1334,8 +1373,11 @@ public class TestEntityStorage {
   }
 
   private static void validateDeleteMetalake(
-      EntityStore store, BaseMetalake metalake, CatalogEntity catalogCopy) throws IOException {
+      EntityStore store, BaseMetalake metalake, CatalogEntity catalogCopy, UserEntity user2)
+      throws IOException {
     // Now delete catalog 'catalogCopy' and metalake
+    Assertions.assertTrue(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
+
     Assertions.assertThrowsExactly(
         NonEmptyEntityException.class,
         () -> store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
@@ -1344,6 +1386,7 @@ public class TestEntityStorage {
 
     store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
     Assertions.assertFalse(store.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    Assertions.assertFalse(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
   }
 
   private static void validateDeleteCatalog(
@@ -1454,6 +1497,17 @@ public class TestEntityStorage {
         topic1New, store.get(topic1.nameIdentifier(), Entity.EntityType.TOPIC, TopicEntity.class));
   }
 
+  private void validateDeleteUser(EntityStore store, UserEntity user1) throws IOException {
+    Assertions.assertTrue(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertTrue(store.delete(user1.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertFalse(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
+
+    UserEntity user =
+        createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "user1", user1.auditInfo());
+    store.put(user);
+    Assertions.assertTrue(store.exists(user.nameIdentifier(), Entity.EntityType.USER));
+  }
+
   private void validateDeleteTable(
       EntityStore store, SchemaEntity schema2, TableEntity table1, TableEntity table1InSchema2)
       throws IOException {
@@ -1490,7 +1544,9 @@ public class TestEntityStorage {
       FilesetEntity fileset1,
       FilesetEntity fileset1InSchema2,
       TopicEntity topic1,
-      TopicEntity topic1InSchema2)
+      TopicEntity topic1InSchema2,
+      UserEntity user1,
+      UserEntity user2)
       throws IOException {
     // Now try to get
     Assertions.assertEquals(
@@ -1523,6 +1579,10 @@ public class TestEntityStorage {
     Assertions.assertEquals(
         topic1InSchema2,
         store.get(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC, TopicEntity.class));
+    Assertions.assertEquals(
+        user1, store.get(user1.nameIdentifier(), Entity.EntityType.USER, UserEntity.class));
+    Assertions.assertEquals(
+        user2, store.get(user2.nameIdentifier(), Entity.EntityType.USER, UserEntity.class));
   }
 
   private void validateDeletedFileset(EntityStore store) throws IOException {
