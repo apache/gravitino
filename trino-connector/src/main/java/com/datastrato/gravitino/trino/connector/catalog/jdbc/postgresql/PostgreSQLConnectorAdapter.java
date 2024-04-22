@@ -4,14 +4,15 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
 
-import static java.util.Collections.emptyList;
-
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -19,9 +20,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;
   private static final AtomicInteger VERSION = new AtomicInteger(0);
+  private final HasPropertyMeta propertyMetadata;
 
   public PostgreSQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
+    this.propertyMetadata = new PostgreSQLPropertyMeta();
   }
 
   @Override
@@ -42,6 +45,17 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
-    return new PostgreSQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
+    return new PostgreSQLMetadataAdapter(
+        getSchemaProperties(), getTableProperties(), getColumnProperties());
+  }
+
+  @Override
+  public List<PropertyMetadata<?>> getTableProperties() {
+    return propertyMetadata.getTablePropertyMetadata();
+  }
+
+  @Override
+  public List<PropertyMetadata<?>> getColumnProperties() {
+    return propertyMetadata.getColumnPropertyMetadata();
   }
 }

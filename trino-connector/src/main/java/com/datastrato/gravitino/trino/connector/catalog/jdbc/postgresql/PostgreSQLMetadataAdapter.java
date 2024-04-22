@@ -4,18 +4,23 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
 
-import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.DefaultJDBCMetadataAdapter;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
 /** Transforming gravitino PostgreSQL metadata to trino. */
-public class PostgreSQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
+public class PostgreSQLMetadataAdapter extends DefaultJDBCMetadataAdapter {
 
   public PostgreSQLMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
 
-    super(schemaProperties, tableProperties, columnProperties, new PostgreSQLDataTypeTransformer());
+    super(
+        schemaProperties,
+        tableProperties,
+        columnProperties,
+        new PostgreSQLDataTypeTransformer(),
+        new PostgreSQLTablePropertyConverter());
   }
 }
