@@ -1266,8 +1266,8 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.of("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
         .withProperties(null)
         .build();
   }
