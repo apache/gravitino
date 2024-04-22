@@ -41,14 +41,26 @@ The Gravitino Spark connector leverages the Spark DataSourceV2 interface to faci
 --conf spark.sql.warehouse.dir=hdfs://127.0.0.1:9000/user/hive/warehouse-hive
 ```
 
-3. Execute the spark sql query. 
+3. Execute the Spark SQL query. 
 
-Suppose there are two catalogs in the metalake `test`, `hive` and `iceberg`, and the table `hive_table1` in the catalog `hive`, and the table `iceberg_table1` in the catalog `iceberg`.
+Suppose there are two catalogs in the metalake `test`, `hive` for Hive catalog and `iceberg` for Iceberg catalog. 
 
 ```sql
-select * from hive.db.hive_table1 union all select * from iceberg.db.iceberg_table1;
-use hive;
-select * from db.hive_table1;
+// use hive catalog
+USE hive;
+CREATE DATABASE db;
+USE db;
+CREATE TABLE hive_students (id INT, name STRING);
+INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
+
+// use Iceberg catalog
+USE iceberg;
+USE db;
+CREATE TABLE IF NOT EXISTS iceberg_scores (id INT, score INT) USING iceberg;
+INSERT INTO iceberg_scores VALUES (1, 95), (2, 88);
+
+// execute federation query between hive table and iceberg table
+SELECT hs.name, is.score FROM hive.db.hive_students hs JOIN iceberg_scores is ON hs.id = is.id;
 ```
 
 :::info
