@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -94,16 +93,7 @@ public class GroupMetaService {
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(GroupEntity, builder);
 
-      List<Long> roleIds = GroupEntity.roleIds();
-      if (roleIds == null) {
-        roleIds =
-            Optional.ofNullable(GroupEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-                .map(
-                    roleName ->
-                        RoleMetaService.getInstance()
-                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-                .collect(Collectors.toList());
-      }
+      List<Long> roleIds = Optional.ofNullable(GroupEntity.roleIds()).orElse(Lists.newArrayList());
       List<GroupRoleRelPO> groupRoleRelPOS =
           POConverters.initializeGroupRoleRelsPOWithVersion(GroupEntity, roleIds);
 

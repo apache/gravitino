@@ -746,13 +746,18 @@ public class TestJDBCBackend {
   }
 
   public static UserEntity createUserEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<String> roleNames) {
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withRoleNames(roleNames)
-        .withRoleIds(null)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -783,13 +788,18 @@ public class TestJDBCBackend {
   }
 
   public static GroupEntity createGroupEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<String> roleNames) {
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withRoleNames(roleNames)
-        .withRoleIds(null)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }
