@@ -41,7 +41,7 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 
 Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
-When you use the Gravitino in Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass`. For example using `trino.bypass.iceberg.table-statistics-enabled` to passing the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
+When you use the Gravitino with Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
 
 
 #### JDBC catalog
