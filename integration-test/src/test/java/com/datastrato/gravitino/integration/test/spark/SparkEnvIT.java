@@ -147,6 +147,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
             .config("hive.exec.dynamic.partition.mode", "nonstrict")
             .config("spark.sql.warehouse.dir", warehouse)
+            .config("spark.sql.session.timeZone", TIME_ZONE_UTC)
             .enableHiveSupport()
             .getOrCreate();
   }
