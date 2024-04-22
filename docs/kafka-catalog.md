@@ -9,7 +9,7 @@ This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Kafka catalog is a messaging catalog that offers the ability to manage Kafka topics metadata.
+Kafka catalog is a messaging catalog that offers the ability to manage Apache Kafka topics' metadata.
 One Kafka catalog corresponds to one Kafka cluster.
 
 ## Catalog
