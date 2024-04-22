@@ -24,7 +24,7 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 
 All contributions to the project must be reviewed by **AT LEAST** one maintainer before merging.
 For larger changes, it is recommended to have more than one reviewer. In particular, if you are
-working on a area you are not familiar with, it is recommended to ask for review from that area by
+working on an area you are not familiar with, it is recommended to ask for review from that area by
 using `git log --format=full <filename>` to see who committed the most.
 
 ## When to commit/merge a pull request
@@ -38,12 +38,12 @@ those involved with conversations to be resolved.
 Changes pushed to the main branch on Gravitino cannot be **removed**, that is, we can't do
 force-push to it. So please don't add any test commits or anything like that. If the PR is
 merged by mistake, please using `git revert` to revert the commit, not `git reset` or anything
-like this.
+like that.
 
 Please use the "Squash and merge" option when merging a PR. This will keep the commit history
 clean and meaningful.
 
-Gravitino use "issue" to track the project progress. So make sure each PR has a related issue, if
+Gravitino uses "issue" to track the project progresses. So make sure each PR has a related issue, if
 not, please ask the PR author to create one. Unless this PR is a trivial one, like fixing a typo or
 something like that, all PRs should have related issues.
 
@@ -65,7 +65,7 @@ something like that, all PRs should have related issues.
 ## Policy on backporting bug fixes
 
 Gravitino maintains several branches for different versions, so backporting bug fixes is a
-common and necessary operation for maintenance release. The decision point is when you have a
+common and necessary operation for maintenance releases. The decision point is when you have a
 bug fix, and it's not clear whether it is worth backporting or not. Here is the general policy:
 
 For those bug fixes we should backport:
