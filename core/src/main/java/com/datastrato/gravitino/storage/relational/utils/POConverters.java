@@ -651,7 +651,8 @@ public class POConverters {
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
     Long lastVersion = oldUserPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
     Long nextVersion = lastVersion;
     try {
       return UserPO.builder()
@@ -681,15 +682,21 @@ public class POConverters {
       List<String> roleNames =
           rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
       List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-      return UserEntity.builder()
-          .withId(userPO.getUserId())
-          .withName(userPO.getUserName())
-          .withRoleNames(roleNames.isEmpty() ? null : roleNames)
-          .withRoleIds(roleIds.isEmpty() ? null : roleIds)
-          .withNamespace(namespace)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
-          .build();
+
+      UserEntity.Builder builder =
+          UserEntity.builder()
+              .withId(userPO.getUserId())
+              .withName(userPO.getUserName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
+      return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
@@ -709,15 +716,21 @@ public class POConverters {
       List<String> roleNames =
           rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
       List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-      return GroupEntity.builder()
-          .withId(groupPO.getGroupId())
-          .withName(groupPO.getGroupName())
-          .withRoleNames(roleNames.isEmpty() ? null : roleNames)
-          .withRoleIds(roleIds.isEmpty() ? null : roleIds)
-          .withNamespace(namespace)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class))
-          .build();
+
+      GroupEntity.Builder builder =
+          GroupEntity.builder()
+              .withId(groupPO.getGroupId())
+              .withName(groupPO.getGroupName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
+      return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
@@ -811,7 +824,8 @@ public class POConverters {
    */
   public static GroupPO updateGroupPOWithVersion(GroupPO oldGroupPO, GroupEntity newGroup) {
     Long lastVersion = oldGroupPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
     Long nextVersion = lastVersion;
     try {
       return GroupPO.builder()
