@@ -92,7 +92,7 @@ Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configurati
 
 Gravitino provides event listener mechanism to allow users to capture the event provides by Gravitino server to integrate some custom operations.
 
-To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the resulting JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
+To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
 
 | Property name                              | Description                                                                                            | Default value | Required | Since Version |
 |--------------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -104,19 +104,14 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 
 Gravitino generates an event following the completion of CREATE, DROP, PURGE, ALTER, LOAD, LIST operations. The events can be hooked to the following resources:
 
-- table
-- fileset
-- topic
-- schema
-- catalog
-- metalake
-
-However, events are not hooked to the following resources for now:
-
-- partition
-- role
-- user
-- group
+| operation type     | event                                                                                                                                                                                                                                                                           | 
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| table operation    | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent` |
+| fileset operation  | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`                                 |
+| topic operation    | `CreateTopicEvent`, `AlterTopicEvent`, `DropTopicEvent`, `LoadTopicEvent`, `ListTopicEvent`, `CreateTopicFailureEvent`, `AlterTopicFailureEvent`, `DropTopicFailureEvent`, `LoadTopicFailureEvent`, `ListTopicFailureEvent`                                                     |
+| schema operation   | `CreateSchemaEvent`, `AlterSchemaEvent`, `DropSchemaEvent`, `LoadSchemaEvent`, `ListSchemaEvent`, `CreateSchemaFailureEvent`, `AlterSchemaFailureEvent`, `DropSchemaFailureEvent`, `LoadSchemaFailureEvent`, `ListSchemaFailureEvent`                                           |
+| catalog operation  | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                 |
+| metalake operation | `CreateMetalakeEvent`, `AlterMetalakeEvent`, `DropMetalakeEvent`, `LoadMetalakeEvent`, `ListMetalakeEvent`, `CreateMetalakeFailureEvent`, `AlterMetalakeFailureEvent`, `DropMetalakeFailureEvent`, `LoadMetalakeFailureEvent`, `ListMetalakeFailureEvent`                       |
 
 #### Event listener plugin
 
@@ -124,11 +119,11 @@ The `EventListenerPlugin` defines an interface for event listeners that manage t
 
 The plugin provides several operational modes for how to process event, supporting both synchronous and asynchronous processing approaches.
 
-- **SYNC**: Events are processed synchronously, immediately after the related operation is completed. While this method ensures timely event handling, it may block the main process if significant time is required to process an event.
+- **SYNC**: Events are processed synchronously, immediately following the associated operation. This mode ensures events are processed before the operation's result is returned to the client, but it may delay the main process if event processing takes too long.
 
-- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own unique event-processing queue and dispatcher thread.
-
-- **ASYNC_SHARED**: In this mode, event listeners utilize a shared event-processing queue and dispatcher to process events asynchronously.
+- **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing. It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed. Sharing a dispatcher can lead to poor isolation in case of slow listeners.
+ 
+- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation with separate dispatchers but at the expense of multiple queues and dispatchers.
 
 For more details, please refer to the definition of the plugin.
 
