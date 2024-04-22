@@ -274,7 +274,6 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       droppedFromStore = store.delete(ident, TOPIC);
     } catch (NoSuchEntityException e) {
       LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
-      return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
