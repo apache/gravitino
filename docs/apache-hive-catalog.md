@@ -40,7 +40,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 | `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                  | 60            | No                           | 0.4.0         |
 | `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                      | 60            | No                           | 0.4.0         |
 
-When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
+When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
 
 ### Catalog operations
 
