@@ -16,6 +16,7 @@ import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.ToString;
@@ -121,6 +122,14 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   /** Convert the catalog entity to a {@link CatalogInfo} instance. */
   public CatalogInfo toCatalogInfo() {
     return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
+  }
+
+  public CatalogInfo toCatalogInfoWithoutHiddenProps(Set<String> hiddenKeys) {
+    Map<String, String> filteredProperties =
+        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    filteredProperties.keySet().removeAll(hiddenKeys);
+    return new CatalogInfo(
+        id, name, type, provider, comment, filteredProperties, auditInfo, namespace);
   }
 
   /** Builder class for creating instances of {@link CatalogEntity}. */

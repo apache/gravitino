@@ -23,7 +23,10 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -48,6 +51,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
@@ -63,6 +67,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -251,8 +256,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     checkMetalakeExists(metalakeIdent);
 
     try {
-      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
-          .map(CatalogEntity::toCatalogInfo)
+      List<CatalogEntity> catalogEntities =
+          store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
+
+      // Using provider as key to avoid loading the same type catalog instance multiple times
+      Map<String, Set<String>> hiddenProps = new HashMap<>();
+      Multimaps.index(catalogEntities, CatalogEntity::getProvider)
+          .asMap()
+          .forEach((p, e) -> hiddenProps.put(p, getHiddenPropertyNames(e.iterator().next())));
+
+      return catalogEntities.stream()
+          .map(e -> e.toCatalogInfoWithoutHiddenProps(hiddenProps.get(e.getProvider())))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -347,11 +361,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (Exception e3) {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
+      if (e3 instanceof RuntimeException) {
+        throw (RuntimeException) e3;
+      }
       throw new RuntimeException(e3);
     } finally {
       if (!createSuccess) {
         try {
-          store.delete(ident, EntityType.CATALOG);
+          store.delete(ident, EntityType.CATALOG, true);
         } catch (IOException e4) {
           LOG.error("Failed to clean up catalog {}", ident, e4);
         }
@@ -544,21 +561,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    IsolatedClassLoader classLoader;
-    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
-    } else {
-      // This will use the current class loader, it is mainly used for test.
-      classLoader =
-          new IsolatedClassLoader(
-              Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    }
-
-    // Load Catalog class instance
-    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
-    catalog.withCatalogConf(conf).withCatalogEntity(entity);
+    IsolatedClassLoader classLoader = createClassLoader(provider, conf);
+    BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
     // Validate catalog properties and initialize the config
@@ -580,6 +584,48 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
+    Map<String, String> conf = entity.getProperties();
+    String provider = entity.getProvider();
+
+    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+      return classLoader.withClassLoader(
+          cl -> {
+            try (CatalogOperations ops = catalog.ops()) {
+              PropertiesMetadata catalogPropertiesMetadata = ops.catalogPropertiesMetadata();
+              return catalogPropertiesMetadata.propertyEntries().values().stream()
+                  .filter(PropertyEntry::isHidden)
+                  .map(PropertyEntry::getName)
+                  .collect(Collectors.toSet());
+            } catch (Exception e) {
+              LOG.error("Failed to get hidden property names", e);
+              throw e;
+            }
+          },
+          RuntimeException.class);
+    }
+  }
+
+  private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
+    // Load Catalog class instance
+    BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
+    catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    return catalog;
+  }
+
+  private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
+    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+      String pkgPath = buildPkgPath(conf, provider);
+      String confPath = buildConfPath(conf, provider);
+      return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+    } else {
+      // This will use the current class loader, it is mainly used for test.
+      return new IsolatedClassLoader(
+          Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    }
   }
 
   private BaseCatalog<?> createCatalogInstance(IsolatedClassLoader classLoader, String provider) {

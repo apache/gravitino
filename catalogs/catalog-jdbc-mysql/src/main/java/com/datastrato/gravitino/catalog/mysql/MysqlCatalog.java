@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.mysql;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalog;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -30,7 +31,7 @@ public class MysqlCatalog extends JdbcCatalog {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
-    return new MySQLCatalogOperations(
+    return new MySQLProtocolCompatibleCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),

@@ -21,6 +21,7 @@ For more details, please refer to the related doc.
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
+- [**Doris**](./jdbc-doris-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 Assuming:
@@ -93,6 +94,7 @@ Currently, Gravitino supports the following catalog providers:
 | `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
 | `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
+| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
 
 ### Load a catalog
 
@@ -305,6 +307,7 @@ Currently, Gravitino supports the following schema property:
 | `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
 | `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
 | `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
+| `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
 
 ### Load a schema
 
@@ -727,6 +730,7 @@ The following is the table property that Gravitino supports:
 | `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
 | `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
+| `doris`             | [Doris table property](./jdbc-doris-catalog.md#table-properties)           | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
 
 #### Table partitioning, bucketing, sort ordering and indexes
 

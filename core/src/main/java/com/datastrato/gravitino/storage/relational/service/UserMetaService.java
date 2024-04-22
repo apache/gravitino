@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
 public class UserMetaService {
@@ -94,16 +93,7 @@ public class UserMetaService {
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds = userEntity.roleIds();
-      if (roleIds == null) {
-        roleIds =
-            Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-                .map(
-                    roleName ->
-                        RoleMetaService.getInstance()
-                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-                .collect(Collectors.toList());
-      }
+      List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 

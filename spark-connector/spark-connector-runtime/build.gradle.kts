@@ -28,7 +28,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   // Relocate dependencies to avoid conflicts
   relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
   relocate("google", "com.datastrato.gravitino.shaded.google")
-  relocate("org.apache", "com.datastrato.gravitino.shaded.org.apache")
+  relocate("org.apache.hc", "com.datastrato.gravitino.shaded.org.apache.hc")
 }
 
 tasks.jar {

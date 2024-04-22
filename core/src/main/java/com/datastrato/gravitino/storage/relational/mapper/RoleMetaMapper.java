@@ -21,8 +21,6 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface RoleMetaMapper {
-  String USER_TABLE_NAME = "user_meta";
-  String GROUP_TABLE_NAME = "group_meta";
   String ROLE_TABLE_NAME = "role_meta";
   String USER_RELATION_TABLE_NAME = "user_role_rel";
   String GROUP_RELATION_TABLE_NAME = "group_role_rel";

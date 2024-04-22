@@ -66,7 +66,9 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
@@ -132,8 +134,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         AdminClientConfig.CLIENT_ID_CONFIG,
         String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));
 
+    try {
+      adminClient = AdminClient.create(adminClientConfig);
+    } catch (KafkaException e) {
+      if (e.getCause() instanceof ConfigException) {
+        throw new IllegalArgumentException(
+            "Invalid configuration for Kafka AdminClient: " + e.getCause().getMessage(), e);
+      }
+      throw new RuntimeException("Failed to create Kafka AdminClient", e);
+    }
     createDefaultSchemaIfNecessary();
-    adminClient = AdminClient.create(adminClientConfig);
   }
 
   @Override

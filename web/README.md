@@ -63,6 +63,8 @@ The Gravitino Web UI only works in the latest version of the Chrome browser. You
 
 ### Development scripts
 
+#### Lint and format styles
+
 This command runs ESLint to help you inspect the code. If errors occur, please make modifications based on the provided prompts.
 
 ```bash
@@ -79,6 +81,14 @@ This command automatically formats the code.
 
 ```bash
 pnpm format
+```
+
+#### Custom SVG icons
+
+If you need to add a custom icon, please add your SVG icon in the `./src/lib/icons/svg` directory and run the following command:
+
+```bash
+pnpm gen:icons
 ```
 
 ## Self-hosting deployment
