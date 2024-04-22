@@ -16,6 +16,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -123,9 +124,8 @@ public class CatalogIT extends AbstractIT {
         assertCatalogEquals(fileCatalog, catalog);
       }
     }
-    // TODO: uncomment this after fixing hidden properties
-    // Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
-    // Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
   }
 
   private void assertCatalogEquals(Catalog catalog1, Catalog catalog2) {
