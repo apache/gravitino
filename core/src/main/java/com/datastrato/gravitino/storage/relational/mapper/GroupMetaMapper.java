@@ -22,7 +22,7 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface GroupMetaMapper {
   String GROUP_TABLE_NAME = "group_meta";
-  String GROUP_RELATION_TABLE_NAME = "group_role_rel";
+  String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
   @Select(
       "SELECT group_id as groupId FROM "
@@ -127,7 +127,7 @@ public interface GroupMetaMapper {
           + " FROM "
           + GROUP_TABLE_NAME
           + " gr JOIN "
-          + GROUP_RELATION_TABLE_NAME
+          + GROUP_ROLE_RELATION_TABLE_NAME
           + " re ON gr.group_id = re.group_id"
           + " WHERE re.role_id = #{roleId}"
           + " AND gr.deleted_at = 0 AND re.deleted_at = 0")

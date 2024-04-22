@@ -22,8 +22,8 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface RoleMetaMapper {
   String ROLE_TABLE_NAME = "role_meta";
-  String USER_RELATION_TABLE_NAME = "user_role_rel";
-  String GROUP_RELATION_TABLE_NAME = "group_role_rel";
+  String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
+  String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
   @Select(
       "SELECT role_id as roleId, role_name as roleName,"
@@ -55,7 +55,7 @@ public interface RoleMetaMapper {
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
-          + USER_RELATION_TABLE_NAME
+          + USER_ROLE_RELATION_TABLE_NAME
           + " re ON ro.role_id = re.role_id"
           + " WHERE re.user_id = #{userId}"
           + " AND ro.deleted_at = 0 AND re.deleted_at = 0")
@@ -70,7 +70,7 @@ public interface RoleMetaMapper {
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
-          + GROUP_RELATION_TABLE_NAME
+          + GROUP_ROLE_RELATION_TABLE_NAME
           + " ge ON ro.role_id = ge.role_id"
           + " WHERE ge.group_id = #{groupId}"
           + " AND ro.deleted_at = 0 AND ge.deleted_at = 0")

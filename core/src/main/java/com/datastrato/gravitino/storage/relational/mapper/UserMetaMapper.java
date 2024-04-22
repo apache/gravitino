@@ -22,7 +22,7 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface UserMetaMapper {
   String USER_TABLE_NAME = "user_meta";
-  String USER_RELATION_TABLE_NAME = "user_role_rel";
+  String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
   @Select(
       "SELECT user_id as userId FROM "
@@ -127,7 +127,7 @@ public interface UserMetaMapper {
           + " FROM "
           + USER_TABLE_NAME
           + " us JOIN "
-          + USER_RELATION_TABLE_NAME
+          + USER_ROLE_RELATION_TABLE_NAME
           + " re ON us.user_id = re.user_id"
           + " WHERE re.role_id = #{roleId}"
           + " AND us.deleted_at = 0 AND re.deleted_at = 0")
