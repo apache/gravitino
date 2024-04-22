@@ -155,6 +155,15 @@ public class TestRole extends TestBase {
     buildMockResource(Method.GET, rolePath, null, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
         RuntimeException.class, () -> client.getRole(metalakeName, roleName), "internal error");
+
+    // test SecurableDTO use parent method
+    Role testParentRole = mockHasParentRoleDTO("test");
+    Assertions.assertEquals("schema", testParentRole.securableObject().name());
+    Assertions.assertEquals(SecurableObject.Type.SCHEMA, testParentRole.securableObject().type());
+    Assertions.assertEquals("catalog", testParentRole.securableObject().parent().fullName());
+    Assertions.assertEquals("catalog", testParentRole.securableObject().parent().name());
+    Assertions.assertEquals(
+        SecurableObject.Type.CATALOG, testParentRole.securableObject().parent().type());
   }
 
   @Test
@@ -184,6 +193,18 @@ public class TestRole extends TestBase {
         .withProperties(ImmutableMap.of("k1", "v1"))
         .withSecurableObject(DTOConverters.toSecurableObject(SecurableObjects.ofCatalog("catalog")))
         .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private RoleDTO mockHasParentRoleDTO(String name) {
+    SecurableObject catalog = SecurableObjects.ofCatalog("catalog");
+    return RoleDTO.builder()
+        .withName(name)
+        .withProperties(ImmutableMap.of("k1", "v1"))
+        .withSecurableObject(
+            DTOConverters.toSecurableObject(SecurableObjects.ofSchema(catalog, "schema")))
+        .withPrivileges(Lists.newArrayList(Privileges.UseSchema.get()))
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }

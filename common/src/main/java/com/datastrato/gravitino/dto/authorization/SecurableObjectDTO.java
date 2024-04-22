@@ -43,13 +43,12 @@ public class SecurableObjectDTO implements SecurableObject {
   @Nullable
   @Override
   public SecurableObject parent() {
-    throw new UnsupportedOperationException(
-        "SecurableObjectDTO doesn't support the method `parent`");
+    return parent;
   }
 
   @Override
   public String name() {
-    throw new UnsupportedOperationException("SecurableObjectDTO doesn't support the method `name`");
+    return name;
   }
 
   @Override
