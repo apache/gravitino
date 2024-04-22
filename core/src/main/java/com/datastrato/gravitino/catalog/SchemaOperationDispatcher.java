@@ -301,7 +301,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     doWithCatalog(
         getCatalogIdentifier(ident),
         c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-        NonEmptySchemaException.class);
+        NonEmptySchemaException.class,
+        RuntimeException.class);
 
     // It could happen that the schema is not found in the catalog (dropped directly from
     // underlying sources), but it is still in the store. So we should ignore the return value
@@ -309,7 +310,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     try {
       return store.delete(ident, SCHEMA, cascade);
     } catch (NoSuchEntityException e) {
-      LOG.warn("The schema to be deleted does not exist in the store: {}", ident, e);
+      LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
       return false;
     } catch (Exception e) {
       throw new RuntimeException(e);

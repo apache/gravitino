@@ -312,7 +312,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       return store.delete(ident, TABLE);
     } catch (NoSuchEntityException e) {
-      LOG.warn("The table to be deleted does not exist in the store: {}", ident, e);
+      LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
       return false;
     } catch (Exception e) {
       throw new RuntimeException(e);

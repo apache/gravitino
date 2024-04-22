@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
@@ -251,22 +252,21 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    boolean dropped =
-        doWithCatalog(
-            getCatalogIdentifier(ident),
-            c -> c.doWithTopicOps(t -> t.dropTopic(ident)),
-            NoSuchTopicException.class);
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithTopicOps(t -> t.dropTopic(ident)),
+        RuntimeException.class);
 
-    if (!dropped) {
-      return false;
-    }
-
+    // It could happen that the topic is not found in the catalog (dropped directly from the
+    // underlying sources), but it is still in the store. So we should ignore the return value
+    // from the catalog operation and try to delete the table entity in the store.
     try {
-      store.delete(ident, TOPIC);
+      return store.delete(ident, TOPIC);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
+      return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
-    return true;
   }
 }
