@@ -12,12 +12,13 @@ With the Gravitino Spark connector, accessing data or managing metadata in Hive 
 
 Supports most DDL and DML operations in SparkSQL, except such operations:
 
-    * Function operations 
-    * Partition operations
-    * View operations
-    * Querying UDF
-    * `LOAD` clause
-    * `CREATE TABLE LIKE` clause 
+- Function operations 
+- Partition operations
+- View operations
+- Querying UDF
+- `LOAD` clause
+- `CREATE TABLE LIKE` clause
+- `TRUCATE TABLE` clause
 
 ## Requirement
 

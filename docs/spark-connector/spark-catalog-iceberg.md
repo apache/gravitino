@@ -10,24 +10,29 @@ This software is licensed under the Apache License version 2."
 
 #### Support basic DML and DDL operations:
 
-* `CREATE TABLE` Supports basic create table clause including table schema, properties, partition, does not support distribution and sort orders.
-* `DROP TABLE`
-* `ALTER TABLE`
-* `INSERT INTO&OVERWRITE`
-* `SELECT`
-* `DELETE` Supports file delete.
+- `CREATE TABLE` 
+ 
+Supports basic create table clause including table schema, properties, partition, does not support distribution and sort orders.
+
+- `DROP TABLE`
+- `ALTER TABLE`
+- `INSERT INTO&OVERWRITE`
+- `SELECT`
+- `DELETE` 
+ 
+Supports file delete only.
 
 #### Not supported operations:
 
-* Row level operations. like `MERGE INOT`, `DELETE FROM`, `UPDATE`
-* View operations.
-* Branching and tagging operations.
-* Spark procedures.
-* Other Iceberg extension SQL, like:
-  * `ALTER TABLE prod.db.sample ADD PARTITION FIELD xx`
-  * `ALTER TABLE ... WRITE ORDERED BY`
+- Row level operations. like `MERGE INOT`, `DELETE FROM`, `UPDATE`
+- View operations.
+- Branching and tagging operations.
+- Spark procedures.
+- Other Iceberg extension SQL, like:
+  - `ALTER TABLE prod.db.sample ADD PARTITION FIELD xx`
+  - `ALTER TABLE ... WRITE ORDERED BY`
 
-## SQLs
+## SQL example
 
 ```sql
 // Suppose iceberg_a is the Iceberg catalog name managed by Gravitino
