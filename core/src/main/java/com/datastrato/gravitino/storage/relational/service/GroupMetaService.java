@@ -8,12 +8,12 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.meta.UserEntity;
-import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
-import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import com.datastrato.gravitino.storage.relational.po.GroupPO;
+import com.datastrato.gravitino.storage.relational.po.GroupRoleRelPO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
-import com.datastrato.gravitino.storage.relational.po.UserPO;
-import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -26,47 +26,47 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
-/** The service class for user metadata. It provides the basic database operations for user. */
-public class UserMetaService {
-  private static final UserMetaService INSTANCE = new UserMetaService();
+/** The service class for group metadata. It provides the basic database operations for group. */
+public class GroupMetaService {
+  private static final GroupMetaService INSTANCE = new GroupMetaService();
 
-  public static UserMetaService getInstance() {
+  public static GroupMetaService getInstance() {
     return INSTANCE;
   }
 
-  private UserMetaService() {}
+  private GroupMetaService() {}
 
-  private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName) {
-    UserPO userPO =
+  private GroupPO getGroupPOByMetalakeIdAndName(Long metalakeId, String groupName) {
+    GroupPO GroupPO =
         SessionUtils.getWithoutCommit(
-            UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
 
-    if (userPO == null) {
+    if (GroupPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          userName);
+          Entity.EntityType.GROUP.name().toLowerCase(),
+          groupName);
     }
-    return userPO;
+    return GroupPO;
   }
 
-  private Long getUserIdByMetalakeIdAndName(Long metalakeId, String userName) {
-    Long userId =
+  private Long getGroupIdByMetalakeIdAndName(Long metalakeId, String groupName) {
+    Long groupId =
         SessionUtils.getWithoutCommit(
-            UserMetaMapper.class,
-            mapper -> mapper.selectUserIdByMetalakeIdAndName(metalakeId, userName));
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupIdBySchemaIdAndName(metalakeId, groupName));
 
-    if (userId == null) {
+    if (groupId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          userName);
+          Entity.EntityType.GROUP.name().toLowerCase(),
+          groupName);
     }
-    return userId;
+    return groupId;
   }
 
-  public UserEntity getUserByIdentifier(NameIdentifier identifier) {
+  public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
     Preconditions.checkArgument(
         identifier != null
             && !identifier.namespace().isEmpty()
@@ -74,62 +74,62 @@ public class UserMetaService {
         "The identifier should not be null and should have three level.");
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
-    return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
+    return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
-  public void insertUser(UserEntity userEntity, boolean overwritten) {
+  public void insertGroup(GroupEntity GroupEntity, boolean overwritten) {
     try {
       Preconditions.checkArgument(
-          userEntity.namespace() != null
-              && !userEntity.namespace().isEmpty()
-              && userEntity.namespace().levels().length == 3,
+          GroupEntity.namespace() != null
+              && !GroupEntity.namespace().isEmpty()
+              && GroupEntity.namespace().levels().length == 3,
           "The identifier should not be null and should have three level.");
 
       Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
-      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
-      UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
+          MetalakeMetaService.getInstance().getMetalakeIdByName(GroupEntity.namespace().level(0));
+      GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
+      GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(GroupEntity, builder);
 
-      List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
-      List<UserRoleRelPO> userRoleRelPOs =
-          POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
+      List<Long> roleIds = Optional.ofNullable(GroupEntity.roleIds()).orElse(Lists.newArrayList());
+      List<GroupRoleRelPO> groupRoleRelPOS =
+          POConverters.initializeGroupRoleRelsPOWithVersion(GroupEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
+                  GroupMetaMapper.class,
                   mapper -> {
                     if (overwritten) {
-                      mapper.insertUserMetaOnDuplicateKeyUpdate(userPO);
+                      mapper.insertGroupMetaOnDuplicateKeyUpdate(GroupPO);
                     } else {
-                      mapper.insertUserMeta(userPO);
+                      mapper.insertGroupMeta(GroupPO);
                     }
                   }),
           () -> {
-            if (userRoleRelPOs.isEmpty()) {
+            if (groupRoleRelPOS.isEmpty()) {
               return;
             }
             SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class,
+                GroupRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertUserRoleRelOnDuplicateKeyUpdate(userRoleRelPOs);
+                    mapper.batchInsertGroupRoleRelOnDuplicateKeyUpdate(groupRoleRelPOS);
                   } else {
-                    mapper.batchInsertUserRoleRel(userRoleRelPOs);
+                    mapper.batchInsertGroupRoleRel(groupRoleRelPOS);
                   }
                 });
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.USER, userEntity.nameIdentifier().toString());
+          re, Entity.EntityType.GROUP, GroupEntity.nameIdentifier().toString());
       throw re;
     }
   }
 
-  public boolean deleteUser(NameIdentifier identifier) {
+  public boolean deleteGroup(NameIdentifier identifier) {
     Preconditions.checkArgument(
         identifier != null
             && !identifier.namespace().isEmpty()
@@ -137,19 +137,20 @@ public class UserMetaService {
         "The identifier should not be null and should have three level.");
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
 
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
-                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
+                GroupMetaMapper.class, mapper -> mapper.softDeleteGroupMetaByGroupId(groupId)),
         () ->
             SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)));
+                GroupRoleRelMapper.class,
+                mapper -> mapper.softDeleteGroupRoleRelByGroupId(groupId)));
     return true;
   }
 
-  public <E extends Entity & HasIdentifier> UserEntity updateUser(
+  public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) {
     Preconditions.checkArgument(
         identifier != null
@@ -159,21 +160,23 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
+    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    List<RolePO> rolePOs =
+        RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
+    GroupEntity oldGroupEntity =
+        POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
 
-    UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);
+    GroupEntity newEntity = (GroupEntity) updater.apply((E) oldGroupEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldUserEntity.id(), newEntity.id()),
-        "The updated user entity id: %s should be same with the user entity id before: %s",
+        Objects.equals(oldGroupEntity.id(), newEntity.id()),
+        "The updated group entity id: %s should be same with the group entity id before: %s",
         newEntity.id(),
-        oldUserEntity.id());
+        oldGroupEntity.id());
 
     Set<Long> oldRoleIds =
-        oldUserEntity.roleIds() == null
+        oldGroupEntity.roleIds() == null
             ? Sets.newHashSet()
-            : Sets.newHashSet(oldUserEntity.roleIds());
+            : Sets.newHashSet(oldGroupEntity.roleIds());
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
@@ -183,24 +186,24 @@ public class UserMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
-
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
+                  GroupMetaMapper.class,
                   mapper ->
-                      mapper.updateUserMeta(
-                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+                      mapper.updateGroupMeta(
+                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                          oldGroupPO)),
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
             }
             SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class,
+                GroupRoleRelMapper.class,
                 mapper ->
-                    mapper.batchInsertUserRoleRel(
-                        POConverters.initializeUserRoleRelsPOWithVersion(
+                    mapper.batchInsertGroupRoleRel(
+                        POConverters.initializeGroupRoleRelsPOWithVersion(
                             newEntity, Lists.newArrayList(insertRoleIds))));
           },
           () -> {
@@ -208,14 +211,14 @@ public class UserMetaService {
               return;
             }
             SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class,
+                GroupRoleRelMapper.class,
                 mapper ->
-                    mapper.softDeleteUserRoleRelByUserAndRoles(
+                    mapper.softDeleteGroupRoleRelByGroupAndRoles(
                         newEntity.id(), Lists.newArrayList(deleteRoleIds)));
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+          re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
       throw re;
     }
     return newEntity;
