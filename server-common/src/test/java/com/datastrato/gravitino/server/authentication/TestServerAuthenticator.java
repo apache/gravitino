@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server.authentication;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -45,7 +46,7 @@ public class TestServerAuthenticator extends KerberosSecurityTestcase {
   @Test
   public void testSingleFilter() {
     Config config = new Config(false) {};
-    config.set(OAuthConfig.AUTHENTICATOR, AuthenticatorType.SIMPLE.name().toLowerCase(Locale.ROOT));
+    config.set(Configs.AUTHENTICATOR, AuthenticatorType.SIMPLE.name().toLowerCase(Locale.ROOT));
     ServerAuthenticator serverAuthenticator = ServerAuthenticator.getInstance();
     serverAuthenticator.initialize(config);
     Assertions.assertEquals(1, serverAuthenticator.authenticators().length);
@@ -66,7 +67,7 @@ public class TestServerAuthenticator extends KerberosSecurityTestcase {
             .append(AuthenticatorType.KERBEROS.name().toLowerCase())
             .append(",")
             .toString();
-    config.set(OAuthConfig.AUTHENTICATOR, authenticators);
+    config.set(Configs.AUTHENTICATOR, authenticators);
     initOAuthConfig(config);
     initKerberosConfig(config);
 
@@ -88,7 +89,7 @@ public class TestServerAuthenticator extends KerberosSecurityTestcase {
   @Test
   public void testUnknownFilter() {
     Config config = new Config(false) {};
-    config.set(OAuthConfig.AUTHENTICATOR, "inknown");
+    config.set(Configs.AUTHENTICATOR, "unknown");
     ServerAuthenticator serverAuthenticator = ServerAuthenticator.getInstance();
     Assertions.assertThrows(RuntimeException.class, () -> serverAuthenticator.initialize(config));
   }
