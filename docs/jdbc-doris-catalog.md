@@ -81,7 +81,7 @@ Please refer to
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
+- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 #### Table column types
 
@@ -102,7 +102,7 @@ Please refer to
 | `String`       | `String`   |
 
 Doris doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino
+The data types other than those listed above are mapped to Gravitino's
 **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that
 represents an unresolvable data type since 0.5.0.
 
