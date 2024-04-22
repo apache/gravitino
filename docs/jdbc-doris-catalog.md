@@ -1,9 +1,9 @@
 ---
-title: "Doris catalog"
+title: "Apache Doris catalog"
 slug: /jdbc-doris-catalog
 keywords:
 - jdbc
-- Doris
+- Apache Doris
 - metadata
 license: "Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
@@ -14,10 +14,11 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage Apache Doris metadata.
+Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection..
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
 :::
 
 ## Catalog
@@ -29,17 +30,17 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-:::note
-Doris 2.x supports more advanced metadata features such as auto-increment column. We will be adding support for it in the future.
-:::
-
 ### Catalog properties
 
-You can pass to a Doris data source any property that isn't defined by Gravitino by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+You can pass to a Doris data source any property that isn't defined by Gravitino by adding
+`gravitino.bypass.` prefix as a catalog property. For example, catalog property
+`gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+You can check the relevant data source configuration in
+[data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
+more details.
 
-If you use a Doris catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+Here are the catalog properties defined in Gravitino for Doris catalog:
 
 | Configuration item   | Description                                                                         | Default value | Required | Since Version |
 |----------------------|-------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -50,9 +51,8 @@ If you use a Doris catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 | `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                      | `2`           | No       | 0.5.0         |
 | `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                     | `10`          | No       | 0.5.0         |
 
-:::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
-:::
+Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
+Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 
 ### Catalog operations
 
@@ -72,7 +72,8 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Please refer to
+[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -100,57 +101,51 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `FixedChar`    | `Char`     |
 | `String`       | `String`   |
 
-:::info
 Doris doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
-:::
+The data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)**
+that represents an unresolvable data type since 0.5.0.
 
 #### Table column auto-increment
 
-:::note
-Gravitino does not support the creation of an auto-increment column for a Doris table now.
-:::
-
+Unsupported for now.
 
 ### Table properties
 
 - Doris supports table properties, and you can set them in the table properties.
-- Only support Doris table properties, don't support user-defined properties.
+- Only supports Doris table properties, doesn't support user-defined properties.
 
 ### Table indexes
 
 - Supports PRIMARY_KEY
 
-:::note
-Index can only apply to a single column
-:::
+    Please be aware that the index can only apply to a single column.
 
-<Tabs>
-<TabItem value="json" label="Json">
+    <Tabs>
+    <TabItem value="json" label="Json">
 
-```json
-{
-  "indexes": [
+    ```json
     {
-      "indexType": "primary_key",
-      "name": "PRIMARY",
-      "fieldNames": [["id"]]
+      "indexes": [
+        {
+          "indexType": "primary_key",
+          "name": "PRIMARY",
+          "fieldNames": [["id"]]
+        }
+      ]
     }
-  ]
-}
-```
+    ```
 
-</TabItem>
-<TabItem value="java" label="Java">
+    </TabItem>
+    <TabItem value="java" label="Java">
 
-```java
-Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
-```
+    ```java
+    Index[] indexes = new Index[] {
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+    }
+    ```
 
-</TabItem>
-</Tabs>
+    </TabItem>
+    </Tabs>
 
 ### Table operations
 
@@ -169,10 +164,13 @@ Gravitino supports these table alteration operations:
 - `UpdateColumnComment`
 - `SetProperty`
 
-:::info
- - Not all table alteration operations can be processed in batch. 
- - Schema change, such as add/modify/drop columns can be processed in batch
- - Support modify multiple column comments at the same time.
- - Don't support modify the column type and column comment at the same time
- - The schema alteration in Doris is an asynchronous operation. You might retrieve an outdated schema if you execute a schema query immediately following the alteration. It is recommended to pause briefly following the schema alteration, and Gravitino will incorporate the schema alteration status into the schema information in the upcoming version.
-:::
+Please be aware that:
+
+ - Not all table alteration operations can be processed in batch.
+ - Schema change, such as add/modify/drop columns can be processed in batch.
+ - Supports modify multiple column comments at the same time.
+ - Doesn't support modify the column type and column comment at the same time.
+ - The schema alteration in Doris is asynchronous. You might get an outdated schema if you
+   execute a schema query immediately after the alteration. It is recommended to pause briefly
+   after the schema alteration. Gravitino will add the schema alteration status into
+   the schema information in the upcoming version to solve this problem.
