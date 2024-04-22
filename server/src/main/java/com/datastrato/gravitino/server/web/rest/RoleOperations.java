@@ -65,6 +65,7 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -75,7 +76,9 @@ public class RoleOperations {
                               metalake,
                               request.getName(),
                               request.getProperties(),
-                              SecurableObjects.parse(request.getSecurableObject()),
+                              SecurableObjects.parse(
+                                  request.getSecurableObject().fullName(),
+                                  request.getSecurableObject().type()),
                               request.getPrivileges().stream()
                                   .map(Privileges::fromString)
                                   .collect(Collectors.toList()))))));
