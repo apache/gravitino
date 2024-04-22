@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -146,6 +147,8 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
     partitionPaths.put("months", "name=a/name_trunc=a/id_bucket=4/ts_month=2024-01");
     partitionPaths.put("days", "name=a/name_trunc=a/id_bucket=4/ts_day=2024-01-01");
     partitionPaths.put("hours", "name=a/name_trunc=a/id_bucket=4/ts_hour=2024-01-01-12");
+
+    TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 
     partitionPaths
         .keySet()
