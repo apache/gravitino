@@ -14,6 +14,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -297,18 +298,19 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    boolean dropped =
-        doWithCatalog(
-            getCatalogIdentifier(ident),
-            c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-            NonEmptySchemaException.class);
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
+        NonEmptySchemaException.class);
 
-    if (!dropped) {
-      return false;
-    }
-
+    // It could happen that the schema is not found in the catalog (dropped directly from
+    // underlying sources), but it is still in the store. So we should ignore the return value
+    // from catalog operation and try to delete the schema entity from the store.
     try {
       return store.delete(ident, SCHEMA, cascade);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The schema to be deleted does not exist in the store: {}", ident, e);
+      return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
