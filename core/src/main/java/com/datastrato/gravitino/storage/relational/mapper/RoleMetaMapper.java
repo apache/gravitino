@@ -68,8 +68,8 @@ public interface RoleMetaMapper {
   @Select(
       "SELECT ro.role_id as roleId, ro.role_name as roleName,"
           + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " securable_object_full_name as securableObjectFullName,"
-          + " securable_object_type as securableObjectType,"
+          + " ro.securable_object_full_name as securableObjectFullName,"
+          + " ro.securable_object_type as securableObjectType,"
           + " ro.privileges as privileges,"
           + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
           + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
