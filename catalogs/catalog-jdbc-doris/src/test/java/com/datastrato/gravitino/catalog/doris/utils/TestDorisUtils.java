@@ -59,5 +59,12 @@ public class TestDorisUtils {
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     Assertions.assertEquals("test_value1", result.get("test_property1"));
     Assertions.assertEquals("test_value2", result.get("test_property2"));
+
+    // test when properties has blank
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n\"property1\" = \"value1\",\n\"comment\"= \"comment\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    Assertions.assertEquals("value1", result.get("property1"));
+    Assertions.assertEquals("comment", result.get("comment"));
   }
 }
