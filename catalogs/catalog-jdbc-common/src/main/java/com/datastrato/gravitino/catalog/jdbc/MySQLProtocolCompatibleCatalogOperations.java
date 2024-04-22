@@ -2,10 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.mysql;
 
-import com.datastrato.gravitino.catalog.jdbc.JdbcCatalogOperations;
-import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
+package com.datastrato.gravitino.catalog.jdbc;
+
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -16,10 +15,11 @@ import java.sql.DriverManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MySQLCatalogOperations extends JdbcCatalogOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(MySQLCatalogOperations.class);
+public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperations {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MySQLProtocolCompatibleCatalogOperations.class);
 
-  public MySQLCatalogOperations(
+  public MySQLProtocolCompatibleCatalogOperations(
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
