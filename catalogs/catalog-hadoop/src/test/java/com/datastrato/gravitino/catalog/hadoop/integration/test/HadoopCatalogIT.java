@@ -523,7 +523,7 @@ public class HadoopCatalogIT extends AbstractIT {
         .createSchema(
             NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", ImmutableMap.of());
 
-    // Drop the schema.
+    // Drop the empty schema.
     boolean dropped =
         filesetCatalog
             .asSchemas()

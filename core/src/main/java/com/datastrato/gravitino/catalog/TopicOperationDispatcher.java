@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
@@ -252,21 +253,33 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    doWithCatalog(
-        getCatalogIdentifier(ident),
-        c -> c.doWithTopicOps(t -> t.dropTopic(ident)),
-        RuntimeException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTopicOps(t -> t.dropTopic(ident)), RuntimeException.class);
 
-    // It could happen that the topic is not found in the catalog (dropped directly from the
-    // underlying sources), but it is still in the store. So we should ignore the return value
-    // from the catalog operation and try to delete the table entity in the store.
+    // For unmanaged topic, it could happen that the topic:
+    // 1. Is not found in the catalog (dropped directly from underlying sources)
+    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+    // 3. Is found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed topic, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
     try {
-      return store.delete(ident, TOPIC);
+      droppedFromStore = store.delete(ident, TOPIC);
     } catch (NoSuchEntityException e) {
       LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
       return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    return isManagedEntity(catalogIdent, Capability.Scope.TOPIC)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 }

@@ -298,22 +298,35 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    doWithCatalog(
-        getCatalogIdentifier(ident),
-        c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-        NonEmptySchemaException.class,
-        RuntimeException.class);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean droppedFromCatalog =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
+            NonEmptySchemaException.class,
+            RuntimeException.class);
 
-    // It could happen that the schema is not found in the catalog (dropped directly from
-    // underlying sources), but it is still in the store. So we should ignore the return value
-    // from the catalog operation and try to delete the schema entity in the store.
+    // For unmanaged schema, it could happen that the schema:
+    // 1. Is not found in the catalog (dropped directly from underlying sources)
+    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+    // 3. Is found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed schema, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
     try {
-      return store.delete(ident, SCHEMA, cascade);
+      droppedFromStore = store.delete(ident, SCHEMA, cascade);
     } catch (NoSuchEntityException e) {
       LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-      return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 }
