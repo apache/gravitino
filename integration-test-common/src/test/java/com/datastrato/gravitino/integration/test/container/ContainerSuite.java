@@ -42,6 +42,7 @@ public class ContainerSuite implements Closeable {
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
+  private static volatile PostgreSQLContainer postgreSQLContainer;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -205,6 +206,33 @@ public class ContainerSuite implements Closeable {
     }
     synchronized (MySQLContainer.class) {
       mySQLVersion5Container.createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName) {
+    if (postgreSQLContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (postgreSQLContainer == null) {
+          // Start PostgreSQL container
+          PostgreSQLContainer.Builder pgBuilder =
+              PostgreSQLContainer.builder()
+                  .withImage("postgresql:14.0")
+                  .withHostName("gravitino-ci-pg")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .build())
+                  .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
+                  .withNetwork(network);
+
+          PostgreSQLContainer container = closer.register(pgBuilder.build());
+          container.start();
+          postgreSQLContainer = container;
+        }
+      }
+    }
+    synchronized (PostgreSQLContainer.class) {
+      postgreSQLContainer.createDatabase(testDatabaseName);
     }
   }
 
