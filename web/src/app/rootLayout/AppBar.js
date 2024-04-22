@@ -76,7 +76,7 @@ const AppBar = () => {
             <Box className={'app-bar-content-right twc-flex twc-items-center'}>
               <Stack direction='row' spacing={2} alignItems='center'>
                 {metalake ? (
-                  <FormControl fullWidth size='small'>
+                  <FormControl sx={{ maxWidth: 240 }} size='small'>
                     <InputLabel id='select-metalake'>Metalake</InputLabel>
                     <Select
                       labelId='select-metalake'
@@ -84,16 +84,28 @@ const AppBar = () => {
                       data-refer='select-metalake'
                       value={metalake}
                       label='Metalake'
+                      sx={{ width: '100%' }}
                     >
                       {metalakes.map(item => {
                         return (
                           <MenuItem
+                            title={item}
                             value={item}
                             key={item}
                             data-refer={'select-option-' + item}
+                            sx={{
+                              maxWidth: 240
+                            }}
                             onClick={() => router.push('/metalakes?metalake=' + item)}
                           >
-                            {item}
+                            <Box
+                              sx={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {item}
+                            </Box>
                           </MenuItem>
                         )
                       })}
