@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.dto.authorization;
 
 import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
@@ -19,6 +20,9 @@ public class SecurableObjectDTO implements SecurableObject {
   @JsonProperty("type")
   private Type type;
 
+  private SecurableObject parent;
+  private String name;
+
   /** Default constructor for Jackson deserialization. */
   protected SecurableObjectDTO() {}
 
@@ -29,8 +33,11 @@ public class SecurableObjectDTO implements SecurableObject {
    * @param type The type of the securable object.
    */
   protected SecurableObjectDTO(String fullName, Type type) {
+    SecurableObject securableObject = SecurableObjects.parse(fullName, type);
     this.type = type;
     this.fullName = fullName;
+    this.parent = securableObject.parent();
+    this.name = securableObject.name();
   }
 
   @Nullable
