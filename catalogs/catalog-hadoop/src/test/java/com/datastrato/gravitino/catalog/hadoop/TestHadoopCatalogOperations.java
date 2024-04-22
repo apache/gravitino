@@ -309,10 +309,6 @@ public class TestHadoopCatalogOperations {
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
-
-      // Test drop empty schema
-      Assertions.assertFalse(ops.dropSchema(id, true));
-      Assertions.assertFalse(ops.dropSchema(id, false));
     }
   }
 
