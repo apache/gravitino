@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -75,9 +74,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a schema with with reserved name `*`");
-    }
 
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(

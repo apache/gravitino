@@ -146,6 +146,35 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @Test
+  public void testCatalogException() {
+    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    ImmutableMap.of(BOOTSTRAP_SERVERS, "2")));
+    Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    ImmutableMap.of("abc", "2")));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Missing configuration: bootstrap.servers"));
+  }
+
+  @Test
   public void testDefaultSchema() {
     NameIdentifier[] schemas =
         catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));

@@ -3,15 +3,16 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterSchemaEvent;
 import com.datastrato.gravitino.listener.api.event.AlterSchemaFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateSchemaEvent;
@@ -31,8 +32,8 @@ import java.util.Map;
 /**
  * {@code SchemaEventDispatcher} is a decorator for {@link SchemaDispatcher} that not only delegates
  * schema operations to the underlying schema dispatcher but also dispatches corresponding events to
- * an {@link EventBus} after each operation is completed. This allows for event-driven workflows or
- * monitoring of schema operations.
+ * an {@link com.datastrato.gravitino.listener.EventBus} after each operation is completed. This
+ * allows for event-driven workflows or monitoring of schema operations.
  */
 public class SchemaEventDispatcher implements SchemaDispatcher {
   private final EventBus eventBus;

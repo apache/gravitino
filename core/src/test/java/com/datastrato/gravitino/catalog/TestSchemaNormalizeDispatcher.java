@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.rel.Schema;
@@ -53,5 +55,25 @@ public class TestSchemaNormalizeDispatcher extends TestSchemaOperationDispatcher
         schemaNormalizeDispatcher.dropSchema(
             NameIdentifier.of(schemaIdent.namespace(), schemaIdent.name().toLowerCase()), false));
     Assertions.assertFalse(schemaNormalizeDispatcher.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testNameSpec() {
+    NameIdentifier schemaIdent1 =
+        NameIdentifier.of(metalake, catalog, SECURABLE_ENTITY_RESERVED_NAME);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> schemaNormalizeDispatcher.createSchema(schemaIdent1, null, null));
+    Assertions.assertEquals(
+        "The SCHEMA name '*' is reserved. Illegal name: *", exception.getMessage());
+
+    NameIdentifier schemaIdent2 = NameIdentifier.of(metalake, catalog, "a?");
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> schemaNormalizeDispatcher.createSchema(schemaIdent2, null, null));
+    Assertions.assertEquals(
+        "The SCHEMA name 'a?' is illegal. Illegal name: a?", exception.getMessage());
   }
 }

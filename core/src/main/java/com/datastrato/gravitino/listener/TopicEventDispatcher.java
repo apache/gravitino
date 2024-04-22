@@ -3,13 +3,13 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog;
+package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
-import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.api.event.AlterTopicEvent;
 import com.datastrato.gravitino.listener.api.event.AlterTopicFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateTopicEvent;
@@ -30,8 +30,8 @@ import java.util.Map;
 /**
  * {@code TopicEventDispatcher} is a decorator for {@link TopicDispatcher} that not only delegates
  * topic operations to the underlying catalog dispatcher but also dispatches corresponding events to
- * an {@link EventBus} after each operation is completed. This allows for event-driven workflows or
- * monitoring of topic operations.
+ * an {@link com.datastrato.gravitino.listener.EventBus} after each operation is completed. This
+ * allows for event-driven workflows or monitoring of topic operations.
  */
 public class TopicEventDispatcher implements TopicDispatcher {
   private final EventBus eventBus;

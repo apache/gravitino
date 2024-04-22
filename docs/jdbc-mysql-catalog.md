@@ -63,7 +63,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's schema concept corresponds to the MySQL database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
-- Doesn't support cascade dropping schema.
+- Supports cascade dropping schema.
 
 ### Schema properties
 
