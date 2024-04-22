@@ -69,7 +69,7 @@ class TestSchema(IntegrationTestEnv):
             logger.info("Drop metalake %s[%s]", self.metalake_ident,
                         self.gravitino_admin_client.drop_metalake(self.metalake_ident))
         except Exception as e:
-            logger.error("Ignore deletion of non-existent data.")
+            logger.warning("Ignore deletion of non-existent data.")
 
     def create_schema(self) -> Schema:
         catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
