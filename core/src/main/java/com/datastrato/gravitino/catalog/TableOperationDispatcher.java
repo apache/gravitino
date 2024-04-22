@@ -298,7 +298,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to drop.
    * @return {@code true} if the table was successfully dropped, {@code false} if the table does not
    *     exist.
-   * @throws NoSuchTableException If the table to drop does not exist.
+   * @throws RuntimeException If an error occurs while dropping the table.
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
@@ -343,6 +343,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident A table identifier.
    * @return True if the table was purged, false if the table did not exist.
    * @throws UnsupportedOperationException If the catalog does not support to purge a table.
+   * @throws RuntimeException If an error occurs while purging the table.
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {

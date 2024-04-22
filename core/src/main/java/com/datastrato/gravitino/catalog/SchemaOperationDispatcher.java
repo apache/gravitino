@@ -293,8 +293,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    *
    * @param ident The identifier of the schema to be dropped.
    * @param cascade If true, drops all tables within the schema as well.
-   * @return True if the schema was successfully dropped, false otherwise.
+   * @return True if the schema was successfully dropped, false if the schema doesn't exist.
    * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   * @throws RuntimeException If an error occurs while dropping the schema.
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {

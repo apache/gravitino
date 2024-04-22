@@ -250,6 +250,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    *
    * @param ident A topic identifier.
    * @return true If the topic is dropped, false if the topic does not exist.
+   * @throws RuntimeException If an error occurs while dropping the topic.
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
