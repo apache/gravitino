@@ -96,11 +96,11 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean deteted = accessControlManager.deleteRole(metalake, role);
-            if (!deteted) {
+            boolean deleted = accessControlManager.deleteRole(metalake, role);
+            if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
-            return Utils.ok(new DeleteResponse(deteted));
+            return Utils.ok(new DeleteResponse(deleted));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);

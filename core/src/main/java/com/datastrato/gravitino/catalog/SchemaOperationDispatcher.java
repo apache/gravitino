@@ -305,7 +305,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // It could happen that the schema is not found in the catalog (dropped directly from
     // underlying sources), but it is still in the store. So we should ignore the return value
-    // from catalog operation and try to delete the schema entity from the store.
+    // from the catalog operation and try to delete the schema entity in the store.
     try {
       return store.delete(ident, SCHEMA, cascade);
     } catch (NoSuchEntityException e) {
