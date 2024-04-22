@@ -102,7 +102,7 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 
 #### Event
 
-Gravitino generates an event following the completion of CREATE, DROP, PURGE, ALTER, LOAD, LIST operations. The events can be hooked to the following resources:
+Gravitino triggers a specific event upon the completion of the operation, with varying events being generated for different operations.
 
 | operation type     | event                                                                                                                                                                                                                                                                           | 
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -123,7 +123,7 @@ The plugin provides several operational modes for how to process event, supporti
 
 - **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing. It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed. Sharing a dispatcher can lead to poor isolation in case of slow listeners.
  
-- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation with separate dispatchers but at the expense of multiple queues and dispatchers.
+- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
 
 For more details, please refer to the definition of the plugin.
 
