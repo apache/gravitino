@@ -165,15 +165,46 @@ const TabsContent = () => {
                             <Box sx={{ p: 1.5, px: 4 }}>
                               {item.items.map((it, idx) => {
                                 return (
-                                  <Typography
-                                    key={idx}
-                                    variant='caption'
-                                    color='white'
-                                    className={fonts.className}
-                                    sx={{ display: 'flex', flexDirection: 'column' }}
-                                  >
-                                    {item.type === 'sortOrders' ? it.text : it.fields.join('.')}
-                                  </Typography>
+                                  <Fragment key={idx}>
+                                    <Typography
+                                      variant='caption'
+                                      color='white'
+                                      className={fonts.className}
+                                      sx={{ display: 'flex', flexDirection: 'column' }}
+                                    >
+                                      {item.type === 'sortOrders'
+                                        ? it.text
+                                        : it.fields.map((v, vi) => {
+                                            return (
+                                              <Fragment key={vi}>
+                                                <Box component={'span'} sx={{}}>
+                                                  {Array.isArray(v) ? v.join('.') : v}
+                                                </Box>
+                                                {vi < it.fields.length - 1 && (
+                                                  <Box
+                                                    component={'span'}
+                                                    sx={{
+                                                      display: 'block',
+                                                      my: 1,
+                                                      borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                                    }}
+                                                  ></Box>
+                                                )}
+                                              </Fragment>
+                                            )
+                                          })}
+                                    </Typography>
+                                    {idx < item.items.length - 1 && (
+                                      <Box
+                                        component={'span'}
+                                        sx={{
+                                          display: 'block',
+                                          my: 1,
+                                          borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                        }}
+                                      ></Box>
+                                    )}
+                                  </Fragment>
                                 )
                               })}
                             </Box>
@@ -220,7 +251,7 @@ const TabsContent = () => {
                                   return (
                                     <Fragment key={idx}>
                                       <Typography variant='caption' className={fonts.className}>
-                                        {it.fields.join('.')}
+                                        {it.fields.map(v => (Array.isArray(v) ? v.join('.') : v)).join(',')}
                                       </Typography>
                                       {idx < item.items.length - 1 && <span>, </span>}
                                     </Fragment>

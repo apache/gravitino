@@ -672,7 +672,7 @@ export const getTableDetails = createAsyncThunk(
             fields: i.fieldNames,
             name: i.name,
             indexType: i.indexType,
-            text: `${i.name}(${i.fieldNames.join('.')})`
+            text: `${i.name}(${i.fieldNames.map(v => v.join('.')).join(',')})`
           }
         })
       }
