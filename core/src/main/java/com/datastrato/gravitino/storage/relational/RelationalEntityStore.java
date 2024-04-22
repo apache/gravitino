@@ -102,7 +102,11 @@ public class RelationalEntityStore implements EntityStore {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    return backend.delete(ident, entityType, cascade);
+    try {
+      return backend.delete(ident, entityType, cascade);
+    } catch (NoSuchEntityException nse) {
+      return false;
+    }
   }
 
   @Override
