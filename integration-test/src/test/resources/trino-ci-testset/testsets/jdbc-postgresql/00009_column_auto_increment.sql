@@ -2,7 +2,7 @@ CREATE SCHEMA gt_postgresql.gt_db1;
 
 CREATE TABLE gt_postgresql.gt_db1.tb01 (
     name varchar,
-    id int  with ('auto_increment' = false)
+    id int with ("auto_increment" = true)
 );
 
 
