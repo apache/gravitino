@@ -7,6 +7,8 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Version;
+import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
@@ -14,7 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.InlineMe;
 import java.io.Closeable;
 import java.net.URI;
@@ -173,7 +175,7 @@ public abstract class GravitinoClientBase implements Closeable {
     /** The check version flag. */
     protected boolean checkVersion = true;
     /** The request base header for the Gravitino API. */
-    protected Map<String, String> headers = ImmutableMap.of();
+    protected Map<String, String> headers = Maps.newHashMap();
 
     /**
      * The constructor for the Builder class.
@@ -191,6 +193,9 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withSimpleAuth() {
       this.authDataProvider = new SimpleTokenProvider();
+      this.headers.put(
+          AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE,
+          AuthenticatorType.SIMPLE.name().toLowerCase());
       return this;
     }
 
@@ -213,6 +218,8 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withOAuth(OAuth2TokenProvider dataProvider) {
       this.authDataProvider = dataProvider;
+      this.headers.put(
+          AuthConstants.HTTP_CHALLENGE_HEADER, AuthenticatorType.OAUTH.name().toLowerCase());
       return this;
     }
 
@@ -227,6 +234,9 @@ public abstract class GravitinoClientBase implements Closeable {
       try {
         if (uri != null) {
           dataProvider.setHost(new URI(uri).getHost());
+          this.headers.put(
+              AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE,
+              AuthenticatorType.KERBEROS.name().toLowerCase());
         }
       } catch (URISyntaxException ue) {
         throw new IllegalArgumentException("URI has the wrong format", ue);
@@ -243,7 +253,7 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withHeaders(Map<String, String> headers) {
       if (headers != null) {
-        this.headers = ImmutableMap.copyOf(headers);
+        this.headers.putAll(headers);
       }
       return this;
     }
