@@ -19,7 +19,7 @@ public class GravitinoCatalog {
   private final String metalake;
   private final Catalog catalog;
 
-  public GravitinoCatalog(String metalake, Catalog catalog, boolean usingSimpleName) {
+  public GravitinoCatalog(String metalake, Catalog catalog) {
     this.metalake = metalake;
     this.catalog = catalog;
   }

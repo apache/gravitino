@@ -32,7 +32,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
-    server = closeAfterClass(new GravitinoMockServer(false));
+    server = closeAfterClass(new GravitinoMockServer());
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();

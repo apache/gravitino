@@ -61,12 +61,10 @@ public class GravitinoMockServer implements AutoCloseable {
   private final Map<String, Metalake> metalakes = new HashMap<>();
 
   private boolean start = true;
-  private boolean simpleCatalogName;
   CatalogConnectorManager catalogConnectorManager;
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
-  public GravitinoMockServer(boolean simpleCatalogName) {
-    this.simpleCatalogName = simpleCatalogName;
+  public GravitinoMockServer() {
     createMetalake(NameIdentifier.ofMetalake(testMetalake));
     createCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
   }
@@ -214,8 +212,7 @@ public class GravitinoMockServer implements AutoCloseable {
     when(mockAudit.createTime()).thenReturn(Instant.now());
     when(catalog.auditInfo()).thenReturn(mockAudit);
 
-    GravitinoCatalog gravitinoCatalog =
-        new GravitinoCatalog(testMetalake, catalog, simpleCatalogName);
+    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(testMetalake, catalog);
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));
