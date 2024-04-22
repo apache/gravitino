@@ -188,12 +188,12 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
               String insertData =
                   String.format(
-                      "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00.0' as timestamp));",
+                      "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00' as timestamp));",
                       tableName);
               sql(insertData);
               List<String> queryResult = getTableData(tableName);
               Assertions.assertEquals(1, queryResult.size());
-              Assertions.assertEquals("2,a,2024-01-01 12:00:00.0", queryResult.get(0));
+              Assertions.assertEquals("2,a,2024-01-01 12:00:00", queryResult.get(0));
               String partitionExpression = partitionPaths.get(func);
               Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
               checkDirExists(partitionPath);

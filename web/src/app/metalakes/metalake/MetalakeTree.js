@@ -45,13 +45,15 @@ const MetalakeTree = props => {
       case 'relational':
         switch (provider) {
           case 'hive':
-            return 'simple-icons:apachehive'
+            return 'custom-icons-hive'
           case 'lakehouse-iceberg':
             return 'openmoji:iceberg'
           case 'jdbc-mysql':
             return 'devicon:mysql-wordmark'
           case 'jdbc-postgresql':
             return 'devicon:postgresql-wordmark'
+          case 'jdbc-doris':
+            return 'custom-icons-doris'
           default:
             return 'bx:book'
         }

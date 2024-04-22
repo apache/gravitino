@@ -45,6 +45,11 @@ public class RoleMetaService {
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
   }
 
+  public List<RolePO> listRolesByGroupId(Long groupId) {
+    return SessionUtils.getWithoutCommit(
+        RoleMetaMapper.class, mapper -> mapper.listRolesByGroupId(groupId));
+  }
+
   public void insertRole(RoleEntity roleEntity, boolean overwritten) {
     try {
       Preconditions.checkArgument(
