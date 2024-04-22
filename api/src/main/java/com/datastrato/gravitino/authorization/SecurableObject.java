@@ -20,17 +20,17 @@ import javax.annotation.Nullable;
  * `SecurableObjects.ofCatalog("catalog1")` to create the securable object, or you can use full name
  * `catalog1` and type `CATALOG` in the RESTFUL API. <br>
  * If you want to use a schema named `schema1` in the catalog named `catalog1`, you can use the code
- * `SecurableObjects.ofSchema("schema1")` to create the securable object, or you can use full name
- * `catalog1.schema1` and type `SCHEMA` in the RESTFUL API. <br>
+ * `SecurableObjects.ofSchema(catalog, "schema1")` to create the securable object, or you can use
+ * full name `catalog1.schema1` and type `SCHEMA` in the RESTFUL API. <br>
  * If you want to use a table named `table1` in the schema named `schema1`, you can use the code
- * `SecurableObjects.ofTable("table1")` to create the securable object, or you can use full name
- * `catalog1.schema1.table1` and type `TABLE` in the RESTFUL API. <br>
+ * `SecurableObjects.ofTable(schema, "table1")` to create the securable object, or you can use full
+ * name `catalog1.schema1.table1` and type `TABLE` in the RESTFUL API. <br>
  * If you want to use a topic named `topic1` in the schema named `schema1`, you can use the code
- * `SecurableObjects.ofTopic("topic1")` to create the securable object, or you can use full name
- * `catalog1.schema1.topic1` and type `TOPIC` in the RESTFUL API. <br>
+ * `SecurableObjects.ofTopic(schema, "topic1")` to create the securable object, or you can use full
+ * name `catalog1.schema1.topic1` and type `TOPIC` in the RESTFUL API. <br>
  * If you want to use a fileset named `fileset1` in the schema named `schema1`, you can use the code
- * `SecurableObjects.ofFileset("fileset1)` to create the securable object, or you can use full name
- * `catalog1.schema1.fileset1` and type `FILESET` in the RESTFUL API. <br>
+ * `SecurableObjects.ofFileset(schema, "fileset1)` to create the securable object, or you can use
+ * full name `catalog1.schema1.fileset1` and type `FILESET` in the RESTFUL API. <br>
  * If you want to use a metalake named `metalake1`, you can use the code
  * `SecurableObjects.ofMetalake("metalake1")` to create the securable object, or you can use full
  * name `metalake1` and type `METALAKE` in the RESTFUL API. <br>
