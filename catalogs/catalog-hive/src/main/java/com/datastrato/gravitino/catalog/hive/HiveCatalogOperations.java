@@ -1079,8 +1079,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {
-    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
-    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
+    try {
+      return EXTERNAL_TABLE.name().equalsIgnoreCase(loadHiveTable(tableIdent).getTableType());
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static ThreadFactory getThreadFactory(String factoryName) {

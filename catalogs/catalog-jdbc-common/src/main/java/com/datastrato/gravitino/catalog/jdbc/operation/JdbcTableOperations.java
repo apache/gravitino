@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueCon
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -96,14 +97,17 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void drop(String databaseName, String tableName) throws NoSuchTableException {
-    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
+  public boolean drop(String databaseName, String tableName) {
+    try {
+      LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
+      dropTable(databaseName, tableName);
       LOG.info("Deleted table {} from database {}", tableName, databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (GravitinoRuntimeException e) {
+      throw new RuntimeException("Failed to drop table " + tableName + " from " + databaseName, e);
     }
+    return true;
   }
 
   @Override
@@ -254,6 +258,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));
       LOG.info("Purge table {} from database {}", tableName, databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  protected void dropTable(String databaseName, String tableName) {
+    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }

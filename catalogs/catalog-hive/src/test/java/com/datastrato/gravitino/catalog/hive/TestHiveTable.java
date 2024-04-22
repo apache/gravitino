@@ -320,6 +320,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
     hiveCatalogOperations.dropTable(tableIdentifier);
     Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
+    Assertions.assertFalse(hiveCatalogOperations.dropTable(tableIdentifier), "table should not be exists");
   }
 
   @Test

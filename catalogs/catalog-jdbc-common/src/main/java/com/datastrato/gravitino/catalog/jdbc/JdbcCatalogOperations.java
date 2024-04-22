@@ -244,8 +244,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    databaseOperation.delete(ident.name(), cascade);
-    return true;
+    return databaseOperation.delete(ident.name(), cascade);
   }
 
   /**
@@ -342,8 +341,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.drop(databaseName, tableIdent.name());
-    return true;
+    return tableOperation.drop(databaseName, tableIdent.name());
   }
 
   /**
