@@ -13,6 +13,8 @@ import { styled, Box, Divider, List, ListItem, ListItemText, Stack, Tab, Typogra
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { TabContext, TabList, TabPanel } from '@mui/lab'
 
+import clsx from 'clsx'
+
 import { useAppSelector } from '@/lib/hooks/useStore'
 
 import { useSearchParams } from 'next/navigation'
@@ -253,7 +255,9 @@ const TabsContent = () => {
                                       <Typography variant='caption' className={fonts.className}>
                                         {it.fields.map(v => (Array.isArray(v) ? v.join('.') : v)).join(',')}
                                       </Typography>
-                                      {idx < item.items.length - 1 && <span>, </span>}
+                                      {idx < item.items.length - 1 && (
+                                        <span className={clsx(fonts.className, 'twc-text-[12px]')}>,</span>
+                                      )}
                                     </Fragment>
                                   )
                                 })}
