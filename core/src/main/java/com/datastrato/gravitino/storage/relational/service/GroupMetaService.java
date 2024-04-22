@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
