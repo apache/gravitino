@@ -264,7 +264,6 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected void dropTable(String databaseName, String tableName) {
-    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
     } catch (final SQLException se) {
