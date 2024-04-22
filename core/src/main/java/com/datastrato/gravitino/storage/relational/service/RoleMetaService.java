@@ -74,7 +74,7 @@ public class RoleMetaService {
           roleEntity.namespace() != null
               && !roleEntity.namespace().isEmpty()
               && roleEntity.namespace().levels().length == 3,
-          "The identifier should not be null and should have three level.");
+          "The namespace of roleEntity should not be null and should have three level.");
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
