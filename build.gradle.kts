@@ -478,6 +478,7 @@ tasks.rat {
     "web/yarn.lock",
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
+    "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
     "ROADMAP.md",
