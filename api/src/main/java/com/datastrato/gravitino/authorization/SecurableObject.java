@@ -9,15 +9,33 @@ import javax.annotation.Nullable;
 
 /**
  * The securable object is the entity which access can be granted. Unless allowed by a grant, access
- * is denied. Gravitino organizes the securable objects using tree structure. The securable object
- * may be a catalog, a table or a schema, etc. <br>
- * For example, `catalog1.schema1.table1` represents a table named `table1`. It's in the schema
- * named `schema1`. The schema is in the catalog named `catalog1`. <br>
- * Similarly, `catalog1.schema1.topic1` can represent a topic.`catalog1.schema1.fileset1` can
- * represent a fileset.<br>
- * `*` can represent all th metalakes <br>
- * `metalake` can represent all the catalogs of this metalake. <br>
- * To use other securable objects which represents all entities," you can use their parent entity,
+ * is denied. Gravitino organizes the securable objects using tree structure. <br>
+ * There are three fields in the securable object: parent, name, and type. <br>
+ * The types include 6 kinds: CATALOG,SCHEMA,TABLE,FILESET,TOPIC and METALAKE. <br>
+ * You can use the helper class `SecurableObjects` to create the securable object which you need.
+ * <br>
+ * You can use full name and type of the securable object in the RESTFUL API. <br>
+ * For example, <br>
+ * If you want to use a catalog named `catalog1`, you can use the code
+ * `SecurableObjects.ofCatalog("catalog1")` to create the securable object, or you can use full name
+ * `catalog1` and type `CATALOG` in the RESTFUL API. <br>
+ * If you want to use a schema named `schema1` in the catalog named `catalog1`, you can use the code
+ * `SecurableObjects.ofSchema("schema1")` to create the securable object, or you can use full name
+ * `catalog1.schema1` and type `SCHEMA` in the RESTFUL API. <br>
+ * If you want to use a table named `table1` in the schema named `schema1`, you can use the code
+ * `SecurableObjects.ofTable("table1")` to create the securable object, or you can use full name
+ * `catalog1.schema1.table1` and type `TABLE` in the RESTFUL API. <br>
+ * If you want to use a topic named `topic1` in the schema named `schema1`, you can use the code
+ * `SecurableObjects.ofTopic("topic1")` to create the securable object, or you can use full name
+ * `catalog1.schema1.topic1` and type `TOPIC` in the RESTFUL API. <br>
+ * If you want to use a fileset named `fileset1` in the schema named `schema1`, you can use the code
+ * `SecurableObjects.ofFileset("fileset1)` to create the securable object, or you can use full name
+ * `catalog1.schema1.fileset1` and type `FILESET` in the RESTFUL API. <br>
+ * If you want to use a metalake named `metalake1`, you can use the code
+ * `SecurableObjects.ofMetalake("metalake1")` to create the securable object, or you can use full
+ * name `metalake1` and type `METALAKE` in the RESTFUL API. <br>
+ * If you want to use all the catalogs, you use the metalake to represent them. Likely, you can use
+ * their common parent to represent all securable objects.<br>
  * For example if you want to have read table privileges of all tables of `catalog1.schema1`, " you
  * can use add `read table` privilege for `catalog1.schema1` directly
  */

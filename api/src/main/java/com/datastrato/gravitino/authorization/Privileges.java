@@ -4,26 +4,34 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import static com.datastrato.gravitino.authorization.Privilege.Name.ADD_GROUP;
+import static com.datastrato.gravitino.authorization.Privilege.Name.ADD_USER;
 import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.ALTER_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_METALAKE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_ROLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.CREATE_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.DELETE_ROLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_SCHEMA;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.DROP_TOPIC;
-import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_GROUP;
+import static com.datastrato.gravitino.authorization.Privilege.Name.GET_GROUP;
+import static com.datastrato.gravitino.authorization.Privilege.Name.GET_ROLE;
+import static com.datastrato.gravitino.authorization.Privilege.Name.GET_USER;
+import static com.datastrato.gravitino.authorization.Privilege.Name.GRANT_ROLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_METALAKE;
-import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_ROLE;
-import static com.datastrato.gravitino.authorization.Privilege.Name.MANAGE_USER;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_FILESET;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TABLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.READ_TOPIC;
+import static com.datastrato.gravitino.authorization.Privilege.Name.REMOVE_GROUP;
+import static com.datastrato.gravitino.authorization.Privilege.Name.REMOVE_USER;
+import static com.datastrato.gravitino.authorization.Privilege.Name.REVOKE_ROLE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_METALAKE;
 import static com.datastrato.gravitino.authorization.Privilege.Name.USE_SCHEMA;
@@ -54,97 +62,93 @@ public class Privileges {
   public static Privilege fromName(Privilege.Name name) {
     switch (name) {
         // Catalog
-      case USE_CATALOG:
-        return UseCatalog.get();
       case CREATE_CATALOG:
         return CreateCatalog.get();
-      case ALTER_CATALOG:
-        return AlterCatalog.get();
       case DROP_CATALOG:
         return DropCatalog.get();
+      case ALTER_CATALOG:
+        return AlterCatalog.get();
+      case USE_CATALOG:
+        return UseCatalog.get();
 
         // Schema
-      case USE_SCHEMA:
-        return UseSchema.get();
       case CREATE_SCHEMA:
         return CreateSchema.get();
-      case ALTER_SCHEMA:
-        return AlterSchema.get();
       case DROP_SCHEMA:
         return DropSchema.get();
+      case ALTER_SCHEMA:
+        return AlterSchema.get();
+      case USE_SCHEMA:
+        return UseSchema.get();
 
         // Table
       case CREATE_TABLE:
         return CreateTable.get();
       case DROP_TABLE:
         return DropTable.get();
-      case READ_TABLE:
-        return ReadTable.get();
       case WRITE_TABLE:
         return WriteTable.get();
+      case READ_TABLE:
+        return ReadTable.get();
 
         // Fileset
       case CREATE_FILESET:
         return CreateFileset.get();
       case DROP_FILESET:
         return DropFileset.get();
-      case READ_FILESET:
-        return ReadFileset.get();
       case WRITE_FILESET:
         return WriteFileset.get();
+      case READ_FILESET:
+        return ReadFileset.get();
 
         // Topic
       case CREATE_TOPIC:
         return CreateTopic.get();
       case DROP_TOPIC:
         return DropTopic.get();
-      case READ_TOPIC:
-        return ReadTopic.get();
       case WRITE_TOPIC:
         return WriteTopic.get();
+      case READ_TOPIC:
+        return ReadTopic.get();
 
         // Metalake
-      case USE_METALAKE:
-        return UseMetalake.get();
-      case MANAGE_METALAKE:
-        return ManageMetalake.get();
       case CREATE_METALAKE:
         return CreateMetalake.get();
+      case MANAGE_METALAKE:
+        return ManageMetalake.get();
+      case USE_METALAKE:
+        return UseMetalake.get();
 
-        // Access control
-      case MANAGE_USER:
-        return ManageUser.get();
-      case MANAGE_GROUP:
-        return ManageGroup.get();
-      case MANAGE_ROLE:
-        return ManageRole.get();
+        // User
+      case ADD_USER:
+        return AddUser.get();
+      case REMOVE_USER:
+        return RemoveUser.get();
+      case GET_USER:
+        return GetUser.get();
+
+        // Group
+      case ADD_GROUP:
+        return AddGroup.get();
+      case REMOVE_GROUP:
+        return RemoveGroup.get();
+      case GET_GROUP:
+        return GetGroup.get();
+
+        // Role
+      case CREATE_ROLE:
+        return CreateRole.get();
+      case DELETE_ROLE:
+        return DeleteRole.get();
+      case GRANT_ROLE:
+        return GrantRole.get();
+      case REVOKE_ROLE:
+        return RevokeRole.get();
+      case GET_ROLE:
+        return GetRole.get();
 
       default:
         throw new IllegalArgumentException("Don't support the privilege: " + name);
-    }
-  }
-
-  /** The privilege to use a catalog. */
-  public static class UseCatalog implements Privilege {
-    private static final UseCatalog INSTANCE = new UseCatalog();
-
-    /** @return The instance of the privilege. */
-    public static UseCatalog get() {
-      return INSTANCE;
-    }
-
-    private UseCatalog() {}
-
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return USE_CATALOG;
-    }
-
-    /** @return A readable string representation for the privilege. */
-    @Override
-    public String simpleString() {
-      return "use catalog";
     }
   }
 
@@ -220,6 +224,30 @@ public class Privileges {
     @Override
     public String simpleString() {
       return "drop catalog";
+    }
+  }
+
+  /** The privilege to use a catalog. */
+  public static class UseCatalog implements Privilege {
+    private static final UseCatalog INSTANCE = new UseCatalog();
+
+    /** @return The instance of the privilege. */
+    public static UseCatalog get() {
+      return INSTANCE;
+    }
+
+    private UseCatalog() {}
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return USE_CATALOG;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "use catalog";
     }
   }
 
@@ -690,78 +718,278 @@ public class Privileges {
     }
   }
 
-  /** The privilege to manage users. */
-  public static class ManageUser implements Privilege {
+  /** The privilege to get a user. */
+  public static class GetUser implements Privilege {
 
-    private static final ManageUser INSTANCE = new ManageUser();
+    private static final GetUser INSTANCE = new GetUser();
 
-    private ManageUser() {}
+    private GetUser() {}
 
     /** @return The instance of the privilege. */
-    public static ManageUser get() {
+    public static GetUser get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return MANAGE_USER;
+      return GET_USER;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "manage user";
+      return "get user";
     }
   }
 
-  /** The privilege to manage roles. */
-  public static class ManageGroup implements Privilege {
+  /** The privilege to add a user. */
+  public static class AddUser implements Privilege {
 
-    private static final ManageGroup INSTANCE = new ManageGroup();
+    private static final AddUser INSTANCE = new AddUser();
 
-    private ManageGroup() {}
+    private AddUser() {}
 
     /** @return The instance of the privilege. */
-    public static ManageGroup get() {
+    public static AddUser get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return MANAGE_GROUP;
+      return ADD_USER;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "manage group";
+      return "add user";
     }
   }
 
-  /** The privilege to manage roles. */
-  public static class ManageRole implements Privilege {
+  /** The privilege to remove a user. */
+  public static class RemoveUser implements Privilege {
 
-    private static final ManageRole INSTANCE = new ManageRole();
+    private static final RemoveUser INSTANCE = new RemoveUser();
 
-    private ManageRole() {}
+    private RemoveUser() {}
 
     /** @return The instance of the privilege. */
-    public static ManageRole get() {
+    public static RemoveUser get() {
       return INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
     @Override
     public Name name() {
-      return MANAGE_ROLE;
+      return REMOVE_USER;
     }
 
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "manage role";
+      return "remove user";
+    }
+  }
+
+  /** The privilege to add a group. */
+  public static class AddGroup implements Privilege {
+
+    private static final AddGroup INSTANCE = new AddGroup();
+
+    private AddGroup() {}
+
+    /** @return The instance of the privilege. */
+    public static AddGroup get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return ADD_GROUP;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "add group";
+    }
+  }
+
+  /** The privilege to remove a group. */
+  public static class RemoveGroup implements Privilege {
+
+    private static final RemoveGroup INSTANCE = new RemoveGroup();
+
+    private RemoveGroup() {}
+
+    /** @return The instance of the privilege. */
+    public static RemoveGroup get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return REMOVE_GROUP;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "remove group";
+    }
+  }
+
+  /** The privilege to get a group. */
+  public static class GetGroup implements Privilege {
+
+    private static final GetGroup INSTANCE = new GetGroup();
+
+    private GetGroup() {}
+
+    /** @return The instance of the privilege. */
+    public static GetGroup get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return GET_GROUP;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "get group";
+    }
+  }
+
+  /** The privilege to create a role. */
+  public static class CreateRole implements Privilege {
+
+    private static final CreateRole INSTANCE = new CreateRole();
+
+    private CreateRole() {}
+
+    /** @return The instance of the privilege. */
+    public static CreateRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return CREATE_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "create role";
+    }
+  }
+
+  /** The privilege to get a role. */
+  public static class GetRole implements Privilege {
+
+    private static final GetRole INSTANCE = new GetRole();
+
+    private GetRole() {}
+
+    /** @return The instance of the privilege. */
+    public static GetRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return GET_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "get role";
+    }
+  }
+
+  /** The privilege to delete a role. */
+  public static class DeleteRole implements Privilege {
+
+    private static final DeleteRole INSTANCE = new DeleteRole();
+
+    private DeleteRole() {}
+
+    /** @return The instance of the privilege. */
+    public static DeleteRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return DELETE_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "delete role";
+    }
+  }
+
+  /** The privilege to grant a role to the user or the group. */
+  public static class GrantRole implements Privilege {
+
+    private static final GrantRole INSTANCE = new GrantRole();
+
+    private GrantRole() {}
+
+    /** @return The instance of the privilege. */
+    public static GrantRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return GRANT_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "grant role";
+    }
+  }
+
+  /** The privilege to revoke a role from the user or the group. */
+  public static class RevokeRole implements Privilege {
+
+    private static final RevokeRole INSTANCE = new RevokeRole();
+
+    private RevokeRole() {}
+
+    /** @return The instance of the privilege. */
+    public static RevokeRole get() {
+      return INSTANCE;
+    }
+
+    /** @return The generic name of the privilege. */
+    @Override
+    public Name name() {
+      return REVOKE_ROLE;
+    }
+
+    /** @return A readable string representation for the privilege. */
+    @Override
+    public String simpleString() {
+      return "revoke role";
     }
   }
 }
