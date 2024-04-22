@@ -69,7 +69,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             logger.info("Drop metalake %s[%s]", self.metalake_ident,
                         self.gravitino_admin_client.drop_metalake(self.metalake_ident))
         except Exception as e:
-            logger.error("Clean test data failed.")
+            logger.error("Ignore deletion of non-existent data.")
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(ident=self.metalake_ident, comment="", properties={})
