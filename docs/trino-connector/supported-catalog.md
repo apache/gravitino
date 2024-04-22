@@ -146,7 +146,6 @@ More trino connector configurations can refer to:
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
 - [PostgreSQL catalog](https://trino.io/docs/current/connector/postgresql.html#general-configuration-properties)
 
-
 ## Data type mapping between Trino and Gravitino
 
 Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
