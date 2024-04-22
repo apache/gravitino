@@ -309,7 +309,7 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @Test
-  public void testDropTopic() {
+  public void testDropTopic() throws ExecutionException, InterruptedException {
     String topicName = GravitinoITUtils.genRandomName("test-topic");
     Topic createdTopic =
         catalog
@@ -332,6 +332,30 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
     Assertions.assertTrue(
         ex.getMessage().contains("This server does not host this topic-partition"));
+
+    // verify dropping non-exist topic
+    String topicName1 = GravitinoITUtils.genRandomName("test-topic");
+    catalog
+        .asTopicCatalog()
+        .createTopic(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1),
+            "comment",
+            null,
+            Collections.emptyMap());
+
+    adminClient.deleteTopics(Collections.singleton(topicName1)).all().get();
+    boolean dropped1 =
+        catalog
+            .asTopicCatalog()
+            .dropTopic(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1));
+    Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
+    Assertions.assertFalse(
+        catalog
+            .asTopicCatalog()
+            .topicExists(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1)),
+        "Topic should not exist after dropping");
   }
 
   private void assertTopicWithKafka(Topic createdTopic)
