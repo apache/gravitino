@@ -197,6 +197,39 @@ public class NameIdentifier {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a user identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The user {@link NameIdentifier} to check.
+   */
+  public static void checkUser(NameIdentifier ident) {
+    check(ident != null, "User identifier must not be null");
+    Namespace.checkUser(ident.namespace);
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a group identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The group {@link NameIdentifier} to check.
+   */
+  public static void checkGroup(NameIdentifier ident) {
+    check(ident != null, "Group identifier must not be null");
+    Namespace.checkGroup(ident.namespace);
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a role identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The role {@link NameIdentifier} to check.
+   */
+  public static void checkRole(NameIdentifier ident) {
+    check(ident != null, "Role identifier must not be null");
+    Namespace.checkRole(ident.namespace);
+  }
+
+  /**
    * Create a {@link NameIdentifier} from the given identifier string.
    *
    * @param identifier The identifier string

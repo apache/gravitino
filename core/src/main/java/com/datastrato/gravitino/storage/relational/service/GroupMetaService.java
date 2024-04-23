@@ -67,11 +67,8 @@ public class GroupMetaService {
   }
 
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    NameIdentifier.checkGroup(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -82,11 +79,7 @@ public class GroupMetaService {
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          groupEntity.namespace() != null
-              && !groupEntity.namespace().isEmpty()
-              && groupEntity.namespace().levels().length == 3,
-          "The namespace of groupEntity should not be null and should have three level.");
+      NameIdentifier.checkGroup(groupEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
@@ -130,11 +123,8 @@ public class GroupMetaService {
   }
 
   public boolean deleteGroup(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    NameIdentifier.checkGroup(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
@@ -152,11 +142,7 @@ public class GroupMetaService {
 
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    NameIdentifier.checkGroup(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));

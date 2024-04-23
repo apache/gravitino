@@ -70,11 +70,7 @@ public class RoleMetaService {
 
   public void insertRole(RoleEntity roleEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          roleEntity.namespace() != null
-              && !roleEntity.namespace().isEmpty()
-              && roleEntity.namespace().levels().length == 3,
-          "The namespace of RoleEntity must have three levels.");
+      NameIdentifier.checkRole(roleEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
@@ -99,11 +95,8 @@ public class RoleMetaService {
   }
 
   public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier of Role must have three levels.");
+    NameIdentifier.checkRole(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -112,11 +105,8 @@ public class RoleMetaService {
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier of Role must have three levels.");
+    NameIdentifier.checkRole(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());

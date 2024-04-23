@@ -195,6 +195,45 @@ public class Namespace {
         namespace);
   }
 
+  /**
+   * Check if the given user namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The user namespace
+   */
+  public static void checkUser(Namespace namespace) {
+    check(
+            namespace != null && namespace.length() == 3,
+            "User namespace must be non-null and have 3 levels, the input namespace is %s",
+            namespace);
+  }
+
+  /**
+   * Check if the given group namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The group namespace
+   */
+  public static void checkGroup(Namespace namespace) {
+    check(
+            namespace != null && namespace.length() == 3,
+            "Group namespace must be non-null and have 3 levels, the input namespace is %s",
+            namespace);
+  }
+
+  /**
+   * Check if the given role namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The role namespace
+   */
+  public static void checkRole(Namespace namespace) {
+    check(
+            namespace != null && namespace.length() == 3,
+            "Role namespace must be non-null and have 3 levels, the input namespace is %s",
+            namespace);
+  }
+
   private Namespace(String[] levels) {
     this.levels = levels;
   }
