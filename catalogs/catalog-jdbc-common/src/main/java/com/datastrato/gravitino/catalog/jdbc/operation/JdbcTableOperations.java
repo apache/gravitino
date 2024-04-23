@@ -159,8 +159,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
       // 1. Get table information, The result of tables may be more than one due to the reason
-      // above,
-      // so we need to check the result.
+      // above, so we need to check the result.
       ResultSet tables = getTable(connection, databaseName, tableName);
       JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 
