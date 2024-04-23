@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -47,6 +48,14 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   private static final long WAIT_INTERVAL = 1;
 
+  public String DORIS_COL_NAME1 = "doris_col_name1";
+  public String DORIS_COL_NAME2 = "doris_col_name2";
+  public String DORIS_COL_NAME3 = "doris_col_name3";
+
+  public String DORIS_COL_NAME4 = "doris_col_name4";
+
+  private final String TABLE_COMMENT = "table_comment";
+
   @BeforeAll
   public static void startup() {
     TestDorisAbstractIT.startup();
@@ -63,23 +72,41 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     return properties;
   }
 
+  private List<JdbcColumn> createColumns() {
+    List<JdbcColumn> columns = new ArrayList<>();
+
+    columns.add(
+        JdbcColumn.builder()
+            .withName(DORIS_COL_NAME1)
+            .withType(INT)
+            .withComment("col_1_comment")
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName(DORIS_COL_NAME2)
+            .withType(VARCHAR_255)
+            .withComment("col_2_comment")
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName(DORIS_COL_NAME3)
+            .withType(VARCHAR_255)
+            .withComment("col_3_comment")
+            .build());
+    return columns;
+  }
+
+  private Distribution createDistribution() {
+    return Distributions.hash(2, NamedReference.field(DORIS_COL_NAME1));
+  }
+
   @Test
   public void testBasicTableOperation() {
-    String tableName = GravitinoITUtils.genRandomName("doris_basic_test_table");
-    String tableComment = "test_comment";
-    List<JdbcColumn> columns = new ArrayList<>();
-    JdbcColumn col_1 =
-        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
-    columns.add(col_1);
-    JdbcColumn col_2 =
-        JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).withComment("col_2").build();
-    columns.add(col_2);
-    JdbcColumn col_3 =
-        JdbcColumn.builder().withName("col_3").withType(VARCHAR_255).withComment("col_3").build();
-    columns.add(col_3);
-    Map<String, String> properties = new HashMap<>();
-
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    String tableName = GravitinoITUtils.genRandomName("doris_basic_test");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
     Index[] indexes = new Index[] {};
 
     // create table
@@ -88,7 +115,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         tableName,
         columns.toArray(new JdbcColumn[0]),
         tableComment,
-        createProperties(),
+        properties,
         null,
         distribution,
         indexes);
@@ -112,23 +139,12 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
   }
 
   @Test
-  public void testAlterTable() {
-    String tableName = GravitinoITUtils.genRandomName("doris_alter_test_table");
-
-    String tableComment = "test_comment";
-    List<JdbcColumn> columns = new ArrayList<>();
-    JdbcColumn col_1 =
-        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
-    columns.add(col_1);
-    JdbcColumn col_2 =
-        JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).withComment("col_2").build();
-    columns.add(col_2);
-    JdbcColumn col_3 =
-        JdbcColumn.builder().withName("col_3").withType(VARCHAR_255).withComment("col_3").build();
-    columns.add(col_3);
-    Map<String, String> properties = new HashMap<>();
-
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+  void testAlterColumnType() {
+    String tableName = GravitinoITUtils.genRandomName("doris_alter_column_type");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
     Index[] indexes = new Index[] {};
 
     // create table
@@ -141,25 +157,23 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         null,
         distribution,
         indexes);
+
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
-        TableChange.updateColumnType(new String[] {col_3.name()}, VARCHAR_1024));
+        TableChange.updateColumnType(new String[] {DORIS_COL_NAME3}, VARCHAR_1024));
 
     // After modifying the type, check it
-    columns.clear();
-    col_3 =
+    JdbcColumn col_3 = columns.remove(2);
+    columns.add(
         JdbcColumn.builder()
-            .withName(col_3.name())
+            .withName(DORIS_COL_NAME3)
             .withType(VARCHAR_1024)
             .withComment(col_3.comment())
-            .build();
-    columns.add(col_1);
-    columns.add(col_2);
-    columns.add(col_3);
+            .build());
 
     Awaitility.await()
         .atMost(MAX_WAIT, TimeUnit.SECONDS)
@@ -173,40 +187,99 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     properties,
                     indexes,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
 
-    String colNewComment = "new_comment";
-    // update column comment
+  @Test
+  public void testAlterColumnComment() {
+    String tableName = GravitinoITUtils.genRandomName("doris_alter_column_comment");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
+    String colNewComment = "new_col_comment";
+
+    Column col_3 = columns.remove(2);
+    Column col_2 = columns.remove(1);
 
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
-        TableChange.updateColumnComment(new String[] {col_2.name()}, colNewComment));
-    load = TABLE_OPERATIONS.load(databaseName, tableName);
+        TableChange.updateColumnComment(new String[] {col_2.name()}, colNewComment),
+        TableChange.updateColumnComment(new String[] {col_3.name()}, colNewComment));
 
-    columns.clear();
-    col_2 =
+    columns.add(
         JdbcColumn.builder()
             .withName(col_2.name())
             .withType(col_2.dataType())
             .withComment(colNewComment)
-            .build();
-    columns.add(col_1);
-    columns.add(col_2);
-    columns.add(col_3);
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName(col_3.name())
+            .withType(col_3.dataType())
+            .withComment(colNewComment)
+            .build());
+
+    Awaitility.await()
+        .atMost(MAX_WAIT, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertionsTableInfo(
+                    tableName,
+                    tableComment,
+                    columns,
+                    properties,
+                    indexes,
+                    TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
+
+  @Test
+  public void testAddColumn() {
+    String tableName = GravitinoITUtils.genRandomName("doris_add_column");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
-    // add new column
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
         TableChange.addColumn(new String[] {"col_4"}, VARCHAR_255, "txt4", true));
 
-    columns.clear();
     JdbcColumn col_4 =
         JdbcColumn.builder().withName("col_4").withType(VARCHAR_255).withComment("txt4").build();
-    columns.add(col_1);
-    columns.add(col_2);
-    columns.add(col_3);
     columns.add(col_4);
     Awaitility.await()
         .atMost(MAX_WAIT, TimeUnit.SECONDS)
@@ -220,19 +293,49 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     properties,
                     indexes,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
 
-    // change column position
+  @Test
+  public void testChangeColumnPosition() {
+    String tableName = GravitinoITUtils.genRandomName("doris_change_column_position");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    columns.add(
+        JdbcColumn.builder()
+            .withName(DORIS_COL_NAME4)
+            .withType(VARCHAR_255)
+            .withComment("txt4")
+            .build());
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
         TableChange.updateColumnPosition(
-            new String[] {"col_3"}, TableChange.ColumnPosition.after("col_4")));
+            new String[] {DORIS_COL_NAME3}, TableChange.ColumnPosition.after(DORIS_COL_NAME4)));
 
-    columns.clear();
-    columns.add(col_1);
-    columns.add(col_2);
+    JdbcColumn col_4 = columns.remove(3);
+    JdbcColumn col_3 = columns.remove(2);
+
     columns.add(col_4);
     columns.add(col_3);
+
     Awaitility.await()
         .atMost(MAX_WAIT, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
@@ -245,14 +348,40 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     properties,
                     indexes,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
 
-    // drop column if exist
+  @Test
+  public void testDropColumn() {
+    String tableName = GravitinoITUtils.genRandomName("doris_drop_column");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    columns.add(
+        JdbcColumn.builder()
+            .withName(DORIS_COL_NAME4)
+            .withType(VARCHAR_255)
+            .withComment("txt4")
+            .build());
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+
     TABLE_OPERATIONS.alterTable(
-        databaseName, tableName, TableChange.deleteColumn(new String[] {"col_4"}, true));
-    columns.clear();
-    columns.add(col_1);
-    columns.add(col_2);
-    columns.add(col_3);
+        databaseName, tableName, TableChange.deleteColumn(new String[] {DORIS_COL_NAME4}, true));
+    columns.remove(3);
     Awaitility.await()
         .atMost(MAX_WAIT, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
@@ -274,24 +403,54 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                 TABLE_OPERATIONS.alterTable(
                     databaseName,
                     tableName,
-                    TableChange.deleteColumn(new String[] {"col_4"}, false)));
+                    TableChange.deleteColumn(new String[] {DORIS_COL_NAME4}, false)));
 
     Assertions.assertEquals(
-        "Delete column does not exist: col_4", illegalArgumentException.getMessage());
+        "Delete column does not exist: " + DORIS_COL_NAME4, illegalArgumentException.getMessage());
     Assertions.assertDoesNotThrow(
         () ->
             TABLE_OPERATIONS.alterTable(
-                databaseName, tableName, TableChange.deleteColumn(new String[] {"col_4"}, true)));
+                databaseName,
+                tableName,
+                TableChange.deleteColumn(new String[] {DORIS_COL_NAME4}, true)));
+  }
+
+  @Test
+  public void testAlterIndex() {
+    String tableName = GravitinoITUtils.genRandomName("doris_alter_index");
+    String tableComment = TABLE_COMMENT;
+    List<JdbcColumn> columns = createColumns();
+    Map<String, String> properties = createProperties();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     // test add index
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
         TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{"col_2"}, {"col_3"}}));
+            Index.IndexType.PRIMARY_KEY,
+            "k2_index",
+            new String[][] {{DORIS_COL_NAME2}, {DORIS_COL_NAME3}}));
 
     Index[] newIndexes =
-        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
+        new Index[] {
+          Indexes.primary("k2_index", new String[][] {{DORIS_COL_NAME2}, {DORIS_COL_NAME3}})
+        };
     Awaitility.await()
         .atMost(MAX_WAIT, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
@@ -325,7 +484,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
   @Test
   public void testCreateAllTypeTable() {
     String tableName = GravitinoITUtils.genRandomName("all_type_table");
-    String tableComment = "test_comment";
+    String tableComment = TABLE_COMMENT;
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(JdbcColumn.builder().withName("col_1").withType(Types.IntegerType.get()).build());
     columns.add(JdbcColumn.builder().withName("col_2").withType(Types.BooleanType.get()).build());
@@ -362,8 +521,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   @Test
   public void testCreateNotSupportTypeTable() {
-    String tableName = RandomNameUtils.genRandomName("unspport_type_table");
-    String tableComment = "test_comment";
+    String tableName = RandomNameUtils.genRandomName("unsupported_type_table");
+    String tableComment = TABLE_COMMENT;
     List<JdbcColumn> columns = new ArrayList<>();
     List<Type> notSupportType =
         Arrays.asList(

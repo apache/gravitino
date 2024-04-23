@@ -44,7 +44,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -66,15 +65,14 @@ public class CatalogDorisIT extends AbstractIT {
   public String metalakeName = GravitinoITUtils.genRandomName("doris_it_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("doris_it_catalog");
   public String schemaName = GravitinoITUtils.genRandomName("doris_it_schema");
-  public String tableName = GravitinoITUtils.genRandomName("doris_it_table");
 
   public String table_comment = "table_comment";
 
-  // Doris doesn't support schema comment
-  public String schema_comment = null;
+  public String schema_comment = "schema_comment";
   public String DORIS_COL_NAME1 = "doris_col_name1";
   public String DORIS_COL_NAME2 = "doris_col_name2";
   public String DORIS_COL_NAME3 = "doris_col_name3";
+  public String DORIS_COL_NAME4 = "doris_col_name4";
 
   // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
@@ -108,12 +106,6 @@ public class CatalogDorisIT extends AbstractIT {
   public void stop() {
     clearTableAndSchema();
     AbstractIT.client.dropMetalake(NameIdentifier.of(metalakeName));
-  }
-
-  @AfterEach
-  public void resetSchema() {
-    clearTableAndSchema();
-    createSchema();
   }
 
   private void clearTableAndSchema() {
@@ -247,6 +239,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testDropDorisSchema() {
     String schemaName = GravitinoITUtils.genRandomName("doris_it_schema_dropped").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("doris_it_schema_dropped_table");
 
     catalog
         .asSchemas()
@@ -293,6 +286,8 @@ public class CatalogDorisIT extends AbstractIT {
 
   @Test
   void testDorisTableBasicOperation() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_table_basic_op");
+
     // create a table
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
@@ -337,18 +332,15 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   @Test
-  void testAlterDorisTable() {
+  void testAlterColumnType() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_alter_column_type");
+
     // create a table
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Column[] columns = createColumns();
-
     Distribution distribution = createDistribution();
-
-    Index[] indexes =
-        new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
-        };
+    Index[] indexes = new Index[] {};
 
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -379,9 +371,36 @@ public class CatalogDorisIT extends AbstractIT {
                 ITUtils.assertColumn(
                     Column.of(DORIS_COL_NAME3, Types.VarCharType.of(255), "col_3_comment"),
                     tableCatalog.loadTable(tableIdentifier).columns()[2]));
+  }
+
+  @Test
+  void testAlterColumnComment() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_alter_column_comment");
+
+    // create a table
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Column[] columns = createColumns();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            distribution,
+            null,
+            indexes);
+
+    ITUtils.assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
 
     // update column comment
-    // Alter column type
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.updateColumnComment(new String[] {DORIS_COL_NAME3}, "new_comment"));
@@ -392,14 +411,42 @@ public class CatalogDorisIT extends AbstractIT {
         .untilAsserted(
             () ->
                 ITUtils.assertColumn(
-                    Column.of(DORIS_COL_NAME3, Types.VarCharType.of(255), "new_comment"),
+                    Column.of(DORIS_COL_NAME3, Types.VarCharType.of(10), "new_comment"),
                     tableCatalog.loadTable(tableIdentifier).columns()[2]));
+  }
+
+  @Test
+  void testAddColumn() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_add_column");
+
+    // create a table
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Column[] columns = createColumns();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            distribution,
+            null,
+            indexes);
+
+    ITUtils.assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
 
     // add new column
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.addColumn(
-            new String[] {"col_4"}, Types.VarCharType.of(255), "col_4_comment", true));
+            new String[] {DORIS_COL_NAME4}, Types.VarCharType.of(255), "col_4_comment", true));
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -409,15 +456,40 @@ public class CatalogDorisIT extends AbstractIT {
                     4, tableCatalog.loadTable(tableIdentifier).columns().length));
 
     ITUtils.assertColumn(
-        Column.of("col_4", Types.VarCharType.of(255), "col_4_comment"),
+        Column.of(DORIS_COL_NAME4, Types.VarCharType.of(255), "col_4_comment"),
         tableCatalog.loadTable(tableIdentifier).columns()[3]);
+  }
 
-    // change column position
-    // TODO: change column position is unstable, add it later
+  @Test
+  void testDropColumn() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_drop_column");
+
+    // create a table
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Column[] columns = createColumns();
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            distribution,
+            null,
+            indexes);
+
+    ITUtils.assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
 
     // drop column
     tableCatalog.alterTable(
-        tableIdentifier, TableChange.deleteColumn(new String[] {"col_4"}, true));
+        tableIdentifier, TableChange.deleteColumn(new String[] {DORIS_COL_NAME3}, true));
 
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
@@ -425,12 +497,57 @@ public class CatalogDorisIT extends AbstractIT {
         .untilAsserted(
             () ->
                 Assertions.assertEquals(
-                    3, tableCatalog.loadTable(tableIdentifier).columns().length));
+                    2, tableCatalog.loadTable(tableIdentifier).columns().length));
+  }
+
+  @Test
+  void testChangeColumnPosition() {
+    String tableName = GravitinoITUtils.genRandomName("doris_it_change_column_position");
+
+    // create a table
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Column[] initColumns = createColumns();
+    Column[] columns = Arrays.copyOf(initColumns, initColumns.length + 1);
+    columns[3] = Column.of(DORIS_COL_NAME4, Types.VarCharType.of(10), "col_4_comment");
+
+    Distribution distribution = createDistribution();
+    Index[] indexes = new Index[] {};
+    Map<String, String> properties = createTableProperties();
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            distribution,
+            null,
+            indexes);
+
+    ITUtils.assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
+
+    // change column position
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnPosition(
+            new String[] {DORIS_COL_NAME3}, TableChange.ColumnPosition.after(DORIS_COL_NAME4)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                Assertions.assertEquals(
+                    DORIS_COL_NAME3, tableCatalog.loadTable(tableIdentifier).columns()[3].name()));
   }
 
   @Test
   void testDorisIndex() {
-    String tableName = GravitinoITUtils.genRandomName("test_add_index");
+    String tableName = GravitinoITUtils.genRandomName("doris_it_test_index");
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
