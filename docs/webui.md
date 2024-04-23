@@ -127,7 +127,7 @@ Clicking on the Tab - `DETAILS` views the details of the catalog on the metalake
 
 ![metalake-catalogs-details](./assets/webui/metalake-catalogs-details.png)
 
-On the left side of the page is a tree list.
+On the left side of the page is a tree list, and the icons of the catalog correspond to their type and provider.
 
 - Catalog <Icon icon='bx:book' fontSize='24px' />
 - Schema <Icon icon='bx:coin-stack' fontSize='24px' />
@@ -150,9 +150,9 @@ Creating a catalog requires these fields:
 1. **Catalog name**(**_required_**): the name of the catalog
 2. **Type**(**_required_**): `relational`/`fileset`/`messaging`, the default value is `relational`
 3. **Provider**(**_required_**):
-   1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`
-   2. Type `fileset` - `hadoop`
-   3. Type `messaging` - `kafka`
+    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`
+    2. Type `fileset` - `hadoop`
+    3. Type `messaging` - `kafka`
 4. **Comment**(_optional_): the comment of this catalog
 5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 
@@ -231,17 +231,17 @@ Creating a catalog requires these fields:
     |jdbc-database|e.g. `pg_database`                                   |
 
   </TabItem>
-    <TabItem value='doris' label='Doris'>
-    Follow the [JDBC Doris catalog](jdbc-doris-catalog) document
+  <TabItem value='doris' label='Doris'>
+    Follow the [JDBC Doris catalog](./jdbc-doris-catalog.md) document.
 
     <Image img={require('./assets/webui/props-doris.png')} style={{ width: 480 }} />
 
-    |Key          |Description                                          |
-    |-------------|-----------------------------------------------------|
-    |jdbc-driver  |e.g. `com.mysql.jdbc.Driver`                         |
-    |jdbc-url     |e.g. `jdbc:mysql://localhost:9030`                   |
-    |jdbc-user    |The JDBC user name                                   |
-    |jdbc-password|The JDBC password                                    |
+    |Key          |Description                                                          |
+    |-------------|---------------------------------------------------------------------|
+    |jdbc-driver  |JDBC URL for connecting to the database. e.g. `com.mysql.jdbc.Driver`|
+    |jdbc-url     |e.g. `jdbc:mysql://localhost:9030`                                   |
+    |jdbc-user    |The JDBC user name                                                   |
+    |jdbc-password|The JDBC password                                                    |
 
   </TabItem>
 </Tabs>
@@ -344,19 +344,20 @@ Preview:
 | Topic    | _`View`_ &#10004; / _`Create`_ &#10008; / _`Edit`_ &#10008; / _`Delete`_ &#10008; |
 
 ## E2E test
+
 End-to-end testing for web frontends is conducted using the [Selenium](https://www.selenium.dev/documentation/) testing framework, which is Java-based.
 
 Test cases can be found in the project directory: `integration-test/src/test/java/com/datastrato/gravitino/integration/test/web/ui`, where the `pages` directory is designated for storing definitions of frontend elements, among others.
 The root directory contains the actual steps for the test cases.
 
 :::tip
- While writing test cases, running them in a local environment may not pose any issues.
+While writing test cases, running them in a local environment may not pose any issues.
 
- However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
+However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
 
- To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
+To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
 
- This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
+This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
 
- It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/) methods inherent to Selenium as a substitute for `Thread.sleep()`.
+It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/) methods inherent to Selenium as a substitute for `Thread.sleep()`.
 :::
