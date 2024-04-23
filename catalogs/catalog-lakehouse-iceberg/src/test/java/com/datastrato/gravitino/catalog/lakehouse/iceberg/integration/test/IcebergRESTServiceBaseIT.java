@@ -40,6 +40,7 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
   private SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
+  protected IcebergCatalogBackend backendCatalogType = null;
 
   @BeforeAll
   void initIcebergTestEnv() throws Exception {

@@ -44,12 +44,20 @@ public class IcebergTableOps implements AutoCloseable {
   private String catalogUri = null;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
+    this(icebergConfig, false);
+  }
+
+  public IcebergTableOps(IcebergConfig icebergConfig, boolean buildForIcebergRestService) {
     this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
-      this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
+      if (IcebergCatalogBackend.REST.name().equalsIgnoreCase(catalogType)) {
+        this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_URI);
+      } else {
+        this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
+      }
     }
-    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
+    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig(), buildForIcebergRestService);
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
