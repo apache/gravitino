@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -26,21 +27,26 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
 
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
-    Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace =
-        applyCapabilities(namespace, Capability.Scope.FILESET, capability);
-    NameIdentifier[] identifiers = dispatcher.listFilesets(standardizedNamespace);
-    return applyCapabilities(identifiers, Capability.Scope.FILESET, capability);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.FILESET, dispatcher);
+    NameIdentifier[] identifiers = dispatcher.listFilesets(caseSensitiveNs);
+    return applyCaseSensitive(identifiers, Capability.Scope.FILESET, dispatcher);
   }
 
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    return dispatcher.loadFileset(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.loadFileset(applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
   }
 
   @Override
   public boolean filesetExists(NameIdentifier ident) {
-    return dispatcher.filesetExists(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.filesetExists(
+        applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
   }
 
   @Override
@@ -60,13 +66,17 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
       throws NoSuchFilesetException, IllegalArgumentException {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return dispatcher.alterFileset(
-        applyCapabilities(ident, Capability.Scope.FILESET, capability),
+        // The constraints of the name spec may be more strict than underlying catalog,
+        // and for compatibility reasons, we only apply case-sensitive capabilities here.
+        applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher),
         applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    return dispatcher.dropFileset(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.dropFileset(applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
