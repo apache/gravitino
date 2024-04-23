@@ -140,11 +140,11 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
     } else if (pathArr.length === 4 && type === 'relational') {
       const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
-      const { identifiers = [] } = res
-
       if (err || !res) {
         throw new Error(err)
       }
+
+      const { identifiers = [] } = res
 
       result.data = identifiers.map(tableItem => {
         return {
@@ -163,11 +163,11 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
     } else if (pathArr.length === 4 && type === 'fileset') {
       const [err, res] = await to(getFilesetsApi({ metalake, catalog, schema }))
 
-      const { identifiers = [] } = res
-
       if (err || !res) {
         throw new Error(err)
       }
+
+      const { identifiers = [] } = res
 
       result.data = identifiers.map(filesetItem => {
         return {
@@ -184,11 +184,11 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
     } else if (pathArr.length === 4 && type === 'messaging') {
       const [err, res] = await to(getTopicsApi({ metalake, catalog, schema }))
 
-      const { identifiers = [] } = res
-
       if (err || !res) {
         throw new Error(err)
       }
+
+      const { identifiers = [] } = res
 
       result.data = identifiers.map(topicItem => {
         return {
@@ -970,7 +970,9 @@ export const appMetalakesSlice = createSlice({
       state.metalakes = action.payload.metalakes
     })
     builder.addCase(fetchMetalakes.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
       const { key, data, tree } = action.payload
@@ -978,19 +980,27 @@ export const appMetalakesSlice = createSlice({
       state.metalakeTree = updateTreeData(tree, key, data)
     })
     builder.addCase(setIntoTreeNodeWithFetch.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getMetalakeDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
     })
     builder.addCase(getMetalakeDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(createCatalog.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(updateCatalog.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(fetchCatalogs.fulfilled, (state, action) => {
       state.catalogs = action.payload.catalogs
@@ -1004,16 +1014,22 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchCatalogs.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getCatalogDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
     })
     builder.addCase(getCatalogDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(deleteCatalog.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(fetchSchemas.fulfilled, (state, action) => {
       state.schemas = action.payload.schemas
@@ -1022,13 +1038,17 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchSchemas.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getSchemaDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
     })
     builder.addCase(getSchemaDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(fetchTables.fulfilled, (state, action) => {
       state.tables = action.payload.tables
@@ -1037,14 +1057,18 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchTables.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getTableDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
       state.tableData = action.payload.columns || []
     })
     builder.addCase(getTableDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(fetchFilesets.fulfilled, (state, action) => {
       state.filesets = action.payload.filesets
@@ -1053,14 +1077,18 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchFilesets.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getFilesetDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
       state.tableData = []
     })
     builder.addCase(getFilesetDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(fetchTopics.fulfilled, (state, action) => {
       state.topics = action.payload.topics
@@ -1069,14 +1097,18 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchTopics.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
     builder.addCase(getTopicDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
       state.tableData = []
     })
     builder.addCase(getTopicDetails.rejected, (state, action) => {
-      toast.error(action.error.message)
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
     })
   }
 })
