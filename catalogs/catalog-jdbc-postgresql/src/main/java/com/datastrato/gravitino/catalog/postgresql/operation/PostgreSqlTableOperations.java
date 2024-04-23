@@ -72,59 +72,26 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
-  @Override
-  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    try (Connection connection = getConnection(databaseName)) {
-      // 1.Get table information
-      ResultSet table = getTable(connection, databaseName, tableName);
-      // The result of tables may be more than one due to the reason above, so we need to check
-      // the result
-      JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
-      boolean found = false;
-      // Handle case-sensitive issues.
-      while (table.next() && !found) {
-        String tableNameInResult = table.getString("TABLE_NAME");
-        String tableSchemaInResultLowerCase = table.getString("TABLE_SCHEM");
-        if (Objects.equals(tableNameInResult, tableName)
-            && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
-          jdbcTableBuilder = getBasicJdbcTableInfo(table);
-          found = true;
-        }
+  protected JdbcTable.Builder attachTableToBuilder(
+      ResultSet resultSet, String databaseName, String tableName, JdbcTable.Builder builder)
+      throws SQLException {
+    boolean found = false;
+    // Handle case-sensitive issues.
+    while (resultSet.next() && !found) {
+      String tableNameInResult = resultSet.getString("TABLE_NAME");
+      String tableSchemaInResultLowerCase = resultSet.getString("TABLE_SCHEM");
+      if (Objects.equals(tableNameInResult, tableName)
+          && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
+        builder = getBasicJdbcTableInfo(resultSet);
+        found = true;
       }
-
-      if (!found) {
-        throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
-      }
-
-      // 2.Get column information
-      List<JdbcColumn> jdbcColumns = new ArrayList<>();
-      // Get columns are wildcard sensitive, so we need to check the result.
-      ResultSet columns = getColumns(connection, databaseName, tableName);
-      while (columns.next()) {
-        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)
-            && Objects.equals(columns.getString("TABLE_SCHEM"), databaseName)) {
-          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
-          boolean autoIncrement = getAutoIncrementInfo(columns);
-          columnBuilder.withAutoIncrement(autoIncrement);
-          jdbcColumns.add(columnBuilder.build());
-        }
-      }
-      jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
-
-      // 3.Get index information
-      List<Index> indexes = getIndexes(databaseName, tableName, connection.getMetaData());
-      jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
-
-      // 4.Get table properties
-      Map<String, String> tableProperties = getTableProperties(connection, tableName);
-      jdbcTableBuilder.withProperties(tableProperties);
-
-      // 5.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
-      return jdbcTableBuilder.build();
-    } catch (SQLException e) {
-      throw exceptionMapper.toGravitinoException(e);
     }
+
+    if (!found) {
+      throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+    }
+
+    return builder;
   }
 
   @Override

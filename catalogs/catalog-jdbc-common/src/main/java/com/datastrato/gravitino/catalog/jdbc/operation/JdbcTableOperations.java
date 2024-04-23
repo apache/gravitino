@@ -124,6 +124,32 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
   }
 
+  /**
+   * Get table information from the result set. If the table is not found, it will throw a
+   * NoSuchTableException.
+   *
+   * @param resultSet The result set of the table
+   * @return The builder of the table to be returned
+   */
+  protected JdbcTable.Builder attachTableToBuilder(
+      ResultSet resultSet, String databaseName, String tableName, JdbcTable.Builder builder)
+      throws SQLException {
+    boolean found = false;
+    // Handle case-sensitive issues.
+    while (resultSet.next() && !found) {
+      if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
+        builder = getBasicJdbcTableInfo(resultSet);
+        found = true;
+      }
+    }
+
+    if (!found) {
+      throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+    }
+
+    return builder;
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
@@ -138,18 +164,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       // The result of tables may be more than one due to the reason above, so we need to check the
       // result
       JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
-      boolean found = false;
-      // Handle case-sensitive issues.
-      while (table.next() && !found) {
-        if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
-          jdbcTableBuilder = getBasicJdbcTableInfo(table);
-          found = true;
-        }
-      }
-
-      if (!found) {
-        throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
-      }
+      jdbcTableBuilder = attachTableToBuilder(table, databaseName, tableName, jdbcTableBuilder);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
