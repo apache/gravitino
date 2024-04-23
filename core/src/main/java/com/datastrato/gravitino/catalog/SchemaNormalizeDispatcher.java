@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -27,16 +28,17 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace =
-        applyCapabilities(namespace, Capability.Scope.SCHEMA, capability);
-    NameIdentifier[] identifiers = dispatcher.listSchemas(standardizedNamespace);
-    return applyCapabilities(identifiers, Capability.Scope.SCHEMA, capability);
+    NameIdentifier[] identifiers = dispatcher.listSchemas(namespace);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return applyCaseSensitive(identifiers, Capability.Scope.SCHEMA, dispatcher);
   }
 
   @Override
   public boolean schemaExists(NameIdentifier ident) {
-    return dispatcher.schemaExists(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.schemaExists(applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher));
   }
 
   @Override
@@ -47,18 +49,26 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    return dispatcher.loadSchema(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.loadSchema(applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher));
   }
 
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    return dispatcher.alterSchema(normalizeNameIdentifier(ident), changes);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.alterSchema(
+        applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher), changes);
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.dropSchema(
+        applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher), cascade);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
