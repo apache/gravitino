@@ -60,7 +60,7 @@ class SupportsSchemas(ABC):
             return False
 
     @abstractmethod
-    def create_schema(self, ident: NameIdentifier, comment: Optional[str], properties: Dict[str, str]) -> Schema:
+    def create_schema(self, ident: NameIdentifier, comment: str, properties: Dict[str, str]) -> Schema:
         """Create a schema in the catalog.
 
         Args:
@@ -93,7 +93,7 @@ class SupportsSchemas(ABC):
         pass
 
     @abstractmethod
-    def alter_schema(self, ident: NameIdentifier, changes: List[SchemaChange]) -> Schema:
+    def alter_schema(self, ident: NameIdentifier, *changes: SchemaChange) -> Schema:
         """Apply the metadata change to a schema in the catalog.
 
         Args:

@@ -16,9 +16,5 @@ class CatalogListResponse(BaseResponse):
     """Represents a response for a list of catalogs with their information."""
     _catalogs: List[CatalogDTO] = field(metadata=config(field_name='catalogs'))
 
-    def __init__(self, catalogs: List[CatalogDTO]):
-        super().__init__(0)
-        self._catalogs = catalogs
-
     def catalogs(self) -> List[CatalogDTO]:
         return self._catalogs

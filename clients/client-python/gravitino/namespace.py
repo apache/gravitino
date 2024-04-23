@@ -234,7 +234,7 @@ class Namespace:
         return hash(tuple(self._levels))
 
     def __str__(self) -> str:
-        return Namespace._DOT.join(self._levels)
+        return self._DOT.join(self._levels)
 
     @staticmethod
     def check(expression: bool, message: str, *args) -> None:

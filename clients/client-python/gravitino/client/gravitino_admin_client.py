@@ -8,6 +8,7 @@ from typing import List, Dict
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.dto_converters import DTOConverters
+from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.metalake_create_request import MetalakeCreateRequest
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
@@ -34,11 +35,11 @@ class GravitinoAdminClient(GravitinoClientBase):
         Returns:
             An array of GravitinoMetalake objects representing the Metalakes.
         """
-        resp = self.rest_client.get(self.API_METALAKES_LIST_PATH)
+        resp = self._rest_client.get(self.API_METALAKES_LIST_PATH)
         metalake_list_resp = MetalakeListResponse.from_json(resp.body, infer_missing=True)
         metalake_list_resp.validate()
 
-        return [GravitinoMetalake.build(o, self.rest_client) for o in metalake_list_resp.metalakes]
+        return [GravitinoMetalake(o, self._rest_client) for o in metalake_list_resp.metalakes()]
 
     def create_metalake(self, ident: NameIdentifier, comment: str, properties: Dict[str, str]) -> GravitinoMetalake:
         """Creates a new Metalake using the Gravitino API.
@@ -57,11 +58,12 @@ class GravitinoAdminClient(GravitinoClientBase):
         req = MetalakeCreateRequest(ident.name(), comment, properties)
         req.validate()
 
-        resp = self.rest_client.post(self.API_METALAKES_LIST_PATH, req)
+        resp = self._rest_client.post(self.API_METALAKES_LIST_PATH, req)
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
+        metalake = metalake_response.metalake()
 
-        return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
+        return GravitinoMetalake(metalake, self._rest_client)
 
     def alter_metalake(self, ident: NameIdentifier, *changes: MetalakeChange) -> GravitinoMetalake:
         """Alters a specific Metalake using the Gravitino API.
@@ -75,17 +77,18 @@ class GravitinoAdminClient(GravitinoClientBase):
         TODO: @throws NoSuchMetalakeException If the specified Metalake does not exist.
         TODO: @throws IllegalArgumentException If the provided changes are invalid or not applicable.
         """
-        NameIdentifier.check_metalake(ident)
 
+        NameIdentifier.check_metalake(ident)
         reqs = [DTOConverters.to_metalake_update_request(change) for change in changes]
         updates_request = MetalakeUpdatesRequest(reqs)
         updates_request.validate()
 
-        resp = self.rest_client.put(self.API_METALAKES_IDENTIFIER_PATH + ident.name(), updates_request)
+        resp = self._rest_client.put(self.API_METALAKES_IDENTIFIER_PATH + ident.name(), updates_request)
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
+        metalake = metalake_response.metalake()
 
-        return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
+        return GravitinoMetalake(metalake, self._rest_client)
 
     def drop_metalake(self, ident: NameIdentifier) -> bool:
         """Drops a specific Metalake using the Gravitino API.
@@ -99,10 +102,10 @@ class GravitinoAdminClient(GravitinoClientBase):
         NameIdentifier.check_metalake(ident)
 
         try:
-            resp = self.rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + ident.name())
+            resp = self._rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + ident.name())
             dropResponse = DropResponse.from_json(resp.body, infer_missing=True)
 
             return dropResponse.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop metalake {ident.name()}", e)
+            logger.warning(f"Failed to drop metalake {ident}")
             return False
