@@ -9,10 +9,9 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -70,14 +69,19 @@ public class IcebergCatalogUtil {
     return jdbcCatalog;
   }
 
-  private static Catalog loadRestCatalog(Map<String, String> properties, boolean buildForIcebergRestService) {
+  private static Catalog loadRestCatalog(
+      Map<String, String> properties, boolean buildForIcebergRestService) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     if (buildForIcebergRestService) {
       Map<String, String> copiedProperties = new HashMap<>(properties);
       String realCatalogBackend = icebergConfig.get(IcebergConfig.REAL_CATALOG_BACKEND);
-      Preconditions.checkArgument(StringUtils.isNotBlank(realCatalogBackend), "The real catalog backend of Iceberg RESTCatalog is not set.");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(realCatalogBackend),
+          "The real catalog backend of Iceberg RESTCatalog is not set.");
       String backend_catalog_uri = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_URI);
-      Preconditions.checkArgument(StringUtils.isNotBlank(backend_catalog_uri), "The backend catalog URI of Iceberg RESTCatalog is not set.");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(backend_catalog_uri),
+          "The backend catalog URI of Iceberg RESTCatalog is not set.");
       copiedProperties.put(IcebergCatalogPropertiesMetadata.URI, backend_catalog_uri);
       return loadCatalogBackend(realCatalogBackend, copiedProperties);
     } else {
@@ -94,7 +98,8 @@ public class IcebergCatalogUtil {
     return loadCatalogBackend(catalogType, properties, false);
   }
 
-  public static Catalog loadCatalogBackend(String catalogType, Map<String, String> properties, boolean buildForIcebergRestService) {
+  public static Catalog loadCatalogBackend(
+      String catalogType, Map<String, String> properties, boolean buildForIcebergRestService) {
     LOG.info("Load catalog backend of {}", catalogType);
     switch (IcebergCatalogBackend.valueOf(catalogType.toUpperCase())) {
       case MEMORY:

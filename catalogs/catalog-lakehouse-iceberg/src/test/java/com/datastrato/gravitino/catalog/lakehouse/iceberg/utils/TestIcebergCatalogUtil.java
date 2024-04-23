@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,11 +57,14 @@ public class TestIcebergCatalogUtil {
     catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
-    Assertions.assertThrows(NullPointerException.class, () -> IcebergCatalogUtil.loadCatalogBackend("rest", Collections.emptyMap()));
+    Assertions.assertThrows(
+        NullPointerException.class,
+        () -> IcebergCatalogUtil.loadCatalogBackend("rest", Collections.emptyMap()));
     properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://localhost:9001/iceberg/");
     properties.put(IcebergConfig.REAL_CATALOG_BACKEND.getKey(), "jdbc");
     properties.put(IcebergConfig.CATALOG_BACKEND_URI.getKey(), "jdbc://0.0.0.0:3306");
-    Assertions.assertThrows(RESTException.class, () -> IcebergCatalogUtil.loadCatalogBackend("rest", properties));
+    Assertions.assertThrows(
+        RESTException.class, () -> IcebergCatalogUtil.loadCatalogBackend("rest", properties));
 
     catalog = IcebergCatalogUtil.loadCatalogBackend("rest", properties, true);
     Assertions.assertInstanceOf(JdbcCatalog.class, catalog);
@@ -71,7 +73,8 @@ public class TestIcebergCatalogUtil {
     properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://localhost:9001/iceberg/");
     properties.put(IcebergConfig.REAL_CATALOG_BACKEND.getKey(), "hive");
     properties.put(IcebergConfig.CATALOG_BACKEND_URI.getKey(), "thrift://localhost:9083");
-    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "hdfs://%localhost:9083/user/hive/warehouse-hive");
+    properties.put(
+        CatalogProperties.WAREHOUSE_LOCATION, "hdfs://%localhost:9083/user/hive/warehouse-hive");
     catalog = IcebergCatalogUtil.loadCatalogBackend("rest", properties, true);
     Assertions.assertInstanceOf(HiveCatalog.class, catalog);
 
