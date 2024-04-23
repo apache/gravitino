@@ -37,9 +37,9 @@ const RightContent = () => {
           borderBottom: theme => `1px solid ${theme.palette.divider}`
         }}
       >
-        <Box className={`twc-flex twc-items-center`}>
-          <Box className={`twc-flex twc-items-center twc-justify-between`}>
-            <Box className={`twc-flex twc-items-center`}>
+        <Box className={`twc-flex twc-items-center twc-flex-1 twc-overflow-hidden twc-mr-2`}>
+          <Box className={`twc-flex twc-items-center twc-justify-between twc-w-full`}>
+            <Box className={`twc-flex twc-items-center twc-w-full`}>
               <IconButton color='primary' component={Link} href='/metalakes' sx={{ mr: 2 }} data-refer='back-home-btn'>
                 <Icon icon='mdi:arrow-left' />
               </IconButton>
@@ -54,6 +54,7 @@ const RightContent = () => {
               variant='contained'
               startIcon={<Icon icon='mdi:plus-box' />}
               onClick={handleCreateCatalog}
+              sx={{ width: 200 }}
               data-refer='create-catalog-btn'
             >
               Create Catalog
