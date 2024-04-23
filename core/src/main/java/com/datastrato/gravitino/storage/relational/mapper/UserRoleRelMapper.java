@@ -20,13 +20,13 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface UserRoleRelMapper {
-  String RELATION_TABLE_NAME = "user_role_rel";
   String USER_TABLE_NAME = "user_meta";
+  String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
   @Insert({
     "<script>",
     "INSERT INTO "
-        + RELATION_TABLE_NAME
+        + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -46,7 +46,7 @@ public interface UserRoleRelMapper {
   @Insert({
     "<script>",
     "INSERT INTO "
-        + RELATION_TABLE_NAME
+        + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -73,7 +73,7 @@ public interface UserRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + RELATION_TABLE_NAME
+          + USER_ROLE_RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
   void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
@@ -81,7 +81,7 @@ public interface UserRoleRelMapper {
   @Update({
     "<script>",
     "UPDATE "
-        + RELATION_TABLE_NAME
+        + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
         + " WHERE user_id = #{userId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
@@ -95,11 +95,18 @@ public interface UserRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + RELATION_TABLE_NAME
+          + USER_ROLE_RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE user_id IN (SELECT user_id FROM "
           + USER_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
           + " AND deleted_at = 0")
   void softDeleteUserRoleRelByMetalakeId(Long metalakeId);
+
+  @Update(
+      "UPDATE "
+          + USER_ROLE_RELATION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  void softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId);
 }
