@@ -20,13 +20,13 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface GroupRoleRelMapper {
-  String RELATION_TABLE_NAME = "group_role_rel";
   String GROUP_TABLE_NAME = "group_meta";
+  String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
   @Insert({
     "<script>",
     "INSERT INTO "
-        + RELATION_TABLE_NAME
+        + GROUP_ROLE_RELATION_TABLE_NAME
         + "(group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -46,7 +46,7 @@ public interface GroupRoleRelMapper {
   @Insert({
     "<script>",
     "INSERT INTO "
-        + RELATION_TABLE_NAME
+        + GROUP_ROLE_RELATION_TABLE_NAME
         + "(group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
@@ -73,7 +73,7 @@ public interface GroupRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + RELATION_TABLE_NAME
+          + GROUP_ROLE_RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE group_id = #{groupId} AND deleted_at = 0")
   void softDeleteGroupRoleRelByGroupId(@Param("groupId") Long groupId);
@@ -81,7 +81,7 @@ public interface GroupRoleRelMapper {
   @Update({
     "<script>",
     "UPDATE "
-        + RELATION_TABLE_NAME
+        + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
         + " WHERE group_id = #{groupId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
@@ -95,11 +95,18 @@ public interface GroupRoleRelMapper {
 
   @Update(
       "UPDATE "
-          + RELATION_TABLE_NAME
+          + GROUP_ROLE_RELATION_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE group_id IN (SELECT group_id FROM "
           + GROUP_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
           + " AND deleted_at = 0")
   void softDeleteGroupRoleRelByMetalakeId(Long metalakeId);
+
+  @Update(
+      "UPDATE "
+          + GROUP_ROLE_RELATION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  void softDeleteGroupRoleRelByRoleId(Long roleId);
 }

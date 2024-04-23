@@ -80,22 +80,22 @@ public class GroupMetaService {
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
-  public void insertGroup(GroupEntity GroupEntity, boolean overwritten) {
+  public void insertGroup(GroupEntity groupEntity, boolean overwritten) {
     try {
       Preconditions.checkArgument(
-          GroupEntity.namespace() != null
-              && !GroupEntity.namespace().isEmpty()
-              && GroupEntity.namespace().levels().length == 3,
-          "The identifier should not be null and should have three level.");
+          groupEntity.namespace() != null
+              && !groupEntity.namespace().isEmpty()
+              && groupEntity.namespace().levels().length == 3,
+          "The namespace of groupEntity should not be null and should have three level.");
 
       Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(GroupEntity.namespace().level(0));
+          MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
-      GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(GroupEntity, builder);
+      GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
-      List<Long> roleIds = Optional.ofNullable(GroupEntity.roleIds()).orElse(Lists.newArrayList());
+      List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
       List<GroupRoleRelPO> groupRoleRelPOS =
-          POConverters.initializeGroupRoleRelsPOWithVersion(GroupEntity, roleIds);
+          POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
           () ->
@@ -124,7 +124,7 @@ public class GroupMetaService {
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.GROUP, GroupEntity.nameIdentifier().toString());
+          re, Entity.EntityType.GROUP, groupEntity.nameIdentifier().toString());
       throw re;
     }
   }

@@ -24,6 +24,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
@@ -801,6 +802,25 @@ public class TestJDBCBackend {
         .withRoleNames(roleNames)
         .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static RoleEntity createRoleEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      SecurableObject securableObject,
+      List<Privilege> privileges,
+      Map<String, String> properties) {
+    return RoleEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withProperties(properties)
+        .withNamespace(namespace)
+        .withAuditInfo(auditInfo)
+        .withSecurableObject(securableObject)
+        .withPrivileges(privileges)
         .build();
   }
 }
