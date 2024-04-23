@@ -72,11 +72,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
-  protected JdbcTable.Builder attachTableToBuilder(
-      ResultSet resultSet, String databaseName, String tableName, JdbcTable.Builder builder)
-      throws SQLException {
+  protected JdbcTable.Builder getTableBuilder(
+      ResultSet resultSet, String databaseName, String tableName) throws SQLException {
     boolean found = false;
     // Handle case-sensitive issues.
+    JdbcTable.Builder builder = null;
     while (resultSet.next() && !found) {
       String tableNameInResult = resultSet.getString("TABLE_NAME");
       String tableSchemaInResultLowerCase = resultSet.getString("TABLE_SCHEM");

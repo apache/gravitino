@@ -131,11 +131,11 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @param resultSet The result set of the table
    * @return The builder of the table to be returned
    */
-  protected JdbcTable.Builder attachTableToBuilder(
-      ResultSet resultSet, String databaseName, String tableName, JdbcTable.Builder builder)
-      throws SQLException {
+  protected JdbcTable.Builder getTableBuilder(
+      ResultSet resultSet, String databaseName, String tableName) throws SQLException {
     boolean found = false;
     // Handle case-sensitive issues.
+    JdbcTable.Builder builder = null;
     while (resultSet.next() && !found) {
       if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
         builder = getBasicJdbcTableInfo(resultSet);
@@ -163,8 +163,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       ResultSet table = getTable(connection, databaseName, tableName);
       // The result of tables may be more than one due to the reason above, so we need to check the
       // result
-      JdbcTable.Builder jdbcTableBuilder = JdbcTable.builder();
-      jdbcTableBuilder = attachTableToBuilder(table, databaseName, tableName, jdbcTableBuilder);
+      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(table, databaseName, tableName);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
