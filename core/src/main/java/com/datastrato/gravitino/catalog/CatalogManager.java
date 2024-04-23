@@ -316,8 +316,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     // load catalog-related configuration from catalog-specific configuration file
-    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
-    Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
+    Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
+    Map<String, String> mergedConfig = mergeConf(newProperties, catalogSpecificConfig);
 
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
