@@ -6,9 +6,14 @@
 import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
-  GET: ({ metalake, catalog, schema }) => `/api/metalakes/${metalake}/catalogs/${catalog}/schemas/${schema}/topics`,
+  GET: ({ metalake, catalog, schema }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
+      catalog
+    )}/schemas/${encodeURIComponent(schema)}/topics`,
   GET_DETAIL: ({ metalake, catalog, schema, topic }) =>
-    `/api/metalakes/${metalake}/catalogs/${catalog}/schemas/${schema}/topics/${topic}`
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
+      catalog
+    )}/schemas/${encodeURIComponent(schema)}/topics/${encodeURIComponent(topic)}`
 }
 
 export const getTopicsApi = params => {
