@@ -256,7 +256,7 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
           apiUrl: '',
           urlPrefix: '',
           joinTime: true,
-          ignoreCancelToken: true,
+          ignoreCancelToken: false,
           withToken: true,
           retryRequest: {
             isOpenRetry: false,
