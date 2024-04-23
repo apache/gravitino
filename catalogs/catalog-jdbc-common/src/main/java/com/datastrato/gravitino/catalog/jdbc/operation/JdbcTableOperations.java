@@ -125,8 +125,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   /**
-   * Get table information from the result set. If the table is not found, it will throw a
-   * NoSuchTableException.
+   * Get table information from the result set and attach it to the table builder, If the table is
+   * not found, it will throw a NoSuchTableException.
    *
    * @param resultSet The result set of the table
    * @return The builder of the table to be returned
