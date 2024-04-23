@@ -194,7 +194,7 @@ public class TestJdbcTableOperations {
 
     // delete non-existent table.
     Assertions.assertFalse(
-        JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName), "table should not be exists");
+        JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName), "table should be non-existent");
   }
 
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {

@@ -100,6 +100,6 @@ public class TestJdbcDatabaseOperations {
 
     // drop non-existent database
     Assertions.assertFalse(
-        JDBC_DATABASE_OPERATIONS.delete(database1), "database should not be exists");
+        JDBC_DATABASE_OPERATIONS.delete(database1), "database should be non-existent");
   }
 }

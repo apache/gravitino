@@ -144,6 +144,9 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(
             NoSuchCatalogException.class, () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
+    Assertions.assertFalse(
+        metalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, catalogName)),
+        "catalog should be non-existent");
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
   }

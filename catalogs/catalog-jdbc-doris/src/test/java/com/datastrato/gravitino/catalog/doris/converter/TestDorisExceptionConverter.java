@@ -17,6 +17,12 @@ public class TestDorisExceptionConverter {
         DorisExceptionConverter.getErrorCodeFromMessage(msg));
 
     msg =
+        "errCode = 2, detailMessage = Can't drop database 'default_cluster:test_schema'; database doesn't exists";
+    Assertions.assertEquals(
+        DorisExceptionConverter.CODE_DATABASE_NOT_EXISTS,
+        DorisExceptionConverter.getErrorCodeFromMessage(msg));
+
+    msg =
         "errCode = 2, detailMessage = Unknown table 'table_name' in default_cluster:database_name";
     Assertions.assertEquals(
         DorisExceptionConverter.CODE_NO_SUCH_TABLE,

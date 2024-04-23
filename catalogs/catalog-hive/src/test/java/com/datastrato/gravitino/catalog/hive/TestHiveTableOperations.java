@@ -273,7 +273,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
 
     Assertions.assertFalse(
         hiveTable.supportPartitions().dropPartition("city=not_exist"),
-        "partition should not be exists");
+        "partition should be non-existent");
   }
 
   @Test

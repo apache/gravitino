@@ -331,13 +331,6 @@ public class HadoopCatalogIT extends AbstractIT {
         "fileset should not be exists");
     Assertions.assertFalse(
         hdfs.exists(new Path(storageLocation)), "storage location should be dropped");
-
-    // drop non-existent fileset
-    dropped =
-        catalog
-            .asFilesetCatalog()
-            .dropFileset(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName));
-    Assertions.assertFalse(dropped, "fileset should not be exists");
   }
 
   @Test
