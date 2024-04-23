@@ -74,7 +74,7 @@ public class RoleMetaService {
           roleEntity.namespace() != null
               && !roleEntity.namespace().isEmpty()
               && roleEntity.namespace().levels().length == 3,
-          "The namespace of roleEntity should not be null and should have three level.");
+          "The namespace of RoleEntity must have three levels.");
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
@@ -103,7 +103,7 @@ public class RoleMetaService {
         identifier != null
             && !identifier.namespace().isEmpty()
             && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+        "The identifier of Role must have three levels.");
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -116,7 +116,7 @@ public class RoleMetaService {
         identifier != null
             && !identifier.namespace().isEmpty()
             && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+        "The identifier of Role must have three levels.");
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
