@@ -20,7 +20,7 @@ public class TestCreateGravitinoConnector {
 
   @Test
   public void testCreateConnectorsWithEnableSimpleCatalog() throws Exception {
-    server = new GravitinoMockServer(true);
+    server = new GravitinoMockServer();
     Session session = testSessionBuilder().setCatalog("gravitino").build();
     QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
@@ -56,7 +56,7 @@ public class TestCreateGravitinoConnector {
 
   @Test
   public void testCreateConnectorsWithDisableSimpleCatalog() throws Exception {
-    server = new GravitinoMockServer(false);
+    server = new GravitinoMockServer();
     Session session = testSessionBuilder().setCatalog("gravitino").build();
     QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 

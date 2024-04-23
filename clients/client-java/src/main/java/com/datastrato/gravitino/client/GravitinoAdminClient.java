@@ -451,7 +451,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
                 .map(Privilege::name)
                 .map(Objects::toString)
                 .collect(Collectors.toList()),
-            securableObject.toString());
+            DTOConverters.toSecurableObject(securableObject));
     req.validate();
 
     RoleResponse resp =

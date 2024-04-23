@@ -21,7 +21,8 @@ import org.apache.ibatis.annotations.Select;
  */
 public interface RoleMetaMapper {
   String ROLE_TABLE_NAME = "role_meta";
-  String RELATION_TABLE_NAME = "user_role_rel";
+  String USER_RELATION_TABLE_NAME = "user_role_rel";
+  String GROUP_RELATION_TABLE_NAME = "group_role_rel";
 
   @Select(
       "SELECT role_id as roleId FROM "
@@ -40,11 +41,26 @@ public interface RoleMetaMapper {
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
-          + RELATION_TABLE_NAME
+          + USER_RELATION_TABLE_NAME
           + " re ON ro.role_id = re.role_id"
           + " WHERE re.user_id = #{userId}"
           + " AND ro.deleted_at = 0 AND re.deleted_at = 0")
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
+
+  @Select(
+      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
+          + " ro.metalake_id as metalakeId, ro.properties as properties,"
+          + " ro.securable_object as securableObject, ro.privileges as privileges,"
+          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
+          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
+          + " FROM "
+          + ROLE_TABLE_NAME
+          + " ro JOIN "
+          + GROUP_RELATION_TABLE_NAME
+          + " ge ON ro.role_id = ge.role_id"
+          + " WHERE ge.group_id = #{groupId}"
+          + " AND ro.deleted_at = 0 AND ge.deleted_at = 0")
+  List<RolePO> listRolesByGroupId(Long groupId);
 
   @Insert(
       "INSERT INTO "

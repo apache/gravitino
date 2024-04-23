@@ -31,6 +31,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -745,13 +746,18 @@ public class TestJDBCBackend {
   }
 
   public static UserEntity createUserEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<String> roleNames) {
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withRoleNames(roleNames)
-        .withRoleIds(null)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -764,8 +770,37 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofAllCatalogs())
-        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.LOAD_CATALOG)))
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.USE_CATALOG)))
+        .build();
+  }
+
+  public static GroupEntity createGroupEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(null)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  public static GroupEntity createGroupEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(roleNames)
+        .withRoleIds(roleIds)
+        .withAuditInfo(auditInfo)
         .build();
   }
 }

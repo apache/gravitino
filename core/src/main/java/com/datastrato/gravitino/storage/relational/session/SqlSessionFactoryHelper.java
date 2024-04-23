@@ -10,6 +10,8 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -92,6 +94,8 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(UserMetaMapper.class);
     configuration.addMapper(RoleMetaMapper.class);
     configuration.addMapper(UserRoleRelMapper.class);
+    configuration.addMapper(GroupMetaMapper.class);
+    configuration.addMapper(GroupRoleRelMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

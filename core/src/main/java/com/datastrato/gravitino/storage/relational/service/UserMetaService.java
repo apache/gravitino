@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
 public class UserMetaService {
@@ -94,16 +93,7 @@ public class UserMetaService {
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds = userEntity.roleIds();
-      if (roleIds == null) {
-        roleIds =
-            Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-                .map(
-                    roleName ->
-                        RoleMetaService.getInstance()
-                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-                .collect(Collectors.toList());
-      }
+      List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
@@ -193,34 +183,41 @@ public class UserMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
-    SessionUtils.doMultipleWithCommit(
-        () ->
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMeta(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () -> {
+            if (insertRoleIds.isEmpty()) {
+              return;
+            }
             SessionUtils.doWithoutCommit(
-                UserMetaMapper.class,
+                UserRoleRelMapper.class,
                 mapper ->
-                    mapper.updateUserMeta(
-                        POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
-        () -> {
-          if (insertRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.batchInsertUserRoleRel(
-                      POConverters.initializeUserRoleRelsPOWithVersion(
-                          newEntity, Lists.newArrayList(insertRoleIds))));
-        },
-        () -> {
-          if (deleteRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.softDeleteUserRoleRelByUserAndRoles(
-                      newEntity.id(), Lists.newArrayList(deleteRoleIds)));
-        });
+                    mapper.batchInsertUserRoleRel(
+                        POConverters.initializeUserRoleRelsPOWithVersion(
+                            newEntity, Lists.newArrayList(insertRoleIds))));
+          },
+          () -> {
+            if (deleteRoleIds.isEmpty()) {
+              return;
+            }
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class,
+                mapper ->
+                    mapper.softDeleteUserRoleRelByUserAndRoles(
+                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
+          });
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
     return newEntity;
   }
 }
