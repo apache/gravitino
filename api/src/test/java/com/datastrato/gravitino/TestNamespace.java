@@ -67,5 +67,26 @@ public class TestNamespace {
         Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkTable(abcd));
     Assertions.assertTrue(
         excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
+
+    // Test user
+    Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkUser(null));
+    Throwable excep4 =
+        Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkUser(abcd));
+    Assertions.assertTrue(
+        excep4.getMessage().contains("User namespace must be non-null and have 3 levels"));
+
+    // Test group
+    Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkGroup(null));
+    Throwable excep5 =
+        Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkGroup(abcd));
+    Assertions.assertTrue(
+        excep5.getMessage().contains("Group namespace must be non-null and have 3 levels"));
+
+    // Test role
+    Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkRole(null));
+    Throwable excep6 =
+        Assertions.assertThrows(IllegalNamespaceException.class, () -> Namespace.checkRole(abcd));
+    Assertions.assertTrue(
+        excep6.getMessage().contains("Role namespace must be non-null and have 3 levels"));
   }
 }

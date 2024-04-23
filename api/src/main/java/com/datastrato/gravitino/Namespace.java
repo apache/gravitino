@@ -203,9 +203,9 @@ public class Namespace {
    */
   public static void checkUser(Namespace namespace) {
     check(
-            namespace != null && namespace.length() == 3,
-            "User namespace must be non-null and have 3 levels, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "User namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -216,9 +216,9 @@ public class Namespace {
    */
   public static void checkGroup(Namespace namespace) {
     check(
-            namespace != null && namespace.length() == 3,
-            "Group namespace must be non-null and have 3 levels, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "Group namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -229,9 +229,9 @@ public class Namespace {
    */
   public static void checkRole(Namespace namespace) {
     check(
-            namespace != null && namespace.length() == 3,
-            "Role namespace must be non-null and have 3 levels, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "Role namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
   }
 
   private Namespace(String[] levels) {

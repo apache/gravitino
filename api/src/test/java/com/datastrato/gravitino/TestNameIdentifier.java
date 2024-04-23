@@ -121,5 +121,23 @@ public class TestNameIdentifier {
     Throwable excep3 =
         assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkTable(abc));
     assertTrue(excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
+
+    // test user
+    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkUser(null));
+    Throwable excep4 =
+        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkUser(abc));
+    assertTrue(excep4.getMessage().contains("User namespace must be non-null and have 3 levels"));
+
+    // test group
+    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkGroup(null));
+    Throwable excep5 =
+        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkGroup(abc));
+    assertTrue(excep5.getMessage().contains("Group namespace must be non-null and have 3 levels"));
+
+    // test role
+    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkRole(null));
+    Throwable excep6 =
+        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkRole(abc));
+    assertTrue(excep6.getMessage().contains("Role namespace must be non-null and have 3 levels"));
   }
 }

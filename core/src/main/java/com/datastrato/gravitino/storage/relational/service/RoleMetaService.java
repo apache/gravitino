@@ -15,7 +15,6 @@ import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
-import com.google.common.base.Preconditions;
 import java.util.List;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
