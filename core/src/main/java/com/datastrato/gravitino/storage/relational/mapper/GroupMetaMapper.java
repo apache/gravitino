@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.GroupPO;
+import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -20,11 +21,12 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface GroupMetaMapper {
-  String TABLE_NAME = "group_meta";
+  String GROUP_TABLE_NAME = "group_meta";
+  String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
   @Select(
       "SELECT group_id as groupId FROM "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
           + " AND deleted_at = 0")
   Long selectGroupIdBySchemaIdAndName(
@@ -37,7 +39,7 @@ public interface GroupMetaMapper {
           + " current_version as currentVersion, last_version as lastVersion,"
           + " deleted_at as deletedAt"
           + " FROM "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
           + " AND deleted_at = 0")
   GroupPO selectGroupMetaByMetalakeIdAndName(
@@ -45,7 +47,7 @@ public interface GroupMetaMapper {
 
   @Insert(
       "INSERT INTO "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + "(group_id, group_name,"
           + " metalake_id, audit_info,"
           + " current_version, last_version, deleted_at)"
@@ -62,7 +64,7 @@ public interface GroupMetaMapper {
 
   @Insert(
       "INSERT INTO "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + "(group_id, group_name,"
           + "metalake_id, audit_info,"
           + " current_version, last_version, deleted_at)"
@@ -86,21 +88,21 @@ public interface GroupMetaMapper {
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE group_id = #{groupId} AND deleted_at = 0")
   void softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId);
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + GROUP_TABLE_NAME
           + " SET group_name = #{newGroupMeta.groupName},"
           + " metalake_id = #{newGroupMeta.metalakeId},"
           + " audit_info = #{newGroupMeta.auditInfo},"
@@ -116,4 +118,18 @@ public interface GroupMetaMapper {
           + " AND deleted_at = 0")
   Integer updateGroupMeta(
       @Param("newGroupMeta") GroupPO newGroupPO, @Param("oldGroupMeta") GroupPO oldGroupPO);
+
+  @Select(
+      "SELECT gr.group_id as groupId, gr.group_name as groupName,"
+          + " gr.metalake_id as metalakeId,"
+          + " gr.audit_info as auditInfo, gr.current_version as currentVersion,"
+          + " gr.last_version as lastVersion, gr.deleted_at as deletedAt"
+          + " FROM "
+          + GROUP_TABLE_NAME
+          + " gr JOIN "
+          + GROUP_ROLE_RELATION_TABLE_NAME
+          + " re ON gr.group_id = re.group_id"
+          + " WHERE re.role_id = #{roleId}"
+          + " AND gr.deleted_at = 0 AND re.deleted_at = 0")
+  List<GroupPO> listGroupsByRoleId(@Param("roleId") Long roleId);
 }
