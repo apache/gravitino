@@ -35,7 +35,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
-    server = closeAfterClass(new GravitinoMockServer(true));
+    server = closeAfterClass(new GravitinoMockServer());
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();

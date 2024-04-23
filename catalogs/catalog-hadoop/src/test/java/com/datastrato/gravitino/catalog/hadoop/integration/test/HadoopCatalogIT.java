@@ -502,6 +502,47 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(0, newFileset.properties().size(), "properties should be removed");
   }
 
+  @Test
+  public void testDropCatalogWithEmptySchema() {
+    String catalogName =
+        GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_catalog");
+    // Create a catalog without specifying location.
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            NameIdentifier.of(metalakeName, catalogName),
+            Catalog.Type.FILESET,
+            provider,
+            "comment",
+            ImmutableMap.of());
+
+    // Create a schema without specifying location.
+    String schemaName =
+        GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_schema");
+    filesetCatalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", ImmutableMap.of());
+
+    // Drop the empty schema.
+    boolean dropped =
+        filesetCatalog
+            .asSchemas()
+            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    Assertions.assertTrue(dropped, "schema should be dropped");
+    Assertions.assertFalse(
+        filesetCatalog
+            .asSchemas()
+            .schemaExists(NameIdentifier.of(metalakeName, catalogName, schemaName)),
+        "schema should not be exists");
+
+    // Drop the catalog.
+    dropped = metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertTrue(dropped, "catalog should be dropped");
+    Assertions.assertFalse(
+        metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName)),
+        "catalog should not be exists");
+  }
+
   private Fileset createFileset(
       String filesetName,
       String comment,

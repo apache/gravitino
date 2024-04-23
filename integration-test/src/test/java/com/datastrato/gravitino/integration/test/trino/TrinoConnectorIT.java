@@ -825,16 +825,20 @@ public class TrinoConnectorIT extends AbstractIT {
                     "thrift://%s:%s",
                     containerSuite.getHiveContainer().getContainerIpAddress(),
                     HiveContainer.HIVE_METASTORE_PORT))
-            .put("hive.immutable-partitions", "true")
-            .put("hive.target-max-file-size", "1GB")
-            .put("hive.create-empty-bucket-files", "true")
-            .put("hive.validate-bucketing", "true")
+            .put("trino.bypass.hive.immutable-partitions", "true")
+            .put("trino.bypass.hive.target-max-file-size", "1GB")
+            .put("trino.bypass.hive.create-empty-bucket-files", "true")
+            .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
     Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
-    Assertions.assertEquals("1GB", catalog.properties().get("hive.target-max-file-size"));
-    Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
-    Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
+    Assertions.assertEquals(
+        "1GB", catalog.properties().get("trino.bypass.hive.target-max-file-size"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.create-empty-bucket-files"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.validate-bucketing"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
     boolean success = checkTrinoHasLoaded(sql, 30);
@@ -863,17 +867,21 @@ public class TrinoConnectorIT extends AbstractIT {
                     "thrift://%s:%s",
                     containerSuite.getHiveContainer().getContainerIpAddress(),
                     HiveContainer.HIVE_METASTORE_PORT))
-            .put("hive.immutable-partitions", "true")
+            .put("trino.bypass.hive.immutable-partitions", "true")
             // it should be like '1GB, 1MB', we make it wrong purposely.
-            .put("hive.target-max-file-size", "xxxx")
-            .put("hive.create-empty-bucket-files", "true")
-            .put("hive.validate-bucketing", "true")
+            .put("trino.bypass.hive.target-max-file-size", "xxxx")
+            .put("trino.bypass.hive.create-empty-bucket-files", "true")
+            .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
     Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
-    Assertions.assertEquals("xxxx", catalog.properties().get("hive.target-max-file-size"));
-    Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
-    Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
+    Assertions.assertEquals(
+        "xxxx", catalog.properties().get("trino.bypass.hive.target-max-file-size"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.create-empty-bucket-files"));
+    Assertions.assertEquals(
+        "true", catalog.properties().get("trino.bypass.hive.validate-bucketing"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
     checkTrinoHasLoaded(sql, 6);

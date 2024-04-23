@@ -236,6 +236,8 @@ public class TestEntityStorage {
               auditInfo);
       UserEntity user1 =
           createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "user1", auditInfo);
+      GroupEntity group1 =
+          createGroup(RandomIdGenerator.INSTANCE.nextId(), "metalake", "group1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -246,6 +248,7 @@ public class TestEntityStorage {
       store.put(fileset1);
       store.put(topic1);
       store.put(user1);
+      store.put(group1);
 
       Assertions.assertDoesNotThrow(
           () ->
@@ -288,6 +291,13 @@ public class TestEntityStorage {
                   AuthorizationUtils.ofUser("metalake", "user1"),
                   Entity.EntityType.USER,
                   UserEntity.class));
+
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  AuthorizationUtils.ofGroup("metalake", "group1"),
+                  EntityType.GROUP,
+                  GroupEntity.class));
     }
 
     // It will automatically close the store we create before, then we reopen the entity store
@@ -334,6 +344,12 @@ public class TestEntityStorage {
                   AuthorizationUtils.ofUser("metalake", "user1"),
                   Entity.EntityType.USER,
                   UserEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  AuthorizationUtils.ofGroup("metalake", "group1"),
+                  Entity.EntityType.GROUP,
+                  GroupEntity.class));
       destroy(type);
     }
   }
@@ -464,9 +480,9 @@ public class TestEntityStorage {
       store.put(oneUser);
       UserEntity anotherUser = createUser(2L, "metalake", "anotherUser", auditInfo);
       store.put(anotherUser);
-      GroupEntity oneGroup = createGroup("metalake", "oneGroup", auditInfo);
+      GroupEntity oneGroup = createGroup(1L, "metalake", "oneGroup", auditInfo);
       store.put(oneGroup);
-      GroupEntity anotherGroup = createGroup("metalake", "anotherGroup", auditInfo);
+      GroupEntity anotherGroup = createGroup(2L, "metalake", "anotherGroup", auditInfo);
       store.put(anotherGroup);
       RoleEntity oneRole = createRole("metalake", "oneRole", auditInfo);
       store.put(oneRole);
@@ -533,6 +549,8 @@ public class TestEntityStorage {
               2L, Namespace.of("metalake", "catalog", "schema2"), "topic1", auditInfo);
       UserEntity user1 = createUser(1L, "metalake", "user1", auditInfo);
       UserEntity user2 = createUser(2L, "metalake", "user2", auditInfo);
+      GroupEntity group1 = createGroup(1L, "metalake", "group1", auditInfo);
+      GroupEntity group2 = createGroup(2L, "metalake", "group2", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -548,6 +566,8 @@ public class TestEntityStorage {
       store.put(topic1InSchema2);
       store.put(user1);
       store.put(user2);
+      store.put(group1);
+      store.put(group2);
 
       validateAllEntityExist(
           metalake,
@@ -563,9 +583,13 @@ public class TestEntityStorage {
           topic1,
           topic1InSchema2,
           user1,
-          user2);
+          user2,
+          group1,
+          group2);
 
       validateDeleteUser(store, user1);
+
+      validateDeleteGroup(store, group1);
 
       validateDeleteTable(store, schema2, table1, table1InSchema2);
 
@@ -587,7 +611,7 @@ public class TestEntityStorage {
           topic1,
           topic1InSchema2);
 
-      validateDeleteMetalake(store, metalake, catalogCopy, user2);
+      validateDeleteMetalake(store, metalake, catalogCopy, user2, group2);
 
       // Store all entities again
       // metalake
@@ -675,6 +699,9 @@ public class TestEntityStorage {
       UserEntity userNew =
           createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "userNew", auditInfo);
       store.put(userNew);
+      GroupEntity groupNew =
+          createGroup(RandomIdGenerator.INSTANCE.nextId(), "metalake", "groupNew", auditInfo);
+      store.put(groupNew);
 
       validateDeleteTableCascade(store, table1New);
 
@@ -686,7 +713,7 @@ public class TestEntityStorage {
 
       validateDeleteCatalogCascade(store, catalogNew, schema2New);
 
-      validateDeleteMetalakeCascade(store, metalakeNew, catalogNew, schema2New, userNew);
+      validateDeleteMetalakeCascade(store, metalakeNew, catalogNew, schema2New, userNew, groupNew);
 
       destroy(type);
     }
@@ -1188,35 +1215,32 @@ public class TestEntityStorage {
   private static UserEntity createUser(Long id, String metalake, String name, AuditInfo auditInfo) {
     return UserEntity.builder()
         .withId(id)
-        .withNamespace(
-            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME))
+        .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
         .withRoleNames(null)
         .build();
   }
 
-  private static GroupEntity createGroup(String metalake, String name, AuditInfo auditInfo) {
+  private static GroupEntity createGroup(
+      Long id, String metalake, String name, AuditInfo auditInfo) {
     return GroupEntity.builder()
-        .withId(1L)
-        .withNamespace(
-            Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME))
+        .withId(id)
+        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(Lists.newArrayList())
+        .withRoleNames(null)
         .build();
   }
 
   private static RoleEntity createRole(String metalake, String name, AuditInfo auditInfo) {
     return RoleEntity.builder()
         .withId(1L)
-        .withNamespace(
-            Namespace.of(
-                metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.of("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
+        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
         .withProperties(Collections.emptyMap())
         .build();
   }
@@ -1295,9 +1319,11 @@ public class TestEntityStorage {
       BaseMetalake metalake,
       CatalogEntity catalog,
       SchemaEntity schema2,
-      UserEntity userNew)
+      UserEntity userNew,
+      GroupEntity groupNew)
       throws IOException {
     Assertions.assertTrue(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertTrue(store.exists(groupNew.nameIdentifier(), Entity.EntityType.GROUP));
 
     Assertions.assertTrue(
         store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true));
@@ -1307,6 +1333,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(schema2.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertFalse(store.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
     Assertions.assertFalse(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertFalse(store.exists(groupNew.nameIdentifier(), EntityType.GROUP));
 
     // Delete again should return false
     Assertions.assertFalse(
@@ -1393,10 +1420,15 @@ public class TestEntityStorage {
   }
 
   private static void validateDeleteMetalake(
-      EntityStore store, BaseMetalake metalake, CatalogEntity catalogCopy, UserEntity user2)
+      EntityStore store,
+      BaseMetalake metalake,
+      CatalogEntity catalogCopy,
+      UserEntity user2,
+      GroupEntity group2)
       throws IOException {
     // Now delete catalog 'catalogCopy' and metalake
     Assertions.assertTrue(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertTrue(store.exists(group2.nameIdentifier(), Entity.EntityType.GROUP));
 
     Assertions.assertThrowsExactly(
         NonEmptyEntityException.class,
@@ -1407,6 +1439,7 @@ public class TestEntityStorage {
     store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
     Assertions.assertFalse(store.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
     Assertions.assertFalse(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
+    Assertions.assertFalse(store.exists(group2.nameIdentifier(), Entity.EntityType.GROUP));
     // Delete again should return false
     Assertions.assertFalse(store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
@@ -1541,6 +1574,16 @@ public class TestEntityStorage {
     Assertions.assertTrue(store.exists(user.nameIdentifier(), Entity.EntityType.USER));
   }
 
+  private void validateDeleteGroup(EntityStore store, GroupEntity group1) throws IOException {
+    Assertions.assertTrue(store.delete(group1.nameIdentifier(), EntityType.GROUP));
+    Assertions.assertFalse(store.exists(group1.nameIdentifier(), Entity.EntityType.GROUP));
+
+    GroupEntity group =
+        createGroup(RandomIdGenerator.INSTANCE.nextId(), "metalake", "group1", group1.auditInfo());
+    store.put(group);
+    Assertions.assertTrue(store.exists(group.nameIdentifier(), EntityType.GROUP));
+  }
+
   private void validateDeleteTable(
       EntityStore store, SchemaEntity schema2, TableEntity table1, TableEntity table1InSchema2)
       throws IOException {
@@ -1581,7 +1624,9 @@ public class TestEntityStorage {
       TopicEntity topic1,
       TopicEntity topic1InSchema2,
       UserEntity user1,
-      UserEntity user2)
+      UserEntity user2,
+      GroupEntity group1,
+      GroupEntity group2)
       throws IOException {
     // Now try to get
     Assertions.assertEquals(
@@ -1618,6 +1663,10 @@ public class TestEntityStorage {
         user1, store.get(user1.nameIdentifier(), Entity.EntityType.USER, UserEntity.class));
     Assertions.assertEquals(
         user2, store.get(user2.nameIdentifier(), Entity.EntityType.USER, UserEntity.class));
+    Assertions.assertEquals(
+        group1, store.get(group1.nameIdentifier(), Entity.EntityType.GROUP, GroupEntity.class));
+    Assertions.assertEquals(
+        group2, store.get(group2.nameIdentifier(), Entity.EntityType.GROUP, GroupEntity.class));
   }
 
   private void validateDeletedFileset(EntityStore store) throws IOException {
