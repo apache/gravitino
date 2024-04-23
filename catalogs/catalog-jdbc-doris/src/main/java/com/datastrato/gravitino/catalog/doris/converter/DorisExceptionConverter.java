@@ -31,7 +31,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_OTHER = 1105;
 
   private static final String DATABASE_ALREADY_EXISTS_PATTERN_STRING =
-      ".*detailMessage = Can't create database '.*'; database exists";
+      ".*?detailMessage = Can't create database '.*?'; database exists";
   private static final Pattern DATABASE_ALREADY_EXISTS_PATTERN =
       Pattern.compile(DATABASE_ALREADY_EXISTS_PATTERN_STRING);
 
