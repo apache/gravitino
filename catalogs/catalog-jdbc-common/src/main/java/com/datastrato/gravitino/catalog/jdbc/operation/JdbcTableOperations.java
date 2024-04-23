@@ -128,17 +128,16 @@ public abstract class JdbcTableOperations implements TableOperation {
    * Get table information from the result set and attach it to the table builder, If the table is
    * not found, it will throw a NoSuchTableException.
    *
-   * @param resultSet The result set of the table
+   * @param tablesResult The result set of the table
    * @return The builder of the table to be returned
    */
   protected JdbcTable.Builder getTableBuilder(
-      ResultSet resultSet, String databaseName, String tableName) throws SQLException {
+      ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
     boolean found = false;
-    // Handle case-sensitive issues.
     JdbcTable.Builder builder = null;
-    while (resultSet.next() && !found) {
-      if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
-        builder = getBasicJdbcTableInfo(resultSet);
+    while (tablesResult.next() && !found) {
+      if (Objects.equals(tablesResult.getString("TABLE_NAME"), tableName)) {
+        builder = getBasicJdbcTableInfo(tablesResult);
         found = true;
       }
     }
@@ -159,11 +158,11 @@ public abstract class JdbcTableOperations implements TableOperation {
     // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
-      // 1.Get table information
-      ResultSet table = getTable(connection, databaseName, tableName);
-      // The result of tables may be more than one due to the reason above, so we need to check the
-      // result
-      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(table, databaseName, tableName);
+      // 1. Get table information, The result of tables may be more than one due to the reason
+      // above,
+      // so we need to check the result.
+      ResultSet tables = getTable(connection, databaseName, tableName);
+      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();

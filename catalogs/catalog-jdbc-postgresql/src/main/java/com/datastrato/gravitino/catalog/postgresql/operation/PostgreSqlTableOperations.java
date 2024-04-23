@@ -73,16 +73,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   protected JdbcTable.Builder getTableBuilder(
-      ResultSet resultSet, String databaseName, String tableName) throws SQLException {
+      ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
     boolean found = false;
-    // Handle case-sensitive issues.
     JdbcTable.Builder builder = null;
-    while (resultSet.next() && !found) {
-      String tableNameInResult = resultSet.getString("TABLE_NAME");
-      String tableSchemaInResultLowerCase = resultSet.getString("TABLE_SCHEM");
+    while (tablesResult.next() && !found) {
+      String tableNameInResult = tablesResult.getString("TABLE_NAME");
+      String tableSchemaInResultLowerCase = tablesResult.getString("TABLE_SCHEM");
       if (Objects.equals(tableNameInResult, tableName)
           && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
-        builder = getBasicJdbcTableInfo(resultSet);
+        builder = getBasicJdbcTableInfo(tablesResult);
         found = true;
       }
     }
