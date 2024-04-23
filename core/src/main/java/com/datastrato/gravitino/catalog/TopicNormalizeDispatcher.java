@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -27,21 +28,25 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
 
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
-    Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace =
-        applyCapabilities(namespace, Capability.Scope.TOPIC, capability);
-    NameIdentifier[] identifiers = dispatcher.listTopics(standardizedNamespace);
-    return applyCapabilities(identifiers, Capability.Scope.TOPIC, capability);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.TOPIC, dispatcher);
+    NameIdentifier[] identifiers = dispatcher.listTopics(caseSensitiveNs);
+    return applyCaseSensitive(identifiers, Capability.Scope.TOPIC, dispatcher);
   }
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    return dispatcher.loadTopic(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.loadTopic(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
   }
 
   @Override
   public boolean topicExists(NameIdentifier ident) {
-    return dispatcher.topicExists(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.topicExists(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
   }
 
   @Override
@@ -54,12 +59,17 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    return dispatcher.alterTopic(normalizeNameIdentifier(ident), changes);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.alterTopic(
+        applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher), changes);
   }
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    return dispatcher.dropTopic(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.dropTopic(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

@@ -2,25 +2,30 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+from dataclasses import dataclass, field
+
+from dataclasses_json import DataClassJsonMixin, config
+
 from gravitino.exceptions.illegal_name_identifier_exception import IllegalNameIdentifierException
 from gravitino.namespace import Namespace
 
 
-class NameIdentifier:
+@dataclass
+class NameIdentifier(DataClassJsonMixin):
     """A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
     catalog, a schema or a table. For example, "metalake1" can represent a metalake,
     "metalake1.catalog1" can represent a catalog, "metalake1.catalog1.schema1" can represent a
     schema.
     """
 
+    _name: str = field(metadata=config(field_name='name'))
+    _namespace: Namespace = field(metadata=config(field_name='namespace'))
+
     DOT: str = '.'
 
-    _namespace: Namespace = None
-    _name: str = None
-
-    def __init__(self, namespace: Namespace, name: str):
-        self._namespace = namespace
-        self._name = name
+    @classmethod
+    def builder(cls, namespace: Namespace, name: str):
+        return NameIdentifier(_namespace=namespace, _name=name)
 
     def namespace(self):
         return self._namespace
@@ -42,7 +47,7 @@ class NameIdentifier:
         NameIdentifier.check(names is not None, "Cannot create a NameIdentifier with null names")
         NameIdentifier.check(len(names) > 0, "Cannot create a NameIdentifier with no names")
 
-        return NameIdentifier(Namespace.of(*names[:-1]), names[-1])
+        return NameIdentifier.builder(Namespace.of(*names[:-1]), names[-1])
 
     @staticmethod
     def of_namespace(namespace: Namespace, name: str) -> 'NameIdentifier':
@@ -55,7 +60,7 @@ class NameIdentifier:
         Returns:
             The created NameIdentifier
         """
-        return NameIdentifier(namespace, name)
+        return NameIdentifier.builder(namespace, name)
 
     @staticmethod
     def of_metalake(metalake: str) -> 'NameIdentifier':
@@ -237,7 +242,7 @@ class NameIdentifier:
         Returns:
             The namespace of the NameIdentifier.
         """
-        return self.namespace
+        return self._namespace
 
     def get_name(self):
         """Get the name of the NameIdentifier.
@@ -245,21 +250,21 @@ class NameIdentifier:
         Returns:
             The name of the NameIdentifier.
         """
-        return self.name
+        return self._name
 
     def __eq__(self, other):
         if not isinstance(other, NameIdentifier):
             return False
-        return self.namespace == other.namespace and self.name == other.name
+        return self._namespace == other._namespace and self._name == other._name
 
     def __hash__(self):
-        return hash((self.namespace, self.name))
+        return hash(self._namespace, self._name)
 
     def __str__(self):
         if self.has_namespace():
-            return str(self.namespace) + "." + self.name
+            return str(self._namespace) + "." + self._name
         else:
-            return self.name
+            return self._name
 
     @staticmethod
     def check(condition, message, *args):

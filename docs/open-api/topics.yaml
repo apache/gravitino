@@ -1,0 +1,336 @@
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - topic
+      summary: List topics
+      operationId: listTopics
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - topic
+      summary: Create topic
+      operationId: createTopic
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopicCreateRequest"
+            examples:
+              TopicCreateRequest:
+                $ref: "#/components/examples/TopicCreateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TopicResponse"
+        "409":
+          description: Conflict - The target topic already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TopicAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/TopicAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/topic"
+
+    get:
+      tags:
+        - topic
+      summary: Get topic
+      operationId: loadTopic
+      description: Return the specified topic object
+      responses:
+        "200":
+          $ref: "#/components/responses/TopicResponse"
+        "404":
+          description: Not Found - The target topic does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchTopicException:
+                  $ref: "#/components/examples/NoSuchTopicException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - topic
+      summary: Update topic
+      operationId: alterTopic
+      description: Update the specified topic in a schema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopicUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TopicResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target topic does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchTopicException:
+                  $ref: "#/components/examples/NoSuchTopicException"
+        "409":
+          description: Conflict - The target topic already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TopicAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/TopicAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - topic
+      summary: Delete topic
+      operationId: dropTopic
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    Topic:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the topic
+        comment:
+          type: string
+          description: The comment of the topic
+        properties:
+          type: object
+          description: The properties of the topic
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+
+    TopicCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the topic
+        comment:
+          type: string
+          description: The comment of the topic
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the topic
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+
+    TopicUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopicUpdateRequest"
+
+    TopicUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/UpdateTopicCommentRequest"
+        - $ref: "#/components/schemas/SetTopicPropertyRequest"
+        - $ref: "#/components/schemas/RemoveTopicPropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          updateComment: "#/components/schemas/UpdateTopicCommentRequest"
+          setProperty: "#/components/schemas/SetTopicPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveTopicPropertyRequest"
+
+    UpdateTopicCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the topic
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is the new comment"
+      }
+
+    SetTopicPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "setProperty"
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key",
+        "value": "value"
+      }
+
+    RemoveTopicPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeProperty"
+        property:
+          type: string
+          description: The name of the property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key"
+      }
+
+  responses:
+    TopicResponse:
+      description: Returns include the topic object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              topic:
+                $ref: "#/components/schemas/Topic"
+          examples:
+            TopicResponse:
+              $ref: "#/components/examples/TopicResponse"
+
+  examples:
+    TopicCreateRequest:
+      value: {
+        "name": "topic1",
+        "comment": "This is a topic",
+        "properties": {
+          "partition-count": "1",
+          "replication-factor": "1"
+        }
+      }
+
+    TopicResponse:
+      value: {
+        "code": 0,
+        "topic": {
+          "name": "topic1",
+          "comment": "This is a topic",
+          "properties": {
+            "partition-count": "1",
+            "replication-factor": "1"
+          }
+        }
+      }
+
+    TopicAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "TopicAlreadyExistsException",
+        "message": "Topic already exists",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.TopicAlreadyExistsException: Topic already exists: topic1"
+        ]
+      }
+
+    NoSuchTopicException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchTopicException",
+        "message": "Topic does not exist",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchTopicException: Topic does not exist",
+          "..."
+        ]
+      }
+
+
+
