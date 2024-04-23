@@ -19,13 +19,13 @@ class DTOConverters:
     def to_metalake_update_request(change: MetalakeChange) -> object:
         # Assuming MetalakeUpdateRequest has similar nested class structure for requests
         if isinstance(change, MetalakeChange.RenameMetalake):
-            return MetalakeUpdateRequest.RenameMetalakeRequest(change.newName)
+            return MetalakeUpdateRequest.RenameMetalakeRequest(change.new_name())
         elif isinstance(change, MetalakeChange.UpdateMetalakeComment):
-            return MetalakeUpdateRequest.UpdateMetalakeCommentRequest(change.newComment)
+            return MetalakeUpdateRequest.UpdateMetalakeCommentRequest(change.new_comment())
         elif isinstance(change, MetalakeChange.SetProperty):
-            return MetalakeUpdateRequest.SetMetalakePropertyRequest(change.property, change.value)
+            return MetalakeUpdateRequest.SetMetalakePropertyRequest(change.property(), change.value())
         elif isinstance(change, MetalakeChange.RemoveProperty):
-            return MetalakeUpdateRequest.RemoveMetalakePropertyRequest(change.property)
+            return MetalakeUpdateRequest.RemoveMetalakePropertyRequest(change.property())
         else:
             raise ValueError(f"Unknown change type: {type(change).__name__}")
 
@@ -49,8 +49,8 @@ class DTOConverters:
         elif isinstance(change, CatalogChange.UpdateCatalogComment):
             return CatalogUpdateRequest.UpdateCatalogCommentRequest(change.new_comment)
         elif isinstance(change, CatalogChange.SetProperty):
-            return CatalogUpdateRequest.SetCatalogPropertyRequest(change.property, change.value)
+            return CatalogUpdateRequest.SetCatalogPropertyRequest(change.property(), change.value())
         elif isinstance(change, CatalogChange.RemoveProperty):
-            return CatalogUpdateRequest.RemoveCatalogPropertyRequest(change.property)
+            return CatalogUpdateRequest.RemoveCatalogPropertyRequest(change._property)
         else:
             raise ValueError(f"Unknown change type: {type(change).__name__}")

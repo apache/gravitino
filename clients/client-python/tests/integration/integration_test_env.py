@@ -38,21 +38,12 @@ def check_gravitino_server_status() -> bool:
     return gravitino_server_running
 
 
-def _init_logging():
-    logging.basicConfig(level=logging.DEBUG)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    logger.addHandler(console_handler)
-
-
 class IntegrationTestEnv(unittest.TestCase):
     """Provide real test environment for the Gravitino Server"""
     gravitino_startup_script = None
 
     @classmethod
     def setUpClass(cls):
-        _init_logging()
-
         if os.environ.get('START_EXTERNAL_GRAVITINO') is not None:
             """Maybe Gravitino server already startup by Gradle test command or developer manual startup."""
             if not check_gravitino_server_status():
