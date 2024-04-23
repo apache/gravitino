@@ -310,25 +310,17 @@ Displays a confirmation dialog, clicking on the SUBMIT button deletes this catal
 
 ### Schema
 
-Design draft preview:
-
 ![demo-tables](./assets/webui/demo-tables.png)
 
 ### Table
-
-Design draft preview:
 
 ![demo-columns](./assets/webui/demo-columns.png)
 
 ### Fileset
 
-Preview:
-
 ![fileset-details](./assets/webui/fileset-details.png)
 
 ### Topic
-
-Preview:
 
 ![topic-details](./assets/webui/topic-details.png)
 
