@@ -51,12 +51,18 @@ const AppBar = () => {
       elevation={6}
       position={'sticky'}
       className={
-        'layout-navbar-container twc-px-6 twc-items-center twc-justify-center twc-transition-[border-bottom] twc-ease-in-out twc-duration-200 twc-bg-customs-white'
+        'layout-navbar-container twc-items-center twc-justify-center twc-transition-[border-bottom] twc-ease-in-out twc-duration-200 twc-bg-customs-white'
       }
     >
       <Box className={'layout-navbar twc-w-full'}>
-        <Toolbar className={'navbar-content-container twc-mx-auto [@media(min-width:1440px)]:twc-max-w-[1440px]'}>
-          <Box className={'app-bar-content twc-w-full twc-flex twc-items-center twc-justify-between'}>
+        <Toolbar
+          className={'navbar-content-container twc-p-0 twc-mx-auto [@media(min-width:1440px)]:twc-max-w-[1440px]'}
+        >
+          <Box
+            className={
+              'app-bar-content twc-w-full twc-px-[1.5rem] sm:twc-px-6 twc-flex twc-items-center twc-justify-between'
+            }
+          >
             <Link href='/metalakes' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
               <Image
                 src={process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'}
